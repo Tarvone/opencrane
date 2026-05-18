@@ -1,4 +1,4 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, DestroyRef, inject, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { Router, RouterModule } from "@angular/router";
@@ -128,6 +128,9 @@ export class ProvisionPageComponent
   /** Angular router for post-creation redirect. */
   private readonly _router = inject(Router);
 
+  /** DestroyRef for cleaning up the redirect timeout if the component is destroyed early. */
+  private readonly _destroyRef = inject(DestroyRef);
+
   /** Form field values bound via ngModel. */
   readonly _form: CreateTenantPayload = {
     name: "",
@@ -166,7 +169,13 @@ export class ProvisionPageComponent
       this._success.set(true);
 
       // 2. Redirect to the dashboard after a brief delay so the user sees the success message.
-      setTimeout(async () =>
+      //    Register a cleanup callback so the navigation is cancelled if the component is destroyed.
+      let redirectTimer: ReturnType<typeof setTimeout>;
+      this._destroyRef.onDestroy(function _cancelRedirect()
+      {
+        clearTimeout(redirectTimer);
+      });
+      redirectTimer = setTimeout(async () =>
       {
         await this._router.navigate(["/dashboard"]);
       }, 1500);

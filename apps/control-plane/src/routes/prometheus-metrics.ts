@@ -1,6 +1,10 @@
 import type * as k8s from "@kubernetes/client-node";
 import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
+import pino from "pino";
+
+/** Module-level logger for Prometheus metrics error reporting. */
+const _log = pino({ name: "prometheus-metrics" });
 
 /**
  * Creates a Prometheus-compatible metrics endpoint for the OpenCrane control plane.
@@ -28,8 +32,9 @@ export function prometheusMetricsRouter(prisma: PrismaClient, customApi: k8s.Cus
     });
 
     // 2. Collect drift count from the metrics snapshot to expose as a gauge.
-    const totalDocuments = await prisma.orgDocument.count().catch(function _handleMissing()
+    const totalDocuments = await prisma.orgDocument.count().catch(function _handleMissing(err: unknown)
     {
+      _log.warn({ err }, "org document count unavailable; returning 0 for Prometheus gauge");
       return 0;
     });
 

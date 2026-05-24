@@ -1,6 +1,5 @@
 import { Component, Input } from "@angular/core";
-import { CommonModule } from "@angular/common";
-import { RouterModule } from "@angular/router";
+import { RouterLink } from "@angular/router";
 import { TagModule } from "primeng/tag";
 import { ButtonModule } from "primeng/button";
 import { CardModule } from "primeng/card";
@@ -15,7 +14,7 @@ import type { TenantSummary } from "../../../core/models/tenant-summary.model";
 @Component({
   selector: "oc-tenant-card",
   standalone: true,
-  imports: [CommonModule, RouterModule, TagModule, ButtonModule, CardModule],
+  imports: [RouterLink, TagModule, ButtonModule, CardModule],
   templateUrl: "./tenant-card.component.html",
 })
 export class TenantCardComponent

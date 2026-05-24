@@ -4,7 +4,7 @@ import pino from "pino";
 import { _LoadOperatorConfig } from "./config.js";
 import { _CreateTenantOperator, IdleChecker } from "./tenants/index.js";
 import { PolicyOperator } from "./policies/operator.js";
-import { FleetCanaryController, _ReadFleetUpdateConfig } from "./fleet/fleet-canary.controller.js";
+import { _ReadTenantRolloutConfig, TenantUpdateWithCanaryStrategyController } from "./tenant-rollout/tenant-update-with-canary-strategy.controller.js";
 
 /** Root logger for the opencrane-operator process. */
 const log = pino({ name: "opencrane-operator" });
@@ -30,35 +30,44 @@ async function main(): Promise<void>
   const policyOperator = new PolicyOperator(kc, config, log);
   const idleChecker = new IdleChecker(kc, config, log);
 
-  // Start fleet canary release polling when auto-update is enabled
-  const fleetConfig = _ReadFleetUpdateConfig();
-  if (fleetConfig.autoUpdateEnabled)
+  // Start tenant rollout canary release polling when auto-update is enabled
+  const tenantRolloutConfig = _ReadTenantRolloutConfig();
+  if (tenantRolloutConfig.autoUpdateEnabled)
   {
     const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
     const appsApi = kc.makeApiClient(k8s.AppsV1Api);
-    const fleetController = new FleetCanaryController(customApi, appsApi, log, config.watchNamespace, fleetConfig);
-    log.info({ releaseTag: fleetConfig.releaseTag, canaryTimeoutMs: fleetConfig.canaryTimeoutMs }, "fleet canary controller enabled");
+    const tenantRolloutController = new TenantUpdateWithCanaryStrategyController(
+      customApi,
+      appsApi,
+      log,
+      config.watchNamespace,
+      tenantRolloutConfig,
+    );
+    log.info(
+      { releaseTag: tenantRolloutConfig.releaseTag, canaryTimeoutMs: tenantRolloutConfig.canaryTimeoutMs },
+      "tenant rollout canary controller enabled",
+    );
 
     // Poll npm registry for new releases; the controller handles rollout internally
     setInterval(async function _pollRelease()
     {
       try
       {
-        const latest = await fleetController.getLatestRelease();
+        const latest = await tenantRolloutController.getLatestRelease();
         if (latest !== null)
         {
-          log.debug({ latest }, "fleet release poll");
+          log.debug({ latest }, "tenant rollout release poll");
         }
       }
       catch (err)
       {
-        log.warn({ err }, "fleet release poll failed; will retry next interval");
+        log.warn({ err }, "tenant rollout release poll failed; will retry next interval");
       }
     }, 15 * 60 * 1000); // every 15 minutes
   }
   else
   {
-    log.info("fleet auto-update disabled (OPENCRANE_AUTO_UPDATE_ENABLED not set to true)");
+    log.info("tenant rollout auto-update disabled (OPENCRANE_AUTO_UPDATE_ENABLED not set to true)");
   }
 
   // Start idle-checker (runs on a timer, non-blocking)

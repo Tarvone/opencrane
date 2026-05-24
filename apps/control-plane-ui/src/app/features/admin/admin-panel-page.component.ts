@@ -1,7 +1,6 @@
-import { CommonModule } from "@angular/common";
-import { Component, computed, inject, resource, signal } from "@angular/core";
-import { FormsModule } from "@angular/forms";
-import { RouterModule } from "@angular/router";
+import { Component, computed, inject, signal } from "@angular/core";
+import { rxResource } from "@angular/core/rxjs-interop";
+import { RouterLink } from "@angular/router";
 import { ButtonModule } from "primeng/button";
 import { InputTextModule } from "primeng/inputtext";
 import { MessageModule } from "primeng/message";
@@ -21,9 +20,7 @@ import { _GetTenantPhaseSeverity, type TenantPhaseTagSeverity } from "../../core
   selector: "oc-admin",
   standalone: true,
   imports: [
-    CommonModule,
-    FormsModule,
-    RouterModule,
+    RouterLink,
     ButtonModule,
     TableModule,
     TagModule,
@@ -39,8 +36,8 @@ export class AdminPanelPageComponent
   private readonly _tenantApi = inject(TenantApiService);
 
   /** Resource-backed tenant list for admin operations. */
-  private readonly _tenantsResource = resource({
-    loader: async () => await this._tenantApi.listTenants(),
+  private readonly _tenantsResource = rxResource({
+    stream: () => this._tenantApi.listTenants$(),
     defaultValue: [],
   });
 
@@ -102,5 +99,14 @@ export class AdminPanelPageComponent
   _phaseSeverity(phase: string): TenantPhaseTagSeverity
   {
     return _GetTenantPhaseSeverity(phase);
+  }
+
+  /**
+   * Update the table filter signal from a text input event.
+   * @param event - Native input event from the filter field.
+   */
+  _onFilterInput(event: Event): void
+  {
+    this._filter.set((event.target as HTMLInputElement).value);
   }
 }

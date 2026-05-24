@@ -18,10 +18,8 @@ export function _BuildDeployment(config: OperatorConfig, tenant: Tenant, namespa
   const resources = tenant.spec.resources;
   const openclawVersion = tenant.spec.openclawVersion ?? "latest";
 
-  // Prefer the durable skillAllowlist field over the legacy skills array.
-  // skillAllowlist is the auditable governance path; spec.skills is the legacy env-var path.
-  const effectiveSkills = tenant.spec.skillAllowlist ?? tenant.spec.skills;
-  const allowedSkills = effectiveSkills?.join(",");
+  // Use only the durable skillAllowlist field for tenant skill governance.
+  const allowedSkills = tenant.spec.skillAllowlist?.join(",");
 
   // Merge tenant-level mcpPolicy with any AccessPolicy mcpServers for deployment injection.
   const mcpAllow = tenant.spec.mcpPolicy?.allow?.join(",");

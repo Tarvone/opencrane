@@ -1,15 +1,10 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
+import type { Observable } from "rxjs";
 import { firstValueFrom } from "rxjs";
 
 import type { CreateTenantPayload } from "../models/create-tenant-payload.model";
-import { _ParseTenantPhase } from "../models/tenant-phase.utils";
 import type { TenantSummary } from "../models/tenant-summary.model";
-
-interface TenantSummaryApiResponse extends Omit<TenantSummary, "phase">
-{
-  phase: string;
-}
 
 /**
  * API service for tenant lifecycle operations in the control-plane UI.
@@ -24,10 +19,26 @@ export class TenantApiService
   /**
    * List all tenants from the control-plane.
    */
+  listTenants$(): Observable<TenantSummary[]>
+  {
+    return this._http.get<TenantSummary[]>(this._baseUrl);
+  }
+
+  /**
+   * List all tenants from the control-plane.
+   */
   async listTenants(): Promise<TenantSummary[]>
   {
-    const rows = await firstValueFrom(this._http.get<TenantSummaryApiResponse[]>(this._baseUrl));
-    return rows.map(row => this._toTenantSummary(row));
+    return await firstValueFrom(this.listTenants$());
+  }
+
+  /**
+   * Get a single tenant by name.
+   * @param name - Tenant unique identifier.
+   */
+  getTenant$(name: string): Observable<TenantSummary>
+  {
+    return this._http.get<TenantSummary>(`${this._baseUrl}/${encodeURIComponent(name)}`);
   }
 
   /**
@@ -36,8 +47,7 @@ export class TenantApiService
    */
   async getTenant(name: string): Promise<TenantSummary>
   {
-    const row = await firstValueFrom(this._http.get<TenantSummaryApiResponse>(`${this._baseUrl}/${encodeURIComponent(name)}`));
-    return this._toTenantSummary(row);
+    return await firstValueFrom(this.getTenant$(name));
   }
 
   /**
@@ -97,17 +107,4 @@ export class TenantApiService
     await firstValueFrom(this._http.post(`${this._tenantUrl(name)}/${action}`, {}));
   }
 
-  /**
-   * Normalize API tenant payloads to strict UI model types.
-   * Phase parsing is required because backend payloads are untyped strings, while
-   * the UI relies on enum-backed phase checks for consistent rendering and actions.
-   * @param row - Raw tenant payload from API.
-   */
-  private _toTenantSummary(row: TenantSummaryApiResponse): TenantSummary
-  {
-    return {
-      ...row,
-      phase: _ParseTenantPhase(row.phase),
-    };
-  }
 }

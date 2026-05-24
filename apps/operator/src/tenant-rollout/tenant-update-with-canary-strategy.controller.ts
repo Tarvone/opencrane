@@ -1,22 +1,22 @@
 import type * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
-import type { CanaryPhase, CanaryRolloutEntry, FleetUpdateConfig } from "./fleet.types.js";
+import type { TenantRolloutConfig, TenantRolloutEntry, TenantRolloutPhase } from "./tenant-update-with-canary-strategy.types.js";
 import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "../shared/crd-constants.js";
 
 /**
- * Fleet canary update controller.
+ * Tenant update controller using a canary strategy.
  *
- * Manages rolling version updates across the tenant fleet using a canary
- * strategy: one tenant is updated first, the operator waits for its pod to
- * become Ready, and — if it does — rolls the update to all remaining tenants.
- * On canary failure the canary tenant is reverted and no further tenants update.
+ * Manages rolling version updates across tenants: one tenant is updated first,
+ * the operator waits for its pod to become Ready, and — if it does — rolls the
+ * update to all remaining tenants. On canary failure the canary tenant is
+ * reverted and no further tenants update.
  *
  * This controller is instantiated once per operator process and holds
  * in-memory state for the current rollout. Restart the operator to cancel
  * an in-flight rollout.
  */
-export class FleetCanaryController
+export class TenantUpdateWithCanaryStrategyController
 {
   /** Kubernetes Custom Objects API for Tenant CRD patching. */
   private readonly _customApi: k8s.CustomObjectsApi;
@@ -24,40 +24,40 @@ export class FleetCanaryController
   /** Kubernetes Apps V1 API for Deployment status polling. */
   private readonly _appsApi: k8s.AppsV1Api;
 
-  /** Scoped logger for fleet update events. */
+  /** Scoped logger for tenant rollout events. */
   private readonly _log: Logger;
 
   /** Operator namespace for Tenant CRD operations. */
   private readonly _namespace: string;
 
-  /** Fleet update configuration. */
-  private readonly _config: FleetUpdateConfig;
+  /** Tenant rollout configuration. */
+  private readonly _config: TenantRolloutConfig;
 
   /** Current phase of the rollout. */
-  private _phase: CanaryPhase = "idle";
+  private _phase: TenantRolloutPhase = "idle";
 
   /** Rollout entries for the current update session. */
-  private _entries: CanaryRolloutEntry[] = [];
+  private _entries: TenantRolloutEntry[] = [];
 
   /**
-   * Create a new FleetCanaryController.
+   * Create a new TenantUpdateWithCanaryStrategyController.
    * @param customApi - Kubernetes Custom Objects API client.
    * @param appsApi   - Kubernetes Apps V1 API client.
    * @param log       - Base pino logger; component sub-scoped internally.
    * @param namespace - Kubernetes namespace for tenant CRD operations.
-   * @param config    - Fleet update configuration.
+   * @param config    - Tenant rollout configuration.
    */
   constructor(
     customApi: k8s.CustomObjectsApi,
     appsApi: k8s.AppsV1Api,
     log: Logger,
     namespace: string,
-    config: FleetUpdateConfig,
+    config: TenantRolloutConfig,
   )
   {
     this._customApi = customApi;
     this._appsApi = appsApi;
-    this._log = log.child({ component: "fleet-canary" });
+    this._log = log.child({ component: "tenant-rollout-canary" });
     this._namespace = namespace;
     this._config = config;
   }
@@ -116,10 +116,8 @@ export class FleetCanaryController
     this._phase = "canary";
     this._entries = [];
 
-    // 1. Select the first tenant as the canary — operators can label a specific tenant
-    //    as canary in Phase 4+ by checking for an annotation.
+    // 1. Select the first tenant as the canary; annotation-based canary targeting is a future extension.
     const [canary, ...rest] = tenants;
-
     this._log.info({ canary: canary.name, targetVersion }, "starting canary rollout");
 
     // 2. Patch the canary tenant to the target version.
@@ -128,10 +126,9 @@ export class FleetCanaryController
 
     // 3. Wait for the canary deployment to become Ready within the configured timeout.
     const canaryReady = await this._waitForDeploymentReady(`openclaw-${canary.name}`, this._config.canaryTimeoutMs);
-
     if (!canaryReady)
     {
-      // 4a. Canary failed — revert the canary tenant and abort the rollout.
+      // 4. Canary failed — revert the canary tenant and abort the rollout.
       this._log.error({ canary: canary.name, targetVersion }, "canary failed; rolling back");
       await this._patchTenantVersion(canary.name, canary.version, targetVersion);
       this._entries[0].success = false;
@@ -140,10 +137,9 @@ export class FleetCanaryController
       return;
     }
 
-    // 4b. Canary succeeded — roll out to remaining tenants.
+    // 5. Canary succeeded — roll out to remaining tenants.
     this._entries[0].success = true;
     this._phase = "rolling";
-
     this._log.info({ restCount: rest.length, targetVersion }, "canary passed; rolling to remaining tenants");
 
     for (const tenant of rest)
@@ -154,17 +150,17 @@ export class FleetCanaryController
     }
 
     this._phase = "complete";
-    this._log.info({ targetVersion, total: tenants.length }, "fleet rollout complete");
+    this._log.info({ targetVersion, total: tenants.length }, "tenant rollout complete");
   }
 
   /** Return the current rollout phase. */
-  getPhase(): CanaryPhase
+  getPhase(): TenantRolloutPhase
   {
     return this._phase;
   }
 
   /** Return the rollout entries for the current session. */
-  getEntries(): readonly CanaryRolloutEntry[]
+  getEntries(): readonly TenantRolloutEntry[]
   {
     return this._entries;
   }
@@ -178,13 +174,13 @@ export class FleetCanaryController
 
   /**
    * Patch a Tenant CR's `spec.openclawVersion` field.
-   * Returns a CanaryRolloutEntry recording the before/after version.
+   * Returns a TenantRolloutEntry recording the before/after version.
    */
   private async _patchTenantVersion(
     tenantName: string,
     targetVersion: string,
     previousVersion: string,
-  ): Promise<CanaryRolloutEntry>
+  ): Promise<TenantRolloutEntry>
   {
     await this._customApi.patchNamespacedCustomObject({
       group: OPENCRANE_API_GROUP,
@@ -254,9 +250,9 @@ export class FleetCanaryController
 }
 
 /**
- * Build a FleetUpdateConfig from environment variables with sensible defaults.
+ * Build a TenantRolloutConfig from environment variables with sensible defaults.
  */
-export function _ReadFleetUpdateConfig(): FleetUpdateConfig
+export function _ReadTenantRolloutConfig(): TenantRolloutConfig
 {
   return {
     canaryTimeoutMs: Number(process.env.OPENCRANE_CANARY_TIMEOUT_MS ?? "300000"), // 5 min

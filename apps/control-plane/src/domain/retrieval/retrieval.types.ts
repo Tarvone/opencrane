@@ -1,6 +1,6 @@
 /**
  * Types for the org knowledge retrieval API.
- * Shared between the retrieval route and its conformance tests.
+ * Shared between the retrieval route and conformance tests.
  */
 
 /** Request body for a retrieval query. */

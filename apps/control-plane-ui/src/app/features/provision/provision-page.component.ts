@@ -1,6 +1,5 @@
-import { CommonModule } from "@angular/common";
 import { Component, DestroyRef, computed, effect, inject, resource, signal } from "@angular/core";
-import { Router, RouterModule } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { ButtonModule } from "primeng/button";
 import { CardModule } from "primeng/card";
 import { InputTextModule } from "primeng/inputtext";
@@ -26,8 +25,7 @@ interface CreateTenantRequestState
   selector: "oc-provision",
   standalone: true,
   imports: [
-    CommonModule,
-    RouterModule,
+    RouterLink,
     ButtonModule,
     InputTextModule,
     MessageModule,

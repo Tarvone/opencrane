@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Logger } from "pino";
 
-import type { NormalizedDocument, SlackConnectorConfig, SyncCursor, SyncResult } from "../agent.types.js";
+import type { NormalizedDocument, SlackConnectorConfig, SyncCursor } from "../domain/harvesting-agents/harvesting-agent.types.js";
 
 /** Slack conversations.history API response shape (minimal). */
 interface SlackHistoryResponse

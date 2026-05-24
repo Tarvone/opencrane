@@ -1,5 +1,5 @@
 /**
- * Types shared across the harvesting-agent connectors and ingestion pipeline.
+ * Types shared across harvesting-agent connectors and ingestion pipeline flows.
  */
 
 /** Normalized document produced by a source connector before writing to the org index. */

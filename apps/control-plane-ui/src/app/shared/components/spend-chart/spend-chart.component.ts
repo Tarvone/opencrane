@@ -1,5 +1,4 @@
 import { Component, Input } from "@angular/core";
-import { CommonModule } from "@angular/common";
 import { TagModule } from "primeng/tag";
 import { ProgressBarModule } from "primeng/progressbar";
 
@@ -12,7 +11,7 @@ import { TenantSpendAlertState, type TenantSpend } from "../../../core/models/te
 @Component({
   selector: "oc-spend-chart",
   standalone: true,
-  imports: [CommonModule, TagModule, ProgressBarModule],
+  imports: [TagModule, ProgressBarModule],
   templateUrl: "./spend-chart.component.html",
 })
 export class SpendChartComponent
@@ -25,12 +24,13 @@ export class SpendChartComponent
    */
   _usagePercent(): number
   {
-    if (this.spend.budgetUsd <= 0)
+    const budget = this._budgetValue();
+    if (budget <= 0)
     {
       return 0;
     }
 
-    return Math.min(100, Math.round((this.spend.spentUsd / this.spend.budgetUsd) * 100));
+    return Math.min(100, Math.round((this._spentValue() / budget) * 100));
   }
 
   /**
@@ -69,5 +69,29 @@ export class SpendChartComponent
       default:
         return "success";
     }
+  }
+
+  /**
+   * Resolve the primary displayed spent value, preferring EUR when present.
+   */
+  _spentValue(): number
+  {
+    return this.spend.spentEur ?? this.spend.spentUsd;
+  }
+
+  /**
+   * Resolve the primary displayed budget value, preferring EUR when present.
+   */
+  _budgetValue(): number
+  {
+    return this.spend.budgetEur ?? this.spend.budgetUsd;
+  }
+
+  /**
+   * Resolve the preferred display currency symbol for the chart.
+   */
+  _currencySymbol(): string
+  {
+    return this.spend.budgetEur !== undefined ? "€" : "$";
   }
 }

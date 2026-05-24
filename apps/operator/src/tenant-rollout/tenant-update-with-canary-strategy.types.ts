@@ -1,13 +1,13 @@
 /**
- * Types for the fleet canary update controller.
- * Tracks canary state per operator session and exposes it for logging.
+ * Types for the tenant rollout canary update controller.
+ * Tracks canary rollout state per operator session and exposes it for logging.
  */
 
-/** Canary rollout phase for a fleet update. */
-export type CanaryPhase = "idle" | "canary" | "rolling" | "rolled-back" | "complete";
+/** Canary rollout phase for a tenant rollout session. */
+export type TenantRolloutPhase = "idle" | "canary" | "rolling" | "rolled-back" | "complete";
 
 /** Per-tenant canary update record tracked in memory during a rollout. */
-export interface CanaryRolloutEntry
+export interface TenantRolloutEntry
 {
   /** Tenant name. */
   tenantName: string;
@@ -28,8 +28,8 @@ export interface CanaryRolloutEntry
   failureReason?: string;
 }
 
-/** Fleet update configuration resolved from operator config and environment. */
-export interface FleetUpdateConfig
+/** Tenant rollout configuration resolved from operator config and environment. */
+export interface TenantRolloutConfig
 {
   /** How long to wait for a canary pod to become Ready before rolling back (ms). */
   canaryTimeoutMs: number;

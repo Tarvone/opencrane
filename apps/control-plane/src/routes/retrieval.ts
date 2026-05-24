@@ -2,8 +2,9 @@ import * as k8s from "@kubernetes/client-node";
 import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 
-import type { RetrievalQueryRequest, RetrievalQueryResponse, RetrievalErrorResponse } from "./retrieval.types.js";
-import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL, POLICY_CRD_PLURAL } from "./internal/crd-constants.js";
+import { _HashQuery } from "../domain/retrieval/retrieval-hash.util.js";
+import { _CheckRetrievalPolicyDenied, _ResolveTenantPolicyName } from "../domain/retrieval/retrieval-policy.logic.js";
+import type { RetrievalErrorResponse, RetrievalQueryRequest, RetrievalQueryResponse } from "../domain/retrieval/retrieval.types.js";
 
 /** Excerpt character limit — avoids returning full large documents to the caller. */
 const CONTENT_EXCERPT_LIMIT = 500;
@@ -18,6 +19,11 @@ const MAX_LIMIT = 100;
  * The retrieval route enforces AccessPolicy-driven allow/deny before returning
  * any documents from the org index. Every query is recorded in the audit log
  * regardless of the authorization outcome.
+ *
+ * Tenant linkage:
+ * - The request `tenantName` is resolved from PostgreSQL to confirm tenant existence and runtime phase.
+ * - The same tenant name is then used to resolve its Tenant CR policyRef in Kubernetes.
+ * - AccessPolicy mcpServers allow/deny for that tenant governs whether retrieval is permitted.
  *
  * @param customApi - Kubernetes Custom Objects API client for policy resolution.
  * @param prisma    - Prisma ORM client for org_documents and audit_log access.
@@ -171,113 +177,4 @@ export function retrievalRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaC
   });
 
   return router;
-}
-
-/**
- * Resolve the effective AccessPolicy name for a tenant from its CRD spec.
- * Returns null when no policy is configured or the CRD cannot be read.
- */
-async function _ResolveTenantPolicyName(
-  customApi: k8s.CustomObjectsApi,
-  tenantName: string,
-  namespace: string,
-): Promise<string | null>
-{
-  try
-  {
-    const response = await customApi.getNamespacedCustomObject({
-      group: OPENCRANE_API_GROUP,
-      version: OPENCRANE_API_VERSION,
-      namespace,
-      plural: TENANT_CRD_PLURAL,
-      name: tenantName,
-    }) as { spec?: { policyRef?: string } };
-
-    return response?.spec?.policyRef ?? null;
-  }
-  catch
-  {
-    return null;
-  }
-}
-
-/**
- * Determine whether the resolved AccessPolicy blocks retrieval access.
- *
- * A retrieval request is denied when:
- * - The policy explicitly denies the "retrieval" MCP server name, OR
- * - The policy has an allow list that does not include "retrieval".
- *
- * When no policy is found or the policy has no mcpServers config, retrieval is allowed.
- */
-async function _CheckRetrievalPolicyDenied(
-  customApi: k8s.CustomObjectsApi,
-  policyName: string | null,
-  namespace: string,
-): Promise<boolean>
-{
-  if (!policyName)
-  {
-    return false;
-  }
-
-  try
-  {
-    const response = await customApi.getNamespacedCustomObject({
-      group: OPENCRANE_API_GROUP,
-      version: OPENCRANE_API_VERSION,
-      namespace,
-      plural: POLICY_CRD_PLURAL,
-      name: policyName,
-    }) as { spec?: { mcpServers?: { allow?: string[]; deny?: string[] } } };
-
-    const mcpServers = response?.spec?.mcpServers;
-    if (!mcpServers)
-    {
-      return false;
-    }
-
-    // Explicit deny list takes precedence over allow list.
-    const denyList = mcpServers.deny ?? [];
-    if (denyList.includes("retrieval"))
-    {
-      return true;
-    }
-
-    // Allow list present and does not include "retrieval" → deny.
-    const allowList = mcpServers.allow;
-    if (allowList && allowList.length > 0 && !allowList.includes("retrieval"))
-    {
-      return true;
-    }
-
-    return false;
-  }
-  catch
-  {
-    // Policy lookup failure defaults to allow to avoid blocking queries
-    // on transient Kubernetes API errors.
-    return false;
-  }
-}
-
-/**
- * Produce a short deterministic fingerprint of a query string for audit log storage.
- * Uses a simple djb2-style hash; not a cryptographic hash.
- * The loop bound is the minimum of a hardcoded constant and the string length
- * to prevent loop-bound injection on user-controlled input.
- */
-function _HashQuery(query: string): string
-{
-  /** Maximum number of characters to hash — prevents unbounded iteration on large inputs. */
-  const MAX_HASH_CHARS = 1024;
-  let hash = 5381;
-  // Use a constant upper bound so the loop count cannot be driven by user input alone.
-  for (let i = 0; i < MAX_HASH_CHARS && i < query.length; i++)
-  {
-    hash = ((hash << 5) + hash) + query.charCodeAt(i);
-    hash |= 0;
-  }
-
-  return Math.abs(hash).toString(16).padStart(8, "0");
 }

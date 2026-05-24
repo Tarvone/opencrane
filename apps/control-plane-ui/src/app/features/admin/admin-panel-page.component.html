@@ -4,8 +4,8 @@
     <div class="flex gap-2 align-items-center">
       <input
         pInputText
-        [ngModel]="_filter()"
-        (ngModelChange)="_filter.set($event)"
+        [value]="_filter()"
+        (input)="_onFilterInput($event)"
         placeholder="Filter by name or team..."
         class="p-inputtext-sm"
       />

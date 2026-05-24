@@ -1,6 +1,6 @@
-import { CommonModule } from "@angular/common";
-import { Component, computed, inject, resource } from "@angular/core";
-import { RouterModule } from "@angular/router";
+import { Component, computed, inject } from "@angular/core";
+import { rxResource } from "@angular/core/rxjs-interop";
+import { RouterLink } from "@angular/router";
 import { ButtonModule } from "primeng/button";
 import { MessageModule } from "primeng/message";
 import { ProgressSpinnerModule } from "primeng/progressspinner";
@@ -17,8 +17,7 @@ import { TenantCardComponent } from "../../shared/components/tenant-card/tenant-
   selector: "oc-dashboard",
   standalone: true,
   imports: [
-    CommonModule,
-    RouterModule,
+    RouterLink,
     ButtonModule,
     ProgressSpinnerModule,
     MessageModule,
@@ -32,8 +31,8 @@ export class DashboardPageComponent
   private readonly _tenantApi = inject(TenantApiService);
 
   /** Resource-backed tenant list that reloads on demand and tracks loading/error state. */
-  private readonly _tenantsResource = resource({
-    loader: async () => await this._tenantApi.listTenants(),
+  private readonly _tenantsResource = rxResource({
+    stream: () => this._tenantApi.listTenants$(),
     defaultValue: [],
   });
 

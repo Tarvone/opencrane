@@ -2,7 +2,7 @@ import http from "node:http";
 
 import type { Logger } from "pino";
 
-import type { IngestMetrics, SourceMetrics } from "./agent.types.js";
+import type { IngestMetrics, SourceMetrics } from "./domain/harvesting-agents/harvesting-agent.types.js";
 
 /** In-memory metrics store updated after each sync cycle. */
 interface MetricsStore

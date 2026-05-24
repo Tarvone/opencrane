@@ -1,7 +1,7 @@
 import pino from "pino";
 
-import type { SlackConnectorConfig } from "./agent.types.js";
 import { SlackConnector } from "./connectors/slack.connector.js";
+import type { SlackConnectorConfig } from "./domain/harvesting-agents/harvesting-agent.types.js";
 import { _IngestDocuments, _LoadCursor, _SaveCursor } from "./ingestion.js";
 import { _RecordSyncMetrics, _StartMetricsServer } from "./metrics.js";
 

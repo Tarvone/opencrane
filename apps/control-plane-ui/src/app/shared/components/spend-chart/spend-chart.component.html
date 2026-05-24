@@ -12,7 +12,7 @@
     [style]="{ height: '8px' }"
   />
   <div class="flex justify-content-between text-sm text-color-secondary">
-    <span>\${{ spend.spentUsd.toFixed(2) }} spent</span>
-    <span>\${{ spend.budgetUsd.toFixed(2) }} budget</span>
+    <span>{{ _currencySymbol() }}{{ _spentValue().toFixed(2) }} spent</span>
+    <span>{{ _currencySymbol() }}{{ _budgetValue().toFixed(2) }} budget</span>
   </div>
 </div>

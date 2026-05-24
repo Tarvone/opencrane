@@ -5,5 +5,4 @@ export enum TenantPhase
   Pending = "Pending",
   Suspended = "Suspended",
   Error = "Error",
-  Unknown = "Unknown",
 }

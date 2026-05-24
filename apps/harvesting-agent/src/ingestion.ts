@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Logger } from "pino";
 
-import type { NormalizedDocument, SyncCursor, SyncResult } from "./agent.types.js";
+import type { NormalizedDocument, SyncCursor } from "./domain/harvesting-agents/harvesting-agent.types.js";
 import { _ComputeContentHash } from "./connectors/slack.connector.js";
 
 /**

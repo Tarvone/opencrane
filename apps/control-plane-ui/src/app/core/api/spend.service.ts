@@ -1,5 +1,6 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
+import type { Observable } from "rxjs";
 import { firstValueFrom } from "rxjs";
 
 import type { TenantSpend } from "../models/tenant-spend.model";
@@ -17,10 +18,17 @@ export class SpendApiService
    * Get spend summary for a specific tenant.
    * @param tenantName - Tenant unique identifier.
    */
+  getTenantSpend$(tenantName: string): Observable<TenantSpend>
+  {
+    return this._http.get<TenantSpend>(`${this._baseUrl}/${encodeURIComponent(tenantName)}/spend`);
+  }
+
+  /**
+   * Get spend summary for a specific tenant.
+   * @param tenantName - Tenant unique identifier.
+   */
   async getTenantSpend(tenantName: string): Promise<TenantSpend>
   {
-    return await firstValueFrom(
-      this._http.get<TenantSpend>(`${this._baseUrl}/${encodeURIComponent(tenantName)}/spend`),
-    );
+    return await firstValueFrom(this.getTenantSpend$(tenantName));
   }
 }

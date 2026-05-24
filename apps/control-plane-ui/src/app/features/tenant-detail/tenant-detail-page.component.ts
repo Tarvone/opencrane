@@ -1,8 +1,8 @@
-import { CommonModule } from "@angular/common";
-import { Component, computed, inject, resource, signal } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
-import { ActivatedRoute, Router, RouterModule } from "@angular/router";
-import { map } from "rxjs";
+import { DatePipe } from "@angular/common";
+import { Component, computed, inject, signal } from "@angular/core";
+import { rxResource, toSignal } from "@angular/core/rxjs-interop";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { catchError, map, of } from "rxjs";
 import { ConfirmationService } from "primeng/api";
 import { ButtonModule } from "primeng/button";
 import { CardModule } from "primeng/card";
@@ -27,8 +27,8 @@ import { SpendChartComponent } from "../../shared/components/spend-chart/spend-c
   selector: "oc-tenant-detail",
   standalone: true,
   imports: [
-    CommonModule,
-    RouterModule,
+    DatePipe,
+    RouterLink,
     ButtonModule,
     TagModule,
     CardModule,
@@ -70,38 +70,31 @@ export class TenantDetailPageComponent
   );
 
   /** Resource-backed tenant detail request. */
-  private readonly _tenantResource = resource<TenantSummary | null, string>({
+  private readonly _tenantResource = rxResource<TenantSummary | null, string>({
     params: this._tenantName,
-    loader: async ({ params }) =>
+    stream: ({ params }) =>
     {
       if (!params)
       {
-        return null;
+        return of(null);
       }
 
-      return await this._tenantApi.getTenant(params);
+      return this._tenantApi.getTenant$(params);
     },
     defaultValue: null,
   });
 
   /** Resource-backed spend lookup. Spend is optional and failure-tolerant for this page. */
-  private readonly _spendResource = resource<TenantSpend | null, string>({
+  private readonly _spendResource = rxResource<TenantSpend | null, string>({
     params: this._tenantName,
-    loader: async ({ params }) =>
+    stream: ({ params }) =>
     {
       if (!params)
       {
-        return null;
+        return of(null);
       }
 
-      try
-      {
-        return await this._spendApi.getTenantSpend(params);
-      }
-      catch
-      {
-        return null;
-      }
+      return this._spendApi.getTenantSpend$(params).pipe(catchError(() => of(null)));
     },
     defaultValue: null,
   });

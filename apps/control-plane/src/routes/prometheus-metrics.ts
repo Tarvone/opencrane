@@ -9,7 +9,21 @@ const _log = pino({ name: "prometheus-metrics" });
 /**
  * Creates a Prometheus-compatible metrics endpoint for the OpenCrane control plane.
  *
- * Exposes tenant phase counts, projection drift counts, and basic process metrics
+ * Why Prometheus:
+ * - Prometheus is the cluster-standard scrape system used by OpenCrane ops dashboards and alerts.
+ * - This route emits numeric control-plane health signals that are inexpensive to scrape.
+ *
+ * What this route reports:
+ * - tenant lifecycle distribution (`opencrane_tenants_total`)
+ * - org knowledge corpus size (`opencrane_org_documents_total`)
+ * - audit log growth (`opencrane_audit_entries_total`)
+ * - process uptime and Node heap usage for runtime diagnostics
+ *
+ * How it connects to the app:
+ * - Values are sourced from PostgreSQL via Prisma (tenant/docs/audit state).
+ * - The operator and platform monitoring stack scrape this endpoint for alerting and trend dashboards.
+ *
+ * Exposes these metrics in the Prometheus text exposition format
  * in the Prometheus text exposition format (version 0.0.4).
  *
  * @param prisma    - Prisma ORM client for tenant and drift data.

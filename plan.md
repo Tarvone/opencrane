@@ -403,16 +403,17 @@ All Phase 2 architecture questions are now decided. Decisions are marked with th
 4. **Tenant Config Injection** — **DECIDED**
    - **Decision**: LiteLLM proxy endpoint is injected as `LITELLM_ENDPOINT` env var; the virtual key is injected as `LITELLM_API_KEY` from a tenant Secret. Both are already implemented.
    - **Decision**: Tenants cannot override the cluster-local proxy endpoint (`http://litellm:4000`). The endpoint is always operator-controlled.
-   - **Decision**: The LiteLLM integration is optional per cluster (controlled by `liteLlmEnabled` operator config), but not opt-out per tenant.
+   - **Decision**: LiteLLM remains mandatory in-cluster for target architecture; there is no tenant-level or cluster-level opt-out path.
 
 5. **Observability & Alerts** — **DECIDED**
    - **Decision**: LiteLLM health is surfaced in the `GET /api/ai-budget/:tenantName/spend` route — callers receive a 503 when LiteLLM is unreachable. No separate health endpoint for LiteLLM.
    - **Decision**: An 80% budget alert flag (`budgetAlertState: "warning"`) is returned in the spend payload when usage exceeds 80% of ceiling. External alert delivery (webhook) is implemented via the projection-drift alert path (see item 10).
+   - **Decision**: Monthly budget limits are supported. Weekly budget limits require a follow-up LiteLLM capability verification and are tracked as investigation work.
 
 6. **Org Knowledge Index Model** — **DECIDED**
    - **Decision**: Minimum canonical schema: `source`, `sourceId`, `owner`, `teamScope`, `sensitivityTags`, `title`, `content`, `contentHash`, `embeddingReady`, `ingestedAt`, `updatedAt`. All fields except `title` and `teamScope` are mandatory.
    - **Decision**: RBAC filtering uses `owner` and `teamScope`. Sensitivity tags are metadata only for Phase 2; they gate retrieval starting Phase 3.
-   - **Decision**: PostgreSQL-only for MVP. pgvector is added when embedding generation is wired (Phase 3+).
+   - **Decision**: PostgreSQL-only for MVP. pgvector, Cognee, and alternative memory stacks are under comparative review before Phase 3 memory architecture lock.
 
 7. **Retrieval Authorization Model** — **DECIDED**
    - **Decision**: AccessPolicy is the sole enforcement source for retrieval allow/deny decisions. No additional ACL layer for Phase 2.
@@ -420,13 +421,15 @@ All Phase 2 architecture questions are now decided. Decisions are marked with th
    - **Decision**: Retrieval access is audited at query-level — each `/api/retrieval/query` call writes an audit entry with the tenant, query fingerprint, and allow/deny outcome.
 
 8. **Harvesting Agent Scope (MVP)** — **DECIDED**
-   - **Decision**: First source connector is **Slack**. Incremental sync via cursor (latest message timestamp). Batch pull mode (every 15 minutes); near-real-time via Events API is Phase 3.
+   - **Decision**: Initial connector implementation exists for Slack, but the source strategy is not locked to Slack-only. Candidate frameworks/connectors for Office 365, SharePoint, Google Workspace, and other enterprise sources must be evaluated before scaling connector coverage.
    - **Decision**: Ingestion SLOs gating Phase 3 progression: lag < 30 minutes for 95% of messages, failure rate < 1% per sync cycle.
    - **Decision**: The harvesting agent runs as a standalone Node.js service (`apps/harvesting-agent`) deployed via the Helm chart as an optional workload.
+   - **Reference**: Connector portfolio and integration strategy documented in `harvesting-agents-plan.md` and communication source rationale in `conversation-plan.md`.
 
 **Single-Writer Ownership Decision** — **DECIDED**
    - **Decision**: The operator sidecar (watch loop) is the authoritative single-writer for Tenant and AccessPolicy PostgreSQL projections going forward. Request-path dual-writes in the control-plane are retained as compatibility shims during Phase 2 and removed in Phase 3 when the projector pattern is fully validated.
    - **Rationale**: The operator already watches CRD events and is the canonical source of truth for Kubernetes state. Centralising writes there eliminates the split-brain risk from concurrent request-path and watch-path writes.
+   - **Reference**: Additional explanation documented in `single_ownership_decision.md`.
 
 ---
 
@@ -482,7 +485,7 @@ All Phase 2 architecture questions are now decided. Decisions are marked with th
 
 9. **Tenant Skill Distribution Model**
    - Decide long-term mechanism for per-tenant skill filtering (subdirectory mount, symlink subset, or packaged distribution).
-   - Extend beyond `spec.skills` env-var filtering to a durable, auditable per-tenant allowlist.
+   - Use durable, auditable per-tenant `skillAllowlist` governance as the single skill distribution path.
    - Document the canonical UX contract for operators and tenant owners.
 
 10. **Dual-write projection repair and metrics**
@@ -535,6 +538,7 @@ platform/
 - [x] One harvesting connector continuously ingests documents with measurable lag/error metrics (Slack connector in `apps/harvesting-agent` with `/metrics` endpoint).
 - [x] AccessPolicy allow/deny rules are enforced for retrieval access path with tests (10 conformance tests in `retrieval.test.ts`).
 - [x] MCP server allow/deny is enforced at gateway level beyond startup: tenant CRD `mcpPolicy` field, injected as `OPENCRANE_TENANT_MCP_ALLOW`/`OPENCRANE_TENANT_MCP_DENY` env vars, checked in `entrypoint.sh` before policy-level allow/deny.
+- [ ] Control-plane-managed env updates and propagation path to OpenClaw runtime still need explicit design and implementation notes.
 - [x] Tenant skill distribution model: durable `skillAllowlist` field added to Tenant CRD spec and TypeScript interface; takes precedence over legacy `skills` array.
 - [x] Projection drift is measurable via metrics and repairable via a periodic reconcile job; periodic automation remains open.
 - [x] Projection repair is available on demand via `POST /tenants/repair` and `POST /policies/repair`.
@@ -670,7 +674,7 @@ apps/
 - [ ] Tenant appears in Kubernetes as Tenant CR within 30s (operator reconcile already handles this; e2e not re-run).
 - [x] Dashboard shows health, spend, and last reconciled time per tenant (DashboardPageComponent + SpendChartComponent implemented).
 - [ ] Admin can approve pending tenants (if approval flow enabled; approval flow routes deferred to Phase 3+ iteration).
-- [ ] Slack `/opencrane create` creates tenants from Slack (slack-bot deferred; harvesting-agent implemented instead).
+- [ ] Slack `/opencrane create` creates tenants from Slack (not a current requirement; deferred unless scope is explicitly re-approved).
 - [ ] Slack bot posts status + error notifications to #channel (deferred to Phase 3 iteration).
 
 ---
@@ -759,10 +763,10 @@ Before implementing updates, metrics, and self-config, clarify:
 
 ### Success Criteria
 
-- [x] Operator detects new OpenClaw release (FleetCanaryController with npm registry polling implemented in `apps/operator/src/fleet/`).
-- [x] Canary updates 1 tenant, waits for confirmation, rolls to rest (FleetCanaryController.startCanaryRollout implemented with Deployment readiness polling).
+- [x] Operator detects new OpenClaw release (`TenantUpdateWithCanaryStrategyController` with npm registry polling implemented in `apps/operator/src/tenant-rollout/`).
+- [x] Canary updates 1 tenant, waits for confirmation, rolls to rest (`TenantUpdateWithCanaryStrategyController.startCanaryRollout` implemented with Deployment readiness polling).
 - [ ] On failure, auto-rollback restores from GCS snapshot (GCS snapshot deferred; in-place version revert is implemented).
-- [x] Tenant CRD supports Slack/WhatsApp channel config (channels field added to Tenant CRD and TenantSpec interface).
+- [x] Tenant communication config is represented as adapter-oriented channel entries in `TenantSpec`; CRD alignment is tracked as follow-up refactor.
 - [ ] Operator injects channel creds into tenant pod (channel credential injection from Secret references deferred to Phase 4 iteration).
 - [x] Prometheus scrapes tenant metrics; grafana dashboard shows usage (`/prom/metrics` endpoint added to control-plane in Prometheus text format).
 
@@ -840,7 +844,7 @@ This avoids rework and ensures alignment across teams.
 - [x] Virtual key generation: sync (block reconcile) — implemented in operator reconcile step 4.
 - [x] Spend tracking: real-time from LiteLLM API, augmented with local budget metadata.
 - [x] Hard budget enforcement: LiteLLM rejects on overage (429); control-plane warns at 80%.
-- [x] Proxy optional: no — LiteLLM is cluster-wide; opt-out is a Phase 4 decision.
+- [x] Proxy optional: no — LiteLLM is cluster-wide; opt-out is not allowed.
 - [x] Org index storage profile: PostgreSQL-only for MVP; pgvector deferred to Phase 3+.
 - [x] Retrieval authorization source: AccessPolicy only — no additional ACL layer for Phase 2.
 - [x] Retrieval failure behavior: explicit 403 authorization errors (not silent empty results).
@@ -938,15 +942,15 @@ Already complete from previous cycle. Key generation, budget enforcement, spend 
 
 ### Session 8 — Angular portal features
 - `TenantApiService` and `SpendApiService` added to `core/api/`.
-- `TenantSummary`, `TenantSpend`, `CreateTenantPayload` types added to `core/models/tenant.models.ts`.
+- `TenantSummary`, `TenantSpend`, `CreateTenantPayload`, and tenant phase enums split into dedicated `core/models/*` files.
 - Shared components: `TenantCardComponent`, `SpendChartComponent`.
 - Feature pages: `DashboardPageComponent`, `ProvisionPageComponent`, `TenantDetailPageComponent`, `AdminPanelPageComponent`.
 - App routes updated: `/dashboard`, `/provision`, `/tenants/:name`, `/admin`.
 
 ### Session 9 — Phase 4 operational maturity
-- `FleetCanaryController` implemented in `apps/operator/src/fleet/` with npm release polling and canary→fleet rollout strategy.
+- `TenantUpdateWithCanaryStrategyController` implemented in `apps/operator/src/tenant-rollout/` with npm release polling and canary rollout strategy.
 - Prometheus-format `/prom/metrics` endpoint added to control-plane with tenant phase gauges, org document count, audit entry counter, and process metrics.
-- `channels` field added to Tenant CRD for Slack/WhatsApp credential references.
+- `channels` model is being shifted toward adapter-oriented configuration rather than provider-specific inline schema.
 
 ### Remaining work (not yet implemented)
 - Slack bot (`apps/slack-bot`) — Slash command `/opencrane create/status/delete` path.

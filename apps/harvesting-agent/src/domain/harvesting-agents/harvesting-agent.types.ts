@@ -74,52 +74,6 @@ export interface OrgIndexDocumentConformanceResult
   issues: OrgIndexDocumentConformanceIssue[];
 }
 
-/** Stored org document fields needed to detect metadata drift without re-embedding. */
-export interface StoredOrgDocumentSnapshot
-{
-  /** Stored content hash representing the last embedded document body. */
-  contentHash: string | null;
-
-  /** Stored owner identifier. */
-  owner: string;
-
-  /** Stored team scope. */
-  teamScope: string | null;
-
-  /** Stored department scope. */
-  departmentScope: string | null;
-
-  /** Stored project scope. */
-  projectScope: string | null;
-
-  /** Stored sensitivity tags. */
-  sensitivityTags: string[];
-
-  /** Stored title. */
-  title: string | null;
-
-  /** Stored confidentiality marker. */
-  confidentiality: string | null;
-
-  /** Stored jurisdiction marker. */
-  jurisdiction: string | null;
-
-  /** Stored retention class. */
-  retentionClass: string | null;
-
-  /** Stored ACL origin marker. */
-  aclOrigin: string;
-
-  /** Stored source update time. */
-  sourceUpdatedAt: Date;
-
-  /** Stored ingest cursor. */
-  ingestCursor: string;
-
-  /** Stored embedding-ready flag. */
-  embeddingReady: boolean;
-}
-
 /** Cursor value persisted between sync cycles for incremental ingestion. */
 export interface SyncCursor
 {

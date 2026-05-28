@@ -25,7 +25,7 @@ export class SpendLogic
   {
     const endpoint = process.env.LITELLM_ENDPOINT ?? "http://litellm:4000";
     const masterKey = process.env.LITELLM_MASTER_KEY ?? "";
-    const pathTemplate = process.env.LITELLM_SPEND_PATH_TEMPLATE ?? "/spend/tenant/{tenant}";
+    const pathTemplate = process.env.LITELLM_SPEND_PATH_TEMPLATE ?? "/team/info?team_id={tenant}";
 
     if (!masterKey)
     {

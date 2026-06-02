@@ -1,5 +1,5 @@
 packages:
-  - apps/contracts
+  - libs/contracts
   - apps/operator
   - apps/control-plane
   - apps/control-plane-ui

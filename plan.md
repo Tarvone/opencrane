@@ -901,6 +901,93 @@ apps/
 
 ---
 
+## Phase 5: Headless Control Plane (API-First + CLI)
+
+### Architecture Checkpoint: One Contract, Many Surfaces
+
+OpenCrane's control plane becomes a **fully headless, API-first system**. The administrative experience is decoupled from the platform: the embedded Angular admin UI (`apps/control-plane-ui`) is extracted into a dedicated consumer repository. This repository ships the platform, its public API, and a first-class CLI — and nothing UI-specific.
+
+1. **API as the single boundary**
+   - Every administrative and operational capability is reachable through the versioned HTTP API (`/api/v1`). No capability may be UI-only or CLI-only.
+   - The control-plane emits a machine-readable **OpenAPI** description as the source of truth for the contract.
+   - `libs/contracts` graduates from hand-written shared types to the **published API contract package**: generated TypeScript client + DTOs, consumed by the CLI and by any external surface.
+
+2. **CLI as a first-class surface**
+   - A new `oc` CLI (`apps/cli`) wraps the same API and covers the full administrative surface (tenants, policies, datasets, MCP servers, skills, schedules, budgets, audit, contract/rollout operations).
+   - The CLI authenticates through the IAM/OIDC and projected-token paths defined in `AGENTS.md`; static bearer tokens remain a break-glass path only.
+
+3. **UI decoupling**
+   - `apps/control-plane-ui` is removed from this repository once API + CLI parity is verified, and continues life in an external consumer repository.
+   - The Helm chart and installers no longer build, bundle, or serve an admin UI. External consumers deploy their own admin surface against the API.
+   - The platform stays operable end-to-end with **zero UI present** (API + CLI only).
+
+### Decisions (Lock Before Execution)
+
+- [ ] API versioning scheme and deprecation policy (`/api/v1` + sunset headers).
+- [ ] OpenAPI generation approach (route annotations vs schema-first) and CI drift gate.
+- [ ] `libs/contracts` publication model (in-repo workspace package vs published artifact for external consumers).
+- [ ] CLI distribution (npm package, single-binary, or container) and auth/token storage model.
+- [ ] Parity bar required before UI removal (every current UI action has an audited API + CLI equivalent).
+- [ ] Auth migration sequencing (OIDC for human operators; projected tokens for automation; bearer retirement timeline).
+
+### Deliverables
+
+1. **API surface hardening + OpenAPI**
+   - Annotate all routers; emit `openapi.json` from the control-plane build.
+   - Introduce `/api/v1` namespace, consistent error envelopes, pagination, and idempotency conventions.
+   - CI gate: fail the build when routes drift from the published OpenAPI contract.
+
+2. **Contract / SDK package (`libs/contracts`)**
+   - Generate a typed client and DTOs from OpenAPI; keep existing hand-written domain types in sync.
+   - Version the package alongside the API; document the integration boundary for external consumers.
+
+3. **`oc` CLI (`apps/cli`)**
+   - Command groups for tenants, policies, datasets, budgets/spend, MCP servers, skills (incl. promotion/demotion), schedules, audit, and awareness-contract rollout/rollback.
+   - Human and machine output modes (`--output table|json`); OIDC/projected-token auth; non-interactive automation support.
+
+4. **Capability parity audit**
+   - Enumerate every action currently exposed only in `control-plane-ui`; ensure each has an API + CLI path before extraction.
+   - Close gaps where the UI previously called undocumented or internal endpoints.
+
+5. **UI extraction + chart cleanup**
+   - Remove `apps/control-plane-ui` from `pnpm-workspace.yaml` and the repo after parity.
+   - Remove UI build/serve wiring from Helm, installers, and CI; document the external-consumer integration path.
+
+6. **Auth alignment**
+   - Human operators authenticate via OIDC; automation via projected/short-lived tokens.
+   - Bearer-token control paths are documented as break-glass only, with a removal target.
+
+7. **Documentation**
+   - `docs/api.md` (reference + OpenAPI link), `docs/cli.md` (command reference), and an integration guide for building external surfaces against the contract.
+
+### Key Tasks (Phase 5)
+
+| Task | Owner | Effort | Dependency |
+|------|-------|--------|-----------|
+| OpenAPI emission + `/api/v1` namespace + error/pagination conventions | Backend | 18h | Phase 4 routes |
+| CI contract-drift gate (routes ↔ OpenAPI) | Backend + QA | 8h | OpenAPI emission |
+| `libs/contracts` SDK generation + versioning | Backend | 14h | OpenAPI emission |
+| `oc` CLI scaffold + auth (OIDC/projected token) | Backend | 16h | SDK package |
+| CLI command groups (full admin surface) | Backend | 24h | CLI scaffold |
+| Capability parity audit (UI → API + CLI) | Backend + QA | 12h | CLI command groups |
+| UI extraction + workspace/Helm/CI cleanup | DevOps | 12h | Parity audit complete |
+| Auth alignment (OIDC operators, token retirement plan) | Backend | 12h | SDK + CLI auth |
+| Docs: API reference, CLI reference, integration guide | Backend | 10h | All above |
+| **Phase 5 Total** | | **126h** | |
+
+### Success Criteria
+
+- [ ] The platform is fully operable with no admin UI deployed (API + CLI only).
+- [ ] Every administrative capability has a documented API endpoint and a corresponding `oc` CLI command.
+- [ ] OpenAPI is emitted from the build and enforced by a CI drift gate.
+- [ ] `libs/contracts` publishes a generated, versioned client consumed by the CLI.
+- [ ] `oc` CLI authenticates via OIDC/projected tokens; no command requires a static bearer token by default.
+- [ ] `apps/control-plane-ui` is removed from this repository and the Helm chart/installers no longer reference it.
+- [ ] An external repository can integrate this repo as a git submodule, run the full stack locally, and drive every operation through the published contract.
+- [ ] All new code conforms to `AGENTS.md`.
+
+---
+
 ## Cross-Phase Priorities
 
 ### Must Do Before Public Release

@@ -26,6 +26,8 @@ function _buildHealthApp(dbHealthy: boolean): Express
 
 /**
  * Build a minimal Express app with auth middleware loaded after env setup.
+ * No Prisma client is passed so DB-token validation is skipped; these tests
+ * only exercise the env-var token and dev-mode bypass paths.
  * @returns An Express app wired for auth testing
  */
 async function _buildAuthApp(): Promise<Express>
@@ -35,6 +37,7 @@ async function _buildAuthApp(): Promise<Express>
   const { ___AuthMiddleware } = await import("../infra/middleware/auth.middleware.js");
   const app = express();
   app.use(express.json());
+  // Prisma omitted intentionally — tests target the env-var and dev-mode paths.
   app.use(___AuthMiddleware());
 
   app.get("/healthz", function _healthz(req, res)

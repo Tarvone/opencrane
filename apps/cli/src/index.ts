@@ -3,10 +3,12 @@
  * oc — OpenCrane CLI entry point.
  *
  * Authentication:
- *   Set OPENCRANE_TOKEN or pass --token <token>.
- *   Bearer token auth is the current automation path (break-glass).
- *   OIDC is the planned human-operator path; projected ServiceAccount tokens
- *   will replace bearer tokens once Kubernetes workload identity support lands.
+ *   Run `oc auth login` to authenticate via the device authorization flow.
+ *   The CLI opens a browser, waits for OIDC sign-in, and persists the issued
+ *   token to ~/.config/opencrane/credentials.json automatically.
+ *
+ *   For CI / automation use the OPENCRANE_TOKEN environment variable with a
+ *   token created via POST /access-tokens.  No interactive flow is needed.
  *
  * Server:
  *   Set OPENCRANE_URL or pass --url <url> (default: http://localhost:8080).
@@ -37,18 +39,20 @@ program
   .name("oc")
   .description("OpenCrane platform CLI — manage tenants, policies, budgets, MCP servers, and skills")
   .version("0.1.0")
-  .option("--url <url>", "Control-plane base URL (overrides OPENCRANE_URL)", undefined)
-  .option("--token <token>", "Bearer token (overrides OPENCRANE_TOKEN)", undefined);
+  .option("--url <url>", "Control-plane base URL (overrides OPENCRANE_URL)", undefined);
 
-/** Lazily resolved config — deferred so --help works with no token set. */
+/** Lazily resolved config — deferred so --help works without credentials. */
 let _resolvedConfig: CliConfig | undefined;
 
-/** Resolve config once then return the cached result on subsequent calls. */
+/**
+ * Resolve config once then return the cached result on subsequent calls.
+ * Lazy resolution ensures --help and `oc auth login` work without a token.
+ */
 function _getConfig(): CliConfig
 {
   if (!_resolvedConfig)
   {
-    const opts = program.opts<{ url?: string; token?: string }>();
+    const opts = program.opts<{ url?: string }>();
     _resolvedConfig = _ResolveConfig(opts);
   }
   return _resolvedConfig;

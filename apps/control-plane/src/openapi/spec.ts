@@ -1171,6 +1171,41 @@ export const spec = {
       },
     },
 
+    "/auth/pod-token": {
+      post: {
+        operationId: "exchangePodToken",
+        summary: "Exchange the current OIDC session for a short-lived token to the caller's OpenClaw pod",
+        description: "Single sign-on across the control plane and the tenant pod: requires an established OIDC session (cookie) and returns a short-lived, audience-bound token minted via the Kubernetes TokenRequest API for the caller's tenant. The token targets the OpenClaw pod's session audience (reachable at `ingressHost`) — it is NOT an `obot-gateway` token; Obot is called only from inside the pod. The tenant is resolved solely from the session's verified email, so a caller cannot obtain a token for another user's pod. Re-call before `expiresAt`; re-login only when the session itself expires. Returns 401 without a session, 403 when no tenant matches the session email, 409 when the pod has no ingress host yet or when the email maps to more than one tenant.",
+        tags: ["Auth"],
+        security: [],
+        responses: {
+          200: ok("Short-lived pod access token.", {
+            type: "object",
+            required: ["token", "expiresAt", "tenant", "ingressHost", "audience"],
+            properties: {
+              token: { type: "string", description: "Short-lived bearer token bound to the OpenClaw pod session audience." },
+              expiresAt: { type: "string", format: "date-time", description: "ISO-8601 expiry reported by the API server." },
+              tenant: { type: "string", description: "Resolved tenant (pod) name." },
+              ingressHost: { type: "string", description: "Host to reach the tenant's OpenClaw pod session API." },
+              audience: { type: "string", description: "Audience the token is bound to (the OpenClaw pod session, not obot-gateway)." },
+            },
+          }),
+          401: ok("No authenticated session.", {
+            type: "object",
+            properties: { error: { type: "string" }, code: { type: "string" } },
+          }),
+          403: ok("Session has no email claim, or no tenant is provisioned for it.", {
+            type: "object",
+            properties: { error: { type: "string" }, code: { type: "string" } },
+          }),
+          409: ok("The tenant pod has no ingress host yet.", {
+            type: "object",
+            properties: { error: { type: "string" }, code: { type: "string" } },
+          }),
+        },
+      },
+    },
+
     "/auth/login": {
       get: {
         operationId: "startOidcLogin",

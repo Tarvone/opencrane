@@ -40,7 +40,7 @@ export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi,
   // Auth router is mounted before the auth middleware so its endpoints are
   // inherently public — the device-flow activate handler enforces its own
   // session check internally.
-  app.use("/api/v1/auth", ___AuthRouter(authService, prisma));
+  app.use("/api/v1/auth", ___AuthRouter(authService, prisma, coreApi));
 
   // Pass prisma so DB-issued access tokens (from `oc auth login` and
   // POST /access-tokens) are validated in addition to the env-var token.

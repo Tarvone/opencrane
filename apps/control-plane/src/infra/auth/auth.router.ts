@@ -1,9 +1,27 @@
 import { createHash, randomBytes } from "crypto";
 import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
+import type * as k8s from "@kubernetes/client-node";
 
 import type { OidcAuthService } from "./oidc.service.js";
 import { _AuthorizeDeviceGrant, _CreateDeviceGrant, _FindGrantByUserCode, _PollDeviceGrant } from "./device-grant.js";
+import { _MintPodToken } from "./pod-token.js";
+
+/**
+ * Audience bound to the token minted here for the **browser/BFF → OpenClaw pod**
+ * session — the tenant pod's own inbound session audience.
+ *
+ * Override via `POD_TOKEN_AUDIENCE`. The exact string the OpenClaw session
+ * expects is platform-defined; @see `docs/auth.md` (open question on the pod
+ * session API).
+ */
+const _POD_TOKEN_AUDIENCE = process.env.POD_TOKEN_AUDIENCE ?? "openclaw";
+
+/** Tenant-pod access token lifetime in seconds (override via POD_TOKEN_TTL_SECONDS). */
+const _POD_TOKEN_TTL_SECONDS = Number(process.env.POD_TOKEN_TTL_SECONDS ?? "600");
+
+/** Namespace tenant ServiceAccounts live in (matches the AI-budget convention). */
+const _TENANT_NAMESPACE = process.env.NAMESPACE ?? "default";
 
 /**
  * Build the auth router covering:
@@ -16,8 +34,9 @@ import { _AuthorizeDeviceGrant, _CreateDeviceGrant, _FindGrantByUserCode, _PollD
  *
  * @param authService - OIDC auth service instance.
  * @param prisma      - Prisma client used to persist device-issued access tokens.
+ * @param coreApi     - Kubernetes Core V1 API client, used to mint tenant-pod tokens.
  */
-export function ___AuthRouter(authService: OidcAuthService, prisma: PrismaClient): Router
+export function ___AuthRouter(authService: OidcAuthService, prisma: PrismaClient, coreApi: k8s.CoreV1Api): Router
 {
   const router = Router();
 
@@ -29,6 +48,101 @@ export function ___AuthRouter(authService: OidcAuthService, prisma: PrismaClient
   router.get("/me", function _me(req, res)
   {
     res.json(authService.getStatus(req));
+  });
+
+  // --------------------------------------------------------------------------
+  // Tenant-pod token exchange (single sign-on across control plane + pod)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Exchange the caller's OIDC session for a short-lived, audience-bound token
+   * to **their own** OpenClaw pod session — so the user logs in once and the pod
+   * token is derived, never a second login (see `docs/auth.md`).
+   *
+   * The token is minted via the Kubernetes TokenRequest API against the tenant's
+   * pod ServiceAccount (`openclaw-<tenant>`), bound to the OpenClaw session
+   * audience (see `_POD_TOKEN_AUDIENCE`) and a ~600s TTL. It lets the browser/BFF
+   * reach the tenant pod at `ingressHost`; the pod validates it via TokenReview.
+   * It is **not** an `obot-gateway` token — Obot is called only from inside the
+   * pod, never from the browser. Clients re-call this before the TTL expires;
+   * only when the OIDC session itself expires is a fresh login required.
+   *
+   * **Cross-tenant safety:** the target tenant is resolved solely from the
+   * session's IdP-verified email — there is no request-supplied tenant input —
+   * and an email matching more than one tenant fails closed. A caller therefore
+   * cannot mint a token for another user's pod.
+   *
+   * **This route is mounted before `___AuthMiddleware`** (the whole auth router
+   * is public), so it enforces the session check inline.
+   */
+  router.post("/pod-token", async function _podToken(req, res, next)
+  {
+    try
+    {
+      // 1. Require an established OIDC browser session.
+      const authUser = req.session?.authUser;
+      if (!authUser)
+      {
+        res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });
+        return;
+      }
+
+      // 2. Resolve the caller's tenant by their verified email (one pod per user).
+      const email = typeof authUser.email === "string" ? authUser.email.toLowerCase() : "";
+      if (!email)
+      {
+        res.status(403).json({ error: "Session has no email claim; cannot resolve a tenant", code: "FORBIDDEN" });
+        return;
+      }
+
+      const matches = await prisma.tenant.findMany({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { name: true, ingressHost: true },
+      });
+
+      if (matches.length === 0)
+      {
+        res.status(403).json({ error: "No OpenClaw is provisioned for this account", code: "NO_TENANT" });
+        return;
+      }
+
+      // Fail closed: an ambiguous email→tenant mapping must never silently pick
+      // one pod, which could hand the caller a token for the wrong tenant.
+      if (matches.length > 1)
+      {
+        res.status(409).json({ error: "Multiple OpenClaw pods match this account; contact your administrator", code: "AMBIGUOUS_TENANT" });
+        return;
+      }
+
+      const tenant = matches[0];
+
+      if (!tenant.ingressHost)
+      {
+        res.status(409).json({ error: "OpenClaw pod has no ingress host yet", code: "POD_NOT_READY" });
+        return;
+      }
+
+      // 3. Mint a pod-scoped token bound to the gateway audience.
+      const minted = await _MintPodToken(coreApi, {
+        namespace: _TENANT_NAMESPACE,
+        serviceAccountName: `openclaw-${tenant.name}`,
+        audience: _POD_TOKEN_AUDIENCE,
+        expirationSeconds: _POD_TOKEN_TTL_SECONDS,
+      });
+
+      // 4. Return the token, its expiry, and where to reach the pod.
+      res.status(200).json({
+        token: minted.token,
+        expiresAt: minted.expiresAt,
+        tenant: tenant.name,
+        ingressHost: tenant.ingressHost,
+        audience: _POD_TOKEN_AUDIENCE,
+      });
+    }
+    catch (err)
+    {
+      next(err);
+    }
   });
 
   // --------------------------------------------------------------------------

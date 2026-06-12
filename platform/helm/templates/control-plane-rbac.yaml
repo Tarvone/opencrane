@@ -17,6 +17,15 @@ rules:
   - apiGroups: ["opencrane.io"]
     resources: ["tenants", "tenants/status", "accesspolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Mint short-lived, audience-bound tokens for a tenant's pod ServiceAccount via
+  # the TokenRequest subresource (POST /api/v1/auth/pod-token — single sign-on
+  # across the control plane and the tenant pod, see docs/auth.md). `create` on
+  # serviceaccounts/token is the only verb required; RBAC has no wildcard
+  # resourceNames so it cannot be pinned to the `openclaw-*` set — tighten to a
+  # namespaced Role in the tenants namespace if tenants do not span namespaces.
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

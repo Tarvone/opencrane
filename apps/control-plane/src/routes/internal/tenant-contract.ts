@@ -158,6 +158,20 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
       //    grant/deny reflects in the agent's tool list within one poll interval.
       const toolsMarkdown = _RenderToolsMarkdown(mcpServers, skillBundles);
 
+      // 7b. Resolve approved L2 personalisation docs (P4C.5). Unlike TOOLS.md
+      //     (platform-owned, re-applied every poll), these are tenant-editable, so
+      //     they are delivered as *version-gated* `managedDocs`: the entrypoint
+      //     writes a doc only when its version increases, preserving the tenant's
+      //     live in-pod edits between company reconciliations.
+      const workspaceDocs = await prisma.tenantWorkspaceDoc.findMany({
+        where: { tenant: name },
+        select: { docName: true, content: true, lastReconciledVersion: true },
+      });
+      const managedDocs = workspaceDocs.map(function _toManagedDoc(doc)
+      {
+        return { file: `${doc.docName}.md`, content: doc.content, version: doc.lastReconciledVersion };
+      });
+
       // 8. Return a contract that the polling loop writes over the ConfigMap-mounted file.
       res.json({
         version: "opencrane-runtime/v1alpha1",
@@ -186,6 +200,10 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
           // (see apps/tenant/deploy/entrypoint.sh).
           "TOOLS.md": toolsMarkdown,
         },
+        // Version-gated tenant-editable L2 docs (P4C.5). Delivered once per version
+        // bump so approved company reconciliations land without a restart while the
+        // tenant's between-bump in-pod edits are preserved.
+        managedDocs,
       });
     }
     catch (err)

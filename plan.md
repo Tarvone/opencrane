@@ -6,7 +6,7 @@
 - **Phase 5** (headless API + CLI + hosting adapter): complete. P5.2 (on-prem) and P5.3 (GCP) deploy-validation runs validated by user (2026-06-10).
 - **Phase 4 Track A** (MCP & Skills runtime planes): complete. P4A.1–P4A.3 implemented, tested, and Helm/NetworkPolicy wired (2026-06-10).
 - **Phase 4 Track B** (fleet organizational awareness): **decision-unblocked 2026-06-13** (P4B.0 closed — all Phase 4 Decisions resolved/defaulted). Build not yet started; greenfield, ~324h (P4B.1–P4B.6). See Phase 4 Decisions for the locked choices.
-- **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): scoped, design decisions locked. P4C.1–P4C.5 in Open Backlog; not yet started.
+- **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): **P4C.1–P4C.5 landed** (2026-06-13). Workspace bootstrap/seeding, contract-derived TOOLS.md, company-doc API + immutable versioning + L0 guard, agent-driven reconciliation (deterministic merger; LiteLLM agent merge is the seam) producing approve/reject proposals, and version-gated delivery into the pod via the re-pull loop. Whole track testable spine complete; live LiteLLM merge quality is the remaining upgrade.
 - **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `docs/claw-security-considerations.md`. Transport hardening landed 2026-06-13 (CONN.2); `docs/auth.md` rewritten for the pairing broker (CONN.6); **CONN.8 wildcard TLS** first slice landed (operator Ingress `tls:` + cert-manager ClusterIssuer/Certificate Helm scaffold, dev selfSigned + prod ACME DNS-01) with onboarding-CLI/API + cross-namespace + dev-host + live-e2e as follow-ups. **Kill-switch chain landed 2026-06-13 (CONN.3 persistence+decode, CONN.4 device registry, CONN.5 cut + RBAC)** — testable spine complete; the gateway per-device revoke + CP-held operator device + in-pod mint exec are the remaining live-infra seams. Proxy (Option C) deferred as a contingent vision.
 - **Track P4-D** (MCP & Skills platform completion — the two 🔶 gaps): scoped + decisions locked 2026-06-13. P4D.2 OCI/Zot **foundation slice landed** (`OciBundleStore` + gated Zot Helm; runtime cutover deferred to a live-Zot slice). P4D.1 Obot RFC-8693 creds queued. See Open Backlog → Track P4-D.
 - **Review discipline** (2026-06-13): the `review` agent (`.claude/agents/review.md`) now has a mandatory **"verify every finding before reporting"** step — re-trace the cited code and construct a concrete repro before asserting; unconfirmed concerns go under *Open questions*, not *Findings*. Added after a review surfaced a finding that did not survive verification.
@@ -132,20 +132,34 @@
   the first poll refreshes it; the boot-time apply call is forward-compatible for the day the
   mounted contract embeds them.) Tests: `tools-markdown.test.ts` (3) + contract-route
   TOOLS.md assertion; control-plane 72/72, build clean; `bash -n` clean.
-- [ ] **P4C.3 Company doc API + versioning (L1).** `companyDoc` / `companyDocVersion` Prisma models
-  + migration; CRUD at `/api/v1/org/workspace-docs/:name` with immutable version history + audit;
-  an allowlist guard rejecting company docs that carry L0 system-mechanic directives. Acceptance:
-  publishing a new version stores it immutably and is retrievable by version; covered by tests.
-- [ ] **P4C.4 Agent-driven reconciliation (propose).** LiteLLM-backed reconciler (follow
-  `apps/harvesting-agent` shape) computes the 3-way merge, produces a per-tenant proposed merge +
-  diff stored as a pending proposal, and tracks per-tenant `lastReconciledVersion`. Sandboxed to
-  L1/L2. Acceptance: a company version bump generates a per-tenant proposal with a diff; the run is
-  idempotent/resumable; the reconciler cannot alter L0; covered by a test.
-- [ ] **P4C.5 Approval + delivery + agent awareness.** Approve/reject API; on approval the reconciled
-  doc rides the re-pull loop into the workspace, bumps `lastReconciledVersion`, and audits; OpenClaw
-  is notified and can view the change (e.g. a `BOOT.md`/`HEARTBEAT.md` note or system message + the
-  diff). Acceptance: approving delivers the doc without a pod restart and the agent surfaces/can view
-  the change; rejecting leaves the tenant doc untouched.
+- [x] **P4C.3 Company doc API + versioning (L1).** (2026-06-13) `CompanyDoc`/`CompanyDocVersion`
+  Prisma models + migration `0009_company_personalisation`; CRUD at `/api/v1/org/workspace-docs/:name`
+  (`routes/company-docs.ts` + `features/company-docs/company-docs.logic.ts`): `PUT` publishes an
+  **immutable** version (transactional append + `currentVersion` bump, records `createdBy`), `GET`
+  current, `GET /versions`, `GET /versions/:version` (retrieve any prior version). L0 allowlist guard
+  (`core/personalisation/l0-guard.ts`) rejects content asserting platform mechanics (managed mode,
+  Obot, skill-registry, effective-contract, `OPENCRANE_*`, `/data/openclaw`, AGENTS/TOOLS.md) with
+  422 before any write. Tests: l0-guard (4) + publish-versioning (2). **Acceptance met.**
+- [x] **P4C.4 Agent-driven reconciliation (propose).** (2026-06-13) `_ReconcileTenantDoc`
+  (`features/company-docs/reconciliation.logic.ts`) runs the 3-way merge (base = tenant's
+  `lastReconciledVersion`, ours = current company version, theirs = `TenantWorkspaceDoc.content`),
+  guards the output with the L0 sandbox, and upserts a pending `DocMergeProposal` keyed by
+  (tenant, docName, targetVersion) → **idempotent/resumable**; `up-to-date` fast-exit when the
+  cursor already matches. `POST /:name/reconcile`. Tests: 3 reconcile-outcome + merge cases.
+  **Acceptance met.** ⚠️ **Seam:** the merge engine is the dependency-free `_DeterministicReconciler`
+  (company-wins + tenant-addition preservation); the locked **LiteLLM agent-driven** merge is the
+  swap-in at `_BuildDocMergeReconciler` (`core/personalisation/reconciler.ts`) — needs a live model
+  endpoint, so its quality upgrade is deferred (the orchestration is final).
+- [x] **P4C.5 Approval + delivery + agent awareness.** (2026-06-13) `_DecideProposal` approve/reject
+  API (`POST /:name/proposals/:id/{approve,reject}`); on approval the merged content is written to
+  `TenantWorkspaceDoc` and the cursor advances **in one transaction** with the status flip. Delivery:
+  the internal contract endpoint emits approved L2 docs as **version-gated `managedDocs`**, and the
+  entrypoint (`apps/tenant/deploy/entrypoint.sh`) writes a doc only when its version exceeds a per-doc
+  marker — so an approved reconciliation lands **without a pod restart** while the tenant's live in-pod
+  edits between bumps are **preserved** (distinct from TOOLS.md, which is platform-owned and re-applied
+  every poll). Reject leaves the tenant doc untouched. Tests: approve/reject/already-decided/missing (4).
+  **Acceptance met.** Minor follow-up: explicit change-diff surfacing to the agent (a `HEARTBEAT.md`
+  note) is deferred — the agent sees the new doc content, not yet a separate diff note.
 
 ### Track CONN — OpenClaw connection auth & session security (Option B)
 

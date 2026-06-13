@@ -108,6 +108,37 @@ EOF
   then
     echo "[opencrane] Applied contract-derived TOOLS.md to workspace" >&2
   fi
+
+  # Apply version-gated tenant-editable L2 docs (managedDocs, P4C.5). Unlike
+  # TOOLS.md, these (e.g. SOUL.md) are edited live in the pod, so a doc is written
+  # ONLY when its contract version exceeds the last applied version recorded in a
+  # per-doc marker file — delivering an approved company reconciliation once while
+  # preserving the tenant's between-bump edits. Node owns the compare+write+marker
+  # so the exact bytes and the gating stay atomic.
+  node - "$contract_file" "$WORKSPACE_DIR" <<'EOF'
+const fs = require("node:fs");
+const path = require("node:path");
+const [, , contractPath, workspaceDir] = process.argv;
+const contract = JSON.parse(fs.readFileSync(contractPath, "utf8"));
+const docs = Array.isArray(contract?.managedDocs) ? contract.managedDocs : [];
+const markerDir = path.join(workspaceDir, ".opencrane", "doc-versions");
+for (const doc of docs) {
+  // Only accept a safe single-segment filename to keep writes inside the workspace.
+  if (!doc || typeof doc.file !== "string" || typeof doc.content !== "string") { continue; }
+  if (doc.file.includes("/") || doc.file.includes("..")) { continue; }
+  const version = Number.isInteger(doc.version) ? doc.version : 0;
+  const markerPath = path.join(markerDir, `${doc.file}.version`);
+  let applied = -1;
+  try { applied = parseInt(fs.readFileSync(markerPath, "utf8"), 10); } catch { applied = -1; }
+  if (Number.isNaN(applied)) { applied = -1; }
+  // Skip when the tenant already has this version (or newer) — preserves live edits.
+  if (version <= applied) { continue; }
+  fs.mkdirSync(markerDir, { recursive: true });
+  fs.writeFileSync(path.join(workspaceDir, doc.file), doc.content);
+  fs.writeFileSync(markerPath, String(version));
+  process.stderr.write(`[opencrane] Delivered managed doc ${doc.file} v${version} to workspace\n`);
+}
+EOF
 }
 
 function _mcp_server_is_enabled()

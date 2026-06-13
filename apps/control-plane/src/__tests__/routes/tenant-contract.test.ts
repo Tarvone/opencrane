@@ -50,6 +50,9 @@ function _buildPrismaStub(overrides: {
     skillBundle: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    tenantWorkspaceDoc: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as PrismaClient;
 }
 

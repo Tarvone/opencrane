@@ -19,7 +19,25 @@ import { skillCatalogRouter } from "./routes/skill-catalog.js";
 import { tenantsRouter } from "./routes/tenants.js";
 import { thirdPartySourcesRouter } from "./routes/third-party-sources.js";
 import { tokenUsageRouter } from "./routes/token-usage.js";
+import { OciBundleStore } from "./core/oci/oci-bundle-store.js";
 import { _CheckDbHealth } from "./infra/db/healtcheck-db.js";
+
+/**
+ * Build the optional OCI (Zot) skill-bundle store from the environment.
+ *
+ * Returns null when `SKILL_OCI_REGISTRY_URL` is unset, in which case skill delivery
+ * serves DB `content` only (today's behaviour). When set, publish dual-writes to the
+ * store and delivery reads from it first, falling back to DB content (P4D.2 cutover).
+ */
+function _BuildOciBundleStore(): OciBundleStore | null
+{
+  const registryUrl = process.env.SKILL_OCI_REGISTRY_URL?.trim();
+  if (!registryUrl)
+  {
+    return null;
+  }
+  return new OciBundleStore({ registryUrl, repository: process.env.SKILL_OCI_REPOSITORY?.trim() || "skills" });
+}
 
 /**
  * Registers all API routes on the given Express application instance.
@@ -40,8 +58,11 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   // tenant pods can reach the control-plane service on the cluster network.
   // @see platform/helm/templates/networkpolicy-planes.yaml — runtime-plane policies.
   // @see platform/helm/templates/obot-mcp-gateway-deployment.yaml — OBOT_SERVER_PROVIDER_REGISTRIES wiring.
+  // Optional OCI store for skill-bundle content (P4D.2); null → DB-only delivery.
+  const ociBundleStore = _BuildOciBundleStore();
+
   app.use("/api/internal/obot-registry", _RegisterObotRegistry(prisma));
-  app.use("/api/internal/bundles", _RegisterInternalBundles(prisma));
+  app.use("/api/internal/bundles", _RegisterInternalBundles(prisma, ociBundleStore));
   // Note: /api/internal/contract enforces per-tenant identity via TokenReview — not NetworkPolicy-only.
   app.use("/api/internal/contract", _RegisterInternalTenantContract(prisma, authApi));
 
@@ -53,7 +74,7 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/token-usage", tokenUsageRouter(prisma));
   app.use("/api/v1/groups", groupsRouter(prisma));
   app.use("/api/v1/mcp-servers", mcpServersRouter(prisma));
-  app.use("/api/v1/skills/catalog", skillCatalogRouter(prisma));
+  app.use("/api/v1/skills/catalog", skillCatalogRouter(prisma, ociBundleStore));
   app.use("/api/v1/third-party-sources", thirdPartySourcesRouter(prisma));
   app.use("/api/v1/access-tokens", accessTokensRouter(prisma));
   app.use("/api/v1/providers/keys", providerKeysRouter(prisma));

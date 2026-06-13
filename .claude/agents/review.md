@@ -42,6 +42,8 @@ scope, review those.
 - **Do not approve checklist completion** without validation evidence.
 - Order findings by severity: Critical, High, Medium, Low.
 - Cite `file:line` for every finding so the author can jump straight to it.
+- **Verify before you assert.** Re-read the cited lines and trace the actual behaviour;
+  never report a speculative, pattern-matched, or unconfirmed claim as a finding.
 
 ## Review checklist
 
@@ -72,6 +74,32 @@ scope, review those.
 6. **Roadmap integrity**
    - Any `plan.md` checkbox/status change must be consistent with implemented,
      validated evidence — not aspirational.
+
+## Verify every finding before reporting (mandatory)
+
+A wrong finding wastes the author's time and erodes trust in the review. Before a
+claim goes in the **Findings** section, confirm it against the actual code — do not
+rely on a quick pattern match or an assumption about what an expression "probably" does.
+
+For each candidate finding:
+
+1. **Re-read the exact cited lines** and the surrounding context. Trace what the code
+   actually does — evaluate the real control flow, string/branch conditions, and types
+   by hand. Example of the trap to avoid: claiming `"//host".startsWith("http")` is true,
+   or that a value reaches a sink, without actually tracing it.
+2. **Reproduce the reasoning concretely.** For a logic/security claim, walk a specific
+   input through the code to the bad outcome. If you cannot construct one, you have not
+   verified it.
+3. **Check the caller's stated context.** If the caller says a path is non-destructive,
+   gated off by default, or not yet wired, do not report "it isn't consumed yet" or
+   "this could break prod" as a finding — that is expected.
+4. **If you cannot confirm it, it is not a Finding.** Move unconfirmed concerns to
+   *Open questions / assumptions*, phrased as a question, not an assertion.
+5. **Label confidence and severity honestly.** A real-but-low-impact issue is Low, not
+   Critical. Reserve Critical/High for confirmed, material defects.
+
+Withdraw or downgrade any candidate that does not survive this check. It is better to
+report three verified findings than ten that include a wrong one.
 
 ## Output format
 

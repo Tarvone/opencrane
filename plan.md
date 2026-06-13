@@ -8,6 +8,8 @@
 - **Phase 4 Track B** (fleet organizational awareness): not started. Blocked on product decisions (P4B.0). See Phase 4 Decisions below before building anything in Track B.
 - **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): scoped, design decisions locked. P4C.1–P4C.5 in Open Backlog; not yet started.
 - **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `docs/claw-security-considerations.md`. Transport hardening landed 2026-06-13 (CONN.2); `docs/auth.md` rewritten for the pairing broker (CONN.6); **CONN.8 wildcard TLS** first slice landed (operator Ingress `tls:` + cert-manager ClusterIssuer/Certificate Helm scaffold, dev selfSigned + prod ACME DNS-01) with onboarding-CLI/API + cross-namespace + dev-host + live-e2e as follow-ups. Remaining kill-switch / provisioning items (CONN.3–5) in Open Backlog. Proxy (Option C) deferred as a contingent vision.
+- **Track P4-D** (MCP & Skills platform completion — the two 🔶 gaps): scoped + decisions locked 2026-06-13. P4D.2 OCI/Zot **foundation slice landed** (`OciBundleStore` + gated Zot Helm; runtime cutover deferred to a live-Zot slice). P4D.1 Obot RFC-8693 creds queued. See Open Backlog → Track P4-D.
+- **Review discipline** (2026-06-13): the `review` agent (`.claude/agents/review.md`) now has a mandatory **"verify every finding before reporting"** step — re-trace the cited code and construct a concrete repro before asserting; unconfirmed concerns go under *Open questions*, not *Findings*. Added after a review surfaced a finding that did not survive verification.
 - **Branch**: `phase-4-5-fixes`, 6 commits ahead of `main`.
 
 ---
@@ -346,14 +348,21 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
     `skillRegistry.ociStore` values block (default **off**); `helm template` validated (renders
     when enabled, nothing by default). `tsc --noEmit` clean. Non-destructive — no runtime path
     changed yet.
-  - **Remaining (next slice, needs a live Zot in the loop):** (a) wire bundle **publish** to push
-    to Zot (`skill-catalog.ts` PUT→published); (b) switch **delivery** (`skill-bundles.ts`) to
-    pull-by-digest from Zot with DB-`content` fallback + the `SKILL_OCI_REGISTRY_URL` env/DI
-    through `routes.ts`; (c) backfill existing bundles into Zot, then the **destructive** Prisma
-    migration dropping `SkillBundle.content`; (d) tighten `networkpolicy-planes.yaml` so only the
-    control plane reaches the OCI store; (e) live round-trip e2e. The runtime cutover (a/b) was
-    deliberately deferred from this slice — it changes the entitlement-gated delivery path and
-    should be validated against a running Zot, not shipped blind.
+  - **Cutover landed (2026-06-13, dual-write):** (a) bundle **publish** now dual-writes to Zot
+    (`skill-catalog.ts` PUT→published → `_PushPublishedBundle`, best-effort); (b) **delivery**
+    (`skill-bundles.ts`) reads Zot-first via `_ResolveBundleContent` (digest-verified inside the
+    store) with DB-`content` fallback on miss/error; (c) DI through `routes.ts` from
+    `SKILL_OCI_REGISTRY_URL`/`SKILL_OCI_REPOSITORY` (`_BuildOciBundleStore`, null → DB-only, so
+    existing installs are unchanged); (d) `networkpolicy-planes.yaml` gains a `skill-oci-ingress`
+    policy admitting **only the control plane**; control-plane Deployment gets the OCI env when
+    `ociStore.enabled`. Tests: `_ResolveBundleContent` (5) — Zot-hit / null-miss / throw-fallback /
+    no-store / neither. control-plane 85/85, `tsc` clean, `helm template` validated (env + policy
+    render when enabled, nothing by default). Safe: the DB `content` fallback means the
+    entitlement-gated delivery path is unchanged until Zot is populated + verified.
+  - **Parked — needs LIVE infrastructure (do not ship blind):** (e) backfill existing bundles
+    into a running Zot, then the **destructive** Prisma migration dropping `SkillBundle.content`
+    (the registry-only end state); (f) live round-trip e2e against a real Zot. **P4D.1** (Obot
+    RFC-8693 token exchange) is likewise parked — it needs a live Obot/upstream to test OBO.
 
 ---
 

@@ -138,3 +138,30 @@ spec:
         - protocol: TCP
           port: {{ .Values.skillRegistry.service.port }}
 {{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.skillRegistry.ociStore.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opencrane.fullname" . }}-skill-oci-ingress
+  labels:
+    {{- include "opencrane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: skill-oci-store
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "opencrane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: skill-oci-store
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only the control plane reads/writes the OCI store; tenant pods have no path to it.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: control-plane
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillRegistry.ociStore.service.port }}
+{{- end }}

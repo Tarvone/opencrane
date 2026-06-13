@@ -34,6 +34,15 @@ spec:
               value: {{ .Values.controlPlane.service.port | quote }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}
+            {{- if .Values.skillRegistry.ociStore.enabled }}
+            # OCI (Zot) store for skill-bundle content (P4D.2). When set, the control
+            # plane pushes published bundles here and serves delivery by digest from it,
+            # falling back to the DB `content` column until the destructive cutover lands.
+            - name: SKILL_OCI_REGISTRY_URL
+              value: "http://{{ include "opencrane.fullname" . }}-skill-oci.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.skillRegistry.ociStore.service.port }}"
+            - name: SKILL_OCI_REPOSITORY
+              value: {{ .Values.skillRegistry.ociStore.repository | quote }}
+            {{- end }}
             - name: COGNEE_ENDPOINT
               value: {{ .Values.controlPlane.cognee.endpoint | quote }}
             - name: COGNEE_PERMISSIONS_TIMEOUT_MS

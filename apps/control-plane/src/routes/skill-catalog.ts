@@ -3,15 +3,51 @@ import type { Grant, SkillBundle, SkillPromotion } from "@opencrane/contracts";
 import type { PrismaClient } from "@prisma/client";
 
 import { _ScanBundleContent } from "../core/scanning/scan-bundle.js";
+import type { OciBundleStore } from "../core/oci/oci-bundle-store.js";
 import type { SkillBundleWriteRequest, SkillEntitlementInput } from "./skill-catalog.types.js";
+
+/**
+ * Best-effort push of a published bundle's content to the OCI store (P4D.2 dual-write).
+ *
+ * Failures are swallowed: the DB `content` column remains the trusted source and
+ * delivery falls back to it, so a transient registry outage must not fail the publish.
+ * (Once the destructive content-column drop lands, this becomes a hard requirement.)
+ *
+ * @param prisma   - Prisma client.
+ * @param ociStore - The OCI store.
+ * @param id       - The published bundle's id.
+ */
+async function _PushPublishedBundle(prisma: PrismaClient, ociStore: OciBundleStore, id: string): Promise<void>
+{
+  try
+  {
+    // 1. Fetch the stored content; a bundle with no content has nothing to push.
+    const row = await (prisma as unknown as {
+      skillBundle: { findUnique: (args: { where: { id: string }; select: { content: true } }) => Promise<{ content: string | null } | null> };
+    }).skillBundle.findUnique({ where: { id }, select: { content: true } });
+
+    // 2. Push the content; OciBundleStore derives the digest and stores it idempotently.
+    if (row?.content)
+    {
+      await ociStore.pushBundle(row.content);
+    }
+  }
+  catch (err)
+  {
+    // Swallowed during the dual-write window — DB content + delivery fallback cover it —
+    // but logged so a persistently-failing push is visible before the destructive cutover.
+    console.warn(`[skill-catalog] OCI dual-write push failed for bundle ${id}:`, err instanceof Error ? err.message : err);
+  }
+}
 
 /**
  * CRUD router for the registry-backed Phase 4 skill catalog.
  *
- * @param prisma - Prisma client used for persistence.
+ * @param prisma   - Prisma client used for persistence.
+ * @param ociStore - Optional OCI store; published bundles are dual-written to it (P4D.2).
  * @returns Configured Express router.
  */
-export function skillCatalogRouter(prisma: PrismaClient): Router
+export function skillCatalogRouter(prisma: PrismaClient, ociStore: OciBundleStore | null = null): Router
 {
   const router = Router();
 
@@ -173,7 +209,8 @@ export function skillCatalogRouter(prisma: PrismaClient): Router
   {
     const body = req.body as Partial<SkillBundleWriteRequest>;
 
-    // Gate: promotion to Published requires a passing scan.
+    // 1. Gate: promotion to Published requires a passing scan — a published bundle is
+    //    deliverable, so it must clear the vulnerability scan before it can be promoted.
     if (body.status === "published")
     {
       const current = await (prisma as unknown as {
@@ -198,6 +235,7 @@ export function skillCatalogRouter(prisma: PrismaClient): Router
       }
     }
 
+    // 2. Persist the changed fields (only keys present in the body are written).
     await (prisma as unknown as {
       skillBundle: {
         update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown>;
@@ -218,8 +256,19 @@ export function skillCatalogRouter(prisma: PrismaClient): Router
       },
     });
 
+    // 3. Replace child rows wholesale — entitlements/promotions are fully owned by this
+    //    request, so delete then re-write rather than diffing.
     await _DeleteSkillBundleChildren(prisma, req.params.id);
     await _WriteSkillBundleChildren(prisma, req.params.id, body);
+
+    // 4. Dual-write to the OCI store on publish so delivery can serve it by digest
+    //    (P4D.2). Best-effort: the DB content + delivery fallback cover any push failure.
+    if (ociStore && body.status === "published")
+    {
+      await _PushPublishedBundle(prisma, ociStore, req.params.id);
+    }
+
+    // 5. Audit the update for the queryable change log.
     await (prisma as unknown as {
       auditEntry: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> };
     }).auditEntry.create({

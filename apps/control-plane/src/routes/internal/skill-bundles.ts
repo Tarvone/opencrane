@@ -3,6 +3,44 @@ import type { PrismaClient } from "@prisma/client";
 
 import { compile } from "../../core/grants/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../../core/grants/grant-compiler.types.js";
+import type { OciBundleStore } from "../../core/oci/oci-bundle-store.js";
+
+/**
+ * Resolve a bundle's content during the P4D.2 cutover: prefer the OCI store
+ * (content is digest-verified inside `pullBundle`), and fall back to the DB
+ * `content` column when the store is absent, has no such blob, or errors —
+ * the DB remains the trusted original until the destructive column drop lands.
+ *
+ * @param ociStore  - The OCI store, or null when unconfigured.
+ * @param digest    - The bundle's content-addressable digest.
+ * @param dbContent - The DB-stored content fallback (may be null).
+ * @returns The bundle content, or null when neither source has it.
+ */
+export async function _ResolveBundleContent(ociStore: OciBundleStore | null, digest: string, dbContent: string | null): Promise<string | null>
+{
+  // 1. Try the OCI store first when configured; a thrown error (registry down or a
+  //    digest mismatch) must never be served — fall through to the trusted DB copy.
+  if (ociStore)
+  {
+    try
+    {
+      const fromOci = await ociStore.pullBundle(digest);
+      if (fromOci !== null)
+      {
+        return fromOci;
+      }
+    }
+    catch (err)
+    {
+      // Fall back to DB content during the dual-write window, but log so a registry
+      // outage or a digest mismatch (never served — see OciBundleStore) is visible.
+      console.warn(`[skill-bundles] OCI pull failed for ${digest}, falling back to DB content:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  // 2. Fall back to the DB content column.
+  return dbContent;
+}
 
 /**
  * Internal router for skill-bundle content delivery to the skill-registry service.
@@ -26,9 +64,11 @@ import { GrantCompilerAccess, GrantCompilerPayloadType } from "../../core/grants
  * @see platform/helm/templates/skill-registry-deployment.yaml — where the
  *   skill-registry's `CONTROL_PLANE_URL` is wired to this endpoint.
  *
- * @param prisma - Prisma client for database access.
+ * @param prisma   - Prisma client for database access.
+ * @param ociStore - Optional OCI store; when set, content is served from it
+ *   (digest-verified) with a DB-`content` fallback (P4D.2). Null → DB-only.
  */
-export function _RegisterInternalBundles(prisma: PrismaClient): Router
+export function _RegisterInternalBundles(prisma: PrismaClient, ociStore: OciBundleStore | null = null): Router
 {
   const router = Router();
 
@@ -93,8 +133,10 @@ export function _RegisterInternalBundles(prisma: PrismaClient): Router
         return;
       }
 
-      // 4. Guard against bundles recorded in the database but not yet uploaded.
-      if (!bundle.content)
+      // 4. Resolve content: OCI store first (digest-verified), DB content as fallback.
+      //    Guard against bundles recorded in the database but never uploaded anywhere.
+      const content = await _ResolveBundleContent(ociStore, digest, bundle.content);
+      if (!content)
       {
         res.status(404).json({ error: "Not found", code: "NOT_FOUND" });
         return;
@@ -117,7 +159,7 @@ export function _RegisterInternalBundles(prisma: PrismaClient): Router
       res.setHeader("Content-Type", bundle.contentType ?? "text/markdown");
       res.setHeader("X-Skill-Name", bundle.name);
       res.setHeader("X-Skill-Digest", digest);
-      res.send(bundle.content);
+      res.send(content);
     }
     catch (err)
     {

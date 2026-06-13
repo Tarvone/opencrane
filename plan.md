@@ -5,7 +5,7 @@
 - **Phases 1–3**: complete and validated.
 - **Phase 5** (headless API + CLI + hosting adapter): complete. P5.2 (on-prem) and P5.3 (GCP) deploy-validation runs validated by user (2026-06-10).
 - **Phase 4 Track A** (MCP & Skills runtime planes): complete. P4A.1–P4A.3 implemented, tested, and Helm/NetworkPolicy wired (2026-06-10).
-- **Phase 4 Track B** (fleet organizational awareness): not started. Blocked on product decisions (P4B.0). See Phase 4 Decisions below before building anything in Track B.
+- **Phase 4 Track B** (fleet organizational awareness): **decision-unblocked 2026-06-13** (P4B.0 closed — all Phase 4 Decisions resolved/defaulted). Build not yet started; greenfield, ~324h (P4B.1–P4B.6). See Phase 4 Decisions for the locked choices.
 - **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): scoped, design decisions locked. P4C.1–P4C.5 in Open Backlog; not yet started.
 - **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `docs/claw-security-considerations.md`. Transport hardening landed 2026-06-13 (CONN.2); `docs/auth.md` rewritten for the pairing broker (CONN.6); **CONN.8 wildcard TLS** first slice landed (operator Ingress `tls:` + cert-manager ClusterIssuer/Certificate Helm scaffold, dev selfSigned + prod ACME DNS-01) with onboarding-CLI/API + cross-namespace + dev-host + live-e2e as follow-ups. Remaining kill-switch / provisioning items (CONN.3–5) in Open Backlog. Proxy (Option C) deferred as a contingent vision.
 - **Track P4-D** (MCP & Skills platform completion — the two 🔶 gaps): scoped + decisions locked 2026-06-13. P4D.2 OCI/Zot **foundation slice landed** (`OciBundleStore` + gated Zot Helm; runtime cutover deferred to a live-Zot slice). P4D.1 Obot RFC-8693 creds queued. See Open Backlog → Track P4-D.
@@ -53,8 +53,13 @@
 
 > This entire track is greenfield. All items are **[BLOCKED]** on P4B.0 — resolve that first.
 
-- [ ] **P4B.0 Lock Phase 4 awareness decisions.** Resolve the open decisions in the
-  "Phase 4 Decisions" section below before building. **[BLOCKED — product decision.]**
+- [x] **P4B.0 Lock Phase 4 awareness decisions.** (2026-06-13) All "Phase 4 Decisions" below are
+  now resolved (explicit) or defaulted — Track B is **decision-unblocked**. Key locks: single
+  shared `libs/awareness` SDK · tenant-cohort canary rollout · citation = title+URI+timestamp ·
+  Standard SLOs (p95<1s / 24h freshness / 0 policy violations) · hard ingest conformance gate ·
+  most-specific-wins+deny-overrides scope precedence · participation over control-plane API +
+  A2A Agent-Card advertisement · violation=page/drift=warn · per-scope-node owners approve
+  promotions · bootstrap governed by P4-C layering. (Build is still greenfield, ~324h — see Key Tasks.)
 - [ ] **P4B.1 Org Context / Awareness SDK.** New shared lib (`libs/awareness` or similar) that
   every OpenClaw consumes, pinned to a contract version. Acceptance: tenant pods retrieve org
   context through the SDK against Cognee with no control-plane retrieval mediation.
@@ -178,14 +183,32 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
   requires path `/` + no Domain and is deferred to CONN.6 doc review.) (security doc §10–§11)
 - [ ] **CONN.3 Pairing-link provisioning + short bootstrap.** Populate
   `configOverrides.openclaw.{gatewayUrl,bootstrapToken}` when the operator provisions a
-  tenant pod, and mint/rotate **single-use, ~30–60s** bootstrap tokens. **[BLOCKED]** —
-  needs the OpenClaw pod provisioning / bootstrap-mint contract (does the pod emit a setup
-  code? is bootstrap-TTL settable?). Anchor: operator pod provisioning + `routes/tenants.ts`.
+  tenant pod, and mint/rotate **single-use, ~30–60s** bootstrap tokens. Anchor: operator pod
+  provisioning + `routes/tenants.ts`.
+  - **Research (2026-06-13, docs.openclaw.ai/channels/pairing):** the setup code IS exactly
+    `base64({ url, bootstrapToken })` — matches our broker shape ✅. Setup codes are minted by a
+    **pairing command** (`/pair`-style; bot replies with the setup code), **not** emitted at
+    gateway startup — so provisioning must *run the pairing flow* against the pod (likely an
+    `openclaw devices`-family CLI) and capture the code into `configOverrides`. **TTL is NOT
+    documented as configurable** ("short-lived single-device", "treat like a password") — so the
+    "~30–60s settable" assumption is unconfirmed; treat bootstrap as short-lived-but-fixed.
+    Still **unconfirmed:** the exact programmatic mint command/API surface → needs the OpenClaw
+    CLI/admin contract (or a live pod). Partially unblocked.
 - [ ] **CONN.4 CP-held operator device + device registry.** OpenCrane holds one
   `operator.pairing`-scoped device per pod (paired server-side, key in a Secret), and a
   `BrokeredDevice` Prisma model + migration recording devices brokered per tenant.
   Acceptance: every broker call records the device; CP can authenticate to a pod gateway
   with `operator.pairing`. (Prereq for CONN.5; depends on CONN.3 / B1 signature scheme.)
+  - **Research (2026-06-13):** scope model confirmed — the default pairing profile grants
+    `node` + bounded `operator` (`operator.read/write/approvals`) and **explicitly NOT**
+    `operator.admin`/`operator.pairing`. So a CP device with `operator.pairing` needs an
+    explicit elevation/**approval** step (`openclaw devices approve`, which itself may need
+    `operator.admin`). `device.token.revoke`/`rotate` require `operator.pairing` (confirms CONN.5's
+    revoke half). B1 device-signature: docs confirm the **signed payload is the v2/v3 layout**
+    (v2 binds device/client/role/scopes/token/nonce; v3 adds `platform`+`deviceFamily`) and
+    **base64** key/sig encoding — so align the signer to the v2/v3 payload (prefer v3); the
+    **algorithm (Ed25519 vs ECDSA-P256) is still unspecified** and needs the gateway source or a
+    live handshake to confirm.
 - [ ] **CONN.5 "Cut tenant" kill-switch + RBAC.** Admin action + self-serve "sign out my
   other sessions": call `device.token.revoke` + `device.pair.remove`, then a **K8s
   force-disconnect** — pod-delete (CNI-independent) or a deny `NetworkPolicy` (only if the
@@ -320,6 +343,17 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
   fallback path.
   Anchors: `mcp-servers.ts`, `obot-registry.ts`, operator drift-repairer, `obot-mcp-gateway-deployment.yaml`,
   `networkpolicy-planes.yaml`. (Phase 4 Decision: "MCP credential custody" ✅; Deliverable 8.)
+  - **Research (2026-06-13, docs.obot.ai/concepts/mcp-gateway + obot.ai/blog):** Obot
+    **natively performs RFC 8693 token exchange in its "MCP Server Shim"**, with client
+    credentials / token-exchange secrets kept **in the shim, never exposed to the MCP server or
+    the pod** — exactly our custody model ✅. The gateway "forwards the original bearer token
+    unchanged" to the shim, which does the exchange; per-user is supported via **user-defined
+    header pass-through**. So P4D.1 is largely *configuring an Obot-native capability*, not
+    building token exchange ourselves — which resolves the earlier "who's the OBO actor"
+    question (Obot is). **Still needs a live Obot:** the public docs do NOT specify the auth
+    **config surface** (how an admin registers the OAuth client/token-endpoint/scopes) or the
+    **encryption-at-rest/vault** mechanism — confirming this item stays parked until tested
+    against a running Obot of the pinned version.
 - [ ] **P4D.2 OCI/ORAS (Zot) digest-pinned bundle storage.** Today the Skill Registry serves
   bundle `content` from the control-plane DB — the 🔶 in `docs/skills-registry.md`. Substrate
   is decided (OCI/ORAS + Cognee). Build: deploy an in-cluster OCI registry (Helm), push each
@@ -579,7 +613,7 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
 - [ ] Per-tenant schedules survive pod suspension and restarts; claws run no self-owned cron.
 - [ ] All new code conforms to `AGENTS.md`.
 
-> **Phase 4 status (2026-06-10):** Track A ~90% built (P4A.1–P4A.3 remaining). Track B greenfield, gated on P4B.0 decisions.
+> **Phase 4 status:** Track A complete (P4A.1–P4A.3). Track B greenfield and **decision-unblocked 2026-06-13** (P4B.0 closed; all Phase 4 Decisions resolved/defaulted) — build not yet started (~324h).
 
 ---
 
@@ -594,24 +628,24 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
 > resolvable here): CONN.3/B2 pairing-link + bootstrap-mint provisioning and B1 device-signature
 > scheme — both need OpenClaw-contract facts.
 
-- [ ] Awareness SDK ownership model (single package vs per-domain modules).
-- [ ] Contract version rollout strategy (global vs tenant cohort waves).
-- [ ] Minimum required citation format in OpenClaw responses.
-- [ ] Fleet SLO thresholds for freshness, latency, and policy safety.
-- [ ] Connector conformance bar for org index schema v2 adoption.
-- [ ] Skills sharing scope rules (org/department/project/personal) and precedence model.
-- [ ] Protocol transport and delivery guarantees for claw participation events.
-- [ ] Monitoring severity model for non-participating claws and policy-violating executions.
-- [ ] Department scope semantics versus team scope migration rules.
-- [ ] Promotion and demotion authorization rules and required approvers per scope boundary.
+- [x] Awareness SDK ownership model. **Single shared package `libs/awareness`, pinned to a contract version, consumed by every tenant runtime (2026-06-13).**
+- [x] Contract version rollout strategy. **Tenant-cohort canary waves (personal→project→department→org) + optional shadow-mode + one-step contract-ID rollback (2026-06-13).**
+- [x] Minimum required citation format. **Source title + URI/link to the system of record + freshness timestamp (2026-06-13).**
+- [x] Fleet SLO thresholds. **"Standard": p95 retrieval < 1s; re-fetch when memory > 24h stale; policy-violation rate = 0 (hard gate + alert) (2026-06-13).**
+- [x] Connector conformance bar for org index schema v2. **Hard gate at ingest — reject non-conformant records (missing lineage/ACL-origin/freshness/scope) (2026-06-13).**
+- [x] Skills sharing scope rules + precedence. **Most-specific-wins (personal〉project〉dept〉org), deny-overrides-allow at a tie — matches the grant compiler (2026-06-13).**
+- [x] Protocol transport + delivery guarantees for claw participation events. **Over the control-plane API, at-least-once + idempotency keys, `aud=control-plane` projected token (no new bus). Claws learn the protocol via the pinned `libs/awareness` SDK + versioned effective-contract (re-pull plumbing) and advertise capabilities via an A2A-style "Agent Card" manifest (researched 2026-06-13). (security: events carry no secrets.)**
+- [x] Monitoring severity model. **Policy-violating skill execution = critical/page; non-participation or version drift = warning (dashboard/digest, no page) (2026-06-13).**
+- [~] Department scope vs team scope. **Keep both as distinct levels in the model, but allow `team` and `department` to alias the same group initially and split later (no forced migration up front) (2026-06-13).**
+- [x] Promotion/demotion authorization + approvers. **Each scope node (org/department/team/project) has one or more **owners**; a promotion/demotion request must be approved by the owner(s) of the relevant scope. Needs an `owners` (multi-owner) concept per scope node (2026-06-13).**
 - [x] OCI artifact naming, tagging, and digest pinning policy for skill versions. **`skills/<scope>/<name>:<semver>@<digest>` (2026-06-13).**
 - [x] MCP credential custody: central broker (Obot holds downstream creds; pod never receives them). **Confirmed.** Mechanism (2026-06-13): **per-user RFC 8693** token exchange + static per-tenant/per-server fallback for non-OBO upstreams; encryption-at-rest = K8s-Secret-backed key. (P4D.1)
 - [x] Skill substrate: build thin over OCI/ORAS + Cognee (not a ClawHub fork). **Confirmed.**
 - [~] Obot MCP Gateway version and deployment topology (single replica vs HA). **Default (2026-06-13): single replica dev / HA via values prod.**
 - [x] Skill registry OCI store: Zot vs alternative OCI-compliant registry. **Zot (2026-06-13).** (P4D.2)
-- [ ] Third-party source auto-sync interval defaults and rate-limit policy.
-- [ ] Scheduler dispatch identity model: job-scoped token TTL and audience.
-- [ ] ClawdBot bootstrap injection content (BOOTSTRAP.MD, SOUL.MD) review and sign-off.
+- [~] Third-party source auto-sync interval defaults and rate-limit policy. **Default (2026-06-13): conservative interval, discover-only (install requires explicit admin action).**
+- [~] Scheduler dispatch identity model: job-scoped token TTL and audience. **Default (2026-06-13): job-scoped token, ~600s TTL, dedicated audience.**
+- [x] ClawdBot bootstrap injection content review and sign-off. **Governed by the P4-C L0/L1/L2 doc layering + propose-and-approve (no separate process; no silent prompt changes) (2026-06-13).**
 
 ---
 

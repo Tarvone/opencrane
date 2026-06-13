@@ -7,7 +7,7 @@
 - **Phase 4 Track A** (MCP & Skills runtime planes): complete. P4A.1–P4A.3 implemented, tested, and Helm/NetworkPolicy wired (2026-06-10).
 - **Phase 4 Track B** (fleet organizational awareness): not started. Blocked on product decisions (P4B.0). See Phase 4 Decisions below before building anything in Track B.
 - **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): scoped, design decisions locked. P4C.1–P4C.5 in Open Backlog; not yet started.
-- **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `docs/claw-security-considerations.md`. Transport hardening (HSTS, fail-closed `Secure` cookie, `wss://`-only broker, opt-in HTTP→HTTPS redirect) landed 2026-06-13 (CONN.2). Remaining kill-switch / provisioning items in Open Backlog; proxy (Option C) deferred as a contingent vision.
+- **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `docs/claw-security-considerations.md`. Transport hardening (HSTS, fail-closed `Secure` cookie, `wss://`-only broker, opt-in HTTP→HTTPS redirect) landed 2026-06-13 (CONN.2). Remaining kill-switch / provisioning items in Open Backlog, plus **CONN.8 wildcard TLS issuance via cert-manager DNS-01** (k8s-native, any cloud + on-prem; a prerequisite for the wss-only hardening to hold in prod). Proxy (Option C) deferred as a contingent vision.
 - **Branch**: `phase-4-5-fixes`, 6 commits ahead of `main`.
 
 ---
@@ -193,6 +193,46 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
   per-session cutting or per-frame auditing **and** the connection-stateful cost (LB affinity,
   reconnect storms on deploy, content transiting the CP, ~days build) is judged worth it.
   CONN.1–CONN.5 are prerequisites, so nothing is wasted. (security doc §6 / §8 / § Decision)
+- [ ] **CONN.8 TLS issuance for tenant ingress (wildcard, k8s-native).** *Prerequisite
+  for CONN.2 to mean anything in production* — today the operator-built tenant Ingress
+  (`apps/operator/src/tenants/deploy/5-ingress.ts`) has **no `tls:` block** and Helm has
+  `ingress.tls.enabled: false` with an unwired `opencrane-wildcard-tls` secret slot
+  (`platform/helm/values.yaml`). The browser connects `wss://<tenant>.<domain>`, so the
+  ingress must present a browser-trusted cert. Kubernetes' own CA is cluster-internal and
+  **not** browser-trusted, so certs come from a public CA via an in-cluster controller.
+  **Decision (2026-06-13): use `cert-manager`, NOT Certbot.** cert-manager is the
+  CNCF-standard k8s-native controller — declarative CRDs (`ClusterIssuer`/`Certificate`),
+  runs in-cluster, stores certs in Secrets, auto-renews, integrates with Ingress, works on
+  any cloud + on-prem. Certbot is host-centric/imperative and would mean rebuilding the
+  reconcile/renew/secret plumbing by hand.
+  - **Wildcard via ACME DNS-01.** One `*.<domain>` cert covers every tenant → new tenants
+    need zero new issuance (no per-tenant latency, no Let's Encrypt rate limits). Wildcards
+    require **DNS-01** (HTTP-01 can't issue wildcards). Issue into `opencrane-wildcard-tls`,
+    flip `ingress.tls.enabled`, and add a `tls:` block (host + `secretName`) in `5-ingress.ts`.
+  - **DNS-provider abstraction (cloud-agnostic + on-prem).** DNS-01 writes an
+    `_acme-challenge.<domain>` TXT record, so cert-manager needs DNS-provider credentials.
+    Support a small `{ provider, zone, credentialsRef }` config that renders the
+    `ClusterIssuer` DNS-01 solver + credentials Secret. Solvers: built-in
+    (route53/clouddns/azuredns/cloudflare/digitalocean), **RFC2136** (BIND/PowerDNS + TSIG —
+    the on-prem/any-DNS escape hatch), or webhook solvers for the rest.
+  - **Onboarding CLI + API.** New `oc platform dns set --provider … --zone … --token-file …`
+    (mirroring the `_Register*` command pattern in `apps/cli/src/commands`) + equivalent
+    control-plane API method, capturing the DNS-provider config above. New Helm template:
+    `platform/helm/templates/cluster-issuer.yaml` (+ cert-manager as a dependency/prereq).
+  - **Local/dev mode.** Keep the *same* cert-manager path, swap only the issuer: a
+    `selfSigned`/`CA` `ClusterIssuer` (instant, no DNS challenge) + `sslip.io`/`nip.io`
+    wildcard hostnames (`<tenant>.127.0.0.1.sslip.io` → localhost, no `/etc/hosts`, supports
+    dynamic tenants) so the k3d substrate (`platform/tests/values-k3d-local.yaml`,
+    currently `domain: opencrane.local`, TLS off) gets real TLS. The dev cert is still real
+    TLS, so `wss://` + the CONN.2 wss-only/Secure/HSTS hardening are **not** bypassed — only
+    the trust anchor differs. Optional `mkcert` root for warning-free browser trust; a
+    plain-HTTP fallback stays gated behind `OIDC_COOKIE_SECURE=false` + a dev flag.
+  - **Acceptance:** prod path issues a wildcard cert via DNS-01 and tenant Ingresses serve
+    it (verified in a cluster/e2e); dev path serves self-signed TLS over an sslip.io
+    wildcard host with no manual cert steps; onboarding CLI/API persists DNS-provider config.
+    Pairs with CONN.3 (pod provisioning). Anchors: `5-ingress.ts`, `values.yaml`
+    (`ingress.tls`), new `cluster-issuer.yaml`, `apps/cli/src/commands`, control-plane API,
+    `platform/tests/values-k3d-local.yaml`. (security doc §11)
 
 ---
 

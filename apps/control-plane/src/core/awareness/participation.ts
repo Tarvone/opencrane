@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { _LoadAwarenessRollout } from "./rollout-store.js";
 import { _ResolveAwarenessVersion } from "./rollout.js";
+import type { AwarenessRolloutState } from "./rollout.types.js";
 import type { FleetParticipationReport, ParticipationEventInput, ParticipationSeverity, RecordParticipationResult, TenantParticipationStatus } from "./participation.types.js";
 
 /** Default participation staleness window: not seen within this → non-participating. */
@@ -114,15 +115,18 @@ export function _ClassifyParticipation(args: {
  * @param prisma            - Prisma client.
  * @param nowMs             - Current time in epoch ms (for staleness; injected for determinism).
  * @param stalenessWindowMs - Non-participation threshold; defaults to the 15-minute window.
+ * @param rollout           - Pre-loaded rollout to reuse (avoids a redundant singleton read when
+ *   the caller already holds it, e.g. the /prom scrape); loaded internally when omitted.
  * @returns The aggregate fleet report.
  */
-export async function _BuildFleetParticipationReport(prisma: PrismaClient, nowMs: number, stalenessWindowMs: number = ___DEFAULT_PARTICIPATION_STALENESS_MS): Promise<FleetParticipationReport>
+export async function _BuildFleetParticipationReport(prisma: PrismaClient, nowMs: number, stalenessWindowMs: number = ___DEFAULT_PARTICIPATION_STALENESS_MS, rollout?: AwarenessRolloutState): Promise<FleetParticipationReport>
 {
-  // 1. Load the inputs once: every tenant (+ its wave), each rollup, and the rollout.
-  const [tenants, rollups, rollout] = await Promise.all([
+  // 1. Load the inputs once: every tenant (+ its wave), each rollup, and the rollout
+  //    (reusing a caller-provided rollout when given to avoid a duplicate read).
+  const [tenants, rollups, rolloutState] = await Promise.all([
     prisma.tenant.findMany({ select: { name: true, awarenessWave: true } }),
     prisma.tenantParticipation.findMany(),
-    _LoadAwarenessRollout(prisma),
+    rollout ? Promise.resolve(rollout) : _LoadAwarenessRollout(prisma),
   ]);
   const rollupByTenant = new Map(rollups.map(function _entry(r) { return [r.tenant, r] as const; }));
 
@@ -130,7 +134,7 @@ export async function _BuildFleetParticipationReport(prisma: PrismaClient, nowMs
   const statuses: TenantParticipationStatus[] = tenants.map(function _classify(t): TenantParticipationStatus
   {
     const rollup = rollupByTenant.get(t.name) ?? null;
-    const expectedVersion = _ResolveAwarenessVersion(rollout, t.awarenessWave).version;
+    const expectedVersion = _ResolveAwarenessVersion(rolloutState, t.awarenessWave).version;
     const lastSeenAtMs = rollup ? rollup.lastSeenAt.getTime() : null;
     const policyViolations = rollup?.policyViolationCount ?? 0;
     const cls = _ClassifyParticipation({

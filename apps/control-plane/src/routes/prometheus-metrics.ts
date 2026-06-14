@@ -3,6 +3,10 @@ import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 import pino from "pino";
 
+import { _BuildFleetParticipationReport } from "../core/awareness/participation.js";
+import { _LoadAwarenessRollout } from "../core/awareness/rollout-store.js";
+import { _RenderAwarenessMetrics } from "../core/awareness/metrics.js";
+
 /** Module-level logger for Prometheus metrics error reporting. */
 const _log = pino({ name: "prometheus-metrics" });
 
@@ -72,7 +76,22 @@ export function prometheusMetricsRouter(prisma: PrismaClient, customApi: k8s.Cus
       `nodejs_heap_used_bytes ${process.memoryUsage().heapUsed}`,
     ];
 
-    // 4. Respond with Prometheus text format content type so scrapers accept it.
+    // 4. Append awareness SLO metrics (P4B.6). Best-effort: a failure here must not
+    //    blank the core control-plane metrics a scraper depends on.
+    try
+    {
+      // Load the rollout once and reuse it for both the report and the gauges,
+      // so a scrape reads the rollout singleton a single time.
+      const rollout = await _LoadAwarenessRollout(prisma);
+      const report = await _BuildFleetParticipationReport(prisma, Date.now(), undefined, rollout);
+      lines.push("", _RenderAwarenessMetrics(report, rollout));
+    }
+    catch (err)
+    {
+      _log.warn({ err }, "failed to render awareness SLO metrics; emitting core metrics only");
+    }
+
+    // 5. Respond with Prometheus text format content type so scrapers accept it.
     res.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
     res.send(lines.join("\n") + "\n");
   });

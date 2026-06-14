@@ -54,7 +54,8 @@
 > Decision-unblocked (P4B.0 locked). **P4B.1 (the `@opencrane/awareness` SDK) landed 2026-06-13** —
 > the foundation it builds on. **P4B.2** (AccessPolicy→Cognee grant sync) and **P4B.3** (contract
 > versioning + canary rollout), **P4B.4** (golden-query eval harness + rollout gate), and **P4B.5**
-> (fleet participation protocol + monitoring) landed; P4B.6–P4B.7 remain greenfield.
+> (fleet participation protocol + monitoring), and **P4B.6** (awareness SLO metrics + dashboard +
+> alerts) landed; **P4B.7** (anti-spill scope plugin + session→scope binding) is the last item.
 
 - [x] **P4B.0 Lock Phase 4 awareness decisions.** (2026-06-13) All "Phase 4 Decisions" below are
   now resolved (explicit) or defaulted — Track B is **decision-unblocked**. Key locks: single
@@ -152,8 +153,22 @@
   registry + grant compiler); a tenant-facing "what skills are shared with my scopes" discovery query
   (most-specific-wins) is the remaining sub-item — leans on existing entitlement compilation. Live wiring
   of the SDK to *emit* these events from the pod is the shared P4B.1 seam.
-- [ ] **P4B.6 Fleet awareness dashboards + SLOs.** Prometheus metrics + Grafana dashboards +
-  alert thresholds + runbook links for awareness SLOs (current `/prom` metrics have none).
+- [x] **P4B.6 Fleet awareness dashboards + SLOs.** (2026-06-14) `/prom` now emits awareness SLO
+  metrics: pure `_RenderAwarenessMetrics(report, rollout)` (`core/awareness/metrics.ts`) derives
+  `opencrane_awareness_{tenants,participating,non_participating,drifted,policy_violations}_total`,
+  a `tenants_by_severity{severity}` breakdown, and rollout frontier/info gauges from the P4B.5 fleet
+  report + P4B.3 rollout; wired into `prometheus-metrics.ts` **best-effort** (a render failure logs +
+  keeps core metrics). **Alerts:** `awareness-prometheusrule.yaml` (PrometheusRule, gated on
+  `monitoring.enabled`) — `AwarenessPolicyViolations` → **page/critical** (locked: rate must be 0),
+  `AwarenessVersionDrift` + `AwarenessNonParticipation` → **warning** (the locked `violation=page /
+  drift=warn` model), each with a `runbook_url`. **Dashboard:** `files/awareness-dashboard.json` shipped
+  via a Grafana-sidecar ConfigMap (`awareness-grafana-dashboard.yaml`, `grafana_dashboard` label).
+  **Runbook:** `docs/runbooks/awareness-slos.md` (the alert link target). `monitoring` values block added.
+  Tests: 5 metric-renderer; control-plane 162/162, build clean; `helm template` validated (PrometheusRule
+  severities + runbook links, dashboard ConfigMap, full chart renders monitoring on **and** off).
+  **Seam:** the **p95 retrieval-latency SLO (<1s)** is a *pod-side* metric (the SDK times retrieval) —
+  not control-plane-derivable; emitting it from the pod + a `histogram_quantile` alert is the remaining
+  piece, gated on the shared P4B.1 live-SDK-wiring seam.
 - [ ] **P4B.7 Scope-aware retrieval plugin + session→scope binding (anti-spill).** Stop project
   context from spilling across chat windows. A chat window is an OpenClaw `sessionKey` multiplexed
   over one wss connection / one device identity / one pod principal — so nothing in the transport or

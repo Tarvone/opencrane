@@ -151,6 +151,18 @@ ingress:
 # -- cert-manager TLS issuance (CONN.8). When enabled, renders a ClusterIssuer +
 # a wildcard Certificate (*.ingress.domain, plus the apex) into ingress.tls.secretName.
 # k8s-native, cloud-agnostic + on-prem. Requires cert-manager installed in-cluster.
+# -- Fleet awareness SLO monitoring (P4B.6). When enabled, renders a PrometheusRule
+# (SLO alerts) and a Grafana dashboard ConfigMap. Requires the Prometheus Operator
+# CRDs (monitoring.coreos.com) + a Grafana sidecar that imports labelled ConfigMaps.
+monitoring:
+  enabled: false
+  # -- Severity label applied to the policy-violation alert (paging route in your AM).
+  pageSeverity: critical
+  # -- Severity label for drift / non-participation alerts (non-paging).
+  warnSeverity: warning
+  # -- Base URL prefix for runbook links embedded in alert annotations.
+  runbookBaseUrl: https://github.com/opencrane/opencrane/blob/main/docs/runbooks
+
 certManager:
   enabled: false
   # -- Issuer mode: "acme" (production, public CA via DNS-01) or "selfSigned" (dev/local).

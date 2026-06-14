@@ -25,6 +25,11 @@ spec:
           env:
             - name: WATCH_NAMESPACE
               value: {{ .Values.operator.watchNamespace | quote }}
+            # -- Multi-instance fail-closed guard (brief B2): when true the operator
+            #    refuses to start with an empty WATCH_NAMESPACE, so it can never
+            #    reconcile another instance's Tenants cluster-wide.
+            - name: REQUIRE_WATCH_NAMESPACE
+              value: {{ .Values.multiInstance.requireWatchNamespace | quote }}
             - name: TENANT_DEFAULT_IMAGE
               value: "{{ .Values.tenant.defaultImage.repository }}:{{ .Values.tenant.defaultImage.tag }}"
             - name: INGRESS_DOMAIN

@@ -11,6 +11,7 @@ function _buildConfig(overrides: Partial<OpenClawTenantOperatorConfig> = {}): Op
 {
   return {
     watchNamespace: "opencrane",
+    requireWatchNamespace: false,
     tenantDefaultImage: "opencrane/tenant:latest",
     ingressDomain: "opencrane.local",
     ingressTlsEnabled: false,

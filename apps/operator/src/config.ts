@@ -12,6 +12,13 @@ export interface OpenClawTenantOperatorConfig
   /** Namespace to watch for CRDs (empty string watches all namespaces). */
   watchNamespace: string;
 
+  /**
+   * Multi-instance fail-closed guard: when true the operator refuses to start
+   * with an empty `watchNamespace`, so an instance can never reconcile another
+   * instance's Tenants cluster-wide (multi-instance brief B2).
+   */
+  requireWatchNamespace: boolean;
+
   /** Default container image used for tenant deployments. */
   tenantDefaultImage: string;
 
@@ -81,8 +88,9 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
   // 1. Resolve hosting provider first; GCP block is conditionally required.
   const hostingProvider = _readHostingProvider();
 
-  return {
+  const config: OpenClawTenantOperatorConfig = {
     watchNamespace: _readEnvValue<string>("WATCH_NAMESPACE", "string"),
+    requireWatchNamespace: _readEnvValue<boolean>("REQUIRE_WATCH_NAMESPACE", "boolean", false, false),
     tenantDefaultImage: _readEnvValue<string>("TENANT_DEFAULT_IMAGE", "string"),
     ingressDomain: _readEnvValue<string>("INGRESS_DOMAIN", "string"),
     ingressTlsEnabled: _readEnvValue<boolean>("INGRESS_TLS_ENABLED", "boolean", false, false),
@@ -110,6 +118,18 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     skillRegistryDeploymentName: _readEnvValue<string>("SKILL_REGISTRY_DEPLOYMENT_NAME", "string", false, "opencrane-skill-registry"),
     projectedTokenTtlSeconds: _readEnvValue<number>("PROJECTED_TOKEN_TTL_SECONDS", "number", false, 600),
   };
+
+  // 2. Fail closed in multi-instance mode: refuse to watch the whole cluster when
+  //    this instance must be scoped to its own namespace(s) (brief B2). Without
+  //    this, an unscoped operator would reconcile every instance's Tenants.
+  if (config.requireWatchNamespace && config.watchNamespace.trim().length === 0)
+  {
+    const message = "REQUIRE_WATCH_NAMESPACE is set but WATCH_NAMESPACE is empty; refusing to watch all namespaces in multi-instance mode";
+    console.error(message);
+    throw new Error(message);
+  }
+
+  return config;
 }
 
 /**

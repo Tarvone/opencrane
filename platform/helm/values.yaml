@@ -5,6 +5,23 @@ global:
   # -- Deployment environment used for Helm validations (`dev`, `staging`, `prod`).
   environment: dev
 
+# -- Native multi-instance mode (run N strictly-isolated OpenCrane instances in
+#    one cluster). Off by default → the legacy single-install path is unchanged.
+#    When enabled, the chart flips the isolation-safe defaults below.
+multiInstance:
+  # -- Turn on the per-instance isolation defaults (namespaced RBAC, fail-closed watch).
+  enabled: false
+  # -- The namespace(s) this instance owns. Namespaced RBAC is rendered for each.
+  #    Empty → defaults to the release namespace.
+  instanceNamespaces: []
+  # -- Operator/control-plane RBAC mode: `namespaced` (Role/RoleBinding, isolated)
+  #    or `cluster` (legacy ClusterRole/ClusterRoleBinding). Forced `namespaced`
+  #    semantics when `enabled` and `namespaced`.
+  rbac: namespaced
+  # -- When true the operator fails closed (refuses to start) if WATCH_NAMESPACE is
+  #    empty, so an instance can never reconcile another instance's Tenants (brief B2).
+  requireWatchNamespace: true
+
 # -- Operator settings
 operator:
   image:

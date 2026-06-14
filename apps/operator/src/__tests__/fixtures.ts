@@ -12,6 +12,7 @@ import type { GcsBucketOperations } from "../hosting/adapters/gcp/gcp-bucket.cli
  */
 export const defaultConfig: OpenClawTenantOperatorConfig = {
   watchNamespace: "default",
+  requireWatchNamespace: false,
   tenantDefaultImage: "ghcr.io/opencrane/tenant:latest",
   ingressDomain: "opencrane.local",
   ingressTlsEnabled: false,

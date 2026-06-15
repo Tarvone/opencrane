@@ -260,7 +260,7 @@ resource gating are modeled and enforced rather than implied by how you wrote th
 > `Tenant` in code. They live on separate, independent domains — the customer's own base domain
 > (e.g. `ai.client-company.com`) and a per-user subdomain under it (e.g. `mike.ai.client-company.com`),
 > while the control plane runs on the platform's own domain. See the authoritative
-> [Tenancy Model](agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant)
+> [Tenancy Model](https://github.com/opencrane/opencrane/blob/main/docs/agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant)
 > for the full table and DNS hierarchy.
 
 > **The invariant the resource makes enforceable: one customer = one `ClusterTenant` = one
@@ -312,7 +312,7 @@ in-tree vendor code. The control plane POSTs a vendor-neutral `ClusterTenantProv
 plus a kubeconfig **Secret reference** — the credential material never crosses the wire inline.
 A private vendor (e.g. a hosted-control-plane product) implements that contract in their own
 service; nothing vendor-specific lives in the AGPL tree. See
-[`enterprise-needs.md`](enterprise-needs.md) for the licensing rationale and the Kamaji parking note.
+`enterprise-needs.md` for the licensing rationale and the Kamaji parking note.
 
 Configure it via Helm — leave it unset and `dedicatedCluster` stays unavailable (fail-closed):
 

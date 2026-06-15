@@ -4,7 +4,7 @@ import { ClusterTenantComputeMode, ClusterTenantIsolationTier, ClusterTenantPhas
 import type { ClusterTenantProvisionResult } from "@opencrane/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ExternalWebhookProvisioner, SharedClusterProvisioner } from "../../core/cluster-tenants/provisioner.js";
+import { ExternalWebhookProvisioner, SharedClusterProvisioner, _ReadExternalWebhookConfig } from "../../core/cluster-tenants/provisioner.js";
 import { DefaultClusterTenantProvisionerRegistry, _BuildClusterTenantProvisionerRegistry } from "../../core/cluster-tenants/registry.js";
 
 /** Env keys mutated by these tests, restored after each case. */
@@ -142,6 +142,18 @@ describe("DefaultClusterTenantProvisionerRegistry (CT.6 routing)", function _sui
     const registry = new DefaultClusterTenantProvisionerRegistry([]);
     expect(registry.isTierAvailable(ClusterTenantIsolationTier.Shared)).toBe(false);
     expect(registry.provisionerFor(ClusterTenantIsolationTier.Shared)).toBeNull();
+  });
+
+  it("refuses a non-HTTPS webhook URL so the bearer token is never sent in plaintext", function _rejectPlaintext()
+  {
+    for (const key of _WEBHOOK_ENV)
+    {
+      _saved[key] = process.env[key];
+    }
+    process.env.CLUSTER_TENANT_PROVISIONER_WEBHOOK_URL = "http://provisioner.example/api";
+    process.env.CLUSTER_TENANT_PROVISIONER_WEBHOOK_TOKEN = "token";
+
+    expect(function _load() { _ReadExternalWebhookConfig(); }).toThrow(/https:\/\//);
   });
 
   // NO-VENDOR ASSERTION (CT.6): the provisioner seam must carry no vendor names.

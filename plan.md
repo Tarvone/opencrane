@@ -401,7 +401,7 @@ With one agent per lane, wall-clock ≈ 4 sequential slices instead of 7.
   `apps/control-plane/src/core/cluster-tenants/provisioner.ts(+.types.ts)`, MIT `libs/contracts`
   webhook DTOs, `docs/enterprise-needs.md`. **Headless-buildable.**
 
-- [ ] **CT.7 Opt-in gating + docs + conformance.** _(Wave 3 · integration — after all)_ Gate all ClusterTenant machinery behind the
+- [x] **CT.7 Opt-in gating + docs + conformance.** _(Wave 3 · integration — ✅ landed 2026-06-15)_ Gate all ClusterTenant machinery behind the
   existing opt-in (single-install remains the zero-config default and renders none of it). Document
   the ClusterTenant model + the provisioner webhook contract (extend `docs/multi-instance.md`,
   cross-link `docs/enterprise-needs.md`); document the "one customer = one ClusterTenant = one

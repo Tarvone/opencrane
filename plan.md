@@ -663,6 +663,113 @@ standing per-frame audit choke point are **not** in scope → that is the proxy
     **P4D.1** (Obot RFC-8693 token exchange) is likewise parked — it needs a live Obot/upstream to
     test OBO.
 
+### Track MI — Native multi-instance (single-cluster) support
+
+> Scoped 2026-06-14 from `opencrane-multi-instance-brief.md` (WeOwnAI/Elewa). Goal: run **N
+> strictly-isolated OpenCrane instances in one cluster** (one per customer org, each its own
+> namespace, no shared data / no cross-namespace reconcile / no shared cloud creds) as a
+> first-class **opt-in** mode. **Decision (2026-06-14):** keep the legacy single-install path as
+> the **default**; multi-instance is an opt-in `multiInstance` Helm mode (per brief §4). "Avoid
+> leaving any legacy" = no dead/half-migrated codepaths within each item, NOT removal of
+> single-install. Verified against the code (Explore sweep, 2026-06-14): all six brief blockers
+> (B1–B6) CONFIRMED, plus misses noted below.
+>
+> **Answers to the brief's open questions (Q1–Q4):**
+> - **Q1 (other hidden cluster/namespace assumptions):** YES, beyond B1–B6 — (i) **control-plane
+>   RBAC is also a ClusterRole** (`control-plane-rbac.yaml`), incl. a `clusterissuers` grant
+>   (CONN.8 platform-dns); (ii) the **policy operator** watches cluster-wide too when
+>   `WATCH_NAMESPACE` is empty (`policies/operator.ts`), not just the idle-checker; (iii)
+>   control-plane writes CRs to a single `process.env.NAMESPACE ?? "default"`
+>   (`routes/tenants.ts`, `auth.router.ts`); (iv) platform-dns get/create/replaces a **cluster-wide
+>   ClusterIssuer** by a fixed name + writes DNS-01 creds into a shared `cert-manager` ns
+>   (`core/platform-dns/`); (v) a **hard-coded, non-templated `opencrane-obot` Secret name**
+>   (`obot-mcp-gateway-deployment.yaml`) and `opencrane-system` service-URL defaults in
+>   `operator/config.ts` (the Helm layer overrides the URLs via release-prefixed `printf`, so the
+>   URL default is a latent footgun, not an active collision). **Not blockers:** the
+>   `tokenreviews` ClusterRole (skill-registry/control-plane) is *legitimately* cluster-scoped
+>   (TokenReview cannot be namespaced) and grants no cross-namespace data; **Postgres / LiteLLM /
+>   skill-registry / Obot are per-Helm-release** (release-prefixed names, own `DATABASE_URL`), so
+>   they are instance-local by default — the brief's "shared" risk is real only if an operator
+>   deliberately points two instances at one endpoint (covered by MI.5's scope declaration).
+> - **Q2 (CRD singleton / per-instance API group):** "one CRD version, many instances" is the
+>   right fleet contract — do NOT per-instance the API group. Decouple CRD install from the release
+>   and publish a CRD-version ↔ control-plane/operator compatibility matrix (MI.3).
+> - **Q3 (share vs isolate per component):** default **everything instance-scoped** (already true
+>   by release-prefixing); make sharing an explicit, documented opt-in per component (MI.5). The
+>   only naturally-shared cluster singletons are CRDs (MI.3) and, optionally, a platform cert
+>   issuer (MI.4).
+> - **Q4 (upstream vs vendored overlay):** delivered here as an upstream opt-in `multiInstance`
+>   mode + a reference example (MI.7), so it is supported, not patched locally.
+
+- [x] **MI.1 `multiInstance` Helm scaffold + namespaced operator RBAC (B1) + fail-closed watch (B2). — LANDED 2026-06-14.**
+  New `multiInstance` values block (`enabled`/`instanceNamespaces`/`rbac`/`requireWatchNamespace`,
+  default off → legacy unchanged). `operator-rbac.yaml` branches: multi-instance renders a
+  namespaced **Role + RoleBinding per `instanceNamespaces`** (SA subject in the release ns) so
+  instance A's operator SA cannot touch instance B; legacy keeps the ClusterRole/ClusterRoleBinding.
+  Shared rules + helpers in `_helpers.tpl` (`opencrane.operatorRbacRules`/`instanceNamespaces`/
+  `namespacedRbac`) — no rule duplication. Operator fails closed (`config.ts` `requireWatchNamespace`
+  + `REQUIRE_WATCH_NAMESPACE` env, wired in `operator-deployment.yaml`): refuses to start with an
+  empty `WATCH_NAMESPACE` when set. Tests: 4 operator config cases (operator 66/66); `helm template`
+  validated for both modes + full chart. Anchors: `operator-rbac.yaml`, `_helpers.tpl`,
+  `operator-deployment.yaml`, `apps/operator/src/config.ts`, `values.yaml`.
+- [x] **MI.2 Namespaced control-plane RBAC + per-instance CR-write namespace (B1, control-plane half). — LANDED 2026-06-14.** Namespaced Role/RoleBinding branch in `control-plane-rbac.yaml` (shared `opencrane.controlPlaneRbacRules` helper); cluster-scoped `clusterissuers` isolated in a minimal residual ClusterRole (folded into the per-ns Role by MI.4's namespaced issuer). Per-instance CR writes needed no code change — the control-plane Deployment already sets `NAMESPACE` from `fieldRef: metadata.namespace`. Build + 193 tests green; helm both modes.
+  Mirror MI.1 for `control-plane-rbac.yaml` (Role/RoleBinding over `instanceNamespaces` when
+  `multiInstance` on; reuse the MI.1 helpers) and make the control-plane write Tenant/AccessPolicy
+  CRs to a **per-instance** namespace (today `process.env.NAMESPACE ?? "default"` in
+  `routes/tenants.ts` + `infra/auth/auth.router.ts`) so two instances never collide on CR
+  (namespace,name). **Note:** the control-plane ClusterRole also grants `clusterissuers` — coordinate
+  with MI.4 (that grant becomes a namespaced Issuer permission there). **Acceptance:** instance-A's
+  control-plane SA cannot read/write instance-B objects; CRs land in the instance's own namespace;
+  `helm template` both modes + a control-plane test. Anchors: `control-plane-rbac.yaml`,
+  `routes/tenants.ts`, `infra/auth/auth.router.ts`, `_helpers.tpl`. **Headless-buildable.**
+- [x] **MI.3 CRD decoupling + fleet version-compat contract (B3). — LANDED 2026-06-14.** Documented `--skip-crds` for per-instance releases + install-once `kubectl apply -f platform/helm/crds/` (no CRD sub-chart, to avoid duplicating 504 lines of CRD YAML = drift hazard). New `docs/multi-instance.md` carries the CRD-version↔chart compat matrix + "CRDs lead, instances follow; expand before contract" rule; one API group (Q2). Default single-install still auto-ships CRDs. Original scope: install CRDs **once, cluster-wide**,
+  decoupled from the per-instance release: document `--skip-crds` + a separate CRD install step (or a
+  tiny CRD-only sub-chart), and publish a **CRD-version ↔ control-plane/operator compatibility
+  matrix** so the fleet can plan rolling upgrades ("one CRD version, many instances"). Do NOT
+  per-instance the API group. **Acceptance:** two releases install with `--skip-crds` against a
+  pre-installed CRD set without ownership conflict; the compat contract is documented.
+  Anchors: `platform/helm/crds/`, `Chart.yaml`, a new `docs/multi-instance.md`, `values.yaml`.
+  **Headless-buildable** (the install-once flow is `helm template`/doc-validated; the two-release
+  apply is part of MI.7).
+- [x] **MI.4 Namespaced cert Issuer + SecretStore + per-instance platform-DNS (B4). — LANDED 2026-06-14.** `multiInstance.certIssuer`/`secretStore` toggles render namespaced Issuer/SecretStore (verified ClusterIssuer→Issuer, ClusterSecretStore→SecretStore); platform-DNS targets a per-instance issuer + writes DNS-01 creds into the instance ns; RBAC reconciled with MI.2. Build + 193 tests (+6 platform-dns) green; helm both modes. (Live ACME = CONN.8(d) seam.) Original scope: Add a values
+  toggle so `cluster-issuer.yaml` can render a namespaced **Issuer** (not ClusterIssuer) and
+  `external-secrets-store.yaml` a namespaced **SecretStore** (not ClusterSecretStore) under
+  `multiInstance`; OR document a deliberately-shared platform issuer installed once. Make the
+  control-plane platform-DNS path (`core/platform-dns/`, `routes/platform-dns.ts`) target a
+  **per-instance issuer name** + write DNS-01 creds into the **instance's own namespace** (today it
+  upserts a fixed cluster-wide ClusterIssuer + shared `cert-manager` ns → last-write-wins across
+  instances). **Acceptance:** two instances issue certs without fighting over one issuer/cred Secret;
+  `helm template` both modes + platform-dns tests. Anchors: `cluster-issuer.yaml`,
+  `external-secrets-store.yaml`, `core/platform-dns/`, `routes/platform-dns.ts`,
+  `control-plane-rbac.yaml` (clusterissuers grant). **Headless-buildable** (live ACME e2e stays the
+  CONN.8(d) seam). **Overlaps MI.2** on `control-plane-rbac.yaml`.
+- [x] **MI.5 Per-component scope declaration + eliminate hard-coded names (B5). — LANDED 2026-06-14.** New `sharedPlatform` block (litellm/skillRegistry/mcpGateway/externalSecrets, `instance` default | `shared` opt-in, fail-fast guards); release-prefixed the non-templated `opencrane-obot` Secret + a second collision it caught (plain `litellm` Service); `config.ts` `opencrane-system` defaults now derive from `POD_NAMESPACE`. Build + 68 operator tests (+2) green; helm instance+shared modes. Original scope: Add a
+  `sharedPlatform` values block declaring each platform component **instance** (default) vs
+  **shared** (`litellm`/`skillRegistry`/`mcpGateway`/`externalSecrets`), with the isolation
+  implication documented. Fix the concrete collisions the sweep found: the **non-templated
+  `opencrane-obot` Secret name** (`obot-mcp-gateway-deployment.yaml` → release-prefix it) and the
+  `opencrane-system` service-URL defaults in `apps/operator/src/config.ts` (make them
+  release-namespace-aware / required, no silent cross-instance default). **Acceptance:** no
+  fixed-name object collides across two same-namespace-family installs; each component's scope is a
+  documented toggle; `helm template` both modes + an operator config test. Anchors: `values.yaml`,
+  `obot-mcp-gateway-deployment.yaml`, `litellm-deployment.yaml`, `skill-registry-deployment.yaml`,
+  `external-secrets.yaml`, `apps/operator/src/config.ts`. **Headless-buildable.**
+- [x] **MI.6 Cross-instance default-deny NetworkPolicy (B6). — LANDED 2026-06-14.** New opt-in `networkpolicy-multi-instance.yaml`: per-namespace default-deny (Ingress+Egress) allowing only same-instance namespaces (via the apiserver-managed `kubernetes.io/metadata.name` label — no custom label needed) + DNS egress. Renders only in multi-instance mode (verified absent by default). Original scope: Ship, as part of `multiInstance` mode,
+  a **default-deny across instance namespaces** so instance-A pods can never reach instance-B
+  services (today `networkpolicy.yaml`/`networkpolicy-planes.yaml` are per-tenant *within* an
+  install, with no cross-instance boundary). Allow only same-instance + required egress.
+  **Acceptance:** a synthetic policy denies cross-namespace ingress between instance namespaces;
+  `helm template` renders it only in multi-instance mode. Anchors: `networkpolicy.yaml`,
+  `networkpolicy-planes.yaml`, `values.yaml`. **Headless-buildable** (live CNI enforcement is part
+  of MI.7).
+- [x] **MI.7 Reference example + conformance test (brief §5). — LANDED 2026-06-14 (static halves).** Shipped `platform/helm/values/multi-instance/{oc-acme,oc-globex}.yaml` + `platform/tests/multi-instance-conformance.sh` — renders both instances from one chart and asserts (all PASS): per-instance fail-closed watch scope, namespaced RBAC with no cross-instance ClusterRole (only the legit TokenReview), no ClusterIssuer/ClusterSecretStore, cross-instance default-deny netpol, no other-instance references. The **live two-instance cluster run** (§5.2–§5.5: dueling-operator, RBAC `can-i` deny, pod→service deny, teardown isolation) is documented in the script as the **live-infra seam** (needs a real cluster + CNI + ACME). Original scope: Ship `values/multi-instance/{oc-acme,oc-globex}.yaml`
+  + a conformance script asserting the 5 acceptance criteria: two instances install (CRDs once);
+  each operator reconciles only its own ns; instance-A SA cannot touch instance-B (RBAC); a pod in
+  A cannot reach a service in B (NetworkPolicy); tearing down B leaves A untouched. **Depends on
+  MI.1–MI.6.** The static halves (values + `helm template`/RBAC-can-i assertions) are buildable; the
+  live two-instance cluster run is the **live-infra seam** (needs a real cluster + CNI + ACME).
+  Anchors: new `platform/helm/values/multi-instance/`, `platform/tests/`, `docs/multi-instance.md`.
+
 ---
 
 ## Phase 4: Fleet Organizational Awareness + MCP & Skills Platform

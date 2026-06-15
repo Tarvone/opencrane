@@ -594,7 +594,7 @@
     "/platform/dns": {
       "get": {
         "operationId": "getPlatformDns",
-        "summary": "Show the configured platform DNS-01 ClusterIssuer",
+        "summary": "Show the configured platform DNS-01 issuer (ClusterIssuer or namespaced Issuer)",
         "tags": [
           "Platform DNS"
         ],
@@ -622,6 +622,17 @@
                     "issuerName": {
                       "type": "string"
                     },
+                    "issuerKind": {
+                      "type": "string",
+                      "enum": [
+                        "ClusterIssuer",
+                        "Issuer"
+                      ]
+                    },
+                    "issuerNamespace": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "provider": {
                       "type": "string",
                       "nullable": true
@@ -643,7 +654,7 @@
       },
       "put": {
         "operationId": "setPlatformDns",
-        "summary": "Configure the platform DNS-01 ClusterIssuer for wildcard TLS",
+        "summary": "Configure the platform DNS-01 issuer for wildcard TLS (ClusterIssuer or namespaced Issuer)",
         "tags": [
           "Platform DNS"
         ],
@@ -699,6 +710,17 @@
                     },
                     "issuerName": {
                       "type": "string"
+                    },
+                    "issuerKind": {
+                      "type": "string",
+                      "enum": [
+                        "ClusterIssuer",
+                        "Issuer"
+                      ]
+                    },
+                    "issuerNamespace": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "provider": {
                       "type": "string"

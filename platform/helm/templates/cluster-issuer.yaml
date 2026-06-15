@@ -1,7 +1,7 @@
 {{- /*
 CONN.8 — k8s-native TLS issuance via cert-manager.
 
-Renders a ClusterIssuer + a wildcard Certificate so tenant Ingresses (which
+Renders a cert issuer + a wildcard Certificate so tenant Ingresses (which
 reference ingress.tls.secretName) are served over browser-trusted TLS. A single
 wildcard *.<domain> cert covers every <tenant>.<domain> pod, so adding a tenant
 needs no new issuance.
@@ -9,17 +9,30 @@ needs no new issuance.
 - mode=selfSigned : dev/local — issues instantly, no DNS challenge, not browser-trusted.
 - mode=acme       : production — public CA via DNS-01 (wildcards require DNS-01).
 
+Issuer scope (brief B4, MI.4):
+- legacy / `multiInstance.certIssuer=cluster` (DEFAULT): one cluster-singleton
+  ClusterIssuer + a single wildcard Certificate in certificateNamespace.
+- `multiInstance.enabled=true` + `multiInstance.certIssuer=namespaced`: a namespaced
+  Issuer AND a wildcard Certificate are rendered in EACH owned instance namespace, so
+  per-instance installs never collide on one cluster-singleton issuer. cert-manager
+  reads a namespaced Issuer's solver Secret from the Issuer's OWN namespace, and an
+  Ingress can only reference a TLS Secret in its own namespace, so issuer + cert + the
+  wildcard Secret all co-locate per instance namespace.
+
 Requires cert-manager (cert-manager.io/v1) installed in-cluster.
 */ -}}
 {{- if .Values.certManager.enabled }}
 {{- $cm := .Values.certManager }}
-{{- $certNs := default .Release.Namespace $cm.certificateNamespace }}
+{{- $namespaced := eq (include "opencrane.namespacedCertIssuer" .) "true" }}
 {{- if and (eq $cm.mode "acme") (empty $cm.acme.email) }}
 {{- fail "certManager.mode=acme requires certManager.acme.email to be set." }}
 {{- end }}
 {{- if and (eq $cm.mode "acme") (empty $cm.acme.dns01.provider) }}
 {{- fail "certManager.mode=acme requires certManager.acme.dns01.provider (wildcards need a DNS-01 solver)." }}
 {{- end }}
+{{- if not $namespaced }}
+{{- /* Legacy / cluster mode: one ClusterIssuer + one Certificate in certificateNamespace. */ -}}
+{{- $certNs := default .Release.Namespace $cm.certificateNamespace }}
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -63,4 +76,56 @@ spec:
   dnsNames:
     - {{ printf "*.%s" .Values.ingress.domain | quote }}
     - {{ .Values.ingress.domain | quote }}
+{{- else }}
+{{- /* Namespaced mode: a per-instance-namespace Issuer + wildcard Certificate. */ -}}
+{{- $namespaces := include "opencrane.instanceNamespaces" . | fromJsonArray }}
+{{- range $ns := $namespaces }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $cm.issuerName | quote }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "opencrane.labels" $ | nindent 4 }}
+spec:
+{{- if eq $cm.mode "selfSigned" }}
+  selfSigned: {}
+{{- else if eq $cm.mode "acme" }}
+  acme:
+    server: {{ $cm.acme.server | quote }}
+    email: {{ $cm.acme.email | quote }}
+    privateKeySecretRef:
+      name: {{ $cm.acme.privateKeySecretName | quote }}
+    solvers:
+      - dns01:
+          {{- if $cm.acme.dns01.config }}
+          {{ $cm.acme.dns01.provider }}:
+            {{- toYaml $cm.acme.dns01.config | nindent 12 }}
+          {{- end }}
+{{- else }}
+{{- fail (printf "certManager.mode must be 'selfSigned' or 'acme', got %q" $cm.mode) }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $.Values.ingress.tls.secretName | quote }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "opencrane.labels" $ | nindent 4 }}
+spec:
+  # Secret cert-manager writes the issued cert into; tenant Ingresses reference it.
+  secretName: {{ $.Values.ingress.tls.secretName | quote }}
+  issuerRef:
+    # Namespaced Issuer in this same namespace — never a cluster-singleton.
+    name: {{ $cm.issuerName | quote }}
+    kind: Issuer
+  # Wildcard covers every <tenant>.<domain>; the apex is added so anything served
+  # at the bare base domain is also covered (a wildcard does not match the apex).
+  dnsNames:
+    - {{ printf "*.%s" $.Values.ingress.domain | quote }}
+    - {{ $.Values.ingress.domain | quote }}
+{{- end }}
+{{- end }}
 {{- end }}

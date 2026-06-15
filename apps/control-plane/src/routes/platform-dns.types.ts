@@ -1,3 +1,5 @@
+import type { CertIssuerKind } from "../core/platform-dns/cluster-issuer.types.js";
+
 /** Request body to configure the platform DNS-01 issuer (CONN.8a). */
 export interface SetPlatformDnsRequest
 {
@@ -20,10 +22,14 @@ export interface SetPlatformDnsRequest
 /** Response describing the currently configured platform DNS issuer. */
 export interface PlatformDnsStatus
 {
-  /** Whether a ClusterIssuer is configured. */
+  /** Whether an issuer is configured. */
   configured: boolean;
-  /** ClusterIssuer name. */
+  /** Issuer name. */
   issuerName: string;
+  /** Issuer kind — `ClusterIssuer` (cluster-wide) or `Issuer` (namespaced, MI.4). */
+  issuerKind: CertIssuerKind;
+  /** Namespace of the namespaced `Issuer`, or null for a cluster-wide `ClusterIssuer`. */
+  issuerNamespace: string | null;
   /** The configured solver provider, when discoverable. */
   provider: string | null;
   /** The ACME account email, when configured. */

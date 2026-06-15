@@ -39,6 +39,15 @@ spec:
             # DNS-01 credentials Secret into (must match the namespaced RBAC Role).
             - name: CERT_MANAGER_NAMESPACE
               value: {{ default "cert-manager" .Values.certManager.namespace | quote }}
+            {{- if eq (include "opencrane.namespacedCertIssuer" .) "true" }}
+            # MI.4 namespaced cert-issuer mode: `oc platform dns set` upserts a
+            # per-instance *Issuer* and writes the DNS-01 Secret INTO this pod's own
+            # namespace (NAMESPACE, above), not a cluster-wide ClusterIssuer + shared
+            # cert-manager ns — so two instances never collide. The namespace is left
+            # to the runtime NAMESPACE default; only the kind is forced here.
+            - name: PLATFORM_DNS_ISSUER_KIND
+              value: "Issuer"
+            {{- end }}
             {{- end }}
             {{- if .Values.skillRegistry.ociStore.enabled }}
             # OCI (Zot) store for skill-bundle content (P4D.2). When set, the control
@@ -55,8 +64,11 @@ spec:
               value: {{ .Values.controlPlane.cognee.permissionsTimeoutMs | quote }}
             - name: COGNEE_ENABLE_BACKEND_ACCESS_CONTROL
               value: {{ ternary "true" "false" .Values.controlPlane.cognee.backendAccessControl | quote }}
+            # -- LiteLLM base endpoint, resolved via sharedPlatform scope (B5):
+            #    instance mode → release-prefixed in-cluster Service; shared mode →
+            #    sharedPlatform.litellm.shared.endpoint.
             - name: LITELLM_ENDPOINT
-              value: {{ .Values.litellm.endpoint | quote }}
+              value: {{ include "opencrane.litellmEndpoint" . | quote }}
             - name: LITELLM_SPEND_PATH_TEMPLATE
               value: {{ .Values.litellm.spendPathTemplate | quote }}
             {{- if .Values.litellm.enabled }}

@@ -63,24 +63,39 @@ export function _RenderDnsCredentialsSecret(config: DnsProviderConfig, namespace
 }
 
 /**
- * Render a cert-manager ACME DNS-01 `ClusterIssuer` for the given provider.
+ * Render a cert-manager ACME DNS-01 issuer for the given provider (MI.4).
  *
- * The solver block is built from the provider: token-based providers
- * (cloudflare/digitalocean) reference `secretRef` (the Secret from
+ * Renders a cluster-wide `ClusterIssuer` by default, or a namespaced `Issuer`
+ * (with `metadata.namespace`) when `config.issuerKind` is `Issuer` — so two
+ * instances can each own a per-namespace issuer instead of fighting over one
+ * cluster-singleton. The solver block is built from the provider: token-based
+ * providers (cloudflare/digitalocean) reference `secretRef` (the Secret from
  * {@link _RenderDnsCredentialsSecret}); any other provider supplies its block
  * via `config.solverConfig`, rendered verbatim under the provider key.
  *
  * @param config    - The DNS-provider configuration.
  * @param secretRef - The credentials Secret name, or null for non-token providers.
- * @returns The `ClusterIssuer` custom-resource manifest.
+ * @returns The issuer custom-resource manifest (`ClusterIssuer` or `Issuer`).
  * @throws When the provider needs a token (none given) or a solver block (none given).
  */
-export function _RenderDns01ClusterIssuer(config: DnsProviderConfig, secretRef: string | null): Record<string, unknown>
+export function _RenderDns01Issuer(config: DnsProviderConfig, secretRef: string | null): Record<string, unknown>
 {
+  // 1. Resolve the kind — default to the legacy cluster-wide ClusterIssuer so an
+  //    unconfigured (single-install) caller behaves exactly as before.
+  const kind = config.issuerKind ?? "ClusterIssuer";
+
+  // 2. A namespaced Issuer carries metadata.namespace; a ClusterIssuer does not.
+  const metadata: Record<string, unknown> = { name: config.issuerName, labels: { "app.kubernetes.io/managed-by": "opencrane-control-plane" } };
+  if (kind === "Issuer" && config.issuerNamespace)
+  {
+    metadata.namespace = config.issuerNamespace;
+  }
+
+  // 3. Build the manifest; the ACME spec is identical across kinds.
   return {
     apiVersion: "cert-manager.io/v1",
-    kind: "ClusterIssuer",
-    metadata: { name: config.issuerName, labels: { "app.kubernetes.io/managed-by": "opencrane-control-plane" } },
+    kind,
+    metadata,
     spec: {
       acme: {
         server: config.server && config.server.length > 0 ? config.server : _DEFAULT_ACME_SERVER,

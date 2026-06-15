@@ -392,7 +392,7 @@ export const spec = {
     "/platform/dns": {
       get: {
         operationId: "getPlatformDns",
-        summary: "Show the configured platform DNS-01 ClusterIssuer",
+        summary: "Show the configured platform DNS-01 issuer (ClusterIssuer or namespaced Issuer)",
         tags: ["Platform DNS"],
         parameters: [{ name: "issuerName", in: "query", required: false, schema: { type: "string" } }],
         responses: {
@@ -401,6 +401,8 @@ export const spec = {
             properties: {
               configured: { type: "boolean" },
               issuerName: { type: "string" },
+              issuerKind: { type: "string", enum: ["ClusterIssuer", "Issuer"] },
+              issuerNamespace: { type: "string", nullable: true },
               provider: { type: "string", nullable: true },
               email: { type: "string", nullable: true },
               server: { type: "string", nullable: true },
@@ -410,7 +412,7 @@ export const spec = {
       },
       put: {
         operationId: "setPlatformDns",
-        summary: "Configure the platform DNS-01 ClusterIssuer for wildcard TLS",
+        summary: "Configure the platform DNS-01 issuer for wildcard TLS (ClusterIssuer or namespaced Issuer)",
         tags: ["Platform DNS"],
         requestBody: {
           required: true,
@@ -438,6 +440,8 @@ export const spec = {
             properties: {
               status: { type: "string" },
               issuerName: { type: "string" },
+              issuerKind: { type: "string", enum: ["ClusterIssuer", "Issuer"] },
+              issuerNamespace: { type: "string", nullable: true },
               provider: { type: "string" },
               zone: { type: "string" },
               secretName: { type: "string", nullable: true },

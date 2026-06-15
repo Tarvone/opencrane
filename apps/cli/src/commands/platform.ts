@@ -48,7 +48,7 @@ export function _RegisterPlatform(parent: Command, getConfig: () => CliConfig): 
         params: { query: opts.issuerName ? { issuerName: opts.issuerName } : {} },
       });
       if (error) _PrintApiError("platform dns show", error);
-      _Print(data, opts.output, ["configured", "issuerName", "provider", "email", "server"]);
+      _Print(data, opts.output, ["configured", "issuerName", "issuerKind", "issuerNamespace", "provider", "email", "server"]);
     });
 
   dns

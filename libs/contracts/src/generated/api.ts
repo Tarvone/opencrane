@@ -11,9 +11,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Show the configured platform DNS-01 ClusterIssuer */
+        /** Show the configured platform DNS-01 issuer (ClusterIssuer or namespaced Issuer) */
         get: operations["getPlatformDns"];
-        /** Configure the platform DNS-01 ClusterIssuer for wildcard TLS */
+        /** Configure the platform DNS-01 issuer for wildcard TLS (ClusterIssuer or namespaced Issuer) */
         put: operations["setPlatformDns"];
         post?: never;
         delete?: never;
@@ -1175,6 +1175,9 @@ export interface operations {
                     "application/json": {
                         configured?: boolean;
                         issuerName?: string;
+                        /** @enum {string} */
+                        issuerKind?: "ClusterIssuer" | "Issuer";
+                        issuerNamespace?: string | null;
                         provider?: string | null;
                         email?: string | null;
                         server?: string | null;
@@ -1215,6 +1218,9 @@ export interface operations {
                     "application/json": {
                         status?: string;
                         issuerName?: string;
+                        /** @enum {string} */
+                        issuerKind?: "ClusterIssuer" | "Issuer";
+                        issuerNamespace?: string | null;
                         provider?: string;
                         zone?: string;
                         secretName?: string | null;

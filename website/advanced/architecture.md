@@ -88,15 +88,15 @@ A new assistant can chat, but it can't reach any skill, tool, or knowledge until
 <text x="644" y="155" text-anchor="middle" class="g-l">Tools (MCP)</text>
 <rect class="g-box" x="556" y="218" width="176" height="56" rx="10"/>
 <text x="644" y="251" text-anchor="middle" class="g-l">Knowledge</text>
-<path class="g-arr" d="M226,140 C330,120 360,70 420,58 L552,54"/>
-<path class="g-arr" d="M226,150 H552"/>
-<path class="g-arr" d="M226,160 C330,180 360,232 420,244 L552,246"/>
-<rect class="g-pill" x="356" y="40" width="92" height="28" rx="14"/>
-<text x="402" y="59" text-anchor="middle" class="g-pt">✓ grant</text>
-<rect class="g-pill" x="356" y="136" width="92" height="28" rx="14"/>
-<text x="402" y="155" text-anchor="middle" class="g-pt">✓ grant</text>
-<rect class="g-pill" x="356" y="232" width="92" height="28" rx="14"/>
-<text x="402" y="251" text-anchor="middle" class="g-pt">✓ grant</text>
+<path class="g-arr" d="M226,150 L552,54"/>
+<path class="g-arr" d="M226,150 L552,150"/>
+<path class="g-arr" d="M226,150 L552,246"/>
+<rect class="g-pill" x="343" y="88" width="92" height="28" rx="14"/>
+<text x="389" y="106" text-anchor="middle" class="g-pt">✓ grant</text>
+<rect class="g-pill" x="343" y="136" width="92" height="28" rx="14"/>
+<text x="389" y="154" text-anchor="middle" class="g-pt">✓ grant</text>
+<rect class="g-pill" x="343" y="184" width="92" height="28" rx="14"/>
+<text x="389" y="202" text-anchor="middle" class="g-pt">✓ grant</text>
 <text x="380" y="294" text-anchor="middle" class="g-s">You open access deliberately, scoped to exactly what each person needs.</text>
 </svg>
 </figure>

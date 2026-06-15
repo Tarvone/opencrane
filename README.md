@@ -89,7 +89,7 @@ An employee signs in once to reach their assistant, and assistants reach the sha
 planes only with short-lived, scoped credentials. Conversations stay inside the pod —
 OpenCrane governs access, budgets, and networking, but never inspects them.
 
-📐 See the illustrated **[architecture overview](https://docs.opencrane.ai/advanced/architecture)** — diagrams of the control plane, the sign-in flow, and the deny-by-default access model.
+📐 See the illustrated **[architecture overview](https://opencrane.ai/advanced/architecture)** — diagrams of the control plane, the sign-in flow, and the deny-by-default access model.
 
 ## Components
 
@@ -107,7 +107,7 @@ OpenCrane governs access, budgets, and networking, but never inspects them.
 
 ## Documentation
 
-📖 **Full documentation site: [docs.opencrane.ai](https://docs.opencrane.ai)** —
+📖 **Full documentation site: [opencrane.ai](https://opencrane.ai)** —
 getting started, concepts, operator & integrator guides, and an interactive API
 reference. The site is built with [VitePress](https://vitepress.dev) from
 [`website/`](website/). Contributor/agent coding guidance stays in
@@ -115,13 +115,13 @@ reference. The site is built with [VitePress](https://vitepress.dev) from
 
 | Doc | Covers |
 |-----|--------|
-| [Identity & connection auth](https://docs.opencrane.ai/security/identity) | How people sign in and how a browser connects to its assistant |
-| [Connection security model](https://docs.opencrane.ai/security/connection-security) | How OpenCrane keeps the browser↔assistant connection secure |
-| [Hosting architecture](https://docs.opencrane.ai/operators/hosting) | On-prem-default hosting adapters, the cloud seam, and cert-manager TLS issuance |
-| [MCP gateway (Obot)](https://docs.opencrane.ai/integrators/mcp-gateway) | Connecting assistants to external tools over MCP |
-| [Skill registry & delivery](https://docs.opencrane.ai/integrators/skill-registry) | Skill catalog, scan/entitle pipeline, and per-read delivery |
-| [Retrieval & memory](https://docs.opencrane.ai/integrators/retrieval-memory) | Cognee retrieval plane: datasets, AccessPolicy mapping, freshness |
-| [API overview](https://docs.opencrane.ai/reference/api-overview) · [CLI reference](https://docs.opencrane.ai/reference/cli) · [Runbook](https://docs.opencrane.ai/operators/runbook) | HTTP API reference · `oc` CLI reference · operational runbook |
+| [Identity & connection auth](https://opencrane.ai/security/identity) | How people sign in and how a browser connects to its assistant |
+| [Connection security model](https://opencrane.ai/security/connection-security) | How OpenCrane keeps the browser↔assistant connection secure |
+| [Hosting architecture](https://opencrane.ai/operators/hosting) | On-prem-default hosting adapters, the cloud seam, and cert-manager TLS issuance |
+| [MCP gateway (Obot)](https://opencrane.ai/integrators/mcp-gateway) | Connecting assistants to external tools over MCP |
+| [Skill registry & delivery](https://opencrane.ai/integrators/skill-registry) | Skill catalog, scan/entitle pipeline, and per-read delivery |
+| [Retrieval & memory](https://opencrane.ai/integrators/retrieval-memory) | Cognee retrieval plane: datasets, AccessPolicy mapping, freshness |
+| [API overview](https://opencrane.ai/reference/api-overview) · [CLI reference](https://opencrane.ai/reference/cli) · [Runbook](https://opencrane.ai/operators/runbook) | HTTP API reference · `oc` CLI reference · operational runbook |
 
 ## Quick Start
 
@@ -190,7 +190,7 @@ spec:
 EOF
 ```
 
-The operator provisions everything the tenant needs — storage, identity, an encryption key, and its own ingress. With `ingress.domain=opencrane.ai`, the `jente` assistant is reachable at `https://jente.opencrane.ai`. See [Set up your domain](https://docs.opencrane.ai/guide/dns) for DNS and TLS.
+The operator provisions everything the tenant needs — storage, identity, an encryption key, and its own ingress. With `ingress.domain=opencrane.ai`, the `jente` assistant is reachable at `https://jente.opencrane.ai`. See [Set up your domain](https://opencrane.ai/guide/dns) for DNS and TLS.
 
 ### CLI Quick Reference
 
@@ -216,7 +216,7 @@ oc auth me                              # current auth identity
 oc tenants list --output json | jq '.[].name'   # machine-readable output
 ```
 
-See the [CLI reference](https://docs.opencrane.ai/reference/cli) for the full command reference and the [API reference](https://docs.opencrane.ai/reference/api) for the HTTP API.
+See the [CLI reference](https://opencrane.ai/reference/cli) for the full command reference and the [API reference](https://opencrane.ai/reference/api) for the HTTP API.
 
 ### Version Pinning
 

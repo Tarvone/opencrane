@@ -39,7 +39,7 @@ helps the reader **use or locate** something — never to explain how a choice w
 | Problem, vision, what it does, Quick Start | **README.md** (here) |
 | What shipped / what you can now do | [`CHANGELOG.md`](../../CHANGELOG.md) (capability-first) |
 | Design decisions, phase history, why a choice was made | [`plan-done.md`](../../plan-done.md) |
-| Deep dives, threat models, protocol detail, operator/integrator how-to | the docs site (`website/` → docs.opencrane.ai) |
+| Deep dives, threat models, protocol detail, operator/integrator how-to | the docs site (`website/` → opencrane.ai) |
 | Contributor coding rules & architecture-of-record | [`AGENTS.md`](../../AGENTS.md), `docs/agents/` |
 
 If you find decision/mechanism content in the README, **move or link it** to the right
@@ -70,7 +70,7 @@ assistant" over CRD/`Tenant` internals in the narrative.
 2. Update only what changed about *what OpenCrane is or does*. Don't restate commits.
 3. Keep the Architecture section short and linked-out; never reintroduce the topology
    diagram, connection handshake, or decision language.
-4. Verify links resolve (docs.opencrane.ai/* routes, repo files). Prefer the public docs
+4. Verify links resolve (opencrane.ai/* routes, repo files). Prefer the public docs
    site over `docs/agents/*` for reader-facing links.
 5. Self-check before finishing — run a jargon scan and fix any hit:
 

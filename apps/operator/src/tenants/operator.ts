@@ -2,13 +2,12 @@ import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
 import type { OpenClawTenantOperatorConfig } from "../config.js";
-import type { HostingAdapter } from "../hosting/index.js";
-import { _BuildHostingAdapter } from "../hosting/index.js";
+import { _BuildHostingAdapter, type HostingAdapter } from "../hosting/index.js";
 
 import type { Tenant } from "./models/tenant.interface.js";
 import { TenantPolicyResolutionState, TenantStatusPhase } from "./models/tenant-status.interface.js";
 
-import { _K8sApplyResource } from "../infra/k8s.js";
+import { __K8sApplyResource } from "../infra/k8s.js";
 import { _RunWatchLoop, K8sWatchEventType } from "../shared/watch-runner.js";
 import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "../shared/crd-constants.js";
 import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildConfigMap, _BuildDeployment, _BuildIngress, _BuildIngressHost, _BuildService, _BuildServiceAccount, _BuildStatePvc } from "./deploy/index.js";
@@ -228,7 +227,7 @@ export class TenantOperator
 
       // 1. ServiceAccount — identity annotations come from the adapter; empty on-prem,
       //    Workload Identity annotation on GKE, IRSA on EKS, etc.
-      await _K8sApplyResource(this.coreApi, _BuildServiceAccount(this.hosting, effectiveTenant, namespace), this.log);
+      await __K8sApplyResource(this.coreApi, _BuildServiceAccount(this.hosting, effectiveTenant, namespace), this.log);
 
       // 2. External storage — provision per-cloud via the adapter SDK (GCS bucket etc).
       //    No-op on-prem; idempotent so safe to call on every reconcile.
@@ -252,28 +251,28 @@ export class TenantOperator
 
       // 5. ConfigMap — serialises the base OpenClaw JSON config merged with any
       //    spec.configOverrides the tenant author provided.
-      await _K8sApplyResource(this.coreApi, _BuildConfigMap(this.config, effectiveTenant, namespace, policyResolution.effectivePolicy), this.log);
+      await __K8sApplyResource(this.coreApi, _BuildConfigMap(this.config, effectiveTenant, namespace, policyResolution.effectivePolicy), this.log);
 
       // 6. State volume — adapter decides CSI mount (cloud) vs PVC (on-prem).
       //    Create the PVC only when the adapter requests it (on-prem path).
       const stateVolume = this.hosting.buildStateVolume(name);
       if (stateVolume.requiresPvc)
       {
-        await _K8sApplyResource(this.coreApi, _BuildStatePvc(name, namespace), this.log);
+        await __K8sApplyResource(this.coreApi, _BuildStatePvc(name, namespace), this.log);
       }
 
       // 7. Deployment — single-replica pod running the tenant's OpenClaw gateway.
       //    Mounts the ConfigMap, encryption key, state volume, and projected identity tokens.
-      await _K8sApplyResource(this.appsApi, _BuildDeployment(this.config, stateVolume, effectiveTenant, namespace, compute), this.log);
+      await __K8sApplyResource(this.appsApi, _BuildDeployment(this.config, stateVolume, effectiveTenant, namespace, compute), this.log);
 
       // 8. Service — ClusterIP that makes the gateway reachable inside the cluster
       //    on the configured gateway port.
-      await _K8sApplyResource(this.coreApi, _BuildService(this.config, effectiveTenant, namespace), this.log);
+      await __K8sApplyResource(this.coreApi, _BuildService(this.config, effectiveTenant, namespace), this.log);
 
       // 9. Ingress — routes external HTTPS traffic for {tenant}.{domain} to the Service.
       //    Ingress class and annotations come from the adapter (nginx on-prem, gce on GKE).
       const ingressBinding = this.hosting.buildIngressBinding();
-      await _K8sApplyResource(this.networkingApi, _BuildIngress(this.config, ingressBinding, effectiveTenant, namespace, ingressDomain), this.log);
+      await __K8sApplyResource(this.networkingApi, _BuildIngress(this.config, ingressBinding, effectiveTenant, namespace, ingressDomain), this.log);
 
       // 10. Status — write the observed Running state back to the Tenant CR so that
       //    kubectl, the control-plane API, and the UI all see the current phase.
@@ -319,7 +318,7 @@ export class TenantOperator
 
     // 1. Namespace — ensure the fenced namespace exists and carries the PSA
     //    restricted enforce/warn/audit labels before any workload lands in it.
-    await _K8sApplyResource(this.coreApi, _BuildClusterTenantNamespace(namespace, clusterTenantName), this.log);
+    await __K8sApplyResource(this.coreApi, _BuildClusterTenantNamespace(namespace, clusterTenantName), this.log);
 
     // 2. ResourceQuota — cap the customer's aggregate CPU/memory/pods/storage/GPU
     //    so a single customer cannot starve the cluster. Only stamped when the
@@ -327,11 +326,11 @@ export class TenantOperator
     const quota = clusterTenant.spec.resources?.quota;
     if (quota)
     {
-      await _K8sApplyResource(this.coreApi, _BuildClusterTenantResourceQuota(namespace, clusterTenantName, quota), this.log);
+      await __K8sApplyResource(this.coreApi, _BuildClusterTenantResourceQuota(namespace, clusterTenantName, quota), this.log);
 
       // 3. LimitRange — a quota over requests.* rejects pods that omit requests;
       //    supply per-container defaults so unannotated workloads still schedule.
-      await _K8sApplyResource(this.coreApi, _BuildClusterTenantLimitRange(namespace, clusterTenantName), this.log);
+      await __K8sApplyResource(this.coreApi, _BuildClusterTenantLimitRange(namespace, clusterTenantName), this.log);
     }
   }
 
@@ -361,7 +360,7 @@ export class TenantOperator
     const stateVolume = this.hosting.buildStateVolume(name);
     const deployment = _BuildDeployment(this.config, stateVolume, tenant, namespace, compute);
     deployment.spec!.replicas = 0;
-    await _K8sApplyResource(this.appsApi, deployment, this.log);
+    await __K8sApplyResource(this.appsApi, deployment, this.log);
 
     // 3. Record the suspended phase against the CR namespace.
     await this.statusWriter.patchStatus(tenant, crNamespace, {

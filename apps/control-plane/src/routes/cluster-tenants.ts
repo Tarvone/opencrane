@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { ClusterTenantComputeMode, ClusterTenantIsolationTier, ClusterTenantPhase, ClusterTenantTierUnavailableCode } from "@opencrane/contracts";
-import type { ClusterTenant, ClusterTenantProvisionerRegistry, ClusterTenantResourceQuota } from "@opencrane/contracts";
+import { ClusterTenantPhase, ClusterTenantTierUnavailableCode } from "@opencrane/contracts";
+import type { ClusterTenantProvisionerRegistry } from "@opencrane/contracts";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import type { ClusterTenantComputeInput, ClusterTenantCreateRequest, ClusterTenantResourcesInput, ClusterTenantUpdateRequest } from "./cluster-tenants.types.js";
@@ -157,7 +157,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
   router.get("/", async function _listClusterTenants(req, res)
   {
     const rows = await prisma.clusterTenant.findMany({ orderBy: { createdAt: "asc" } });
-    res.json(rows.map(_toContract));
+    res.json(rows.map(_ToContract));
   });
 
   /** Get a single cluster tenant by name. */
@@ -169,7 +169,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       res.status(404).json({ error: "Cluster tenant not found", code: "CLUSTER_TENANT_NOT_FOUND" });
       return;
     }
-    res.json(_toContract(row));
+    res.json(_ToContract(row));
   });
 
   /** Get just the observed status of a cluster tenant. */
@@ -181,7 +181,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       res.status(404).json({ error: "Cluster tenant not found", code: "CLUSTER_TENANT_NOT_FOUND" });
       return;
     }
-    res.json(_toContract(row).status);
+    res.json(_ToContract(row).status);
   });
 
   /** Create a cluster tenant, gating the requested isolation tier on the registry. */
@@ -196,7 +196,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       res.status(400).json({ error: "name and displayName are required.", code: "VALIDATION_ERROR" });
       return;
     }
-    if (!_isIsolationTier(body.isolationTier))
+    if (!_IsIsolationTier(body.isolationTier))
     {
       res.status(400).json({ error: "isolationTier must be 'shared', 'dedicatedNodes', or 'dedicatedCluster'.", code: "VALIDATION_ERROR" });
       return;
@@ -209,13 +209,13 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
 
     // 2. Validate compute placement and resource gating — a dedicated pool needs
     //    a node-pool name, and a quota ceiling must always be supplied.
-    const computeError = _validateCompute(body.compute);
+    const computeError = _ValidateCompute(body.compute);
     if (computeError)
     {
       res.status(400).json({ error: computeError, code: "VALIDATION_ERROR" });
       return;
     }
-    const resourcesError = _validateResources(body.resources);
+    const resourcesError = _ValidateResources(body.resources);
     if (resourcesError)
     {
       res.status(400).json({ error: resourcesError, code: "VALIDATION_ERROR" });
@@ -243,7 +243,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
         phase: ClusterTenantPhase.Pending,
       },
     });
-    res.status(201).json(_toContract(created));
+    res.status(201).json(_ToContract(created));
   });
 
   /** Update a cluster tenant, re-gating the isolation tier when it changes. */
@@ -287,7 +287,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
     //    must not be moved to a tier no provisioner can serve.
     if (body.isolationTier !== undefined)
     {
-      if (!_isIsolationTier(body.isolationTier))
+      if (!_IsIsolationTier(body.isolationTier))
       {
         res.status(400).json({ error: "isolationTier must be 'shared', 'dedicatedNodes', or 'dedicatedCluster'.", code: "VALIDATION_ERROR" });
         return;
@@ -297,26 +297,26 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
         res.status(422).json({ error: `No provisioner is registered for isolation tier '${body.isolationTier}'.`, code: ClusterTenantTierUnavailableCode });
         return;
       }
-      data.isolationTier = _toPrismaTier(body.isolationTier);
+      data.isolationTier = _ToPrismaTier(body.isolationTier);
     }
 
     // 3. Re-validate compute placement when changed (dedicated needs a pool).
     if (body.compute !== undefined)
     {
-      const computeError = _validateCompute(body.compute);
+      const computeError = _ValidateCompute(body.compute);
       if (computeError)
       {
         res.status(400).json({ error: computeError, code: "VALIDATION_ERROR" });
         return;
       }
-      data.computeMode = _toPrismaCompute(body.compute.mode);
+      data.computeMode = _ToPrismaCompute(body.compute.mode);
       data.nodePool = body.compute.nodePool?.trim() || null;
     }
 
     // 4. Re-validate the resources block when changed (quota must be present).
     if (body.resources !== undefined)
     {
-      const resourcesError = _validateResources(body.resources);
+      const resourcesError = _ValidateResources(body.resources);
       if (resourcesError)
       {
         res.status(400).json({ error: resourcesError, code: "VALIDATION_ERROR" });
@@ -326,7 +326,7 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
     }
 
     const updated = await prisma.clusterTenant.update({ where: { name: req.params.name }, data });
-    res.json(_toContract(updated));
+    res.json(_ToContract(updated));
   });
 
   /** Delete a cluster tenant. */

@@ -7,6 +7,32 @@ This file is the canonical agent instruction file for the repository.
 - Read this file first when working in the repo.
 - Treat legacy guidance in `CLAUDE.md` as redirected here.
 
+## Agent Index
+
+The repository defines specialised agents in two formats. Delegate to the right one rather than
+doing everything inline; **dispatch independent agents concurrently** (multiple agent calls in one
+message) wherever the work has no dependency between them.
+
+**Claude Code subagents** (`.claude/agents/*.md` — invoked via the Agent tool by `name`):
+
+| Agent | Model | Use it for |
+|-------|-------|-----------|
+| `review` | Haiku | Independent, fresh-context code review of a changed slice — correctness bugs, regressions, security/IAM-policy drift, missing tests, AGENTS.md style. Read-only; reports findings severity-first. **Required by the review gate before a turn ends** (see Mandatory Independent Review). |
+| `changelog` | Sonnet | Maintain `CHANGELOG.md` in functional, capability-first terms when a phase/track completes or a tag is cut. Reads `plan.md`/`plan-done.md` + git range; writes capability, not commit history. |
+
+**Roadmap execution** is the `/execute-plan` **skill** (`.claude/commands/execute-plan.md`), not an
+agent — it runs in the main session, parallelises via a dependency DAG + waves (one `general-purpose`
+subagent per lane), commits at each gate, and delegates the review gate to the `review` subagent above.
+
+**Built-in platform agent types** (available via the Agent tool, not repo-defined): `Explore`
+(read-only broad search — locating code across many files), `Plan` (design an implementation plan),
+`general-purpose` (multi-step research/execution). The `architecture` and `angular` types target the
+WeOwnAI frontend monorepo, not this AGPL platform repo.
+
+When adding a new agent: put Claude Code subagents in `.claude/agents/` and add a row above — that is
+the single home for agent definitions (do not reintroduce a parallel `.github/agents/` copy). Add a
+user-invocable workflow as a skill under `.claude/commands/`.
+
 ## Build And Test
 
 - Install deps: `pnpm install`
@@ -28,24 +54,39 @@ This file is the canonical agent instruction file for the repository.
 ## Commit Messages
 
 - Always end each work cycle with a suggested commit message.
-- Commit messages must start with a [gitmoji](https://gitmoji.dev/) emoji that matches the primary intent of the change.
+- **Every commit subject must start with an emoji** that matches the primary intent of the change.
+  Use the table below — it is **derived from this repository's own commit history**, so following it
+  keeps `git log` consistent with the convention already established here.
 - Use imperative mood for the subject line (e.g. `add`, `fix`, `update`, not `added` or `adding`).
 - Keep the subject line under 72 characters.
-- If the change touches multiple concerns, list them as bullet points in the body.
+- If the change touches multiple concerns, list them as bullet points in the body. When a secondary
+  concern is significant, you may append a second emoji after the first (history does this — e.g.
+  `🎱✨`, `🚀 🔧`, `🔧 🔥`); lead with the emoji for the primary intent.
+- **Do not add a Claude / AI co-author trailer** (no `Co-Authored-By: Claude …`). Commits are authored solely by the configured git user.
 
-Common gitmoji prefixes:
-| Intent | Emoji |
-|--------|-------|
-| New feature | ✨ |
-| Bug fix | 🐛 |
-| Refactor (no behavior change) | ♻️ |
-| Documentation | 📝 |
-| Tests | ✅ |
-| Configuration / tooling | 🔧 |
-| Performance | ⚡️ |
-| Security | 🔒️ |
-| Work in progress | 🚧 |
-| Remove code or files | 🔥 |
+Emoji convention (derived from commit history; the count is how often it already appears):
+
+| Intent | Emoji | Notes / what it has marked here |
+|--------|-------|----------------------------------|
+| Configuration / tooling / infra wiring (most common) | 🔧 | Helm scaffold, cluster/scope config, deploy plumbing (45×) |
+| New feature / capability | ✨ | A new subsystem or API/CLI surface (19×) |
+| Enhancement / extend an existing capability | ⚡ | Increment to a shipped capability — metrics, versioning, bindings (5×) |
+| Bug fix / typing fix / address review findings | 🐛 | (7×) |
+| Refactor — no behaviour change | ♻️ | Move shared code, align typing/signals (7×) |
+| Move / rename / restructure files | 🚚 | Split `src/` into packages, relocate tests (4×) |
+| Remove code, files, or infra | 🔥 | Delete dead infra (e.g. remove Crossplane) (13×) |
+| Security / auth / RBAC / TLS / NetworkPolicy | 🔒️ | IAM-first changes (13×) |
+| Documentation | 📝 | Docs + `plan.md` updates (14×) |
+| Notes / progress / readmes | 📓 | Lighter-weight notes & progress (6×) |
+| Architecture / plan / design updates | 🏡 | High-level design & phase planning (6×) |
+| Agent / prompt / AI-loop / meta-config | 🎱 | `AGENTS.md`, agent defs, prompt/loop tuning (5×) |
+| Cosmetic / UI polish | 🎨 | Visual-only tweaks (10×) |
+| Deploy / launch | 🚀 | Launch scripts, local deploy fixes (2×) |
+| Tests | 🧪 | Test-only additions |
+| Work in progress | 🚧 | Incomplete checkpoint |
+
+When an intent isn't covered above, pick the closest [gitmoji](https://gitmoji.dev/) and prefer
+reusing an emoji already in this table over introducing a new one.
 
 ## TypeScript Coding Guidelines
 

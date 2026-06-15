@@ -252,18 +252,28 @@ Multi-instance (§1–4) gives you N isolated *instances* in one cluster. **`Clu
 makes the *customer* a first-class, API-managed resource on top of that, so isolation and
 resource gating are modeled and enforced rather than implied by how you wrote the values files.
 
+> **Two tenant concepts — keep them straight.** A **ClusterTenant** is the *customer /
+> isolation unit* (cluster-scoped `clustertenants.opencrane.io`): it owns a namespace, a
+> `ResourceQuota`/`LimitRange`, a compute `isolationTier`, and its own base domain. A
+> **UserTenant** is the *per-user OpenClaw agent gateway* — the openclaw / `Tenant` CRD
+> (`tenant.opencrane.io`); "UserTenant" is the canonical doc name, while the CRD kind is still
+> `Tenant` in code. They sit at different DNS levels (`acme.ai.example.com` for the customer,
+> `mike.acme.ai.example.com` for the user). See the authoritative
+> [Tenancy Model](agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant)
+> for the full table and DNS hierarchy.
+
 > **The invariant the resource makes enforceable: one customer = one `ClusterTenant` = one
-> instance.** An openclaw (`Tenant` CR) attaches to exactly one `ClusterTenant`; the operator
-> deploys it into that customer's bound namespace and fences it there.
+> instance.** A **UserTenant** (the openclaw / `Tenant` CR) attaches to exactly one
+> `ClusterTenant`; the operator deploys it into that customer's bound namespace and fences it there.
 
 ### 5.1 Default stays single-install (opt-in)
 
 `ClusterTenant` machinery is **opt-in** and changes nothing for a zero-config install. The
 cluster-scoped `clustertenants.opencrane.io` CRD installs with the chart (installing a CRD is
-inert — nothing creates a `ClusterTenant`), and an openclaw with no `spec.clusterTenantRef`
-deploys into the install namespace exactly as before. `helm template` with no flags renders
-**no** ClusterTenant env, namespace, quota, or scheduling. You opt in per customer by creating a
-`ClusterTenant` and pointing openclaws at it with `spec.clusterTenantRef`.
+inert — nothing creates a `ClusterTenant`), and a UserTenant (openclaw / `Tenant` CR) with no
+`spec.clusterTenantRef` deploys into the install namespace exactly as before. `helm template`
+with no flags renders **no** ClusterTenant env, namespace, quota, or scheduling. You opt in per
+customer by creating a `ClusterTenant` and pointing UserTenants at it with `spec.clusterTenantRef`.
 
 ### 5.2 Isolation tiers
 

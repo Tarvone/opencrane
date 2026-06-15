@@ -10,17 +10,39 @@
 > model, network topology, isolation tiers, and multi-instance shape — is in
 > [`cluster-architecture.md`](./cluster-architecture.md). This file covers the coding rules and the
 > operator's runtime behaviour.
+>
+> **Tenancy terms** — a **ClusterTenant** is the customer/isolation unit that owns a namespace, quota,
+> and its own base domain; a **UserTenant** is the per-user OpenClaw agent gateway (the `Tenant`/openclaw
+> CRD, kind still `Tenant` in code) that runs inside that namespace and is exposed at one host under the
+> ClusterTenant's domain. Defined authoritatively in
+> [`cluster-architecture.md` → Tenancy Model](./cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
 
 ## Cluster Architecture Context
 
 How the operator actually shapes the cluster (verified June 2026):
 
 - **Six CRDs** in `platform/helm/crds/`: `Tenant`, `ClusterTenant` (cluster-scoped), `AccessPolicy`, `MCPServer`, `SkillRegistry`, `Schedule`. CRDs use `spec`/`status` subresources — spec is user-owned, status is operator-owned (patched via `*StatusWriter` / `patchNamespacedCustomObjectStatus`).
-- **Operator reconcile is an idempotent ~10-step sequence per Tenant** (`apps/operator/src/tenants/operator.ts`): resolve parent ClusterTenant → enforce isolation (PSA labels + ResourceQuota + LimitRange) → resolve effective AccessPolicy (precedence: explicit `policyRef` > selector > default > none) → ServiceAccount (+ Workload Identity annotation on GKE) → external storage → per-tenant AES-256 key Secret → LiteLLM virtual key (best-effort) → ConfigMap → state volume → single-replica Deployment + Service + Ingress → patch status. **All applies are server-side (fieldManager `openclane-operator`)** so re-runs are safe.
+- **Operator reconcile is an idempotent ~10-step sequence per UserTenant** (`Tenant` CR, `apps/operator/src/tenants/operator.ts`): resolve parent ClusterTenant → enforce isolation (PSA labels + ResourceQuota + LimitRange) → resolve effective AccessPolicy (precedence: explicit `policyRef` > selector > default > none) → ServiceAccount (+ Workload Identity annotation on GKE) → external storage → per-UserTenant AES-256 key Secret → LiteLLM virtual key (best-effort) → ConfigMap → state volume → single-replica Deployment + Service + Ingress → patch status. **All applies are server-side (fieldManager `openclane-operator`)** so re-runs are safe.
 - **Watch loop auto-reconnects** with 5s backoff (`shared/watch-runner.ts`); the K8s API closes streams every ~5–10 min — treat reconnects as normal, never as an error path.
 - **Namespace isolation is enforced per-ClusterTenant**: PSA *restricted* profile labels, a `ResourceQuota` (cpu/mem/pods/storage/gpu), and a `LimitRange` (per-container defaults — required because the quota constrains `requests.*`). Pod placement: `nodeSelector` + `tolerations` are stamped only when the parent's `compute.mode = dedicated`; shared mode is left unconstrained (byte-for-byte baseline preserved).
-- **Delete is non-destructive for data**: removing a Tenant deletes Deployment/ConfigMap/Service/Ingress/PVC but **retains GCS buckets and the encryption-key Secret**. Suspend (`spec.suspended=true`) scales to 0 replicas and keeps all state.
+- **Delete is non-destructive for data**: removing a UserTenant (`Tenant` CR) deletes Deployment/ConfigMap/Service/Ingress/PVC but **retains GCS buckets and the encryption-key Secret**. Suspend (`spec.suspended=true`) scales to 0 replicas and keeps all state.
 - **`PolicyOperator`** builds a standard `NetworkPolicy` (CIDR + port egress, DNS always allowed first) from each AccessPolicy, plus an optional `CiliumNetworkPolicy` for FQDN/domain filtering — Cilium apply failures are logged and skipped gracefully (standard NetworkPolicy still applies).
+
+### Ingress hosts & DNS hierarchy
+
+The cluster routes three DNS levels (full model in
+[`cluster-architecture.md` → Tenancy Model](./cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant)):
+
+```
+ai.example.com               → control plane (platform management API)              [apex]
+  acme.ai.example.com        → ClusterTenant "acme" base domain                     [per-customer]
+    mike.acme.ai.example.com → UserTenant "mike" gateway (wildcard *.acme.ai.example.com)  [per-user]
+```
+
+- The operator builds **one `Ingress` per UserTenant** at `<name>.<ingress.domain>` (`apps/operator/.../5-ingress.ts`). `ingress.domain` is per-instance and **is** the ClusterTenant base domain.
+- cert-manager issues `*.<ingress.domain>` + the apex (`cluster-issuer.yaml`). The wildcard `*.<domain>` maps to **UserTenant** gateways — **not** the ClusterTenant. The ClusterTenant *owns* the domain; its UserTenants get the hosts.
+- The **control-plane apex Ingress is not shipped in the chart** today: the apex is cert-covered, but routing it to the control-plane Service is an installer/out-of-chart step.
+- Auth-less-by-host routing (a UserTenant gateway reachable at its host without an OIDC session) applies to the per-user gateway hosts under the wildcard, not the apex.
 
 ## Defaults
 
@@ -61,5 +83,5 @@ The plane-to-plane boundary is `platform/helm/templates/networkpolicy-planes.yam
 ## Workload Identity & Projected Tokens
 
 - **Cloud identity (GKE):** the operator stamps the KSA annotation `iam.gke.io/gcp-service-account: openclaw-{tenant}@{project}.iam.gserviceaccount.com` (`apps/operator/src/hosting/adapters/gcp/`). The GSA↔KSA IAM binding is set up outside the operator (Terraform). On-prem the annotation is empty and storage provisioning is a no-op.
-- **In-cluster identity:** tenant pods mount up to three audience-bound projected SA tokens read-only under `/var/run/opencrane/tokens/` — `obot-gateway.token`, `skill-registry.token`, `control-plane.token`. TTL is `projectedTokenTtlSeconds` (env-driven); kubelet rotates them with no pod restart. These are real and actively consumed, not aspirational.
-- **`WATCH_NAMESPACE` fail-closed:** with `multiInstance.requireWatchNamespace=true` the operator refuses to start if `WATCH_NAMESPACE` is unset — prevents one instance from reconciling another's tenants. Empty means watch-all (legacy single-install only).
+- **In-cluster identity:** UserTenant (OpenClaw) pods mount up to three audience-bound projected SA tokens read-only under `/var/run/opencrane/tokens/` — `obot-gateway.token`, `skill-registry.token`, `control-plane.token`. TTL is `projectedTokenTtlSeconds` (env-driven); kubelet rotates them with no pod restart. These are real and actively consumed, not aspirational.
+- **`WATCH_NAMESPACE` fail-closed:** with `multiInstance.requireWatchNamespace=true` the operator refuses to start if `WATCH_NAMESPACE` is unset — prevents one instance from reconciling another's UserTenants. Empty means watch-all (legacy single-install only).

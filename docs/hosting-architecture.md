@@ -5,7 +5,12 @@
 > Crossplane removal are all live. The scattered `storageProvider` / `crossplaneEnabled`
 > branching this superseded is gone. §9 records the (completed) migration sequence; the
 > Azure/AWS adapters remain agreed extension points, not yet built. TLS issuance for the
-> tenant ingress is being wired via cert-manager (§6.3, plan CONN.8).
+> per-UserTenant ingress is being wired via cert-manager (§6.3, plan CONN.8).
+>
+> **Tenancy terms:** "tenant" below means a **UserTenant** — the per-user OpenClaw gateway
+> (the openclaw / `Tenant` CRD), exposed at `<user>.<ClusterTenant-domain>`. The
+> **ClusterTenant** is the customer that owns the base domain. See the authoritative
+> [Tenancy Model](agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
 
 ## 1. Goals & Principles
 
@@ -449,21 +454,30 @@ compatibility contract.
 ### 6.3 Ingress TLS (cert-manager wildcard — plan CONN.8)
 
 TLS is deliberately **k8s-native and provider-agnostic** rather than per-cloud managed
-certs, so the same mechanism works on-prem and on any cloud:
+certs, so the same mechanism works on-prem and on any cloud. `ingress.domain` is
+per-instance, so it **is** the **ClusterTenant base domain** (e.g. `acme.ai.example.com`);
+the wildcard `*.<domain>` covers the customer's **UserTenant** gateway hosts
+(`<user>.<domain>`), not the ClusterTenant itself.
 
 - **cert-manager** issues one **wildcard `*.<ingress.domain>` (+ apex) certificate** via
   ACME **DNS-01** (wildcards require DNS-01) into the `ingress.tls.secretName` Secret
-  (default `opencrane-wildcard-tls`). One cert covers every `<tenant>.<domain>` pod, so
-  adding a tenant needs no new issuance.
+  (default `opencrane-wildcard-tls`). One cert covers every `<user>.<domain>` UserTenant
+  gateway, so adding a UserTenant needs no new issuance.
 - The chart renders a `ClusterIssuer` + wildcard `Certificate`
   (`platform/helm/templates/cluster-issuer.yaml`) when `certManager.enabled=true` —
   `mode: selfSigned` for dev/local, `mode: acme` with a DNS-01 solver for production.
-- The operator adds a `tls:` block to each tenant Ingress (referencing the shared
-  wildcard Secret) when `ingress.tls.enabled=true`, driven by `INGRESS_TLS_ENABLED` /
-  `INGRESS_TLS_SECRET_NAME` env. Default off → no behaviour change.
+- The operator adds a `tls:` block to each **UserTenant** Ingress (one Ingress per
+  UserTenant at `<name>.<ingress.domain>`, referencing the shared wildcard Secret) when
+  `ingress.tls.enabled=true`, driven by `INGRESS_TLS_ENABLED` / `INGRESS_TLS_SECRET_NAME`
+  env. Default off → no behaviour change.
+- **Apex / control-plane gap.** The wildcard cert *covers* the apex (`<domain>`) as a SAN,
+  and the intended model routes the apex to the control-plane management API. But the
+  **apex→control-plane Ingress is not shipped in the chart today** — only the per-UserTenant
+  Ingresses are operator-built. Routing the (cert-covered) apex to the control-plane Service
+  is currently an installer/out-of-chart step.
 - **Constraint:** TLS Secrets are namespace-scoped, so `certManager.certificateNamespace`
-  must equal the namespace tenant Ingresses run in (the operator `watchNamespace`). The
-  one-label-per-tenant, apex-as-SAN, host-only-cookie, and delegated-DNS-subzone rules
+  must equal the namespace UserTenant Ingresses run in (the operator `watchNamespace`). The
+  one-label-per-UserTenant, apex-as-SAN, host-only-cookie, and delegated-DNS-subzone rules
   live in plan CONN.8.
 
 Remaining CONN.8 follow-ups: a DNS-provider onboarding CLI/API (`oc platform dns set`),

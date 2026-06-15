@@ -3,6 +3,13 @@
 How identities authenticate to OpenCrane and how a single human login grants
 access to **both** the control-plane API and the user's own OpenClaw pod.
 
+> **Terminology:** the per-user OpenClaw agent gateway is a **UserTenant** (the openclaw /
+> `Tenant` CRD); "UserTenant" is the canonical doc name while the CRD kind is still `Tenant`
+> in code. It is exposed at `<user>.<ClusterTenant-domain>`. The **ClusterTenant** is the
+> customer that owns that base domain. See the authoritative
+> [Tenancy Model](agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
+> Below, "tenant pod" / "tenant gateway" means a UserTenant.
+
 > **Status legend:** ✅ implemented · 🔶 planned/target. The OIDC control-plane
 > session and the pairing **broker** (`POST /api/v1/auth/pod-token`) are
 > implemented today. The browser-side OpenClaw **connect handshake** (device
@@ -18,7 +25,7 @@ OpenCrane has two backends a user touches, and they must not require two logins:
 | Plane | What it serves | How it is reached |
 |-------|----------------|-------------------|
 | **Control plane** | management + metadata: tenants, policies, groups, budgets, skills, audit, auth | the versioned control-plane API (OIDC session) |
-| **Tenant pod (OpenClaw)** | the live agent session: chat, Cognee retrieval, canvas | the tenant's own `gatewayUrl` (`wss://<ingressHost>`), via the OpenClaw Gateway v4 protocol |
+| **UserTenant pod (OpenClaw)** | the live agent session: chat, Cognee retrieval, canvas | the UserTenant's own `gatewayUrl` (`wss://<ingressHost>`, i.e. `<user>.<ClusterTenant-domain>`), via the OpenClaw Gateway v4 protocol |
 
 The principle is **one identity, brokered access**: the human signs in once via
 OIDC; the control plane then **brokers** the connection to the user's own pod by
@@ -56,7 +63,7 @@ scheme (B1) and pairing-link provisioning (B2) are confirmed.
 - **OpenClaw-native.** The pairing link (`{ url, bootstrapToken }`) is OpenClaw's
   own mechanism; OpenCrane brokers it instead of inventing a parallel token path.
 - **Data sovereignty.** The bootstrap token is short-lived and single-device, and
-  the connection is audience-bound to one tenant's gateway.
+  the connection is audience-bound to one UserTenant's gateway.
 - **Minimal browser secrets.** The browser holds its HTTP-only session cookie; the
   long-term posture (Option B) re-brokers a short-lived bootstrap per session
   rather than persisting a long-lived device token client-side.
@@ -66,8 +73,8 @@ scheme (B1) and pairing-link provisioning (B2) are confirmed.
 | Credential | Subject | Audience / target | TTL / storage | Status |
 |-----------|---------|-------------------|---------------|--------|
 | **Control-plane session cookie** | the human | control plane | server-signed, HTTP-only cookie (~12h) | ✅ |
-| **OpenClaw bootstrap token** | the device, on the human's behalf | the tenant pod's Gateway (one pod) | short-lived, single-device; from the pairing link | ✅ broker / 🔶 short-TTL mint |
-| **OpenClaw device token** | the paired device | the tenant pod's Gateway | issued in `hello-ok`; persisted per device (Option B target: re-broker, do not persist) | 🔶 |
+| **OpenClaw bootstrap token** | the device, on the human's behalf | the UserTenant pod's Gateway (one pod) | short-lived, single-device; from the pairing link | ✅ broker / 🔶 short-TTL mint |
+| **OpenClaw device token** | the paired device | the UserTenant pod's Gateway | issued in `hello-ok`; persisted per device (Option B target: re-broker, do not persist) | 🔶 |
 | **Projected SA token** | a Kubernetes service account | `obot-gateway` / `skill-registry` / `control-plane` | ~600s, kubelet-rotated, in-cluster only | ✅ |
 
 The **projected SA token** is *workload* identity and must **never be handed to a
@@ -149,19 +156,19 @@ standard OpenID Connect discovery.
 - **Automation / CI** uses a static bearer token (`Authorization: Bearer …`).
   Treat this as a migration target; prefer OIDC/IAM where possible.
 
-## Tenant pod access (pairing broker)
+## UserTenant pod access (pairing broker)
 
-To reach a user's OpenClaw, a caller needs to connect to the pod's **Gateway** and
-complete OpenClaw's native pairing handshake. The **control plane is the broker**:
-it authenticates the human and knows the user↔tenant mapping (`Tenant.email`), so
-it returns that pod's pairing link.
+To reach a user's OpenClaw, a caller needs to connect to the UserTenant pod's
+**Gateway** and complete OpenClaw's native pairing handshake. The **control plane is the
+broker**: it authenticates the human and knows the user↔UserTenant mapping (the `Tenant`
+CR's `email` field), so it returns that pod's pairing link.
 
 Implemented as **`POST /api/v1/auth/pod-token`** ✅ (the endpoint name predates the
 broker model). It returns the pairing link, not a minted bearer token:
 
-1. Resolve the caller's tenant **from the session's verified email only** — there
-   is no request-supplied tenant input — matched case-insensitively to
-   `Tenant.email`; more than one match fails closed (`409 AMBIGUOUS_TENANT`).
+1. Resolve the caller's **UserTenant from the session's verified email only** — there
+   is no request-supplied tenant input — matched case-insensitively to the `Tenant`
+   CR's `email`; more than one match fails closed (`409 AMBIGUOUS_TENANT`).
 2. Resolve the pod's pairing details (`_ResolveOpenClawPairing`): read
    `configOverrides.openclaw.{gatewayUrl,bootstrapToken}`, falling back to
    `wss://<ingressHost>`. **Only `wss://` is ever returned** (CONN.2). Returns

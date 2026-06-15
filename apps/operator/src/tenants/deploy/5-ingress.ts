@@ -7,7 +7,13 @@ import { _BuildIngressHost } from "./ingress-host.js";
 import { _BuildTenantLabels } from "./tenant-labels.js";
 
 /**
- * Build the tenant Ingress that exposes the gateway on its assigned hostname.
+ * Build the UserTenant Ingress that exposes the per-user OpenClaw gateway on its
+ * assigned hostname. The host is `<name>.<ingressDomain>`, where `ingressDomain` is
+ * the ClusterTenant base domain — so this is one Ingress per UserTenant, sitting under
+ * the customer's (ClusterTenant's) domain. ("UserTenant" is the canonical doc name for
+ * the `Tenant` CRD; the ClusterTenant is the customer / isolation unit that owns the
+ * domain. See docs/agents/cluster-architecture.md → "Tenancy Model — ClusterTenant vs
+ * UserTenant".)
  *
  * Ingress class and provider annotations come from the hosting adapter's IngressBinding,
  * so the builder stays provider-agnostic: nginx on-prem, gce on GKE, etc. When
@@ -21,8 +27,9 @@ export function _BuildIngress(config: OpenClawTenantOperatorConfig, ingressBindi
   const host = _BuildIngressHost(name, config.ingressDomain);
 
   // TLS termination: reference the shared wildcard Secret for this host. The Secret is
-  // provisioned once by cert-manager (a wildcard Certificate); per-tenant Ingresses do
-  // not request their own cert, so adding a tenant needs no new issuance.
+  // provisioned once by cert-manager (a wildcard Certificate for the ClusterTenant base
+  // domain); per-UserTenant Ingresses do not request their own cert, so adding a
+  // UserTenant needs no new issuance.
   const tls: k8s.V1IngressTLS[] | undefined = config.ingressTlsEnabled
     ? [{ hosts: [host], secretName: config.ingressTlsSecretName }]
     : undefined;

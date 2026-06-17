@@ -162,5 +162,5 @@ kubectl rollout status "deployment/${RELEASE}-operator" -n "$NAMESPACE" --timeou
 kubectl rollout status "deployment/${RELEASE}-control-plane" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
 
 log "Done. OpenCrane is installed in namespace '$NAMESPACE'."
-[[ -n "$DOMAIN" ]] && log "Point your DNS at the ingress, then visit https://admin.${DOMAIN}"
+[[ -n "$DOMAIN" ]] && log "Point your DNS at the ingress, then visit https://${DOMAIN}"
 log "Ingress: kubectl get ingress -n $NAMESPACE"

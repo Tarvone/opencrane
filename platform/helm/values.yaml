@@ -95,7 +95,7 @@ sharedPlatform:
 # -- Operator settings
 operator:
   image:
-    repository: ghcr.io/italanta/operator
+    repository: ghcr.io/italanta/opencrane-operator
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -116,7 +116,7 @@ operator:
 # -- Control plane settings
 controlPlane:
   image:
-    repository: ghcr.io/italanta/control-plane
+    repository: ghcr.io/italanta/opencrane-control-plane
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -199,7 +199,7 @@ litellm:
 # -- Default tenant pod settings (can be overridden per Tenant CR)
 tenant:
   defaultImage:
-    repository: ghcr.io/italanta/tenant
+    repository: ghcr.io/italanta/opencrane-tenant
     tag: latest
     pullPolicy: IfNotPresent
   defaultResources:

@@ -9,6 +9,7 @@
 - **Track P4-C** (agent identity & personalisation via OpenClaw workspace files): **P4C.1–P4C.5 landed** (2026-06-13). Workspace bootstrap/seeding, contract-derived TOOLS.md, company-doc API + immutable versioning + L0 guard, agent-driven reconciliation (deterministic merger; LiteLLM agent merge is the seam) producing approve/reject proposals, and version-gated delivery into the pod via the re-pull loop. Whole track testable spine complete; live LiteLLM merge quality is the remaining upgrade.
 - **Track CONN** (OpenClaw connection auth & session security): pairing-broker endpoint implemented (2026-06-13); connection-security posture **decided = Option B** (short-lived re-brokered credentials + per-user kill-switch; control plane stays connection-stateless). Full trade-off in `website/security/connection-security.md`. Transport hardening landed 2026-06-13 (CONN.2); `website/security/identity.md` rewritten for the pairing broker (CONN.6); **CONN.8 wildcard TLS** landed (operator Ingress `tls:` + cert-manager ClusterIssuer/Certificate Helm scaffold, dev selfSigned + prod ACME DNS-01; **onboarding CLI/API `oc platform dns set` + dev sslip.io hosts landed 2026-06-13**) with cross-namespace + live-ACME-e2e as the remaining (cluster-bound) follow-ups. **Kill-switch chain landed 2026-06-13 (CONN.3 persistence+decode, CONN.4 device registry, CONN.5 cut + RBAC)** — testable spine complete; the gateway per-device revoke + CP-held operator device + in-pod mint exec are the remaining live-infra seams. Proxy (Option C) deferred as a contingent vision.
 - **Track P4-D** (MCP & Skills platform completion — the two 🔶 gaps): scoped + decisions locked 2026-06-13. P4D.2 OCI/Zot **foundation slice landed** (`OciBundleStore` + gated Zot Helm; runtime cutover deferred to a live-Zot slice). P4D.1 **brokering-model slice landed** (credential brokering-mode + custody validation + API/CLI + gated encryption-at-rest Helm; live OBO push/exchange parked). See Open Backlog → Track P4-D.
+- **Track AIR** (AI model routing, selection & cost optimization): **scoped 2026-06-18** from the LiteLLM BYOK/BYOM + autonomous-router research (`litellm-byok-byom-research.md`, `litellm-router-autonomous-improvement-research.md`). Explicit / skill-pinned / opt-in-`auto` model selection, the BYOM model registry, and the shadow-mode measurement + nightly improvement loop that lowers token cost at equal quality. Locked: full AGPL (OpenRouter = inspiration only), no fee (meter only), no Enterprise license, BYOK at control-plane/ClusterTenant level (not per-openclaw-tenant), k8s-native secrets (GCP-SM + ESO + CMEK-by-default). GuardLLM verified **not** implemented (design-only). See Open Backlog → Track AIR.
 - **Review discipline** (2026-06-13): the `review` agent (`.claude/agents/review.md`) now has a mandatory **"verify every finding before reporting"** step — re-trace the cited code and construct a concrete repro before asserting; unconfirmed concerns go under *Open questions*, not *Findings*. Added after a review surfaced a finding that did not survive verification.
 - **Branch**: `phase-4-5-fixes`, 6 commits ahead of `main`.
 
@@ -444,6 +445,107 @@ With one agent per lane, wall-clock ≈ 4 sequential slices instead of 7.
   is unchanged; opt-in renders the ClusterTenant path; conformance + build green. **Anchors:**
   `platform/helm/values.yaml`, `website/operators/multi-instance.md`, `docs/enterprise-needs.md`,
   `platform/tests/multi-instance-conformance.sh`. **Headless-buildable.**
+
+### Track AIR — AI model routing, selection & cost optimization
+
+> Scoped 2026-06-18 from the LiteLLM BYOK/BYOM + autonomous-router research (this session). Two
+> reports at repo root: `litellm-byok-byom-research.md`, `litellm-router-autonomous-improvement-research.md`.
+> Goal: give every caller **explicit model choice**, let **skills pin (or `auto`) their own model**,
+> add an **opt-in "auto" routing mode**, and stand up the **shadow-mode measurement + nightly
+> improvement loop** that lowers token cost at equal quality — all OSS/AGPL, API-first, IAM-gated.
+>
+> **Decisions (locked 2026-06-18):**
+> - **Full AGPL forever.** OpenRouter is UI/CLI *inspiration only* — no wire/client-slug compat;
+>   triangulate the surface with WeOwnAI.
+> - **No fee — meter + manage only** (no 5% / prepaid wallet).
+> - **No LiteLLM Enterprise license** (proprietary; can't ship in an AGPL artifact). OSS workarounds
+>   are permanent architecture.
+> - **BYOK is control-plane / ClusterTenant level — never per-openclaw-tenant.** Two key types:
+>   *upstream provider key* = central or per-ClusterTenant (held by LiteLLM); *LiteLLM virtual key* =
+>   per-openclaw (budget + `models[]` + metering, already minted).
+> - **Secrets are k8s-native:** GCP Secret Manager → External Secrets Operator → k8s Secret → LiteLLM
+>   env (`os.environ/<KEY>`); the `/credentials` DB store is only for the optional dynamic case.
+>   **CMEK on by default** (Terraform gap today).
+> - **Selection precedence: explicit request model > skill-pinned model > "auto" (only if selected) >
+>   global default**, bounded by the virtual key's `models[]`. **Auto runs only when "auto" is
+>   explicitly chosen** — otherwise the chosen/pinned model is used verbatim.
+> - **`STORE_MODEL_IN_DB` is the BYOM unlock.** LiteLLM does not learn — the improvement loop is
+>   external (RouteLLM Apache-2.0 + Langfuse MIT), writing back via the control plane only.
+>
+> **Verified:** no GuardLLM / guardrail / safety service exists anywhere in `opencrane-2` (code, Helm,
+> briefs, plans) — design-only, never built. A safety stream is future work (AIR.9); its logs would be
+> an auxiliary signal (hard filter + score term), **not** the routing quality judge.
+>
+> **Security prerequisite:** dev auth is OPEN and there is no per-route RBAC
+> (`auth.middleware.ts:117`, `docs/agents/architecture.md:35`). The credential/model/skill-model
+> mutation routes handle live secrets + cost policy and **must get ClusterTenant-scoped route authz
+> before they ship** (AIR.0b).
+
+- [ ] **AIR.0 Platform hardening prereqs (Helm/Terraform — no behaviour change).** (a) **CMEK by
+  default** in `platform/terraform/modules/gke/main.tf`: KMS keyring + crypto key (`prevent_destroy`)
+  + GKE robot `roles/cloudkms.cryptoKeyEncrypterDecrypter` IAM + `database_encryption { state=ENCRYPTED;
+  key_name=… }`. (b) **DB-backed LiteLLM for all profiles**: `DATABASE_URL` + `STORE_MODEL_IN_DB=True`
+  (+ `LITELLM_SALT_KEY` if `/credentials` used) into `litellm-deployment.yaml` + every values profile
+  (today only `gcp.yaml`). (c) **Redis** for cross-replica budgets/limits. (d) **Pin the LiteLLM image**
+  off `:main-latest`. **Acceptance:** existing per-tenant virtual keys still mint + persist across
+  restart; `helm template` clean. **Anchors:** `platform/terraform/modules/gke/main.tf`,
+  `platform/helm/templates/litellm-deployment.yaml`, `platform/helm/values*.yaml`.
+- [ ] **AIR.0b Route authz for credential/model/skill-model mutations.** ClusterTenant-scoped
+  authorization at the route layer — the mutation routes cannot inherit the dev fallback gate. Prereq
+  for AIR.1/AIR.3/AIR.4 shipping. **Anchors:** `apps/control-plane/src/infra/middleware/`, the new routes.
+- [ ] **AIR.1 Model registry (BYOM) — control-plane + LiteLLM.** `ModelDefinition` (scope
+  `global|clusterTenant`) + `ProviderCredential` (scope `global|clusterTenant`, references the
+  ESO-synced k8s Secret — **no raw key**) Prisma tables; `GET /models` + `POST/PATCH/DELETE /models`
+  (global) + `/cluster-tenants/{id}/models`; `oc model add/list/update/remove [--cluster-tenant]` +
+  `oc provider add/list/remove [--cluster-tenant] --token-file`. Backed by LiteLLM `/model/new` (GLOBAL,
+  `api_key: os.environ/<KEY>`). Retire the orphaned `ProviderApiKey` table + hardcoded `["openai","claude"]`.
+  **Anchors:** `openapi/spec.ts`, `routes/provider-keys.ts`→registry routes, `prisma/schema.prisma`,
+  regenerated `libs/contracts`, `apps/cli/src/commands/`.
+- [ ] **AIR.2 Model selection precedence + the "auto" gate.** Resolve per request/skill:
+  **explicit > skill-pinned > auto (opt-in) > global default**, bounded by the key's `models[]`.
+  **Auto runs only when explicitly selected** (request- or skill-level flag) — never global-implicit.
+  Write the resolved per-skill model into the effective-contract + propagate to the pod
+  (`2-config-map.ts` `models[]`/default). **Anchors:** effective-contract endpoint,
+  `apps/operator/src/tenants/deploy/2-config-map.ts`.
+- [ ] **AIR.3 Skill-level model definition.** Let a skill self-define its model in the skill-registry
+  metadata — a **pinned** model or **`auto`** (with a per-skill auto config) — surfaced via the skill
+  API + `oc skill …` + the effective-contract. **Anchors:** skill-registry schema, control-plane skill
+  routes, contract compiler.
+- [ ] **AIR.4 "auto" configuration surface.** The opt-in auto knobs (router report §12):
+  objective/strategy (cheapest-passing-bar default | best-quality-within-budget | balanced via a
+  cost↔quality slider), quality floor (skill bar), budget cap, allowed-model set (= key `models[]`),
+  latency ceiling, fallback chain, scope (global|ClusterTenant|skill|request), session-pin (default on),
+  exploration toggle. API-first + `oc` + WeOwnAI. **Anchors:** config schema in `openapi/spec.ts`,
+  contract, CLI.
+- [ ] **AIR.5 Per-tenant virtual-key hardening.** Extend `_generateLiteLlmVirtualKey` to send `team_id`
+  (ClusterTenant→LiteLLM Team), `models[]` allowlist, `budget_duration`, `tpm/rpm`; fix the no-rotation
+  early-return; complete revocation (`/key/delete`); stop the `org-shared-secrets` `envFrom` broadcast
+  (keys stay at the proxy). **Anchors:** `apps/operator/src/tenants/internal/tenant-litellm-keys.ts`,
+  `deploy/3-deployment.ts`, `core/ai-budget/ai-budget.logic.ts`.
+- [ ] **AIR.6 Shadow-mode savings measurement (FIRST loop slice — zero production risk).** LiteLLM
+  `CustomLogger` → **Langfuse** (skill id, model, cost, latency, propensity); per-skill golden eval set
+  + quality bar; nightly shadow-grade a sample with a **neutral judge** (not the candidates' vendor);
+  **OPE** (Open Bandit Pipeline, doubly-robust + bootstrap CIs + per-tenant breakdown); produce the
+  per-skill **go/no-go savings table**. (Router §11.) **Deliverable:** "routing would save X%±Y at equal
+  quality; overhead Z%." Needs AIR.0 + candidate models registered (AIR.1). **Anchors:** new optimizer
+  service/job, Langfuse self-host (MIT), LiteLLM callback.
+- [ ] **AIR.7 Nightly improvement loop for "auto" skills (WALK/RUN).** judge → OPE → propose
+  (cheapest-≥-bar; later RouteLLM matrix-factorization/BERT or a bandit) → gate on a frozen private
+  hold-out + significance (95% CI excludes zero) → **canary** → **human-approved diff via the control
+  plane** → write per-skill default + LiteLLM `/model/update` + per-key `models[]`. IAM-gated + audited;
+  **never auto-deploy.** Four rules: log propensities/explore, neutral judge (multi-vendor
+  self-preference), frozen hold-out, shadow→canary→approve. (Router §4/§7.)
+- [ ] **AIR.8 (FUTURE) Fixed-model-skill savings evaluator + advisory notification.** For skills pinned
+  to a fixed model (not auto), run the shadow evaluator continuously and **surface an advisory — never
+  auto-change a pinned skill**: WeOwnAI/CLI lists fixed-model skills with *"by changing this skill's
+  model you could save up to N% in token cost at equal quality,"* one-click **"switch to recommended"** /
+  **"enable auto."** (Router §12.)
+- [ ] **AIR.9 (FUTURE) Safety / guardrail stream.** If/when a guardrail service is adopted, run it as an
+  external OSS service (LiteLLM's built-in callbacks are Enterprise), emit verdicts to Langfuse keyed by
+  skill id; use as a hard routing filter + a safety term in the per-skill score — **not** the quality
+  judge. No such service exists today.
+
+**Sequencing:** AIR.0/0b (prereqs) → AIR.1 (registry) → {AIR.2 selection ∥ AIR.3 skill model ∥ AIR.4 auto config} → AIR.5 key hardening → **AIR.6 shadow measurement is the recommended first end-to-end slice** (proves the savings before building AIR.7) → AIR.7 loop → AIR.8/9 future.
 
 ---
 

@@ -23,3 +23,8 @@ CREATE TABLE "model_routing_defaults" (
 );
 
 CREATE UNIQUE INDEX "model_routing_defaults_scope_cluster_tenant_key" ON "model_routing_defaults" ("scope", "cluster_tenant");
+
+-- Postgres treats NULLs as distinct in a composite unique index, so the index above does NOT bound
+-- the Global rows (cluster_tenant IS NULL). This partial unique index enforces at-most-one Global
+-- default on ALL Postgres versions (no reliance on NULLS NOT DISTINCT / PG15+).
+CREATE UNIQUE INDEX "model_routing_defaults_global_key" ON "model_routing_defaults" ("scope") WHERE "cluster_tenant" IS NULL;

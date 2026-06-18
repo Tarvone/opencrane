@@ -204,13 +204,38 @@ export function modelRoutingDefaultsRouter(prisma: PrismaClient): Router
       : Prisma.JsonNull;
 
     // 3. Upsert on the (scope, clusterTenant) pair so repeated writes update in place. Prisma's
-    //    compound-unique selector cannot express a null clusterTenant (Global scope), so resolve
-    //    the existing row with findFirst then branch to update/create rather than `upsert`.
+    //    compound-unique selector cannot express a null clusterTenant (Global scope), so resolve the
+    //    existing row with findFirst then branch. Uniqueness is DB-enforced (compound index for
+    //    ClusterTenant rows; a partial unique index for the Global row — migration 0018); if a
+    //    concurrent create loses that race it surfaces as P2002, so fall back to updating the
+    //    now-existing row, keeping the upsert idempotent under concurrency.
     const prismaScope = _toPrismaScope(scope);
+    const data = { defaultModel, autoConfig: autoConfigValue };
     const existing = await prisma.modelRoutingDefault.findFirst({ where: { scope: prismaScope, clusterTenant } });
-    const row = existing
-      ? await prisma.modelRoutingDefault.update({ where: { id: existing.id }, data: { defaultModel, autoConfig: autoConfigValue } })
-      : await prisma.modelRoutingDefault.create({ data: { scope: prismaScope, clusterTenant, defaultModel, autoConfig: autoConfigValue } });
+    let row: PrismaModelRoutingDefault;
+    if (existing)
+    {
+      row = await prisma.modelRoutingDefault.update({ where: { id: existing.id }, data });
+    }
+    else
+    {
+      try
+      {
+        row = await prisma.modelRoutingDefault.create({ data: { scope: prismaScope, clusterTenant, ...data } });
+      }
+      catch (err)
+      {
+        // Lost the create race against a concurrent writer — the unique index rejected us; update theirs.
+        const raced = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002"
+          ? await prisma.modelRoutingDefault.findFirst({ where: { scope: prismaScope, clusterTenant } })
+          : null;
+        if (!raced)
+        {
+          throw err;
+        }
+        row = await prisma.modelRoutingDefault.update({ where: { id: raced.id }, data });
+      }
+    }
     res.json(_toContract(row));
   });
 

@@ -1,5 +1,6 @@
 import express from "express";
 import type { Express } from "express";
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -121,6 +122,27 @@ describe("modelRoutingDefaultsRouter", function _suite()
     const list = await request(app).get("/api/v1/model-routing/defaults");
     expect(list.body).toHaveLength(1);
     expect(list.body[0].defaultModel).toBe("b");
+  });
+
+  it("stays idempotent when a concurrent create loses the race (P2002 -> update)", async function _upsertRace()
+  {
+    const raced: Row = { id: "default-raced", scope: "Global", clusterTenant: null, defaultModel: "openai/gpt-4o", autoConfig: null, createdAt: new Date(), updatedAt: new Date() };
+    let firstFind = true;
+    const prisma = {
+      tenant: { findMany: async function _fm() { return []; } },
+      modelRoutingDefault: {
+        // First lookup (pre-create) sees nothing; the post-P2002 lookup finds the racer's row.
+        findFirst: async function _ff() { if (firstFind) { firstFind = false; return null; } return raced; },
+        create: async function _create() { throw new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "test" }); },
+        update: async function _update(args: { where: { id: string }; data: Row }) { return { ...raced, ...args.data, updatedAt: new Date() }; },
+      },
+    } as unknown as PrismaClient;
+
+    const res = await request(_buildApp(prisma)).put("/api/v1/model-routing/defaults").send({ defaultModel: "anthropic/claude" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe("default-raced");
+    expect(res.body.defaultModel).toBe("anthropic/claude");
   });
 
   it("accepts an auto-config-only default", async function _autoOnly()

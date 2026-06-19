@@ -274,7 +274,7 @@ export class OidcAuthService
 
     // 1. Exchange the authorization code for tokens using the stored PKCE verifier.
     const discoveredConfig = await this._getDiscoveredConfig();
-    const tokens = await client.authorizationCodeGrant(discoveredConfig, _buildCurrentUrl(req), {
+    const tokens = await client.authorizationCodeGrant(discoveredConfig, _buildCurrentUrl(req, this.config.redirectUri), {
       pkceCodeVerifier: flow.codeVerifier,
       expectedState: flow.state,
       expectedNonce: flow.nonce,
@@ -472,15 +472,24 @@ export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient): Oid
   return new OidcAuthService(log, prisma);
 }
 
-/** Convert the current Express request into an absolute callback URL. */
-function _buildCurrentUrl(req: Request): URL
+/**
+ * Convert the current Express request into an absolute callback URL.
+ * Reconstructed using the configured redirect URI base to prevent domain/protocol
+ * mismatch issues caused by proxies or load balancers stripping x-forwarded headers.
+ *
+ * @param req - The incoming callback request.
+ * @param redirectUri - The static configured redirect URI.
+ * @returns The reconstructed URL matching the OIDC callback.
+ */
+function _buildCurrentUrl(req: Request, redirectUri: string): URL
 {
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  const forwardedHost = req.headers["x-forwarded-host"];
-  const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-  const host = typeof forwardedHost === "string" ? forwardedHost.split(",")[0].trim() : req.get("host");
+  // 1. Rebuild the URL using the configured redirectUri base.
+  const url = new URL(redirectUri);
 
-  return new URL(`${protocol}://${host}${req.originalUrl}`);
+  // 2. Append the search parameters (state, code) from the incoming request.
+  url.search = new URL(req.originalUrl, "http://localhost").search;
+
+  return url;
 }
 
 /** Limit return targets to local relative paths to prevent open redirects. */

@@ -39,6 +39,7 @@ export default defineConfig({
           { text: 'Organizational knowledge', link: '/guide/knowledge' },
           { text: 'Control access', link: '/guide/permissions' },
           { text: 'Manage cost', link: '/guide/budgets' },
+          { text: 'Model routing', link: '/guide/model-routing' },
         ],
       },
       {
@@ -86,6 +87,7 @@ export default defineConfig({
           { text: 'Organizational knowledge', link: '/guide/knowledge' },
           { text: 'Control who can access what', link: '/guide/permissions' },
           { text: 'Manage cost', link: '/guide/budgets' },
+          { text: 'Model routing & auto-routing', link: '/guide/model-routing' },
           { text: 'Review activity', link: '/guide/audit' },
         ],
       },
@@ -107,6 +109,7 @@ export default defineConfig({
           { text: 'Identity & connection auth', link: '/security/identity' },
           { text: 'Connection security', link: '/security/connection-security' },
           { text: 'Runbook', link: '/operators/runbook' },
+          { text: 'Telemetry & logging', link: '/operators/telemetry-logging' },
           { text: 'Awareness SLOs', link: '/operators/awareness-slos' },
         ],
       },

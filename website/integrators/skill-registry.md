@@ -5,8 +5,9 @@ agents. Like Obot, it is split: the control plane is the **source of truth**
 (catalog, scanning, entitlements); the in-cluster **Skill Registry** app is the
 **delivery gate** that tenant pods pull from.
 
-> See also: [obot.md](/integrators/mcp-gateway) (the sibling MCP plane), [auth.md](/security/identity)
-> (token audiences), and [hosting-architecture.md](/operators/hosting).
+> See also: [obot.md](/integrators/mcp-gateway) (the sibling MCP plane),
+> [agent-workspace.md](/integrators/agent-workspace) (how the agent becomes aware of its skills),
+> [auth.md](/security/identity) (token audiences), and [hosting-architecture.md](/operators/hosting).
 
 ## Planes at a glance
 

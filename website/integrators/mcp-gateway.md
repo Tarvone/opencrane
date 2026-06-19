@@ -5,6 +5,7 @@ agents. Obot is the in-cluster **runtime gateway**; the control plane is the
 **source of truth** for the catalog and per-tenant entitlements.
 
 > See also: [skills-registry.md](/integrators/skill-registry) (the sibling delivery plane),
+> [agent-workspace.md](/integrators/agent-workspace) (how the agent learns and is governed),
 > [auth.md](/security/identity) (token audiences), and [hosting-architecture.md](/operators/hosting).
 
 ## What Obot is

@@ -117,6 +117,7 @@ export default defineConfig({
         text: 'Deep dives',
         collapsed: true,
         items: [
+          { text: 'Agent workspace & control', link: '/integrators/agent-workspace' },
           { text: 'MCP gateway (Obot)', link: '/integrators/mcp-gateway' },
           { text: 'Skill registry & delivery', link: '/integrators/skill-registry' },
           { text: 'Retrieval & memory (Cognee)', link: '/integrators/retrieval-memory' },

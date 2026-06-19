@@ -147,6 +147,35 @@ controlPlane:
     backendAccessControl: true
     # -- Permission sync timeout in milliseconds
     permissionsTimeoutMs: 5000
+  # -- OIDC authentication configuration (OIDC broker)
+  oidc:
+    # -- Enable OIDC login broker flow. Requires issuerUrl, clientId, and redirectUri.
+    enabled: false
+    # -- OIDC Issuer URL (e.g. https://accounts.google.com)
+    issuerUrl: ""
+    # -- OIDC Client ID
+    clientId: ""
+    # -- OIDC Redirect URI (callback URL, e.g. https://control-plane.example.com/api/v1/auth/callback)
+    redirectUri: ""
+    # -- Name of an existing K8s Secret containing OIDC_SESSION_SECRET and optionally OIDC_CLIENT_SECRET
+    existingSecret: ""
+    # -- Key within the existing secret that holds the session secret (defaults to OIDC_SESSION_SECRET)
+    sessionSecretKey: OIDC_SESSION_SECRET
+    # -- Key within the existing secret that holds the client secret (defaults to OIDC_CLIENT_SECRET)
+    clientSecretKey: OIDC_CLIENT_SECRET
+    # -- OAuth scopes (defaults to "openid email profile")
+    scopes: "openid email profile"
+    # -- Session cookie name (defaults to "opencrane_oidc")
+    cookieName: "opencrane_oidc"
+    # -- Force secure cookie (defaults to true in production or inferred in dev)
+    cookieSecure: ""
+    # -- Session max age in seconds (defaults to 43200 / 12 hours)
+    sessionMaxAgeSeconds: 43200
+    # -- Comma-separated list of allowed email domains
+    allowedEmailDomains: ""
+    # -- Comma-separated list of allowed email addresses
+    allowedEmails: ""
+
 
 # -- LiteLLM integration settings
 litellm:

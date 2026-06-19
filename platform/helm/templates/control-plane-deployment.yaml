@@ -128,6 +128,52 @@ spec:
                   key: {{ .Values.clusterTenant.provisionerWebhook.secretKey }}
             {{- end }}
             {{- end }}
+            {{- if .Values.controlPlane.oidc.enabled }}
+            - name: OIDC_ISSUER_URL
+              value: {{ .Values.controlPlane.oidc.issuerUrl | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.controlPlane.oidc.clientId | quote }}
+            - name: OIDC_REDIRECT_URI
+              value: {{ .Values.controlPlane.oidc.redirectUri | quote }}
+            {{- if .Values.controlPlane.oidc.existingSecret }}
+            - name: OIDC_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.controlPlane.oidc.existingSecret }}
+                  key: {{ .Values.controlPlane.oidc.sessionSecretKey | default "OIDC_SESSION_SECRET" }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.controlPlane.oidc.existingSecret }}
+                  key: {{ .Values.controlPlane.oidc.clientSecretKey | default "OIDC_CLIENT_SECRET" }}
+                  optional: true
+            {{- end }}
+            {{- if .Values.controlPlane.oidc.scopes }}
+            - name: OIDC_SCOPES
+              value: {{ .Values.controlPlane.oidc.scopes | quote }}
+            {{- end }}
+            {{- if .Values.controlPlane.oidc.cookieName }}
+            - name: OIDC_COOKIE_NAME
+              value: {{ .Values.controlPlane.oidc.cookieName | quote }}
+            {{- end }}
+            {{- if ne .Values.controlPlane.oidc.cookieSecure "" }}
+            - name: OIDC_COOKIE_SECURE
+              value: {{ .Values.controlPlane.oidc.cookieSecure | quote }}
+            {{- end }}
+            {{- if .Values.controlPlane.oidc.sessionMaxAgeSeconds }}
+            - name: OIDC_SESSION_MAX_AGE_SECONDS
+              value: {{ .Values.controlPlane.oidc.sessionMaxAgeSeconds | quote }}
+            {{- end }}
+            {{- if .Values.controlPlane.oidc.allowedEmailDomains }}
+            - name: OIDC_ALLOWED_EMAIL_DOMAINS
+              value: {{ .Values.controlPlane.oidc.allowedEmailDomains | quote }}
+            {{- end }}
+            {{- if .Values.controlPlane.oidc.allowedEmails }}
+            - name: OIDC_ALLOWED_EMAILS
+              value: {{ .Values.controlPlane.oidc.allowedEmails | quote }}
+            {{- end }}
+            {{- end }}
+
           livenessProbe:
             httpGet:
               path: /healthz

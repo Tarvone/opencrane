@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultConfig, gcpConfig, gcpAdapter, onPremAdapter, _makeAccessPolicy, _makeTenant } from "../fixtures.js";
-import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildClusterTenantScheduling, _BuildConfigMap, _BuildDeployment, _BuildIngress, _BuildServiceAccount, _BuildStatePvc } from "../../tenants/deploy/index.js";
+import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildClusterTenantScheduling, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildIngress, _BuildServiceAccount, _BuildStatePvc } from "../../tenants/deploy/index.js";
 
 describe("TenantResourceBuilder", () =>
 {
@@ -249,7 +249,10 @@ describe("TenantResourceBuilder", () =>
 
     expect(host).toBe("sarah.opencrane.local");
     expect(ingress.spec?.ingressClassName).toBe("nginx");
-    expect(ingress.metadata?.annotations).toEqual({});
+    // Trusted-proxy broker (CONN.4): the gateway WS upgrade is auth_request'd to
+    // the control-plane verify endpoint, which injects the trusted user header.
+    expect(ingress.metadata?.annotations?.["nginx.ingress.kubernetes.io/auth-url"]).toContain("/api/v1/auth/gateway-verify");
+    expect(ingress.metadata?.annotations?.["nginx.ingress.kubernetes.io/auth-response-headers"]).toBe(defaultConfig.gatewayTrustedProxyUserHeader);
   });
 
   it("builds Ingress with gce class and annotation on GCP", () =>
@@ -279,6 +282,19 @@ describe("TenantResourceBuilder", () =>
     const ingress = _BuildIngress(tlsConfig, onPremAdapter.buildIngressBinding(), tenant, "default");
 
     expect(ingress.spec?.tls).toEqual([{ hosts: ["sarah.opencrane.local"], secretName: "opencrane-wildcard-tls" }]);
+  });
+
+  it("builds a NetworkPolicy locking the gateway port to the ingress namespace (CONN.4)", () =>
+  {
+    const tenant = _makeTenant("sarah");
+    const netpol = _BuildGatewayNetworkPolicy(defaultConfig, tenant, "default");
+
+    expect(netpol.spec?.policyTypes).toEqual(["Ingress"]);
+    // Only the ingress-nginx namespace may reach the gateway port — so no other
+    // pod can connect directly and assert an arbitrary X-Forwarded-User.
+    const rule = netpol.spec?.ingress?.[0];
+    expect(rule?._from?.[0]?.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"]).toBe("ingress-nginx");
+    expect(rule?.ports?.[0]?.port).toBe(defaultConfig.gatewayPort);
   });
 });
 

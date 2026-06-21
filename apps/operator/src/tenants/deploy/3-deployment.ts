@@ -63,11 +63,9 @@ export function _BuildDeployment(config: OpenClawTenantOperatorConfig, stateVolu
     ...(config.liteLlmEnabled ? [{ name: "LITELLM_ENDPOINT", value: config.liteLlmEndpoint }] : []),
     ...(tenant.spec.team ? [{ name: "OPENCRANE_TEAM", value: tenant.spec.team }] : []),
     ...(tenant.spec.policyRef ? [{ name: "OPENCRANE_POLICY_REF", value: tenant.spec.policyRef }] : []),
-    // Gateway auth token (OC-2): projected from the per-tenant Secret the operator
-    // provisions (`openclaw-<name>-gateway-token`). The OpenClaw gateway reads
-    // OPENCLAW_GATEWAY_TOKEN at startup and refuses to bind to the LAN without it.
-    // Always present — every pod's gateway needs to bind.
-    { name: "OPENCLAW_GATEWAY_TOKEN", valueFrom: { secretKeyRef: { name: `openclaw-${name}-gateway-token`, key: "token" } } },
+    // Gateway auth is trusted-proxy (OC-2 / CONN.4), configured in openclaw.json
+    // (see 2-config-map.ts) — no OPENCLAW_GATEWAY_TOKEN here (mutually exclusive
+    // with trusted-proxy; the gateway binds because trusted-proxy is a valid mode).
   ];
 
   if (config.liteLlmEnabled)

@@ -39,6 +39,11 @@ describe("TenantResourceBuilder", () =>
     const runtimeContract = JSON.parse(configMap.data?.["opencrane-managed-runtime.json"] ?? "{}");
 
     expect(configMap.metadata?.name).toBe("openclaw-cfg-config");
+    // OC-2 / CONN.4: gateway uses trusted-proxy auth (control-plane brokers the
+    // connection); trustedProxies + userHeader come from operator config.
+    expect(payload.gateway.auth.mode).toBe("trusted-proxy");
+    expect(payload.gateway.auth.trustedProxy.userHeader).toBe(defaultConfig.gatewayTrustedProxyUserHeader);
+    expect(payload.gateway.trustedProxies).toEqual(defaultConfig.gatewayTrustedProxies);
     expect(payload.agents.defaults.model).toBe("gpt-4o");
     expect(runtimeContract.mode).toBe("managed");
     expect(runtimeContract.tenant.name).toBe("cfg");
@@ -221,11 +226,9 @@ describe("TenantResourceBuilder", () =>
     expect(envVars.OPENCRANE_ALLOWED_SKILLS).toBeUndefined();
     expect(envVars.HOME).toBe("/tmp/opencrane-home");
     expect(envVars.NPM_CONFIG_CACHE).toBe("/tmp/npm-cache");
-    // OC-2: the gateway auth token is projected from the per-tenant Secret via
-    // secretKeyRef (never a literal), so it carries no inline `value`.
-    const gatewayTokenEnv = (container?.env ?? []).find((entry) => entry.name === "OPENCLAW_GATEWAY_TOKEN");
-    expect(gatewayTokenEnv?.valueFrom?.secretKeyRef?.key).toBe("token");
-    expect(gatewayTokenEnv?.valueFrom?.secretKeyRef?.name).toMatch(/-gateway-token$/);
+    // OC-2 / CONN.4: gateway auth is trusted-proxy (configured in openclaw.json,
+    // not via env), so there is no OPENCLAW_GATEWAY_TOKEN on the pod.
+    expect(envVars.OPENCLAW_GATEWAY_TOKEN).toBeUndefined();
     expect(volumeMounts.some((mount) => mount.name === "tmp" && mount.mountPath === "/tmp")).toBe(true);
     expect(volumeMounts.some((mount) => mount.name === "projected-identity" && mount.mountPath === "/var/run/opencrane/tokens")).toBe(true);
     expect(volumes.some((volume) => volume.name === "tmp" && volume.emptyDir !== undefined)).toBe(true);

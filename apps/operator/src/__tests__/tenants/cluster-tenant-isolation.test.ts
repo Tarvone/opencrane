@@ -82,7 +82,6 @@ function _makeOperator(core: RecordingClient, apps: RecordingClient, networking:
   const statusWriter = { async patchStatus(): Promise<void> {} } as never;
   const encryptionKeys = { async ensureEncryptionKeySecret(): Promise<void> {} } as never;
   const liteLlmKeys = { async ensureLiteLlmKeySecret(): Promise<void> {} } as never;
-  const gatewayTokens = { async ensureGatewayTokenSecret(): Promise<void> {} } as never;
   const cleanup = { async cleanupTenant(): Promise<void> {} } as never;
 
   return new TenantOperator(
@@ -98,7 +97,6 @@ function _makeOperator(core: RecordingClient, apps: RecordingClient, networking:
     statusWriter,
     encryptionKeys,
     liteLlmKeys,
-    gatewayTokens,
   );
 }
 

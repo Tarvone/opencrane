@@ -1,0 +1,44 @@
+# Dev GKE overlay — layer on top of gcp.yaml.
+#
+# Usage:
+#   helm upgrade --install opencrane platform/helm -n opencrane-system \
+#     -f platform/helm/values/gcp.yaml \
+#     -f platform/helm/values/gke-dev.yaml
+
+global:
+  environment: dev
+
+ingress:
+  domain: dev.weownai.eu
+
+controlPlane:
+  image:
+    tag: latest
+
+operator:
+  image:
+    tag: latest
+  # Required when multiInstance.requireWatchNamespace is true — tells the
+  # operator which namespace to watch for Tenant CRs.
+  watchNamespace: opencrane-system
+
+tenant:
+  image:
+    tag: latest
+
+multiInstance:
+  # Re-enable the isolation guard (requireWatchNamespace: true is correct for
+  # multi-instance clusters). The operator refuses to start if WATCH_NAMESPACE
+  # is empty, so operator.watchNamespace above must always be set alongside this.
+  requireWatchNamespace: true
+
+mcpGateway:
+  image:
+    # Pinned to the audited stable tag. Bump deliberately.
+    tag: v0.23.1
+
+litellm:
+  # Disabled in dev: the container has an npm cache permission bug that causes
+  # CrashLoopBackOff. The operator degrades gracefully (unrestricted model
+  # access, no budget enforcement). Re-enable once the LiteLLM image is fixed.
+  enabled: false

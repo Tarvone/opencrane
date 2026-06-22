@@ -13,7 +13,7 @@ import type { CreateTenantRequest, TenantDatasetsResponse, TenantResponse, Updat
 import type { EffectiveContractResponse } from "./tenants.types.js";
 import { _DetectTenantProjectionDrift } from "./internal/projection-drift.js";
 import { _RepairTenantProjection } from "./internal/projection-repair.js";
-import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "./internal/crd-constants.js";
+import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "../shared/crd-constants.js";
 
 /** Tenant CR appearance SLO constants. */
 const TENANT_CR_APPEARANCE_TIMEOUT_MS = 30_000;

@@ -46,6 +46,7 @@ jobs:
       - name: Test skill-registry
         run: pnpm --filter @opencrane/skill-registry test
 
+
   e2e-k3d:
     name: k3d e2e smoke test
     runs-on: ubuntu-latest

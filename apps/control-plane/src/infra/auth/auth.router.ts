@@ -10,6 +10,7 @@ import { _ResolveOpenClawPairing } from "./openclaw-pairing.js";
 import { _RecordBrokeredDevice } from "./brokered-device.js";
 import { _CutTenant } from "../../core/connections/cut-tenant.js";
 import type { OpenClawGatewayAdmin } from "../../core/connections/gateway-admin.types.js";
+import { _ResolveGatewayTarget } from "../../core/connections/gateway-resolve.js";
 
 /**
  * Build the auth router covering:
@@ -48,35 +49,59 @@ export function ___AuthRouter(authService: OidcAuthService, prisma: PrismaClient
     }
   });
 
+
   /**
-   * Reverse-proxy auth check for a tenant's OpenClaw gateway (trusted-proxy mode,
-   * OC-2 / CONN.4). The pod's ingress runs this as an nginx `auth_request` on the
-   * WebSocket upgrade: a valid OIDC session returns 204 with the caller's verified
-   * email in `X-Forwarded-User`; the ingress injects that header (overwriting any
-   * client-supplied value) so the gateway — configured `gateway.auth.mode =
-   * trusted-proxy`, trusting only the ingress source — authenticates the socket as
-   * that user, with no credential ever held by the browser.
+   * Routing-authority endpoint for the identity-routing gateway proxy (DOMAIN.T4).
    *
-   * This makes the control-plane the connection **broker**: every gateway socket
-   * is authorised here against the live session. **Central cut** falls out for
-   * free — revoking the session makes this return 401, so the ingress refuses new
-   * upgrades (live sockets are still severed by the pod-delete kill-switch).
+   * Every user in an org shares ONE host (`<org>.<base>`); this endpoint tells the
+   * identity-routing proxy (now folded into the operator) **where** a session's gateway
+   * socket should go: it returns the verified identity plus the authoritative
+   * `{ tenant, podService }` the proxy forwards to (the proxy then injects that identity
+   * into the trusted-proxy user header on the upstream). The proxy holds NO session
+   * logic — the control plane stays the sole auth authority (delegate-auth), so the
+   * express session store is never shared across services.
+   *
+   * **Cross-tenant safety (routing half):** the target is resolved solely from the
+   * session's IdP-verified email via the fail-closed email→tenant rule — no
+   * request-supplied tenant input — and a missing/ambiguous mapping fails closed with
+   * **403**. Combined with per-pod owner pinning (CONN.10, the pod-level half) this is
+   * defence in depth: neither the routing layer nor the pod will serve a foreign user.
    *
    * Public (mounted before `___AuthMiddleware`); enforces the session inline.
    */
-  router.get("/gateway-verify", function _gatewayVerify(req, res)
+  router.get("/gateway-resolve", async function _gatewayResolve(req, res, next)
   {
-    const authUser = req.session?.authUser;
-    const email = typeof authUser?.email === "string" ? authUser.email.trim().toLowerCase() : "";
-    if (!authUser || email.length === 0)
+    try
     {
-      res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });
-      return;
+      const authUser = req.session?.authUser;
+      if (!authUser)
+      {
+        res.status(401).json({ error: "Authentication required", code: "UNAUTHORIZED" });
+        return;
+      }
+
+      const email = typeof authUser.email === "string" ? authUser.email : "";
+      const sub = typeof authUser.sub === "string" ? authUser.sub : "";
+      const outcome = await _ResolveGatewayTarget(prisma, namespace, email, sub);
+
+      if (!outcome.ok)
+      {
+        // Every fail-closed reason is a 403: the proxy treats it as "refuse the upgrade".
+        const message = outcome.code === "AMBIGUOUS_TENANT"
+          ? "Multiple OpenClaw pods match this account; contact your administrator"
+          : outcome.code === "NO_TENANT"
+            ? "No OpenClaw is provisioned for this account"
+            : "Session has no email claim; cannot resolve a tenant";
+        res.status(403).json({ error: message, code: outcome.code });
+        return;
+      }
+
+      res.status(200).json(outcome.resolved);
     }
-    // Identity the ingress copies into the upstream `X-Forwarded-User` header
-    // (and strips any client-supplied one) for the gateway to trust.
-    res.setHeader("X-Forwarded-User", email);
-    res.status(204).end();
+    catch (err)
+    {
+      next(err);
+    }
   });
 
   // --------------------------------------------------------------------------
@@ -89,11 +114,11 @@ export function ___AuthRouter(authService: OidcAuthService, prisma: PrismaClient
    * connection follows, never a second login (see `docs/auth.md`).
    *
    * Under trusted-proxy gateway auth (CONN.4) the browser holds **no credential**:
-   * it opens the returned `wss://` gateway URL, and the ingress authorises that
-   * socket against the live session via `/auth/gateway-verify` (injecting the
-   * verified user). So this route returns only the gateway URL — no token. The
-   * earlier designs (a minted Kubernetes token, then a bootstrap pairing token)
-   * are both retired.
+   * it opens the returned `wss://` gateway URL (the org host), and the identity-routing
+   * proxy authorises that socket against the live session via `/auth/gateway-resolve`
+   * (injecting the verified user on the upstream). So this route returns only the gateway
+   * URL — no token. The earlier designs (a minted Kubernetes token, then a bootstrap
+   * pairing token) are both retired.
    *
    * **Cross-tenant safety:** the target tenant is resolved solely from the
    * session's IdP-verified email — there is no request-supplied tenant input —

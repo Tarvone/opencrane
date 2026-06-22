@@ -93,6 +93,29 @@ creates a billing account, then creates an org and becomes its root admin.
 - Tests: billing-account create, create-records-owner, the full guard matrix, membership-derived `isOrgAdmin`
   (+20; control-plane suite 407 green).
 
+### Track INSTALL — Complete deploy (one-command install over a shared core) — LANDED 2026-06-22 (PR #52)
+
+A guided, fail-fast install that brings a fresh cluster up end-to-end, with two thin profile
+scripts over one shared core (`platform/k8s-deploy.sh`) so the profiles cannot diverge.
+- **Bundled cluster singletons (default ON, auto-skip if present, `*.install` flag SEPARATE from the
+  chart's `*.enabled`):** ingress-nginx, **external-dns** (acme mode; `--source=crd` → Cloud DNS, scoped
+  to `--base-domain`), and Cognee (in-chart). cert-manager Step 2.5 has three modes — off / selfSigned /
+  acme(DNS-01) — with a DNS-01 preflight that fails fast.
+- **Shared zone-write identity:** external-dns + the cert-manager DNS-01 solver share ONE `roles/dns.admin`
+  Workload-Identity GSA (or one `--dns01-credentials` SA key) — no second binding.
+- **Terraform aligned to external-dns:** `modules/dns` provisions the zone + install-time platform records +
+  the shared WI binding; per-org/per-host records are runtime (external-dns), never Terraform (the
+  `org_wildcards` direct-record path removed). Static ingress IP stays in `app-deploy`.
+- **`--preflight`:** read-only, fail-fast core check — default StorageClass, NetworkPolicy-enforcing CNI,
+  first-party image pullability, registrar NS-delegation for `--base-domain`, and the DNS-write capability
+  shared by external-dns + cert-manager. Exits before any cluster mutation.
+- **Fixes:** the installer now CREATES the OIDC secret (client + auto-generated session secret) and wires
+  `controlPlane.oidc.existingSecret` (previously assumed to exist → crash-loop); the missing
+  `<fullname>-external-secrets` ServiceAccount the SecretStore's WI ref points at is rendered in-chart; the
+  dead `sharedSkills.pvc.storageClass` Terraform set removed; a stale ClusterTenant-seed import path fixed.
+- Validation: operator (155) + control-plane (411) suites green; `helm template` for both profiles clean;
+  tsc/lint clean. `--dry-run=server` for both profiles prepared in the PR (shared cluster is READ-ONLY).
+
 ### Track DOMAIN — Fixed wildcard + CNAME domain topology — LANDED 2026-06-22
 
 Replaced the "each customer brings their own domain + delegated DNS-01" model with a **fixed-wildcard
@@ -111,8 +134,12 @@ Stacked on `feat/org-admin-billing`.
 - **Multi-level wildcard TLS (decided):** `*.<base>` covers org apexes but NOT `<user>.<org>.<base>` (a
   wildcard matches one label) → a **per-org** `*.<org>.<base>` `Certificate` issued at org-provision via
   cert-manager DNS-01 (reference manifest `platform/helm/examples/per-org-wildcard-cert.yaml`).
-- **DNS automation:** `modules/dns` extended — platform wildcard + apex + control-plane-host records, and a
-  `var.org_wildcards`-driven per-org `*.<org>.<base>` record matching the operator hook's shape.
+- **DNS automation (aligned to external-dns):** `modules/dns` provisions the zone + the install-time
+  platform records (apex, `*.<base>`, control-plane host) + the shared `roles/dns.admin` Workload-Identity
+  binding that external-dns and the cert-manager DNS-01 solver impersonate. **Per-org/per-host records are
+  NOT written by Terraform** — external-dns reconciles them at runtime from the operator's `DNSEndpoint` CRs
+  (the old `var.org_wildcards` direct-record path is removed). The install scripts bundle external-dns as a
+  value-gated cluster singleton (`externalDns.install`, default ON in acme mode, `--no-external-dns` to BYO).
 - **Per-org provisioning — IMPLEMENTED (operator-owned, PR #50):** `DefaultOrgDomainProvisioner`
   (`apps/operator/src/cluster-tenants/internal/org-domain.provisioner.ts`) behind the `OrgDomainProvisioner`
   interface. It applies the per-org wildcard `Certificate` (`*.<org>.<base>` + apex/vanity SANs) via
@@ -149,17 +176,29 @@ Stacked on `feat/org-admin-billing`.
   `ingress.dnsManagedZone` value removed. external-dns is a prerequisite (install with `--source=crd`), like
   cert-manager. The k8s-error classification (`_IsCrdAbsent`/`_IsConflict`/`_IsNotFound`) was extracted to a
   shared `k8s-api-errors.ts` used by both the cert-manager and DNSEndpoint clients.
-- **DOMAIN.T2 — wire org-domain teardown on ClusterTenant delete.** The reconciler's `Deleted` case is a no-op,
-  so `OrgDomainProvisioner.deprovisionOrgDomain(...)` (deletes the per-org `Certificate` + `DNSEndpoint`) is
-  implemented but never invoked. Namespace GC reclaims both namespaced CRs, and external-dns reaps the records
-  it owns once the DNSEndpoint is gone — BUT only if the DNSEndpoint is actually deleted, so wire deprovision
-  into the delete handler (idempotent; pass the bound namespace) rather than relying solely on namespace GC.
-- **DOMAIN.T3 — collapse the now-vestigial control-plane provisioner runtime paths.** The operator owns
-  provisioning; the control-plane `SharedClusterProvisioner`/`ExternalWebhookProvisioner` `provision()` /
-  `getStatus()` / `deprovision()` methods are dead at runtime — only `registry.isTierAvailable(...)` (tier
-  gating in `clusterTenantsRouter`) is live. Consider shrinking the `ClusterTenantProvisioner` contract to a
-  tier-availability gate so the dead lifecycle methods (and their interface surface) go away.
-- **DOMAIN.T4 — collapse per-user subdomains to a single per-org host with an identity-routing proxy.**
+- **DOMAIN.T2 — wire org-domain teardown on ClusterTenant delete — DONE.** The reconciler's `Deleted` case now
+  invokes `OrgDomainProvisioner.deprovisionOrgDomain(...)` (deletes the per-org `Certificate` + external-dns
+  `DNSEndpoint` so external-dns reaps the records it owns). The bound namespace is re-derived deterministically
+  (`opencrane-<name>`) so delete never depends on `status` being present; the call is idempotent and fail-soft
+  (errors logged, not re-thrown — namespace GC is the backstop). +3 operator tests (suite 158).
+- **DOMAIN.T3 — collapse the now-vestigial control-plane provisioner runtime paths — DONE.** The operator owns
+  provisioning, so the control-plane `ClusterTenantProvisioner` interface + its `SharedClusterProvisioner` /
+  `ExternalWebhookProvisioner` implementations (all `provision()`/`getStatus()`/`deprovision()` dead at runtime)
+  and the unused `provisionerFor` registry method were deleted. The registry is now a pure tier-availability gate
+  carrying `{ id, tiers }` entries — `isTierAvailable` + `capabilities` only (the live callers). `dedicatedCluster`
+  gating + the HTTPS-only webhook-config validation are preserved (`_ReadExternalWebhookConfig`). Contracts lib
+  unchanged (its `ClusterTenantProvisionerRegistry` was already minimal). `provisioner.test.ts` → `registry.test.ts`.
+- **DOMAIN.T4 — collapse per-user subdomains to a single per-org host with an identity-routing proxy —
+  PARTIALLY LANDED (service + endpoint built & gated; ingress cutover remains).** Landed this slice: the new
+  `@opencrane/gateway-proxy` app (thin, logic-free WS reverse proxy: Origin/CSWSH allowlist → delegated auth →
+  per-identity rate limit → forward to `openclaw-<user>.<ns>.svc`), the control-plane
+  `GET /api/v1/auth/gateway-resolve` routing authority (fail-closed email→tenant; 403 on no/ambiguous), Helm
+  deployment+service gated behind `gatewayProxy.enabled` (off; `automountServiceAccountToken:false`, no RBAC —
+  it never touches the k8s API), the CI image build, and §0.1 of connection-security.md. 19 proxy tests + 7
+  gateway-resolve tests. **STILL TO DO (the cutover, its own slice):** one per-org Ingress that path-routes
+  `/api`/UI/gateway-WS; retire the operator's per-user Ingress + per-user DNS/cert minting; confirm the OIDC
+  redirect-URI allowlist accepts per-org hosts; flip `gatewayProxy.enabled` per install. Until then routing
+  stays per-user-subdomain and the proxy is dormant.
   **Decisions LOCKED (2026-06):** (a) **per-org host** `company.opencrane.ai` (preserves cross-org origin
   isolation + vanity CNAMEs; one DNS record + one **HTTP-01** cert per org → no wildcard, no DNS-01, no
   cert-manager zone access — supersedes the wildcard parts of T1); (b) **same-origin** — the app UI, `/api/*`,
@@ -168,24 +207,23 @@ Stacked on `feat/org-admin-billing`.
   needs is `company.opencrane.ai` (or vanity → it).
   - **Prerequisite (DONE):** CONN.10 per-pod owner pinning (`allowUsers`), so the pod self-enforces its owner
     regardless of routing — without it, identity-routing would be the *only* cross-tenant guard.
-  - **New component — identity-routing WS proxy** on the per-org host. On a gateway WS upgrade it calls a new
+  - **New component — identity-routing WS proxy (DONE)** on the per-org host. On a gateway WS upgrade it calls a new
     control-plane endpoint `GET /auth/gateway-resolve` (verify session → return `{ user, tenant, podService }`,
     reusing the existing fail-closed email→tenant resolution; **403** if no/ambiguous tenant), validates the
     `Origin` header against the same-origin host (CSWSH guard — CORS does NOT cover WS), then reverse-proxies
     to `openclaw-<user>.<ns>.svc`. The proxy holds NO session logic — the control-plane stays the auth
     authority (delegate-auth pattern, like today's nginx `auth_request`). This avoids sharing the express
     session store across services.
-  - **Ingress:** one per-org Ingress for `company.opencrane.ai` — path-route `/api/*`→control-plane, UI→
+  - **Ingress (REMAINS):** one per-org Ingress for `company.opencrane.ai` — path-route `/api/*`→control-plane, UI→
     frontend, gateway WS→the proxy. The operator STOPS minting per-user Ingresses + per-user DNS/cert.
-  - **OIDC:** login/callback/session now happen on the per-org host (host-scoped cookie). Confirm the OIDC
+  - **OIDC (REMAINS):** login/callback/session now happen on the per-org host (host-scoped cookie). Confirm the OIDC
     redirect-URI handling supports per-org hosts (multi-host redirect allowlist) before cutover.
-  - **Security controls (must-haves):** Origin allowlist on the WS upgrade (CSWSH); host-scoped cookie (never
-    parent `.opencrane.ai`); proxy is a thin, logic-free, heavily-logged choke point; per-identity rate limits
-    move into the proxy. Cross-tenant safety rests on CONN.10 (pod-level) + the proxy's `gateway-resolve`
-    (routing-level) — defence in depth.
-  - **Docs:** `website/security/connection-security.md` (extend §0 with the proxy + Origin controls) + a domain-
-    topology doc. **Scope note:** this is a sizable new service (app + Dockerfile + Helm + control-plane
-    endpoint + ingress rework + tests) — implement as its own focused slice.
+  - **Security controls (DONE):** Origin allowlist on the WS upgrade (CSWSH, fail-closed); proxy is a thin,
+    logic-free, heavily-logged choke point; per-identity rate limits live in the proxy. Cross-tenant safety rests
+    on CONN.10 (pod-level) + the proxy's `gateway-resolve` (routing-level) — defence in depth. (Host-scoped cookie
+    lands with the ingress/OIDC cutover above.)
+  - **Docs (DONE):** `website/security/connection-security.md` §0.1 documents the proxy + Origin controls +
+    delegated-auth flow + cutover status.
 
 ### Track P5 — Close Phase 5 — ✅ COMPLETE · full history: plan-done.md § Completed Tracks (archived 2026-06-15)
 

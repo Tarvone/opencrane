@@ -27,7 +27,7 @@ const _RECORD_TTL = 300;
  * returns `{ ready:false, skipped:true }` so the reconciler records the skip and the
  * org still reaches `ready` — it never throws.
  *
- * PRECONDITION: the org's bound namespace (`<namespacePrefix><org>`) must already
+ * PRECONDITION: the org's bound namespace (`req.boundNamespace`) must already
  * exist — the reconciler fences it BEFORE calling this. A missing namespace is a
  * precondition fault: the cert-manager client re-throws that 404 (it is NOT masked as
  * "cert-manager absent"), so the reconciler surfaces it as an error.
@@ -50,7 +50,7 @@ export class DefaultOrgDomainProvisioner implements OrgDomainProvisioner
   /**
    * @param certs  - cert-manager Certificate operations.
    * @param dns    - Cloud DNS record operations, or null when no zone is configured.
-   * @param config - Issuer name/kind + namespace prefix from the chart values.
+   * @param config - Issuer name/kind from the chart values.
    */
   public constructor(certs: CertManagerOperations, dns: CloudDnsOperations | null, config: OrgDomainProvisionerConfig)
   {
@@ -64,7 +64,7 @@ export class DefaultOrgDomainProvisioner implements OrgDomainProvisioner
   {
     const orgDomain = _BuildOrgDomain(req.orgName, req.platformBaseDomain);
     const wildcardDnsName = _BuildOrgWildcard(orgDomain); // `*.<org>.<base>`
-    const namespace = `${this.config.namespacePrefix}${req.orgName}`;
+    const namespace = req.boundNamespace;
     const tlsSecretName = `org-wildcard-tls-${req.orgName}`;
 
     // 1. DNS first — the wildcard A record `*.<org>.<base>` and the org apex, both →
@@ -106,11 +106,11 @@ export class DefaultOrgDomainProvisioner implements OrgDomainProvisioner
   }
 
   /** @inheritdoc */
-  public async deprovisionOrgDomain(orgName: string, platformBaseDomain: string): Promise<void>
+  public async deprovisionOrgDomain(orgName: string, platformBaseDomain: string, boundNamespace: string): Promise<void>
   {
     const orgDomain = _BuildOrgDomain(orgName, platformBaseDomain);
     const wildcardDnsName = _BuildOrgWildcard(orgDomain);
-    const namespace = `${this.config.namespacePrefix}${orgName}`;
+    const namespace = boundNamespace;
     const tlsSecretName = `org-wildcard-tls-${orgName}`;
 
     // 1. Delete the Certificate first — missing Certificate / CRD are no-ops.

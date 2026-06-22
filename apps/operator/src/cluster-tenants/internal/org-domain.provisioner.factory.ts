@@ -40,7 +40,6 @@ export function _BuildOrgDomainProvisioner(customApi: k8s.CustomObjectsApi, conf
     {
       issuerName: config.certManagerIssuerName,
       issuerKind: config.certManagerIssuerKind,
-      namespacePrefix: config.clusterTenantNamespacePrefix,
     },
   );
 }

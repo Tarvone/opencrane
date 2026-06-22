@@ -21,7 +21,6 @@ export const defaultConfig: OpenClawTenantOperatorConfig = {
   dnsManagedZone: "",
   certManagerIssuerName: "opencrane-issuer",
   certManagerIssuerKind: "ClusterIssuer",
-  clusterTenantNamespacePrefix: "opencrane-",
   ingressTlsEnabled: false,
   ingressTlsSecretName: "opencrane-wildcard-tls",
   gatewayPort: 18789,

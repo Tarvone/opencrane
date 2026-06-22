@@ -30,6 +30,12 @@ export interface OrgDomainProvisionRequest
    * bound-namespace name, and Certificate label values.
    */
   orgName: string;
+  /**
+   * The org's bound namespace (the reconciler derives it once via the shared-cluster
+   * provisioner and passes it here), where the per-org `Certificate` is created. Passed
+   * in rather than re-derived so namespace derivation lives in exactly one place.
+   */
+  boundNamespace: string;
   /** Platform wildcard base the org hangs off, e.g. `weownai.eu`. */
   platformBaseDomain: string;
   /**
@@ -87,8 +93,9 @@ export interface OrgDomainProvisioner
    *
    * @param orgName - The org (ClusterTenant) name being deprovisioned.
    * @param platformBaseDomain - The platform wildcard base the org hung off.
+   * @param boundNamespace - The org's bound namespace the Certificate lives in.
    */
-  deprovisionOrgDomain(orgName: string, platformBaseDomain: string): Promise<void>;
+  deprovisionOrgDomain(orgName: string, platformBaseDomain: string, boundNamespace: string): Promise<void>;
 }
 
 /** The readiness a cert-manager Certificate reports once issuance completes. */
@@ -158,8 +165,10 @@ export interface CloudDnsOperations
 
 /**
  * Static config the provisioner needs to author the per-org Certificate, supplied
- * from the chart's `certManager` values (issuerName / issuer kind) and the org's
- * bound namespace prefix. Injected so the provisioner carries no environment reads.
+ * from the chart's `certManager` values (issuerName / issuer kind). Injected so the
+ * provisioner carries no environment reads. The bound namespace is NOT here — it
+ * arrives per-request (`OrgDomainProvisionRequest.boundNamespace`) so namespace
+ * derivation stays in one place (the shared-cluster provisioner).
  */
 export interface OrgDomainProvisionerConfig
 {
@@ -167,6 +176,4 @@ export interface OrgDomainProvisionerConfig
   issuerName: string;
   /** Issuer kind: a cluster-singleton `ClusterIssuer` (default) or namespaced `Issuer`. */
   issuerKind: "ClusterIssuer" | "Issuer";
-  /** Prefix applied to the org name to derive its bound namespace (`opencrane-<org>`). */
-  namespacePrefix: string;
 }

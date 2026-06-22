@@ -137,6 +137,24 @@ Stacked on `feat/org-admin-billing`.
 - Validation: `helm template` (operator + RBAC) green; operator (132; +21 provisioner/cert/DNS/gating unit
   tests), control-plane (408) suites green; touched-package build + lint clean.
 
+#### Follow-ups (open)
+- **DOMAIN.T1 — k8s-native DNS instead of the direct GCP binding.** `_BuildOrgDomainProvisioner` wires a
+  `CloudDnsClient` that talks to `@google-cloud/dns` directly (Application Default Credentials / Workload
+  Identity). The cert side is already k8s-native (cert-manager `Certificate` CRs); the A-record side is the
+  remaining cloud-specific coupling. Evaluate replacing it with **external-dns** (watches Ingress/Service and
+  reconciles records via a provider) so per-org A records become a declarative k8s concern and the operator
+  carries no cloud SDK. Keeps the seam (`CloudDnsOperations`) but swaps the implementation; on-prem/other-cloud
+  installs then need no GCP dep. Decide: external-dns vs. keep the thin SDK wrapper per substrate.
+- **DOMAIN.T2 — wire org-domain teardown on ClusterTenant delete.** The reconciler's `Deleted` case is a no-op,
+  so `OrgDomainProvisioner.deprovisionOrgDomain(...)` (cert + Cloud DNS A-record deletion) is implemented but
+  never invoked. Namespace GC reclaims the namespaced `Certificate`, but the **external Cloud DNS A records
+  leak**. Wire deprovision into the delete handler (idempotent; pass the bound namespace).
+- **DOMAIN.T3 — collapse the now-vestigial control-plane provisioner runtime paths.** The operator owns
+  provisioning; the control-plane `SharedClusterProvisioner`/`ExternalWebhookProvisioner` `provision()` /
+  `getStatus()` / `deprovision()` methods are dead at runtime — only `registry.isTierAvailable(...)` (tier
+  gating in `clusterTenantsRouter`) is live. Consider shrinking the `ClusterTenantProvisioner` contract to a
+  tier-availability gate so the dead lifecycle methods (and their interface surface) go away.
+
 ### Track P5 — Close Phase 5 — ✅ COMPLETE · full history: plan-done.md § Completed Tracks (archived 2026-06-15)
 
 ### Track P4-A — Finish Phase 4 runtime-plane enforcement gaps — ✅ COMPLETE · full history: plan-done.md § Completed Tracks (archived 2026-06-15)

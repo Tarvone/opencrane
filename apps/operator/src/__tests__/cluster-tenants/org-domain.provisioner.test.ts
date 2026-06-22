@@ -47,11 +47,11 @@ function _fakeDns(): CloudDnsOperations & { ensured: Array<{ name: string; rrdat
   };
 }
 
-/** Shared issuer + namespace config for the provisioner under test. */
-const _CONFIG: OrgDomainProvisionerConfig = { issuerName: "opencrane-issuer", issuerKind: "ClusterIssuer", namespacePrefix: "opencrane-" };
+/** Shared issuer config for the provisioner under test. */
+const _CONFIG: OrgDomainProvisionerConfig = { issuerName: "opencrane-issuer", issuerKind: "ClusterIssuer" };
 
 /** A baseline provision request carrying an ingress IP (the DNS-served path). */
-const _REQ = { orgName: "acme", platformBaseDomain: "weownai.eu", ingressIp: "203.0.113.10" };
+const _REQ = { orgName: "acme", boundNamespace: "opencrane-acme", platformBaseDomain: "weownai.eu", ingressIp: "203.0.113.10" };
 
 describe("DefaultOrgDomainProvisioner — per-org wildcard cert + Cloud DNS", function _suite()
 {
@@ -175,7 +175,7 @@ describe("DefaultOrgDomainProvisioner — per-org wildcard cert + Cloud DNS", fu
     const dns = _fakeDns();
     const provisioner = new DefaultOrgDomainProvisioner(certs, dns, _CONFIG);
 
-    await provisioner.provisionOrgDomain({ orgName: "acme", platformBaseDomain: "weownai.eu" });
+    await provisioner.provisionOrgDomain({ orgName: "acme", boundNamespace: "opencrane-acme", platformBaseDomain: "weownai.eu" });
 
     // No ingress IP target → DNS side effect is skipped; the cert is still applied.
     expect(dns.ensured).toHaveLength(0);
@@ -219,7 +219,7 @@ describe("DefaultOrgDomainProvisioner — per-org wildcard cert + Cloud DNS", fu
     const dns = _fakeDns();
     const provisioner = new DefaultOrgDomainProvisioner(certs, dns, _CONFIG);
 
-    await provisioner.deprovisionOrgDomain("acme", "weownai.eu");
+    await provisioner.deprovisionOrgDomain("acme", "weownai.eu", "opencrane-acme");
 
     expect(certs.deleted).toEqual([{ namespace: "opencrane-acme", name: "org-wildcard-tls-acme" }]);
     expect(dns.deleted).toEqual(["*.acme.weownai.eu", "acme.weownai.eu"]);
@@ -230,7 +230,7 @@ describe("DefaultOrgDomainProvisioner — per-org wildcard cert + Cloud DNS", fu
     const certs = _fakeCerts({ ready: true, certManagerInstalled: true });
     const provisioner = new DefaultOrgDomainProvisioner(certs, null, _CONFIG);
 
-    await provisioner.deprovisionOrgDomain("acme", "weownai.eu");
+    await provisioner.deprovisionOrgDomain("acme", "weownai.eu", "opencrane-acme");
 
     expect(certs.deleted).toEqual([{ namespace: "opencrane-acme", name: "org-wildcard-tls-acme" }]);
   });

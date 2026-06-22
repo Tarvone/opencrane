@@ -52,9 +52,6 @@ export interface OpenClawTenantOperatorConfig
   /** Issuer kind for the per-org Certificate: `ClusterIssuer` (default) or `Issuer`. */
   certManagerIssuerKind: "ClusterIssuer" | "Issuer";
 
-  /** Prefix applied to an org name to derive its bound namespace (`opencrane-<org>`). */
-  clusterTenantNamespacePrefix: string;
-
   /** When true, the tenant Ingress gets a `tls:` block referencing the wildcard cert. */
   ingressTlsEnabled: boolean;
 
@@ -170,7 +167,6 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     dnsManagedZone: _readEnvValue<string>("DNS_MANAGED_ZONE", "string", false, ""),
     certManagerIssuerName: _readEnvValue<string>("CERT_MANAGER_ISSUER_NAME", "string", false, "opencrane-issuer"),
     certManagerIssuerKind: _readEnvValue<string>("CERT_MANAGER_ISSUER_KIND", "string", false, "ClusterIssuer") === "Issuer" ? "Issuer" : "ClusterIssuer",
-    clusterTenantNamespacePrefix: _readEnvValue<string>("CLUSTER_TENANT_NAMESPACE_PREFIX", "string", false, "opencrane-"),
     ingressTlsEnabled: _readEnvValue<boolean>("INGRESS_TLS_ENABLED", "boolean", false, false),
     ingressTlsSecretName: _readEnvValue<string>("INGRESS_TLS_SECRET_NAME", "string", false, "opencrane-wildcard-tls"),
     gatewayPort: _readEnvValue<number>("GATEWAY_PORT", "number"),

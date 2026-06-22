@@ -1,0 +1,228 @@
+import * as k8s from "@kubernetes/client-node";
+import type { Logger } from "pino";
+
+import type { OpenClawTenantOperatorConfig } from "../config.js";
+import { __K8sApplyResource } from "../infra/k8s.js";
+import { _RunWatchLoop, K8sWatchEventType } from "../shared/watch-runner.js";
+import { CLUSTER_TENANT_CRD_PLURAL, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION } from "../shared/crd-constants.js";
+import { _BuildClusterTenantNamespace } from "../tenants/deploy/index.js";
+import type { ClusterTenantResource } from "../tenants/internal/cluster-tenant-resolution.types.js";
+
+import { ClusterTenantStatusWriter } from "./internal/cluster-tenant-status-writer.js";
+import { ClusterTenantReconcilePhase, _ProvisionBoundary } from "./internal/shared-cluster.provisioner.js";
+import type { OrgDomainProvisioner } from "./internal/org-domain-provisioner.js";
+import { GatedOrgDomainProvisioner } from "./internal/org-domain-provisioner.js";
+
+/**
+ * Watches the cluster-scoped ClusterTenant custom resource and drives each org
+ * from `pending` to `ready` (or `failed`).
+ *
+ * This closes the "hollow CRUD shell" gap: the control plane dual-writes a
+ * `clustertenants` CR on org create (see the DB→K8s bridge), and THIS reconciler
+ * is what actually acts on it. It mirrors `TenantOperator.reconcileTenant`:
+ * idempotent, server-side apply for child resources, status patched back via the
+ * status subresource.
+ *
+ * Reconcile state machine (per CR event):
+ *   1. `provisioning` — stamp the transitional phase.
+ *   2. Resolve the isolation boundary via the shared provisioner (binds the
+ *      `opencrane-<name>` namespace for in-cluster tiers; `failed` for an
+ *      unsupported tier).
+ *   3. Fence the bound namespace (PSA `restricted`) idempotently.
+ *   4. Invoke the GATED `OrgDomainProvisioner.provisionOrgDomain(...)` — a no-op
+ *      that records a skip condition when cert-manager/DNS is absent; never throws.
+ *   5. `ready` — stamp `boundNamespace` + provisioner + domain status so
+ *      `_ResolveClusterTenant` stops hard-failing and openclaws can attach.
+ *
+ * Re-running on an already-`ready` org converges to the same state (idempotent).
+ */
+export class ClusterTenantOperator
+{
+  /** Watch client for streaming ClusterTenant CR events. */
+  private watch: k8s.Watch;
+
+  /** Client for custom resources (status subresource patch). */
+  private customApi: k8s.CustomObjectsApi;
+
+  /** Client for CoreV1 resources (the fenced namespace). */
+  private coreApi: k8s.CoreV1Api;
+
+  /** Helper for patching ClusterTenant status. */
+  private statusWriter: ClusterTenantStatusWriter;
+
+  /** Gated per-org domain (DNS + wildcard TLS) provisioner. */
+  private domainProvisioner: OrgDomainProvisioner;
+
+  /** Operator runtime configuration loaded from environment. */
+  private config: OpenClawTenantOperatorConfig;
+
+  /** Scoped logger. */
+  private log: Logger;
+
+  /**
+   * Create a ClusterTenantOperator with pre-wired dependencies.
+   * Prefer {@link _CreateClusterTenantOperator} in production entry-points; pass
+   * mocks directly in tests.
+   */
+  constructor(watch: k8s.Watch,
+              customApi: k8s.CustomObjectsApi,
+              coreApi: k8s.CoreV1Api,
+              statusWriter: ClusterTenantStatusWriter,
+              domainProvisioner: OrgDomainProvisioner,
+              config: OpenClawTenantOperatorConfig,
+              log: Logger)
+  {
+    this.watch = watch;
+    this.customApi = customApi;
+    this.coreApi = coreApi;
+    this.statusWriter = statusWriter;
+    this.domainProvisioner = domainProvisioner;
+    this.config = config;
+    this.log = log;
+  }
+
+  /**
+   * Begin watching ClusterTenant CR events and reconcile on each change.
+   * Reconnects on watch errors with the shared backoff. The CRD is cluster-scoped,
+   * so the watch path carries no namespace.
+   */
+  async start(): Promise<void>
+  {
+    const path = `/apis/${OPENCRANE_API_GROUP}/${OPENCRANE_API_VERSION}/${CLUSTER_TENANT_CRD_PLURAL}`;
+
+    await _RunWatchLoop<ClusterTenantResource>({
+      watch: this.watch,
+      path,
+      log: this.log,
+      startMessage: "starting cluster tenant watch",
+      reconnectMessage: "cluster tenant watch connection lost, reconnecting...",
+      failedMessage: "cluster tenant watch failed, retrying...",
+      onEvent: async (type: K8sWatchEventType | string, clusterTenant: ClusterTenantResource) => {
+        await this.handleEvent(type, clusterTenant);
+      },
+    });
+  }
+
+  /** Route a watch event to the reconcile handler (delete is a no-op here). */
+  private async handleEvent(type: K8sWatchEventType | string, clusterTenant: ClusterTenantResource): Promise<void>
+  {
+    const name = clusterTenant.metadata?.name;
+    if (!name) return;
+
+    this.log.info({ type, name }, "cluster tenant event");
+
+    switch (type)
+    {
+      case K8sWatchEventType.Added:
+      case K8sWatchEventType.Modified:
+        await this.reconcile(clusterTenant);
+        break;
+      // Delete: the control-plane bridge removes the CR; the bound namespace and any
+      // attached openclaws are torn down by their own lifecycles. No action here.
+      case K8sWatchEventType.Deleted:
+        break;
+    }
+  }
+
+  /**
+   * Reconcile an org from its current phase to `ready` (or `failed`).
+   *
+   * Idempotent: safe to call repeatedly. On any unexpected error the org is marked
+   * `failed` with the message and the error is re-thrown so the watch loop logs it.
+   *
+   * @param clusterTenant - The ClusterTenant CR being reconciled.
+   */
+  async reconcile(clusterTenant: ClusterTenantResource): Promise<void>
+  {
+    const name = clusterTenant.metadata!.name!;
+    this.log.info({ name }, "reconciling cluster tenant");
+
+    try
+    {
+      // 1. Mark provisioning unless already ready — re-running a ready org skips the
+      //    transitional write so a converged org produces no status churn.
+      if (clusterTenant.status?.phase !== ClusterTenantReconcilePhase.Ready)
+      {
+        await this.statusWriter.patchStatus(clusterTenant, { phase: ClusterTenantReconcilePhase.Provisioning });
+      }
+
+      // 2. Resolve the isolation boundary (binds opencrane-<name> for in-cluster
+      //    tiers; reports failed for an unsupported tier).
+      const boundary = _ProvisionBoundary(name, clusterTenant.spec.isolationTier);
+      if (boundary.phase === ClusterTenantReconcilePhase.Failed || !boundary.boundNamespace)
+      {
+        await this.statusWriter.patchStatus(clusterTenant, {
+          phase: ClusterTenantReconcilePhase.Failed,
+          message: boundary.message ?? "boundary provisioning failed",
+        });
+        return;
+      }
+
+      // 3. Fence the bound namespace (PSA restricted), idempotent. Namespace-already-
+      //    exists is treated as a converged no-op by __K8sApplyResource.
+      await __K8sApplyResource(this.coreApi, _BuildClusterTenantNamespace(boundary.boundNamespace, name), this.log);
+
+      // 4. Per-org domain (DNS + wildcard TLS) — GATED. The default provisioner skips
+      //    gracefully (returns ready:false, skipped:true) when cert-manager/DNS is
+      //    absent; it never throws, so a missing backend cannot fail the reconcile.
+      const domain = await this.domainProvisioner.provisionOrgDomain({
+        orgName: name,
+        platformBaseDomain: this.config.ingressDomain,
+        vanityDomain: clusterTenant.spec.vanityDomain,
+      });
+      if (domain.skipped)
+      {
+        this.log.info({ name, orgDomain: domain.orgDomain }, "org domain provisioning skipped (no backend); org still reaches ready");
+      }
+
+      // 5. Ready — stamp the bound namespace + provisioner + domain status. This is
+      //    what unblocks `_ResolveClusterTenant`: an attached openclaw can now resolve
+      //    `status.boundNamespace` and land in the fenced namespace.
+      await this.statusWriter.patchStatus(clusterTenant, {
+        phase: ClusterTenantReconcilePhase.Ready,
+        boundNamespace: boundary.boundNamespace,
+        provisioner: boundary.provisioner,
+        message: undefined,
+        orgDomain: domain.orgDomain,
+        domainReady: domain.ready,
+        domainSkipped: domain.skipped,
+      });
+
+      this.log.info({ name, boundNamespace: boundary.boundNamespace }, "cluster tenant ready");
+    }
+    catch (err)
+    {
+      this.log.error({ err, name }, "cluster tenant reconcile failed");
+      await this.statusWriter.patchStatus(clusterTenant, {
+        phase: ClusterTenantReconcilePhase.Failed,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+}
+
+/**
+ * Wire all dependencies from a KubeConfig and return a ready-to-start operator.
+ *
+ * Owns K8s client construction so the operator class depends only on the
+ * abstractions it needs. The domain provisioner defaults to the GATED backend
+ * (cert-manager absent on the dev cluster) — swap in a live DNS-01 backend here
+ * once cert-manager is installed.
+ *
+ * @param kc - Resolved KubeConfig.
+ * @param config - Operator runtime configuration.
+ * @param baseLog - Root logger; scoped to `cluster-tenant-operator` inside.
+ */
+export function _CreateClusterTenantOperator(kc: k8s.KubeConfig, config: OpenClawTenantOperatorConfig, baseLog: Logger): ClusterTenantOperator
+{
+  const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
+  const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+  const watch = new k8s.Watch(kc);
+  const log = baseLog.child({ component: "cluster-tenant-operator" });
+
+  const statusWriter = new ClusterTenantStatusWriter(customApi, log);
+  const domainProvisioner = new GatedOrgDomainProvisioner(log);
+
+  return new ClusterTenantOperator(watch, customApi, coreApi, statusWriter, domainProvisioner, config, log);
+}

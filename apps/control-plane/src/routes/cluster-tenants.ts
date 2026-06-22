@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request } from "express";
+import * as k8s from "@kubernetes/client-node";
 import { ClusterTenantPhase, ClusterTenantTierUnavailableCode } from "@opencrane/contracts";
 import type { ClusterTenantProvisionerRegistry } from "@opencrane/contracts";
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -8,6 +9,7 @@ import type { ClusterTenantCreateRequest, ClusterTenantUpdateRequest } from "./c
 import { _IsIsolationTier, _ToContract, _ToPrismaCompute, _ToPrismaTier, _ValidateCompute, _ValidateResources } from "./cluster-tenants.service.js";
 import { _IsDevAuthMode } from "../infra/auth/auth-mode.js";
 import { _RequireBillingAccountForOrgCreate, _RequireOrgManager } from "../infra/middleware/cluster-tenant-org-admin.js";
+import { _ApplyClusterTenantCr, _DeleteClusterTenantCr } from "./internal/cluster-tenant-cr-bridge.js";
 
 /** RFC-1123-ish DNS domain: lowercase labels, ≥1 dot, alpha TLD, ≤253 chars. */
 const _VANITY_DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
@@ -27,9 +29,13 @@ function _isValidVanityDomain(value: string): boolean
  *
  * @param prisma   - Prisma client used for persistence (dual-writes the row).
  * @param registry - Provisioner registry used to gate isolation tiers (CT.6).
+ * @param customApi - Kubernetes custom-objects client used to dual-write the
+ *   cluster-scoped ClusterTenant CR the operator reconciles. Pass `null` in dev/test
+ *   wiring with no cluster; the CR bridge then no-ops and the DB row stands alone.
  * @returns Configured Express router.
  */
-export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTenantProvisionerRegistry): Router
+export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTenantProvisionerRegistry,
+                                     customApi: k8s.CustomObjectsApi | null = null): Router
 {
   const router = Router();
 
@@ -164,17 +170,19 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       return org;
     });
 
-    // 5. Domain provisioning hand-off (fixed-wildcard topology). The org is now
-    //    addressable at its derived apex `<name>.<platformBaseDomain>` and its users
-    //    at `<user>.<name>.<base>`. Two cluster-side side effects must follow — the
-    //    per-org DNS record (`*.<org>.<base>` → ingress IP) and the per-org wildcard
-    //    TLS cert — but BOTH are owned by the ClusterTenant operator/CR watcher (the
-    //    same WS4 hand-off seam that reconciles `pending` → `ready`), never executed
-    //    inline here. The reconciler calls the single typed interface
-    //    `OrgDomainProvisioner.provisionOrgDomain(...)` (see
-    //    core/cluster-tenants/org-domain-provisioner.types.ts). This handler only
-    //    persists desired state; it does not mutate DNS or cert-manager.
-    res.status(201).json(_ToContract(created));
+    // 5. DB → K8s bridge. Project the persisted desired state into the cluster-scoped
+    //    `clustertenants` CR the ClusterTenant reconciler watches. This is the seam
+    //    that turns the `pending` row into something that actually provisions: the
+    //    reconciler picks up the CR, calls the registered provisioner, and patches
+    //    `status.phase` (`pending → provisioning → ready`) + `boundNamespace` back.
+    //    The bridge writes ONLY spec (never status) and is idempotent. Domain
+    //    provisioning (per-org DNS + wildcard TLS via `OrgDomainProvisioner`) is a
+    //    GATED step the reconciler runs — never executed inline here; this handler
+    //    only persists/declares desired state and does not mutate DNS or cert-manager.
+    const orgContract = _ToContract(created);
+    await _ApplyClusterTenantCr(customApi, orgContract);
+
+    res.status(201).json(orgContract);
   });
 
   /** Update a cluster tenant (operator OR owner/admin of that org), re-gating the isolation tier when it changes. */
@@ -256,8 +264,15 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       data.quota = (body.resources.quota as Prisma.InputJsonValue);
     }
 
+    // Persist ONLY the desired-state fields collected above. `data` never carries
+    // `phase`, `boundNamespace`, `message`, or `provisioner`, so an org update can
+    // never clobber the observed status the reconciler stamps — those columns are
+    // the operator's to own. Re-project the new spec onto the CR so the reconciler
+    // re-converges to the changed desired state (idempotent; status untouched).
     const updated = await prisma.clusterTenant.update({ where: { name: req.params.name }, data });
-    res.json(_ToContract(updated));
+    const orgContract = _ToContract(updated);
+    await _ApplyClusterTenantCr(customApi, orgContract);
+    res.json(orgContract);
   });
 
   /** Delete a cluster tenant (operator OR owner/admin of that org). */
@@ -270,6 +285,9 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
       return;
     }
     await prisma.clusterTenant.delete({ where: { name: req.params.name } });
+    // Tear down the cluster-scoped CR so the reconciler stops watching it; tolerant
+    // of a missing CR (404) for the dev/no-cluster path where none was ever written.
+    await _DeleteClusterTenantCr(customApi, req.params.name);
     res.json({ name: req.params.name, status: "deleted" });
   });
 

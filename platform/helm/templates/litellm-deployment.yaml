@@ -97,14 +97,29 @@ spec:
             - name: REDIS_PORT
               value: {{ .Values.litellm.redis.port | quote }}
             {{- end }}
-            {{- /* Trace capture (AIR.6): when enabled, emit per-call traces to an
-                   external/operator-provided Langfuse via LiteLLM's native langfuse
-                   success callback. LITELLM_SUCCESS_CALLBACK=langfuse activates the
-                   logger; LiteLLM reads LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY /
-                   LANGFUSE_SECRET_KEY from env. Keys come from existingSecret when
-                   set, else the chart-managed litellm Secret (inline keys). Gated so
-                   a default render emits none of these. */ -}}
-            {{- if .Values.litellm.langfuse.enabled }}
+            {{- /* Trace capture (AIR.6): emit per-call traces to Langfuse.
+                   Two modes (mutually exclusive):
+                     in-cluster (langfuse.inCluster.enabled=true): auto-wired to the
+                       langfuse subchart Service; keys from opencrane-langfuse Secret.
+                     external (litellm.langfuse.enabled=true): operator-supplied host
+                       and keys (existingSecret or inline in the litellm Secret).
+                   Gated so a default render emits none of these env vars. */ -}}
+            {{- if .Values.langfuse.inCluster.enabled }}
+            - name: LITELLM_SUCCESS_CALLBACK
+              value: "langfuse"
+            - name: LANGFUSE_HOST
+              value: "http://{{ .Release.Name }}-langfuse.{{ .Release.Namespace }}.svc.cluster.local:3000"
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.langfuse.inCluster.existingSecret }}
+                  key: LANGFUSE_INIT_PROJECT_PUBLIC_KEY
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.langfuse.inCluster.existingSecret }}
+                  key: LANGFUSE_INIT_PROJECT_SECRET_KEY
+            {{- else if .Values.litellm.langfuse.enabled }}
             - name: LITELLM_SUCCESS_CALLBACK
               value: "langfuse"
             {{- if .Values.litellm.langfuse.host }}

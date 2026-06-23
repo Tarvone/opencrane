@@ -367,6 +367,26 @@ if [[ -z "${LITELLM_SALT_KEY:-}" ]]; then
   LITELLM_SALT_KEY="$(_read_secret opencrane-litellm LITELLM_SALT_KEY)"
   LITELLM_SALT_KEY="${LITELLM_SALT_KEY:-sk-$(_gen_secret)}"
 fi
+# Langfuse stable credentials. SALT, ENCRYPTION_KEY, and API keys MUST remain constant
+# after the first deploy — changing them orphans stored trace data and breaks NEXTAUTH
+# sessions. Re-use existing values from the secret; only generate fresh ones on first install.
+_gen_secret_256() { openssl rand -hex 32 2>/dev/null || head -c 48 /dev/urandom | base64 | tr -dc 'a-f0-9' | head -c 64; }
+LANGFUSE_NEXTAUTH_SECRET="$(_read_secret opencrane-langfuse NEXTAUTH_SECRET)"
+LANGFUSE_NEXTAUTH_SECRET="${LANGFUSE_NEXTAUTH_SECRET:-$(_gen_secret)}"
+LANGFUSE_SALT="$(_read_secret opencrane-langfuse SALT)"
+LANGFUSE_SALT="${LANGFUSE_SALT:-$(_gen_secret)}"
+# ENCRYPTION_KEY must be 256 bits = 64 hex characters.
+LANGFUSE_ENCRYPTION_KEY="$(_read_secret opencrane-langfuse ENCRYPTION_KEY)"
+LANGFUSE_ENCRYPTION_KEY="${LANGFUSE_ENCRYPTION_KEY:-$(_gen_secret_256)}"
+LANGFUSE_PUBLIC_KEY="$(_read_secret opencrane-langfuse LANGFUSE_INIT_PROJECT_PUBLIC_KEY)"
+LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-pk-lf-$(_gen_secret | head -c 24)}"
+LANGFUSE_SECRET_KEY="$(_read_secret opencrane-langfuse LANGFUSE_INIT_PROJECT_SECRET_KEY)"
+LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-sk-lf-$(_gen_secret | head -c 24)}"
+LANGFUSE_ADMIN_PASSWORD="$(_read_secret opencrane-langfuse LANGFUSE_INIT_USER_PASSWORD)"
+LANGFUSE_ADMIN_PASSWORD="${LANGFUSE_ADMIN_PASSWORD:-$(_gen_secret)}"
+# ClickHouse internal password (stable: changing it after init requires manual CH user management).
+LANGFUSE_CH_PASSWORD="$(_read_secret opencrane-langfuse CLICKHOUSE_PASSWORD)"
+LANGFUSE_CH_PASSWORD="${LANGFUSE_CH_PASSWORD:-$(_gen_secret)}"
 
 log "Target cluster: $(kubectl config current-context)"
 log "Namespace: $NAMESPACE   Release: $RELEASE   Image tag: $IMAGE_TAG"
@@ -385,14 +405,22 @@ if kubectl get cluster "$DB_CLUSTER" -n "$NAMESPACE" >/dev/null 2>&1; then
     warn "DB credential mismatch detected (password drifted from bootstrap). Resetting PostgreSQL cluster…"
     kubectl delete cluster "$DB_CLUSTER" -n "$NAMESPACE" --wait=true
     kubectl delete pvc -n "$NAMESPACE" -l cnpg.io/cluster="$DB_CLUSTER" --ignore-not-found
-    kubectl delete secret "${DB_CLUSTER}" "opencrane-obot" "opencrane-litellm-db" "opencrane-litellm" \
+    kubectl delete secret "${DB_CLUSTER}" "opencrane-obot" "opencrane-litellm-db" "opencrane-litellm" "opencrane-langfuse" \
       -n "$NAMESPACE" --ignore-not-found
     # Fresh secrets — regenerate so cluster + secrets are in sync from scratch.
     # The litellm DB is wiped with the PVCs, so a fresh salt is correct (no stored
-    # provider keys survive to be decrypted).
+    # provider keys survive to be decrypted). Langfuse keys are also reset here since
+    # the DB (and all stored traces) are wiped along with the CNPG cluster.
     DB_PASSWORD="$(_gen_secret)"
     LITELLM_MASTER_KEY="sk-$(_gen_secret)"
     LITELLM_SALT_KEY="sk-$(_gen_secret)"
+    LANGFUSE_NEXTAUTH_SECRET="$(_gen_secret)"
+    LANGFUSE_SALT="$(_gen_secret)"
+    LANGFUSE_ENCRYPTION_KEY="$(_gen_secret_256)"
+    LANGFUSE_PUBLIC_KEY="pk-lf-$(_gen_secret | head -c 24)"
+    LANGFUSE_SECRET_KEY="sk-lf-$(_gen_secret | head -c 24)"
+    LANGFUSE_ADMIN_PASSWORD="$(_gen_secret)"
+    LANGFUSE_CH_PASSWORD="$(_gen_secret)"
   fi
 fi
 
@@ -437,6 +465,7 @@ spec:
       postInitApplicationSQL:
         - CREATE DATABASE obot OWNER ${DB_USER};
         - CREATE DATABASE litellm OWNER ${DB_USER};
+        - CREATE DATABASE langfuse OWNER ${DB_USER};
 EOF
 
 log "Waiting for the database to become ready…"
@@ -460,6 +489,20 @@ kubectl create secret generic opencrane-litellm-db -n "$NAMESPACE" \
 kubectl create secret generic opencrane-litellm -n "$NAMESPACE" \
   --from-literal=LITELLM_MASTER_KEY="$LITELLM_MASTER_KEY" \
   --from-literal=LITELLM_SALT_KEY="$LITELLM_SALT_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Langfuse secret. Contains stable credentials for the in-cluster Langfuse subchart.
+# SALT, ENCRYPTION_KEY, and API keys MUST be stable once set (changing them orphans
+# existing traces). PostgreSQL password is reused from the CNPG cluster creds secret
+# (langfuse.postgresql.auth.existingSecret = <cluster>-creds) so it is NOT duplicated here.
+kubectl create secret generic opencrane-langfuse -n "$NAMESPACE" \
+  --from-literal=NEXTAUTH_SECRET="$LANGFUSE_NEXTAUTH_SECRET" \
+  --from-literal=SALT="$LANGFUSE_SALT" \
+  --from-literal=ENCRYPTION_KEY="$LANGFUSE_ENCRYPTION_KEY" \
+  --from-literal=CLICKHOUSE_PASSWORD="$LANGFUSE_CH_PASSWORD" \
+  --from-literal=LANGFUSE_INIT_PROJECT_PUBLIC_KEY="$LANGFUSE_PUBLIC_KEY" \
+  --from-literal=LANGFUSE_INIT_PROJECT_SECRET_KEY="$LANGFUSE_SECRET_KEY" \
+  --from-literal=LANGFUSE_INIT_USER_PASSWORD="$LANGFUSE_ADMIN_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # OIDC secret. The chart references controlPlane.oidc.existingSecret for the client + session
@@ -723,6 +766,14 @@ if [[ "$CERT_MODE" == "acme" ]] && { [[ "$INSTALL_EXTERNAL_DNS" == "1" ]] || _ex
 fi
 
 # 3. The OpenCrane chart.
+# Fetch subchart dependencies (Langfuse, and any others declared in Chart.yaml).
+# --skip-refresh avoids a network fetch when the chart is already cached; we force
+# an update for langfuse so the version constraint is always satisfied.
+log "Adding Langfuse Helm repository…"
+helm repo add langfuse https://langfuse.github.io/langfuse-k8s --force-update >/dev/null
+log "Fetching chart dependencies…"
+helm dep update "$CHART_DIR"
+
 log "Installing the OpenCrane Helm release '$RELEASE'…"
 # LiteLLM is wired to its own `litellm` database (DATABASE_URL via opencrane-litellm-db) with
 # STORE_MODEL_IN_DB on, so models/keys are stored and seeded at runtime via the admin API. The
@@ -747,6 +798,12 @@ TN_TAG="${TENANT_TAG:-$IMAGE_TAG}"
 # controlPlaneHost) are derived from it. Setting it explicitly here keeps a single
 # source of truth across the chart, the issuer, and the operator's per-org provisioning.
 [[ -n "$BASE_DOMAIN" ]] && helm_args+=(--set "ingress.domain=$BASE_DOMAIN")
+# Langfuse in-cluster wiring: PostgreSQL host (CNPG read-write service) and NEXTAUTH_URL.
+# Both are injected here because they depend on runtime values (namespace, base-domain)
+# not known at values.yaml authoring time. Harmless when langfuse.inCluster.enabled=false
+# (the subchart is disabled by condition so these values are never rendered).
+helm_args+=(--set "langfuse.postgresql.host=${DB_CLUSTER}-rw.${NAMESPACE}.svc.cluster.local")
+[[ -n "$BASE_DOMAIN" ]] && helm_args+=(--set-string "langfuse.langfuse.nextauth.url=https://langfuse.${BASE_DOMAIN}")
 # OIDC human-login (control-plane only). Rendered iff an issuer URL is given; otherwise
 # the chart emits no OIDC env and the control-plane stays in token/development mode.
 [[ -n "$OIDC_ISSUER_URL" ]]   && helm_args+=(--set "controlPlane.oidc.issuerUrl=$OIDC_ISSUER_URL")

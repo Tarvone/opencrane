@@ -144,11 +144,15 @@ docker build -f "$ROOT_DIR/apps/tenant/deploy/Dockerfile" -t ghcr.io/italanta/op
 log "Building control-plane image…"
 docker build -f "$ROOT_DIR/apps/control-plane/deploy/Dockerfile" -t ghcr.io/italanta/opencrane-control-plane:local "$ROOT_DIR"
 
+log "Building skill-registry image…"
+docker build -f "$ROOT_DIR/apps/skill-registry/deploy/Dockerfile" -t ghcr.io/italanta/opencrane-skill-registry:local "$ROOT_DIR"
+
 # 3. Import images into k3s containerd namespace (k8s.io)
 log "Importing images into k3s containerd namespace k8s.io…"
 docker save ghcr.io/italanta/opencrane-operator:local | sudo k3s ctr -n k8s.io images import -
 docker save ghcr.io/italanta/opencrane-tenant:local | sudo k3s ctr -n k8s.io images import -
 docker save ghcr.io/italanta/opencrane-control-plane:local | sudo k3s ctr -n k8s.io images import -
+docker save ghcr.io/italanta/opencrane-skill-registry:local | sudo k3s ctr -n k8s.io images import -
 
 # 4. Deploy using k8s-deploy.sh with local overrides
 log "Deploying OpenCrane…"
@@ -160,4 +164,5 @@ exec "$SCRIPT_DIR/k8s-deploy.sh" \
   --set controlPlane.image.pullPolicy=IfNotPresent \
   --set operator.image.pullPolicy=IfNotPresent \
   --set tenant.defaultImage.pullPolicy=IfNotPresent \
+  --set skillRegistry.image.pullPolicy=IfNotPresent \
   "${PASSTHROUGH[@]}"

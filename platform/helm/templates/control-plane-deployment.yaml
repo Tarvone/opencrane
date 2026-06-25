@@ -178,8 +178,6 @@ spec:
             #    the SA key (jwt-bearer auth) is pulled from a Secret, never inlined.
             - name: ZITADEL_MGMT_API_URL
               value: {{ .mgmtApiUrl | quote }}
-            - name: ZITADEL_PROJECT_ID
-              value: {{ .projectId | quote }}
             {{- if .existingSecret }}
             - name: ZITADEL_MGMT_SA_KEY
               valueFrom:

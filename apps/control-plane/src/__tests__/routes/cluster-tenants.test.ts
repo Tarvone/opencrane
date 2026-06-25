@@ -8,7 +8,16 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { clusterTenantsRouter } from "../../routes/cluster-tenants.js";
-import type { ZitadelManagementClient } from "../../core/zitadel/zitadel-client.types.js";
+import type { ZitadelManagementClient } from "../../infra/zitadel/zitadel-client.types.js";
+
+/** Test double: a Zitadel client that records provisions and returns deterministic ids. */
+function _fakeZitadel(): ZitadelManagementClient
+{
+  return {
+    async provisionOrg(input) { return { orgId: "zorg-test", appId: "zapp-test", redirectUri: input.redirectUri }; },
+    async teardownOrg() { /* no-op */ },
+  };
+}
 
 /** In-memory cluster_tenants store backing the mock Prisma client. */
 type Row = Record<string, unknown>;
@@ -129,9 +138,10 @@ function _buildApp(prisma: PrismaClient, registry: ClusterTenantProvisionerRegis
       next();
     });
   }
-  app.use("/api/v1/cluster-tenants", zitadelClient
-    ? clusterTenantsRouter(prisma, registry, customApi, zitadelClient)
-    : clusterTenantsRouter(prisma, registry, customApi));
+  // The router hard-requires a Zitadel client; default to a benign fake so tests that
+  // don't care about provisioning still construct it (the real client is built only on
+  // the manager-enabled boot path).
+  app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, registry, customApi, zitadelClient ?? _fakeZitadel()));
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use(function _err(err: Error, _req: Request, res: Response, _next: NextFunction)
   {
@@ -355,7 +365,6 @@ describe("clusterTenantsRouter — Zitadel org provisioning (S3 / Phase 2a)", fu
   {
     const calls: unknown[] = [];
     const client: ZitadelManagementClient = {
-      isLive: true,
       async provisionOrg(input)
       {
         calls.push(input);
@@ -388,7 +397,6 @@ describe("clusterTenantsRouter — Zitadel org provisioning (S3 / Phase 2a)", fu
   {
     const store = new Map<string, Record<string, unknown>>();
     const throwing: ZitadelManagementClient = {
-      isLive: true,
       async provisionOrg() { throw new Error("zitadel rejected: org name taken"); },
       async teardownOrg() { /* no-op */ },
     };
@@ -403,15 +411,4 @@ describe("clusterTenantsRouter — Zitadel org provisioning (S3 / Phase 2a)", fu
     expect(res.status).not.toBe(201);
   });
 
-  it("leaves the Zitadel columns unset under the default no-op client (unconfigured)", async function _noop()
-  {
-    const store = new Map<string, Record<string, unknown>>();
-    const app = _buildApp(_mockPrisma(store), _mockRegistry(false), null, { sub: "owner-1", email: "owner@acme.test" });
-
-    const res = await request(app).post("/api/v1/cluster-tenants").send(_sharedBody());
-
-    expect(res.status).toBe(201);
-    const row = store.get("acme");
-    expect(row?.zitadelOrgId).toBeUndefined();
-  });
 });

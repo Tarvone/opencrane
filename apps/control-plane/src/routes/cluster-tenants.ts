@@ -12,8 +12,8 @@ import { _RequireBillingAccountForOrgCreate, _RequireOrgManager } from "../infra
 import { _ApplyClusterTenantCr, _DeleteClusterTenantCr } from "../core/cluster-tenants/cr-bridge.js";
 import { _ReadClusterTenantObservedStatus } from "../core/cluster-tenants/cr-status-reader.js";
 import { _EnsureOwnerDefaultTenant } from "../core/cluster-tenants/default-tenant.js";
-import { _DeriveOrgRedirectUri, _NoopZitadelManagementClient } from "../core/zitadel/zitadel-client.js";
-import type { ZitadelManagementClient } from "../core/zitadel/zitadel-client.types.js";
+import { _DeriveOrgRedirectUri } from "../infra/zitadel/zitadel-client.js";
+import type { ZitadelManagementClient } from "../infra/zitadel/zitadel-client.types.js";
 
 /** RFC-1123-ish DNS domain: lowercase labels, ≥1 dot, alpha TLD, ≤253 chars. */
 const _VANITY_DOMAIN_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
@@ -71,7 +71,7 @@ async function _ReadObservedStatus(prisma: PrismaClient, customApi: k8s.CustomOb
  */
 export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTenantProvisionerRegistry,
                                      customApi: k8s.CustomObjectsApi | null = null,
-                                     zitadelClient: ZitadelManagementClient = new _NoopZitadelManagementClient()): Router
+                                     zitadelClient: ZitadelManagementClient): Router
 {
   const router = Router();
 
@@ -260,26 +260,20 @@ export function clusterTenantsRouter(prisma: PrismaClient, registry: ClusterTena
           data: { clusterTenant: org.name, subject: ownerSubject, role: "Owner" },
         });
 
-        // Provision the org's Zitadel Organization + OIDC app + master `admin` grant as
-        // the LAST fallible step before commit (S3 / Phase 2a): if Zitadel rejects, this
-        // throws and the whole transaction rolls back (no orphan org/membership). The
-        // no-op client (unconfigured) returns null, leaving the Zitadel columns unset.
-        // The reconcile/backfill loop (later slice) closes the commit-after-OK window.
+        // Provision the org's Zitadel Organization + project + roles + OIDC app + master
+        // `admin` grant as the LAST fallible step before commit (S3 / Phase 2a): if Zitadel
+        // rejects, this throws and the whole transaction rolls back (no orphan org/membership),
+        // and the client compensates by deleting any half-created Zitadel org.
         const zitadel = await zitadelClient.provisionOrg({
           orgName: org.name,
           displayName: org.displayName,
           redirectUri: _DeriveOrgRedirectUri(org.name, process.env.PLATFORM_BASE_DOMAIN?.trim() ?? ""),
           masterSubject: ownerSubject,
         });
-        if (zitadel)
-        {
-          return tx.clusterTenant.update({
-            where: { name: org.name },
-            data: { zitadelOrgId: zitadel.orgId, zitadelAppId: zitadel.appId, zitadelRedirectUri: zitadel.redirectUri },
-          });
-        }
-
-        return org;
+        return tx.clusterTenant.update({
+          where: { name: org.name },
+          data: { zitadelOrgId: zitadel.orgId, zitadelAppId: zitadel.appId, zitadelRedirectUri: zitadel.redirectUri },
+        });
       });
     }
     catch (err)

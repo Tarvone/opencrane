@@ -236,11 +236,12 @@ controlPlane:
   #    is wired through but still no-ops (logged), so it is safe to leave configured.
   zitadel:
     # -- Zitadel instance base URL (e.g. https://weownai-oidc-8dwlat.eu1.zitadel.cloud).
+    #    REQUIRED when clusterTenantManager.enabled (the control-plane hard-commits to
+    #    Zitadel for the multi-tenant path); single-cluster installs do not need it.
     mgmtApiUrl: ""
-    # -- Zitadel project id that owns the per-org OIDC apps + role definitions.
-    projectId: ""
-    # -- Existing K8s Secret carrying the service-account key JSON (jwt-bearer auth).
-    #    Strongly preferred over any inline value; key name configurable below.
+    # -- Existing K8s Secret carrying the service-account key JSON (jwt-bearer auth). The
+    #    service account MUST hold instance-level IAM_OWNER (per-org create/delete is an
+    #    instance privilege). Key name configurable below.
     existingSecret: ""
     serviceAccountKeyKey: service-account-key
 

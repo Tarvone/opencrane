@@ -6,7 +6,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { _RegisterInternalTenantContract } from "../../routes/internal/tenant-contract.js";
-import { compile } from "../../core/grants/grant-compiler.js";
+import { compileForPrincipals } from "../../core/grants/grant-compiler.js";
 import { GrantCompilerAccess } from "../../core/grants/grant-compiler.types.js";
 
 // Mock the grant compiler at the module boundary so tests can drive Allow/Deny
@@ -14,6 +14,7 @@ import { GrantCompilerAccess } from "../../core/grants/grant-compiler.types.js";
 // which keeps every existing test's empty-contract expectations intact.
 vi.mock("../../core/grants/grant-compiler.js", () => ({
   compile: vi.fn().mockResolvedValue([]),
+  compileForPrincipals: vi.fn().mockResolvedValue([]),
 }));
 
 // Per-skill model resolution is exercised by its own suite; stub it to [] here so
@@ -41,7 +42,7 @@ function _buildAuthApi(opts: {
 
 /** Build a mock Prisma client for contract endpoint tests. */
 function _buildPrismaStub(overrides: {
-  tenant?: { name: string; team: string | null; awarenessWave?: string | null } | null;
+  tenant?: { name: string; team: string | null; awarenessWave?: string | null; subject?: string | null } | null;
   rollout?: Record<string, unknown> | null;
 } = {}): PrismaClient
 {
@@ -224,8 +225,8 @@ describe("_RegisterInternalTenantContract GET /:name", () =>
     // The route compiles MCP grants first, then skill grants. Allow one skill bundle.
     // The route only reads `payloadId` + `access`, so cast a minimal decision rather
     // than fabricate every CompiledGrantDecision field.
-    const _allowBundle1 = [{ payloadId: "bundle-1", access: GrantCompilerAccess.Allow }] as unknown as Awaited<ReturnType<typeof compile>>;
-    vi.mocked(compile)
+    const _allowBundle1 = [{ payloadId: "bundle-1", access: GrantCompilerAccess.Allow }] as unknown as Awaited<ReturnType<typeof compileForPrincipals>>;
+    vi.mocked(compileForPrincipals)
       .mockResolvedValueOnce([]) // McpServer decisions
       .mockResolvedValueOnce(_allowBundle1); // SkillBundle decisions
     // The entitled-bundle metadata the contract must surface (digest is what addresses the registry).
@@ -242,5 +243,38 @@ describe("_RegisterInternalTenantContract GET /:name", () =>
     expect(res.body.skills.entitled).toEqual([
       { id: "bundle-1", name: "company-policy", digest: "sha256:abc123" },
     ]);
+  });
+
+  it("compiles the contract over the tenant's principal SET {name, subject} when bound (S4 inheritance)", async () =>
+  {
+    vi.mocked(compileForPrincipals).mockClear();
+    const prisma = _buildPrismaStub({ tenant: { name: "team-alpha", team: null, subject: "user-sub" } });
+    const app = _buildApp(prisma, _validAuthApi);
+
+    const res = await request(app)
+      .get("/api/internal/contract/team-alpha")
+      .set("Authorization", "Bearer valid");
+
+    expect(res.status).toBe(200);
+    // The route must pass BOTH the tenant name and its bound subject so the openclaw Tenant
+    // inherits the user's grants — guards the principal-set construction (a typo collapsing
+    // it to tenant-only would otherwise pass every other test).
+    expect(vi.mocked(compileForPrincipals)).toHaveBeenCalledWith(["team-alpha", "user-sub"], expect.anything(), expect.anything());
+    // Never called with the tenant alone when a subject is bound.
+    expect(vi.mocked(compileForPrincipals)).not.toHaveBeenCalledWith(["team-alpha"], expect.anything(), expect.anything());
+  });
+
+  it("collapses to the tenant principal alone for a legacy/unbound tenant (subject null)", async () =>
+  {
+    vi.mocked(compileForPrincipals).mockClear();
+    const prisma = _buildPrismaStub({ tenant: { name: "team-alpha", team: null, subject: null } });
+    const app = _buildApp(prisma, _validAuthApi);
+
+    const res = await request(app)
+      .get("/api/internal/contract/team-alpha")
+      .set("Authorization", "Bearer valid");
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(compileForPrincipals)).toHaveBeenCalledWith(["team-alpha"], expect.anything(), expect.anything());
   });
 });

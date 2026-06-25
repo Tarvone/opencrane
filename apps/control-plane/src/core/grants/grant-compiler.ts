@@ -111,12 +111,10 @@ type _GrantRow = {
 };
 
 /**
- * Compile effective grant decisions for a principal and payload family.
+ * Compile effective grant decisions for a single principal and payload family.
  *
- * The compiler resolves direct tenant/user grants plus any group grants where the
- * principal is listed in `groups.members`. Precedence rules are deterministic:
- * highest priority wins first, deny wins over allow at the same priority, and the
- * newest `createdAt` wins the final tie-break.
+ * Thin wrapper over {@link compileForPrincipals} for the common single-principal case
+ * (a user session, an awareness lookup). Preserved so existing callers are unchanged.
  *
  * @param principalId - Tenant or user identifier being evaluated.
  * @param payloadType - Payload family to compile.
@@ -129,19 +127,53 @@ export async function compile(
   prisma: PrismaClient,
 ): Promise<CompiledGrantDecision[]>
 {
+  return compileForPrincipals([principalId], payloadType, prisma);
+}
+
+/**
+ * Compile effective grant decisions over a SET of principals (S4 inheritance).
+ *
+ * An openclaw Tenant is 1:1 with one ClusterTenant user and must act with that user's
+ * entitlements, so its contract is compiled over `{tenant-name, subject}` — the union of
+ * direct grants on any principal in the set PLUS group grants for every group that
+ * contains any principal. The precedence pass is unchanged and deterministic: highest
+ * priority wins, deny beats allow at equal priority, newest `createdAt` breaks the tie —
+ * so a user-level Deny still overrides a tenant-level Allow regardless of which principal
+ * carried it. Duplicate/empty ids are dropped so the set is minimal.
+ *
+ * @param principalIds - Tenant and/or user identifiers whose grants are unioned.
+ * @param payloadType - Payload family to compile.
+ * @param prisma - Prisma client used to load groups and grants.
+ * @returns Final decision per payload identifier.
+ */
+export async function compileForPrincipals(
+  principalIds: string[],
+  payloadType: GrantCompilerPayloadType,
+  prisma: PrismaClient,
+): Promise<CompiledGrantDecision[]>
+{
+  // 0. Normalise to a minimal, distinct principal set (drop empties + duplicates). An empty
+  //    set has nothing to compile, so short-circuit before touching the DB.
+  const principals = Array.from(new Set(principalIds.filter(function _present(id) { return Boolean(id); })));
+  if (principals.length === 0)
+  {
+    return [];
+  }
+
   // 1. Load the minimum group shape needed so membership matching stays typed and isolated.
   const groupRows: _GroupRow[] = await prisma.group.findMany(_GROUP_ROW_SELECT);
 
-  // 2. Resolve every group that contains the principal because group grants are compiled alongside direct grants.
+  // 2. Resolve every group that contains ANY principal in the set, because a group grant is
+  //    inherited when the user OR the tenant is a member.
   const matchingGroupIds = groupRows.filter(function _matchGroup(group: _GroupRow)
   {
-    return _GroupHasPrincipal(group.members, principalId);
+    return _GroupHasAnyPrincipal(group.members, principals);
   }).map(function _mapGroup(group: _GroupRow)
   {
     return group.id;
   });
 
-  // 3. Fetch only grants that can apply to the principal so the later precedence pass stays deterministic and small.
+  // 3. Fetch only grants that can apply to the principal set so the later precedence pass stays deterministic and small.
   const grantRows: _GrantRow[] = await prisma.grant.findMany({
     ..._GRANT_ROW_SELECT,
     where: {
@@ -151,7 +183,9 @@ export async function compile(
           subjectType: {
             in: _DIRECT_SUBJECT_TYPES,
           },
-          subjectId: principalId,
+          subjectId: {
+            in: principals,
+          },
         },
         ...(matchingGroupIds.length > 0
           ? [
@@ -225,6 +259,21 @@ function _ToCompiledGrantDecision(grant: _GrantRow): CompiledGrantDecision
     subjectId: grant.subjectId,
     createdAt: grant.createdAt.toISOString(),
   };
+}
+
+/**
+ * Check whether a group membership JSON document contains ANY of the principals.
+ *
+ * @param members - Raw JSON stored on the group record.
+ * @param principalIds - Distinct principal identifiers being matched.
+ * @returns True when at least one principal is present.
+ */
+function _GroupHasAnyPrincipal(members: unknown, principalIds: string[]): boolean
+{
+  return ___SomeArray(principalIds, function _anyMatch(principalId)
+  {
+    return _GroupHasPrincipal(members, principalId);
+  });
 }
 
 /**

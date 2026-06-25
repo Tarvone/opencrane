@@ -4,7 +4,7 @@ import * as k8s from "@kubernetes/client-node";
 import { Router } from "express";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { compile } from "../core/grants/grant-compiler.js";
+import { compile, compileForPrincipals } from "../core/grants/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../core/grants/grant-compiler.types.js";
 import { _CutTenant } from "../core/connections/cut-tenant.js";
 import type { OpenClawGatewayAdmin } from "../core/connections/gateway-admin.types.js";
@@ -210,6 +210,7 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
       select: {
         name: true,
         team: true,
+        subject: true,
       },
     });
 
@@ -227,8 +228,13 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
       },
     });
     const awarenessMemberships = _BuildTenantDatasetMembershipResponse(memberships);
+    // Awareness is a fleet-participation property of the tenant itself, so it stays keyed on
+    // the tenant name. MCP + skills are user ENTITLEMENTS, so they compile over the tenant's
+    // principal set { tenant-name, bound subject } (S4 inheritance) — the openclaw Tenant
+    // inherits its 1:1 user's tool/skill rights; Deny>Allow keeps it least-privilege-capable.
+    const principals = [req.params.name, ...(tenant.subject ? [tenant.subject] : [])];
     const awarenessDecisions = await compile(req.params.name, GrantCompilerPayloadType.Awareness, prisma);
-    const mcpDecisions = await compile(req.params.name, GrantCompilerPayloadType.McpServer, prisma);
+    const mcpDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.McpServer, prisma);
     const allowedMcpIds = mcpDecisions.filter(function _isAllowed(decision)
     {
       return decision.access === GrantCompilerAccess.Allow;
@@ -236,7 +242,7 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
     {
       return decision.payloadId;
     });
-    const allowedSkillIds = (await compile(req.params.name, GrantCompilerPayloadType.SkillBundle, prisma)).filter(function _isAllowed(decision)
+    const allowedSkillIds = (await compileForPrincipals(principals, GrantCompilerPayloadType.SkillBundle, prisma)).filter(function _isAllowed(decision)
     {
       return decision.access === GrantCompilerAccess.Allow;
     }).map(function _mapDecision(decision)

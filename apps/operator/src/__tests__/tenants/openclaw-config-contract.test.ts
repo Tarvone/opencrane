@@ -39,7 +39,7 @@ describe("openclaw.json render contract — strict key set (task_d611ab4d)", fun
   {
     // The exact f6afafd regression: trustNothing is operator-internal, not an
     // OpenClaw key, so it must never appear anywhere in the rendered config.
-    const configMap = _BuildConfigMap(defaultConfig, _makeTenant("contract"));
+    const configMap = _BuildConfigMap(defaultConfig, _makeTenant("contract"), "default");
     const raw = configMap.data?.["openclaw.json"] ?? "";
     expect(raw).not.toContain("trustNothing");
   });

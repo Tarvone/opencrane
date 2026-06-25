@@ -301,7 +301,9 @@ function _resolveTrustedProxiesInput(raw: string): string[]
 
   const podIp = process.env["POD_IP"]?.trim() ?? "";
   const maskRaw = process.env["GATEWAY_TRUSTED_PROXIES_AUTO_MASK"]?.trim();
-  const maskBits = maskRaw && /^\d{1,3}$/.test(maskRaw) ? Number(maskRaw) : _DEFAULT_AUTO_TRUSTED_PROXY_MASK;
+  // Reject leading-zero / non-canonical masks (matching trusted-proxies' _isValidPrefix) so a
+  // typo falls back to the safe default rather than being silently coerced.
+  const maskBits = maskRaw && /^(0|[1-9]\d{0,2})$/.test(maskRaw) ? Number(maskRaw) : _DEFAULT_AUTO_TRUSTED_PROXY_MASK;
   const derived = _DeriveTrustedProxyCidr(podIp, maskBits);
 
   return entries.flatMap(function _expandAuto(entry)

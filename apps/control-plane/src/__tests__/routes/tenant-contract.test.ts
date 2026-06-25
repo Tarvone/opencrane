@@ -42,7 +42,7 @@ function _buildAuthApi(opts: {
 
 /** Build a mock Prisma client for contract endpoint tests. */
 function _buildPrismaStub(overrides: {
-  tenant?: { name: string; team: string | null; awarenessWave?: string | null } | null;
+  tenant?: { name: string; team: string | null; awarenessWave?: string | null; subject?: string | null } | null;
   rollout?: Record<string, unknown> | null;
 } = {}): PrismaClient
 {
@@ -243,5 +243,38 @@ describe("_RegisterInternalTenantContract GET /:name", () =>
     expect(res.body.skills.entitled).toEqual([
       { id: "bundle-1", name: "company-policy", digest: "sha256:abc123" },
     ]);
+  });
+
+  it("compiles the contract over the tenant's principal SET {name, subject} when bound (S4 inheritance)", async () =>
+  {
+    vi.mocked(compileForPrincipals).mockClear();
+    const prisma = _buildPrismaStub({ tenant: { name: "team-alpha", team: null, subject: "user-sub" } });
+    const app = _buildApp(prisma, _validAuthApi);
+
+    const res = await request(app)
+      .get("/api/internal/contract/team-alpha")
+      .set("Authorization", "Bearer valid");
+
+    expect(res.status).toBe(200);
+    // The route must pass BOTH the tenant name and its bound subject so the openclaw Tenant
+    // inherits the user's grants — guards the principal-set construction (a typo collapsing
+    // it to tenant-only would otherwise pass every other test).
+    expect(vi.mocked(compileForPrincipals)).toHaveBeenCalledWith(["team-alpha", "user-sub"], expect.anything(), expect.anything());
+    // Never called with the tenant alone when a subject is bound.
+    expect(vi.mocked(compileForPrincipals)).not.toHaveBeenCalledWith(["team-alpha"], expect.anything(), expect.anything());
+  });
+
+  it("collapses to the tenant principal alone for a legacy/unbound tenant (subject null)", async () =>
+  {
+    vi.mocked(compileForPrincipals).mockClear();
+    const prisma = _buildPrismaStub({ tenant: { name: "team-alpha", team: null, subject: null } });
+    const app = _buildApp(prisma, _validAuthApi);
+
+    const res = await request(app)
+      .get("/api/internal/contract/team-alpha")
+      .set("Authorization", "Bearer valid");
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(compileForPrincipals)).toHaveBeenCalledWith(["team-alpha"], expect.anything(), expect.anything());
   });
 });

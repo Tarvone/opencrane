@@ -42,6 +42,7 @@ import { sessionsRouter } from "./routes/sessions.js";
 import { platformDnsRouter } from "./routes/platform-dns.js";
 import { clusterTenantsRouter } from "./routes/cluster-tenants.js";
 import { _BuildClusterTenantProvisionerRegistry } from "./core/cluster-tenants/registry.js";
+import { _BuildZitadelManagementClient } from "./infra/zitadel/zitadel-client.js";
 import { _CheckDbHealth } from "./infra/db/healtcheck-db.js";
 
 /**
@@ -148,7 +149,10 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   }
   if (_featureEnabled("OPENCRANE_CLUSTER_TENANT_MANAGER_ENABLED"))
   {
-    app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, clusterTenantRegistry, customApi));
+    // Zitadel is a hard dependency of the multi-tenant path — built here (and only here)
+    // so a single-cluster install (manager off) never requires it; fail-loud if unset.
+    const zitadelClient = _BuildZitadelManagementClient();
+    app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, clusterTenantRegistry, customApi, zitadelClient));
   }
   app.use("/api/v1/awareness/rollout", awarenessRolloutRouter(prisma));
   app.use("/api/v1/awareness/participation", awarenessParticipationRouter(prisma));

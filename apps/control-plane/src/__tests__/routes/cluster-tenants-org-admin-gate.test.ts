@@ -7,6 +7,13 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clusterTenantsRouter } from "../../routes/cluster-tenants.js";
+import type { ZitadelManagementClient } from "../../infra/zitadel/zitadel-client.types.js";
+
+/** Benign Zitadel test double (this suite exercises the org-admin guard, not provisioning). */
+const _fakeZitadel: ZitadelManagementClient = {
+  async provisionOrg(input) { return { orgId: "z", appId: "a", redirectUri: input.redirectUri }; },
+  async teardownOrg() { /* no-op */ },
+};
 
 /**
  * Security-critical guard matrix for the org-admin model (ORG-ADMIN.3/4):
@@ -81,7 +88,7 @@ function _buildApp(prisma: PrismaClient, user?: User): Express
   {
     app.use(function _seedSession(req, _res, next) { (req as unknown as { session: { authUser: User } }).session = { authUser: user }; next(); });
   }
-  app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, _mockRegistry()));
+  app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, _mockRegistry(), null, _fakeZitadel));
   return app;
 }
 

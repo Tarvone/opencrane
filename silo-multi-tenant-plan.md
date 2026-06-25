@@ -336,10 +336,17 @@ Independent of the network substrate, so it can land in parallel with Phase 1.
   `provisionOrg` as the LAST fallible step inside `prisma.$transaction` (rollback-safe) + persists
   the ids, CT delete calls `teardownOrg`; owner default tenant bound to `Tenant.subject`; gated Helm
   `controlPlane.zitadel` + `PLATFORM_BASE_DOMAIN`. 9 tests.
-- 🔜 **NEXT (S3 slice)** **live HTTP Management client** — jwt-bearer SA auth (validated against
-  `weownai-oidc-8dwlat.eu1.zitadel.cloud`, supports `urn:ietf:params:oauth:grant-type:jwt-bearer`)
-  + the org/app/role/`admin`-grant calls + teardown; **idempotent**; SA key via GCP-SM+ESO. Drops
-  into the seam above. Then **issue the master's openclaw Tenant** is already wired (subject set).
+- ✅ **DONE (S3, PR)** **live HTTP Management client** — `_HttpZitadelManagementClient`: jwt-bearer
+  SA auth (RS256, token cached) + the full lifecycle **validated live** against
+  `weownai-oidc-8dwlat.eu1.zitadel.cloud` (create Org → project → bulk roles → OIDC app → master
+  `admin` grant; teardown deletes the org, 404-tolerant; compensates on mid-flight failure). The
+  **no-op fallback is removed** — Zitadel is a hard dependency (factory throws when unconfigured,
+  built only on the manager path so single-cluster installs are unaffected). Master's openclaw
+  Tenant already wired (subject set). **PREREQ: control-plane SA needs instance-level `IAM_OWNER`**
+  (org create/delete is instance-scoped — confirmed live). SA key via Secret (GCP-SM+ESO later).
+- 🔜 **STILL TO DO (S3 slices):** `oidc.service` host→CT→per-org-client login refactor; member API
+  + `oc cluster-tenant members`; reconcile/backfill (idempotent re-provision + drift); masters
+  self-registration. (Live client + auth flow are now proven, so these are pure code.)
 - **Host→CT→client resolution in `oidc.service`** — replace the single-client `_buildRedirectUri`
   host-reuse with a per-org client registry keyed by host; add the Zitadel org scope so only that
   org's pool can authenticate. Masters app serves `platform.<base>`.

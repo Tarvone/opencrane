@@ -42,12 +42,12 @@
   revives external-dns) and **CONN.8** remaining (cross-namespace wildcard-cert distribution + live
   ACME e2e — per-silo namespaces each need the cert). Dep: S1.
 - **S3 — Zitadel as PDP system-of-record (control-plane controls Zitadel).** *(silo Phase 2a)*
-  🟢 **KEYSTONE IN REVIEW (PR → strong-siloes):** `zitadel-client` seam + no-op factory, schema
-  (migration 0025: `Tenant.subject` + CT zitadel ids), transactional CT create/delete wiring,
-  gated Helm. 🔜 **follow-up S3 slices:** live HTTP Management client (jwt-bearer SA auth + org/app/
-  role/`admin`-grant, validated against the live instance), `oidc.service` host→CT→client login
-  refactor, member API + `oc cluster-tenant members`, reconcile/backfill, masters self-registration.
-  Dep: S1.
+  🟢 **IN REVIEW (PR #73 → strong-siloes):** schema (migration 0025), **live** `_HttpZitadelManagementClient`
+  (jwt-bearer SA auth + create Org→project→roles→OIDC app→master-admin-grant + teardown, **validated
+  against the live instance**), transactional CT create/delete wiring, no-op removed (Zitadel is a
+  hard dependency; single-cluster mode unaffected), `infra/zitadel`. **PREREQ: SA needs instance
+  `IAM_OWNER`.** 🔜 **remaining S3 slices:** `oidc.service` host→CT→client login refactor, member API
+  + `oc cluster-tenant members`, reconcile/backfill, masters self-registration. Dep: S1.
 - **S4 — Inheritance: openclaw Tenant inherits its user's rights.** *(silo Phase 2b)* Bind
   `Tenant.subject`; compile the contract over `{tenant, subject, groups(subject)}`; mirror Zitadel
   groups → `Group.members`; derive Cognee dataset scopes; inter-user sharing API + `oc share`.

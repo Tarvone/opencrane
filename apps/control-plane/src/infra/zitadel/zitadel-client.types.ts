@@ -8,6 +8,17 @@
  * sites stay thin and the orchestration is unit-testable against a fake.
  */
 
+/** Config the live Zitadel management client requires (read from env). */
+export interface ZitadelClientConfig
+{
+  /** Zitadel instance base URL, e.g. https://weownai-oidc-8dwlat.eu1.zitadel.cloud */
+  apiUrl: string;
+  /** Service-account key JSON (the downloaded Zitadel SA key) used for jwt-bearer auth. */
+  serviceAccountKey: string;
+  /** Platform base domain used to derive each org's redirect URI (`<org>.<base>`). */
+  baseDomain: string;
+}
+
 /** Inputs needed to provision a ClusterTenant's Zitadel org + login surface. */
 export interface ProvisionOrgInput
 {

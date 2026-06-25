@@ -1,18 +1,9 @@
 import crypto from "node:crypto";
 
 import { _log } from "../../log.js";
-import type { ProvisionOrgInput, ProvisionOrgResult, ZitadelManagementClient } from "./zitadel-client.types.js";
+import type { ProvisionOrgInput, ProvisionOrgResult, ZitadelClientConfig, ZitadelManagementClient } from "./zitadel-client.types.js";
 
-/** Config the live Zitadel management client requires (read from env). */
-export interface ZitadelClientConfig
-{
-  /** Zitadel instance base URL, e.g. https://weownai-oidc-8dwlat.eu1.zitadel.cloud */
-  apiUrl: string;
-  /** Service-account key JSON (the downloaded Zitadel SA key) used for jwt-bearer auth. */
-  serviceAccountKey: string;
-  /** Platform base domain used to derive each org's redirect URI (`<org>.<base>`). */
-  baseDomain: string;
-}
+export type { ZitadelClientConfig };
 
 /** Shape of the Zitadel service-account key JSON (`type: serviceaccount`). */
 interface _ServiceAccountKey
@@ -53,9 +44,13 @@ export function _ReadZitadelClientConfig(): ZitadelClientConfig | null
  */
 export class _HttpZitadelManagementClient implements ZitadelManagementClient
 {
+  /** Trailing-slash-trimmed Zitadel instance base URL. */
   private readonly apiUrl: string;
+  /** Parsed service-account key used to sign the jwt-bearer assertion. */
   private readonly saKey: _ServiceAccountKey;
+  /** Injectable HTTP transport (global `fetch` in prod; a fake in tests). */
   private readonly fetchImpl: typeof fetch;
+  /** Cached management access token + its refresh deadline (epoch ms). */
   private _cachedToken: { value: string; expiresAtMs: number } | null = null;
 
   /**

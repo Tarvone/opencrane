@@ -187,7 +187,7 @@ export class OidcAuthService
       //    OR-s the login-time flag (groups/operator) with membership-derived authority,
       //    so a user who just created an org is an org admin without re-logging-in.
       const [clusterTenant, membership] = await Promise.all([
-        this._resolveClusterTenant(authUser.email, _RequestHost(req)),
+        this._resolveClusterTenant(authUser.email, _requestHost(req)),
         _ResolveOrgMembershipFacts(this.prisma, authUser.sub),
       ]);
       return {
@@ -234,7 +234,7 @@ export class OidcAuthService
    */
   private async _resolveClusterTenant(email: string | undefined, host: string | undefined): Promise<string | null>
   {
-    return _ResolveCallerClusterTenant(this.prisma, email, _ClusterTenantFromHost(host));
+    return _ResolveCallerClusterTenant(this.prisma, email, _clusterTenantFromHost(host));
   }
 
   /** Build the provider redirect URL and persist PKCE state in the local session. */
@@ -580,7 +580,7 @@ export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient): Oid
  * (first value when comma-joined) and falling back to the `Host` header. Undefined when the
  * request carries no host. Shared by every per-org-host helper so they read the host one way.
  */
-function _RequestHost(req: Request): string | undefined
+function _requestHost(req: Request): string | undefined
 {
   const forwardedHost = req.headers?.["x-forwarded-host"];
   if (typeof forwardedHost === "string") return forwardedHost.split(",")[0].trim();
@@ -596,7 +596,7 @@ function _RequestHost(req: Request): string | undefined
  * fail-closes rather than mis-resolving. Custom org domains that do not follow `<org>.<base>` are
  * not matched here (a future ingressHost-based lookup would cover them).
  */
-function _ClusterTenantFromHost(host: string | undefined): string | undefined
+function _clusterTenantFromHost(host: string | undefined): string | undefined
 {
   if (!host) return undefined;
   const firstLabel = host.split(":")[0].trim().toLowerCase().split(".")[0];
@@ -616,7 +616,7 @@ function _buildRedirectUri(req: Request, configuredRedirect: string): string
 {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-  const host = _RequestHost(req);
+  const host = _requestHost(req);
   if (!host) return configuredRedirect;
   const callbackPath = new URL(configuredRedirect).pathname;
   return `${protocol}://${host}${callbackPath}`;
@@ -633,7 +633,7 @@ function _buildPostLogoutRedirectUri(req: Request, configuredRedirect: string): 
 {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-  const host = _RequestHost(req);
+  const host = _requestHost(req);
   if (!host) return configuredRedirect;
   const parsed = new URL(configuredRedirect);
   return `${protocol}://${host}${parsed.pathname}${parsed.search}`;
@@ -644,7 +644,7 @@ function _buildCurrentUrl(req: Request): URL
 {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-  const host = _RequestHost(req);
+  const host = _requestHost(req);
 
   return new URL(`${protocol}://${host}${req.originalUrl}`);
 }

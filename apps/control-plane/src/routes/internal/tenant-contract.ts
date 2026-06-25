@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 
-import { compile } from "../../core/grants/grant-compiler.js";
+import { compileForPrincipals } from "../../core/grants/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../../core/grants/grant-compiler.types.js";
 import { _RenderToolsMarkdown } from "../../core/contract/tools-markdown.js";
 import { _LoadAwarenessRollout } from "../../core/awareness/rollout-store.js";
@@ -121,7 +121,7 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
       // 4. Verify the tenant exists before compiling grants.
       const tenant = await prisma.tenant.findUnique({
         where: { name },
-        select: { name: true, team: true, awarenessWave: true, clusterTenantRef: true },
+        select: { name: true, team: true, awarenessWave: true, clusterTenantRef: true, subject: true },
       });
 
       if (!tenant)
@@ -130,9 +130,14 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
         return;
       }
 
-      // 5. Compile MCP server and skill grants for this tenant.
-      const mcpDecisions = await compile(name, GrantCompilerPayloadType.McpServer, prisma);
-      const skillDecisions = await compile(name, GrantCompilerPayloadType.SkillBundle, prisma);
+      // 5. Compile MCP server and skill grants over the tenant's principal SET (S4 inheritance):
+      //    the openclaw Tenant inherits the rights of its 1:1 ClusterTenant user, so we compile
+      //    over { tenant-name, bound subject } — the union of both principals' direct + group
+      //    grants. A user-level Deny still beats a tenant-level Allow (Deny>Allow precedence).
+      //    The subject is absent for legacy/unbound tenants, which collapses to tenant-only.
+      const principals = [name, ...(tenant.subject ? [tenant.subject] : [])];
+      const mcpDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.McpServer, prisma);
+      const skillDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.SkillBundle, prisma);
 
       const allowedMcp = mcpDecisions
         .filter(function _isAllow(d) { return d.access === GrantCompilerAccess.Allow; })

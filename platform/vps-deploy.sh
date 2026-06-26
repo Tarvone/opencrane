@@ -31,6 +31,8 @@ done
 [[ "$(uname -s)" == "Linux" ]] || { err "k3s needs Linux. On a laptop use ./platform/install.sh local (k3d)."; exit 1; }
 command -v helm >/dev/null 2>&1 || { err "Missing required command: helm (https://helm.sh/docs/intro/install/)"; exit 1; }
 
+export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+
 # 1. Install k3s (idempotent — skips if already present) → a one-node cluster.
 if ! command -v k3s >/dev/null 2>&1; then
   log "Installing k3s…"
@@ -47,6 +49,21 @@ if [[ ! -r "$KUBECONFIG" ]]; then
   done
 fi
 [[ -r "$KUBECONFIG" ]] || { err "Cannot read $KUBECONFIG (run with sudo, or set KUBECONFIG)."; exit 1; }
+
+# 2. Make kubeconfig accessible to the invoking non-root user (if run via sudo)
+if [[ -n "${SUDO_USER:-}" && -f "$KUBECONFIG" ]]; then
+  USER_HOME=$(eval echo "~$SUDO_USER")
+  if [[ -d "$USER_HOME" ]]; then
+    log "Configuring kubeconfig for user $SUDO_USER in $USER_HOME/.kube/config..."
+    mkdir -p "$USER_HOME/.kube"
+    if [[ -f "$USER_HOME/.kube/config" && ! -L "$USER_HOME/.kube/config" ]]; then
+      mv "$USER_HOME/.kube/config" "$USER_HOME/.kube/config.bak.$(date +%s)"
+    fi
+    cp "$KUBECONFIG" "$USER_HOME/.kube/config"
+    chown -R "$SUDO_USER" "$USER_HOME/.kube"
+    chmod 600 "$USER_HOME/.kube/config"
+  fi
+fi
 
 log "Cluster ready. Installing OpenCrane…"
 # k3s ships the 'local-path' default StorageClass and a Traefik ingress out of the box.

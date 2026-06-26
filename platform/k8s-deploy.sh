@@ -919,5 +919,30 @@ kubectl rollout status "deployment/${RELEASE}-operator" -n "$NAMESPACE" --timeou
 kubectl rollout status "deployment/${RELEASE}-control-plane" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
 
 log "Done. OpenCrane is installed in namespace '$NAMESPACE'."
-[[ -n "$BASE_DOMAIN" ]] && log "Point your DNS at the ingress, then visit https://platform.${BASE_DOMAIN}"
-log "Ingress: kubectl get ingress -n $NAMESPACE"
+
+# Success Banner
+console_domain="${BASE_DOMAIN:-<your-domain>}"
+callback_uri="${OIDC_REDIRECT_URI:-https://platform.${console_domain}/api/v1/auth/callback}"
+
+cat <<EOF
+
+=============================================================================
+                  OpenCrane Deployment Successful!
+=============================================================================
+
+Console URL:
+  https://platform.${console_domain}
+
+Retrieve Database Connection Strings & Credentials:
+  - Main DB secret:      kubectl get secret $DB_SECRET -n $NAMESPACE -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
+  - LiteLLM DB secret:   kubectl get secret opencrane-litellm-db -n $NAMESPACE -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
+  - Obot DB secret:      kubectl get secret opencrane-obot -n $NAMESPACE -o jsonpath='{.data.dsn}' | base64 --decode
+
+OIDC Callback/Redirect URI:
+  ${callback_uri}
+  (Ensure this URI is registered in your Identity Provider's client settings)
+
+For more information, run:
+  kubectl get ingress,pods -n $NAMESPACE
+=============================================================================
+EOF

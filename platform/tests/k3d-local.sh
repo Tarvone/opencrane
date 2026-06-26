@@ -318,6 +318,43 @@ if kubectl get deployment/opencrane-litellm -n "$NAMESPACE" >/dev/null 2>&1; the
 fi
 
 echo "[local] PASS: local full-stack install succeeded"
-echo "[local] Cluster: $CLUSTER_NAME"
-echo "[local] Namespace: $NAMESPACE"
-echo "[local] Control plane: http://localhost (expose with kubectl port-forward if needed)"
+
+cat <<EOF
+
+=============================================================================
+             [local] OpenCrane Local Install Successful!
+=============================================================================
+
+Environment:
+  Cluster:   $CLUSTER_NAME
+  Namespace: $NAMESPACE
+
+Accessing the Control Plane:
+  Since port 80/443 are not mapped directly from the k3d cluster to your host,
+  you can expose the control-plane service using kubectl port-forward:
+  
+  Command:
+    kubectl port-forward service/${RELEASE_NAME}-control-plane -n $NAMESPACE 8080:8080
+    
+  URL:
+    http://localhost:8080
+
+Using sslip.io with Ingress-Nginx:
+  If you have an ingress controller deployed, you can port-forward its service:
+  
+  Command:
+    kubectl port-forward service/ingress-nginx-controller -n ingress-nginx 8080:80 8443:443
+    
+  URL:
+    https://platform.127.0.0.1.sslip.io:8443 (wildcard certificate is active)
+
+Database Secret Extraction:
+  Retrieve the generated database credentials and connection strings:
+  - Main DB secret:      kubectl get secret $DB_SECRET_NAME -n $NAMESPACE -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
+  - LiteLLM DB secret:   kubectl get secret opencrane-litellm-db -n $NAMESPACE -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
+  - Obot DB secret:      kubectl get secret opencrane-obot -n $NAMESPACE -o jsonpath='{.data.dsn}' | base64 --decode
+$( if grep -A 5 "langfuse:" "$VALUES_FILE" 2>/dev/null | grep -A 5 "inCluster:" | grep -q "enabled: true"; then
+echo "  - Langfuse credentials: kubectl get secret $LANGFUSE_SECRET_NAME -n $NAMESPACE -o json"
+fi )
+=============================================================================
+EOF

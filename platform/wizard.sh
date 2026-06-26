@@ -87,6 +87,9 @@ function _summary_row()
 
 # ---- Welcome -----------------------------------------------------------------
 
+TOTAL_STEPS=7
+STEP_IDX=1
+
 _banner
 
 echo -e "${DIM}  This wizard will walk you through installing OpenCrane.${NC}"
@@ -94,7 +97,7 @@ echo -e "${DIM}  Press Enter to accept defaults shown in [brackets].${NC}"
 
 # ---- Step 1: Choose target ---------------------------------------------------
 
-_step "Step 1 of 7 — Install target"
+_step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Install target"
 
 echo -e "  Where do you want to install OpenCrane?\n"
 echo -e "  ${BOLD}1)${NC} Local          — k3d cluster on this machine (development / full stack)"
@@ -117,6 +120,10 @@ case "$mode_choice" in
     ;;
 esac
 
+if [[ "$mode" == "local" ]]; then
+  TOTAL_STEPS=6
+fi
+
 echo ""
 echo -e "  ${GREEN}✓${NC} Target: ${BOLD}$mode${NC}"
 
@@ -137,7 +144,7 @@ DNS_MANAGED_ZONE=""
 
 if [[ "$mode" == "local" ]]; then
 
-  _step "Step 2 of 7 — Local cluster settings"
+  _step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Local cluster settings"
 
   _prompt "Cluster name"    "opencrane-local"   CLUSTER_NAME
   _prompt "Namespace"       "opencrane-system"  NAMESPACE
@@ -157,7 +164,7 @@ if [[ "$mode" == "local" ]]; then
 
 elif [[ "$mode" == "vps" || "$mode" == "custom" ]]; then
 
-  _step "Step 2 of 7 — Cluster settings"
+  _step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Cluster settings"
 
   _prompt "Base domain (required)"       ""               DOMAIN
   _prompt "Namespace"                    "opencrane-system" NAMESPACE
@@ -172,7 +179,7 @@ elif [[ "$mode" == "vps" || "$mode" == "custom" ]]; then
 
 else
 
-  _step "Step 2 of 7 — GCP configuration"
+  _step "Step $((STEP_IDX++)) of $TOTAL_STEPS — GCP configuration"
 
   _prompt "GCP Project ID (required)"    ""               PROJECT_ID
   _prompt "Region"                      "europe-west1"   REGION
@@ -205,7 +212,7 @@ ORG_DISPLAY_NAME=""
 ORG_TIER="shared"
 
 if [[ "$mode" != "local" ]]; then
-  _step "Step 3 of 7 — Choose deployment profile"
+  _step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Choose deployment profile"
 
   echo -e "  Choose the deployment profile for this cluster:\n"
   echo -e "  ${BOLD}1)${NC} Single-tenant — one pre-seeded organization, self-service is OFF"
@@ -257,7 +264,7 @@ fi
 # (fail-closed). This is never persisted in the repo; it is passed to the installer
 # at deploy time only.
 
-_step "Step 4 of 7 — Platform-operator seed (optional)"
+_step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Platform-operator seed (optional)"
 
 echo -e "  ${DIM}Bootstrap the first platform operator by email — useful before you"
 echo -e "  have an IdP group mapping. The caller whose VERIFIED OIDC email matches"
@@ -283,7 +290,7 @@ fi
 # service-account key file. The choices flow to the installer as env vars (same pattern
 # as the operator seed); k8s-deploy.sh re-validates and runs the DNS-01 preflight.
 
-_step "Step 5 of 7 — TLS / certificates"
+_step "Step $((STEP_IDX++)) of $TOTAL_STEPS — TLS / certificates"
 
 echo -e "  How should OpenCrane obtain TLS certificates?\n"
 echo -e "  ${BOLD}1)${NC} Off        — TLS terminated elsewhere (load balancer / external ingress)"
@@ -334,7 +341,7 @@ echo -e "  ${GREEN}✓${NC} TLS: ${BOLD}$cert_label${NC}"
 
 # ---- Step 6: Pre-flight check ------------------------------------------------
 
-_step "Step 6 of 7 — Pre-flight checks"
+_step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Pre-flight checks"
 
 has_error=0
 
@@ -365,7 +372,7 @@ echo -e "  ${GREEN}✓${NC} All required tools found."
 
 # ---- Step 7: Summary + confirm -----------------------------------------------
 
-_step "Step 7 of 7 — Summary"
+_step "Step $((STEP_IDX++)) of $TOTAL_STEPS — Summary"
 
 echo ""
 if [[ "$mode" == "local" ]]; then

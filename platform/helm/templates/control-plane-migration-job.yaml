@@ -27,7 +27,7 @@ spec:
         {{- include "opencrane.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: control-plane-migrate
     spec:
-      serviceAccountName: {{ include "opencrane.fullname" . }}-control-plane
+      automountServiceAccountToken: false
       restartPolicy: Never
       containers:
         - name: db-migrate

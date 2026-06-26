@@ -6,7 +6,7 @@
 # installs OpenCrane onto it. Ideal for a VM, a VPS, or a single server.
 #
 # Usage:
-#   sudo ./platform/vps-deploy.sh [--domain DOMAIN]
+#   sudo ./platform/vps-deploy.sh [--base-domain BASE_DOMAIN]
 #
 # Prereqs: a Linux host with curl + helm (this script installs k3s for you).
 # For laptop/dev on macOS or Windows, use ./platform/install.sh local (k3d).
@@ -23,7 +23,6 @@ err()  { echo -e "\033[0;31m[vps-deploy]\033[0m $1" >&2; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-domain) DOMAIN="$2"; shift 2 ;;
-    --domain) DOMAIN="$2"; shift 2 ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) PASSTHROUGH+=("$1"); shift ;;
   esac

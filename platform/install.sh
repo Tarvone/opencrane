@@ -100,7 +100,7 @@ function _run_interactive_setup()
     exit 1
   fi
 
-  _run_gcp --project-id "$project_id" --region "$region" --domain "$domain" --environment "$environment" --yes
+  _run_gcp --project-id "$project_id" --region "$region" --base-domain "$domain" --environment "$environment" --yes
 }
 
 function _run_local()
@@ -177,10 +177,6 @@ function _run_gcp()
         domain="$2"
         shift 2
         ;;
-      --domain)
-        domain="$2"
-        shift 2
-        ;;
       --environment)
         environment="$2"
         shift 2
@@ -204,7 +200,7 @@ function _run_gcp()
   # Interactive GKE deploy when no project is given (gke-deploy.sh prompts).
   if [[ -z "$project_id" ]]; then
     echo "[install] Running interactive GKE deploy..."
-    "$ROOT_DIR/platform/gke-deploy.sh" ${domain:+--domain "$domain"}
+    "$ROOT_DIR/platform/gke-deploy.sh" ${domain:+--base-domain "$domain"}
     return
   fi
 
@@ -218,7 +214,7 @@ function _run_gcp()
 
   echo "[install] Running non-interactive GKE deploy..."
   "$ROOT_DIR/platform/gke-deploy.sh" \
-    --project-id "$project_id" --region "$region" ${domain:+--domain "$domain"} --yes
+    --project-id "$project_id" --region "$region" ${domain:+--base-domain "$domain"} --yes
 }
 
 if [[ $# -lt 1 ]]; then

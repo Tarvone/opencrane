@@ -52,7 +52,7 @@
 # source of truth: the chart's ingress.domain, the derived controlPlaneHost
 # (platform.<base-domain>), the cert-manager wildcard SANs (*.<domain>, <domain>,
 # controlPlaneHost), and the operator's per-org domain provisioning. NEVER hardcode a
-# real domain in the repo. `--domain` remains a backwards-compatible alias; acme TLS
+# real domain in the repo. acme TLS
 # REQUIRES --base-domain (a wildcard for *.<empty> is meaningless).
 #
 # Bundled cluster singletons (default ON, auto-skip if already present):
@@ -102,7 +102,7 @@ TENANT_TAG=""           # empty → falls back to IMAGE_TAG
 # (e.g. dev.opencrane.ai). It drives the chart's ingress.domain + the derived
 # controlPlaneHost (platform.<base-domain>), the cert-manager wildcard SANs, and the
 # operator's per-org provisioning. NEVER hardcode a real domain in the repo — it is a
-# per-install input. `--domain` is kept as a backwards-compatible alias. Also accepts
+# per-install input. Also accepts
 # OPENCRANE_BASE_DOMAIN so the wizard / CI can supply it off the command line.
 BASE_DOMAIN="${OPENCRANE_BASE_DOMAIN:-}"
 STORAGE_CLASS=""        # empty → cluster default StorageClass
@@ -212,7 +212,6 @@ while [[ $# -gt 0 ]]; do
     --ingress-ip)        INGRESS_IP="$2"; shift 2 ;;
     --dns-managed-zone)  DNS_MANAGED_ZONE="$2"; shift 2 ;;
     --base-domain)   BASE_DOMAIN="$2"; shift 2 ;;
-    --domain)        BASE_DOMAIN="$2"; shift 2 ;;  # backwards-compatible alias
     --namespace)     NAMESPACE="$2"; shift 2 ;;
     --release)       RELEASE="$2"; shift 2 ;;
     --image-tag)        IMAGE_TAG="$2"; shift 2 ;;

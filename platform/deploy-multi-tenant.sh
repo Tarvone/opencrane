@@ -45,7 +45,6 @@ while [[ $# -gt 0 ]]; do
     --ingress-ip)        INGRESS_IP="$2"; shift 2 ;;
     --dns-managed-zone)  DNS_MANAGED_ZONE="$2"; shift 2 ;;
     --base-domain)       BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
-    --domain)            BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
     -h|--help)           grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)                   PASSTHROUGH+=("$1"); shift ;;
   esac

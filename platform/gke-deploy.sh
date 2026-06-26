@@ -38,7 +38,6 @@ while [[ $# -gt 0 ]]; do
     --region)     REGION="$2"; shift 2 ;;
     --cluster)    CLUSTER="$2"; shift 2 ;;
     --base-domain) BASE_DOMAIN="$2"; shift 2 ;;
-    --domain)     BASE_DOMAIN="$2"; shift 2 ;;  # backwards-compatible alias
     --yes)        ASSUME_YES=1; shift ;;
     -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            PASSTHROUGH+=("$1"); shift ;;

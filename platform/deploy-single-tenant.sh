@@ -47,7 +47,6 @@ while [[ $# -gt 0 ]]; do
     --org-owner-email)   ORG_OWNER_EMAIL="$2"; shift 2 ;;
     --org-tier)          ORG_TIER="$2"; shift 2 ;;
     --base-domain)       BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
-    --domain)            BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
     -h|--help)           grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)                   PASSTHROUGH+=("$1"); shift ;;
   esac

@@ -89,7 +89,7 @@ while [[ $# -gt 0 ]]; do
     --client-secret)               CLIENT_SECRET="$2"; shift 2 ;;
     --session-secret)              SESSION_SECRET="$2"; shift 2 ;;
     --redirect-uri)                REDIRECT_URI="$2"; shift 2 ;;
-    --base-domain|--domain)        BASE_DOMAIN="$2"; shift 2 ;;
+    --base-domain)        BASE_DOMAIN="$2"; shift 2 ;;
     --groups-claim)                GROUPS_CLAIM="$2"; shift 2 ;;
     --roles-claim)                 ROLES_CLAIM="$2"; shift 2 ;;
     --org-admin-groups)            ORG_ADMIN_GROUPS="$2"; shift 2 ;;

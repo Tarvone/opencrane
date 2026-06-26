@@ -190,12 +190,27 @@ DB_USER="opencrane"
 DB_NAME="opencrane"
 TIMEOUT="${TIMEOUT_SECONDS:-300}"
 
+PROFILE=""
+ORG_NAME=""
+ORG_DISPLAY_NAME=""
+ORG_OWNER_EMAIL=""
+ORG_TIER="shared"
+INGRESS_IP=""
+DNS_MANAGED_ZONE=""
+
 log()  { echo -e "\033[0;32m[k8s-deploy]\033[0m $1"; }
 warn() { echo -e "\033[1;33m[k8s-deploy]\033[0m $1"; }
 err()  { echo -e "\033[0;31m[k8s-deploy]\033[0m $1" >&2; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --profile)           PROFILE="$2"; shift 2 ;;
+    --org-name)          ORG_NAME="$2"; shift 2 ;;
+    --org-display-name)  ORG_DISPLAY_NAME="$2"; shift 2 ;;
+    --org-owner-email)   ORG_OWNER_EMAIL="$2"; shift 2 ;;
+    --org-tier)          ORG_TIER="$2"; shift 2 ;;
+    --ingress-ip)        INGRESS_IP="$2"; shift 2 ;;
+    --dns-managed-zone)  DNS_MANAGED_ZONE="$2"; shift 2 ;;
     --base-domain)   BASE_DOMAIN="$2"; shift 2 ;;
     --domain)        BASE_DOMAIN="$2"; shift 2 ;;  # backwards-compatible alias
     --namespace)     NAMESPACE="$2"; shift 2 ;;
@@ -838,6 +853,40 @@ if [[ -n "$PLATFORM_OPERATOR_SEED_EMAIL" ]]; then
   helm_args+=(--set-string "controlPlane.oidc.platformOperatorSeedEmail=$PLATFORM_OPERATOR_SEED_EMAIL")
   warn "Seeding platform operator for the cluster (verified OIDC email match). Remove the seed once a group mapping is in place."
 fi
+# Apply profile-specific configurations when --profile is selected.
+if [[ -n "$PROFILE" ]]; then
+  case "$PROFILE" in
+    single-tenant)
+      [[ -n "$ORG_NAME" ]] || { err "--org-name is required for single-tenant profile."; exit 1; }
+      [[ -n "$ORG_OWNER_EMAIL" ]] || { err "--org-owner-email is required for single-tenant profile."; exit 1; }
+      helm_args+=(
+        --set "clusterTenantManager.enabled=false"
+        --set "billing.enabled=false"
+        --set "multiInstance.enabled=false"
+        --set "clusterTenant.seed.name=$ORG_NAME"
+        --set "clusterTenant.seed.ownerEmail=$ORG_OWNER_EMAIL"
+        --set "clusterTenant.seed.tier=$ORG_TIER"
+      )
+      [[ -n "$ORG_DISPLAY_NAME" ]] && helm_args+=(--set "clusterTenant.seed.displayName=$ORG_DISPLAY_NAME")
+      log "Profile single-tenant: seeding organization '$ORG_NAME' (owner: $ORG_OWNER_EMAIL, tier: $ORG_TIER)"
+      ;;
+    multi-tenant)
+      helm_args+=(
+        --set "clusterTenantManager.enabled=true"
+        --set "billing.enabled=true"
+        --set "ingress.tls.enabled=true"
+      )
+      [[ -n "$INGRESS_IP" ]] && helm_args+=(--set "ingress.externalIp=$INGRESS_IP")
+      [[ -n "$DNS_MANAGED_ZONE" ]] && helm_args+=(--set "ingress.dnsManagedZone=$DNS_MANAGED_ZONE")
+      log "Profile multi-tenant: self-service orgs and billing are ON"
+      ;;
+    *)
+      err "Unknown profile '$PROFILE'. Supported profiles: single-tenant, multi-tenant."
+      exit 1
+      ;;
+  esac
+fi
+
 [[ -n "$VALUES_FILE" ]] && helm_args+=(--values "$VALUES_FILE")
 # cert-manager flags resolved in Step 2.5 (empty in mode=off). Placed before --set
 # overrides so an operator can still override individual issuer fields on the CLI.

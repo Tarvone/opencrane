@@ -22,6 +22,7 @@ err()  { echo -e "\033[0;31m[vps-deploy]\033[0m $1" >&2; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --base-domain) DOMAIN="$2"; shift 2 ;;
     --domain) DOMAIN="$2"; shift 2 ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) PASSTHROUGH+=("$1"); shift ;;
@@ -50,4 +51,4 @@ fi
 
 log "Cluster ready. Installing OpenCrane…"
 # k3s ships the 'local-path' default StorageClass and a Traefik ingress out of the box.
-exec "$SCRIPT_DIR/k8s-deploy.sh" ${DOMAIN:+--domain "$DOMAIN"} --set ingress.className=traefik --set networkPolicy.ingressNamespace=kube-system "${PASSTHROUGH[@]}"
+exec "$SCRIPT_DIR/k8s-deploy.sh" ${DOMAIN:+--base-domain "$DOMAIN"} --set ingress.className=traefik --set networkPolicy.ingressNamespace=kube-system "${PASSTHROUGH[@]}"

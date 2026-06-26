@@ -45,6 +45,7 @@ while [[ $# -gt 0 ]]; do
     --ingress-ip)        INGRESS_IP="$2"; shift 2 ;;
     --dns-managed-zone)  DNS_MANAGED_ZONE="$2"; shift 2 ;;
     --base-domain)       BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
+    --domain)            BASE_DOMAIN="$2"; PASSTHROUGH+=(--base-domain "$2"); shift 2 ;;
     -h|--help)           grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)                   PASSTHROUGH+=("$1"); shift ;;
   esac
@@ -52,18 +53,9 @@ done
 
 [[ -n "$BASE_DOMAIN" ]] || { err "--base-domain is required (the platform wildcard base every org is served under)."; exit 1; }
 
-# MULTI-TENANT value profile: self-service manager + billing ON (the defaults, set
-# explicitly so the profile is self-documenting and robust to a changed default), NO
-# seeded org, and the fleet wildcard wiring. multiInstance stays at its default off —
-# multi-TENANT (many orgs in one install) is distinct from multi-INSTANCE (many isolated
-# installs in one cluster).
-PROFILE_SET=(
-  --set "clusterTenantManager.enabled=true"
-  --set "billing.enabled=true"
-  --set "ingress.tls.enabled=true"
-)
-[[ -n "$INGRESS_IP" ]]       && PROFILE_SET+=(--set "ingress.externalIp=$INGRESS_IP")
-[[ -n "$DNS_MANAGED_ZONE" ]] && PROFILE_SET+=(--set "ingress.dnsManagedZone=$DNS_MANAGED_ZONE")
-
 echo -e "\033[0;32m[multi-tenant]\033[0m Profile: multi-tenant platform on $BASE_DOMAIN (self-service orgs + billing ON)"
-exec "$CORE" "${PROFILE_SET[@]}" "${PASSTHROUGH[@]}"
+exec "$CORE" --profile multi-tenant \
+  --base-domain "$BASE_DOMAIN" \
+  ${INGRESS_IP:+--ingress-ip "$INGRESS_IP"} \
+  ${DNS_MANAGED_ZONE:+--dns-managed-zone "$DNS_MANAGED_ZONE"} \
+  "${PASSTHROUGH[@]}"

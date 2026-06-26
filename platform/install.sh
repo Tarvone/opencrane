@@ -11,12 +11,12 @@ OpenCrane Phase 1 installer
 
 Usage:
   ./platform/install.sh local [--keep-cluster] [--cluster-name NAME] [--namespace NS] [--profile PROFILE]
-  ./platform/install.sh gcp [--project-id ID] [--region REGION] [--domain DOMAIN] [--environment ENV] [--yes]
+  ./platform/install.sh gcp [--project-id ID] [--region REGION] [--base-domain DOMAIN] [--environment ENV] [--yes]
 
 Examples:
   ./platform/install.sh local --keep-cluster
   ./platform/install.sh local --profile strict
-  ./platform/install.sh gcp --project-id my-gcp-project --domain opencrane.example.com --yes
+  ./platform/install.sh gcp --project-id my-gcp-project --base-domain opencrane.example.com --yes
 
 Notes:
   - local mode uses k3d + Helm full-stack install and keeps cluster by default.
@@ -171,6 +171,10 @@ function _run_gcp()
         ;;
       --region)
         region="$2"
+        shift 2
+        ;;
+      --base-domain)
+        domain="$2"
         shift 2
         ;;
       --domain)

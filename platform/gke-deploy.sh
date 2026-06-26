@@ -26,6 +26,7 @@ REGION="europe-west1"
 CLUSTER="opencrane-cluster"
 BASE_DOMAIN="${OPENCRANE_BASE_DOMAIN:-}"
 ASSUME_YES=0
+PASSTHROUGH=()
 
 log()  { echo -e "\033[0;32m[gke-deploy]\033[0m $1"; }
 warn() { echo -e "\033[1;33m[gke-deploy]\033[0m $1"; }
@@ -40,7 +41,7 @@ while [[ $# -gt 0 ]]; do
     --domain)     BASE_DOMAIN="$2"; shift 2 ;;  # backwards-compatible alias
     --yes)        ASSUME_YES=1; shift ;;
     -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *)            err "Unknown flag: $1"; exit 1 ;;
+    *)            PASSTHROUGH+=("$1"); shift ;;
   esac
 done
 
@@ -70,7 +71,7 @@ gcloud container clusters get-credentials "$CLUSTER" --region "$REGION" --projec
 
 # 4. Install OpenCrane (published images, GKE default StorageClass).
 log "Installing OpenCrane…"
-"$SCRIPT_DIR/k8s-deploy.sh" ${BASE_DOMAIN:+--base-domain "$BASE_DOMAIN"}
+"$SCRIPT_DIR/k8s-deploy.sh" ${BASE_DOMAIN:+--base-domain "$BASE_DOMAIN"} "${PASSTHROUGH[@]}"
 
 # 5. Next steps. k8s-deploy.sh bundles ingress-nginx by default (auto-skipped if a
 # controller is already present), so a fresh GKE cluster gets one with no extra step.

@@ -13,6 +13,7 @@ is not itself published.
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0001](0001-cluster-tenant-virtual-network-isolation.md) | ClusterTenant-as-virtual-network strict isolation (substrate) | Accepted |
+| [0002](0002-per-clustertenant-silo-architecture.md) | Per-ClusterTenant silo architecture (operator, planes, API/DB) by isolation tier | Proposed |
 
 ## Writing a new ADR
 

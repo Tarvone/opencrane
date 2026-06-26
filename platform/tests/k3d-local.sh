@@ -219,6 +219,9 @@ if grep -A 5 "certManager:" "$VALUES_FILE" 2>/dev/null | grep -q "enabled: true"
 fi
 
 # 6. Install the OpenCrane chart with local-strict overrides wired to the in-cluster database.
+echo "[local] Applying Custom Resource Definitions (CRDs)"
+kubectl apply -f "$ROOT_DIR/platform/helm/crds"
+
 echo "[local] Installing Helm release '$RELEASE_NAME'"
 helm_args=(
   upgrade

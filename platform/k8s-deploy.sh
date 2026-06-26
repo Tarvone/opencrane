@@ -782,6 +782,9 @@ helm repo add langfuse https://langfuse.github.io/langfuse-k8s --force-update >/
 log "Fetching chart dependencies…"
 helm dep update "$CHART_DIR"
 
+log "Applying Custom Resource Definitions (CRDs)…"
+kubectl apply -f "$CHART_DIR/crds/"
+
 log "Installing the OpenCrane Helm release '$RELEASE'…"
 # LiteLLM is wired to its own `litellm` database (DATABASE_URL via opencrane-litellm-db) with
 # STORE_MODEL_IN_DB on, so models/keys are stored and seeded at runtime via the admin API. The

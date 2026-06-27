@@ -146,7 +146,6 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/model-routing/metrics", modelRoutingMetricsRouter(prisma));
   app.use("/api/v1/third-party-sources", thirdPartySourcesRouter(prisma));
   app.use("/api/v1/org/workspace-docs", companyDocsRouter(prisma, _BuildDocMergeReconciler()));
-  app.use("/api/v1/platform/dns", platformDnsRouter(customApi, coreApi));
   // Multi-tenant self-service surfaces. The single-tenant profile turns these OFF
   // (billing.enabled=false, clusterTenantManager.enabled=false in Helm): the org is
   // seeded directly at boot (see _SeedClusterTenant), so there is no self-service
@@ -157,6 +156,10 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   }
   if (_featureEnabled("OPENCRANE_CLUSTER_TENANT_MANAGER_ENABLED"))
   {
+    // Platform DNS is a FLEET / platform-admin surface (it provisions the cert-manager DNS-01
+    // issuer + creds Secret for the wildcard tenant cert) — gated with the manager so a
+    // per-tenant install (manager off) never exposes platform-level DNS configuration.
+    app.use("/api/v1/platform/dns", platformDnsRouter(customApi, coreApi));
     // Zitadel is a hard dependency of the multi-tenant path — built here (and only here)
     // so a single-cluster install (manager off) never requires it; fail-loud if unset.
     const zitadelClient = _BuildZitadelManagementClient();

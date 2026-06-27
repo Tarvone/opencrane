@@ -41,7 +41,7 @@ const _unbindConsole = ___BindConsole(log);
 export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi, coreApi: k8s.CoreV1Api, authApi: k8s.AuthenticationV1Api): Express
 {
   const app = express();
-  const authService = ___CreateOidcAuthService(log, prisma);
+  const authService = ___CreateOidcAuthService(log, prisma, customApi);
 
   // Middleware
   app.set("trust proxy", 1);

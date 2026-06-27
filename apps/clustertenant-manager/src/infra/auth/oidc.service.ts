@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import type { Logger } from "pino";
+import type * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 
 import { OidcAuthServiceBase, _RequestHost } from "@opencrane/infra-auth";
@@ -25,26 +26,34 @@ import { _OrgScope, _ResolvePerOrgClient } from "./per-org-client.js";
  */
 export class OidcAuthService extends OidcAuthServiceBase
 {
-  /** Prisma client for per-org client resolution and the email→tenant→clusterTenant lookup. */
+  /** Prisma client for the email→tenant→clusterTenant lookup (`/auth/me` enrichment). */
   private prisma: PrismaClient;
 
+  /** Kubernetes custom-objects client for reading the ClusterTenant CR (per-org login). */
+  private customApi: k8s.CustomObjectsApi | null;
+
   /**
-   * @param log    - Parent logger; a child scoped to `oidc-auth` is derived by the base.
-   * @param prisma - Prisma client (also the base's `OrgMembership` read surface).
+   * @param log       - Parent logger; a child scoped to `oidc-auth` is derived by the base.
+   * @param prisma    - Prisma client (also the base's `OrgMembership` read surface + the
+   *                    `/auth/me` email→tenant lookup).
+   * @param customApi - Kubernetes custom-objects client used to read the cluster-scoped
+   *                    ClusterTenant CR for per-org login resolution; null in dev/test (login
+   *                    then always uses the masters client).
    */
-  constructor(log: Logger, prisma: PrismaClient)
+  constructor(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null)
   {
     super(log, prisma);
     this.prisma = prisma;
+    this.customApi = customApi;
   }
 
   /**
-   * Resolve the per-org OIDC client for this request host; fall through to the masters
-   * client when the host maps to no fully-provisioned org.
+   * Resolve the per-org OIDC client for this request host from the ClusterTenant CR; fall
+   * through to the masters client when the host maps to no fully-provisioned org.
    */
   protected override async resolveLoginClient(req: Request): Promise<LoginClient>
   {
-    const perOrg = await _ResolvePerOrgClient(this.prisma, _RequestHost(req));
+    const perOrg = await _ResolvePerOrgClient(this.customApi, _RequestHost(req));
     if (!perOrg)
     {
       return super.resolveLoginClient(req);
@@ -67,10 +76,11 @@ export class OidcAuthService extends OidcAuthServiceBase
 
 /**
  * Create the OIDC auth service used by the clustertenant-manager Express app.
- * @param log    - Parent logger.
- * @param prisma - Prisma client for per-org resolution + the email→tenant lookup.
+ * @param log       - Parent logger.
+ * @param prisma    - Prisma client for the `/auth/me` email→tenant lookup + membership facts.
+ * @param customApi - Kubernetes custom-objects client for per-org login CR reads (null in dev/test).
  */
-export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient): OidcAuthService
+export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null): OidcAuthService
 {
-  return new OidcAuthService(log, prisma);
+  return new OidcAuthService(log, prisma, customApi);
 }

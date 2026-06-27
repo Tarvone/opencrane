@@ -1,14 +1,45 @@
-import type { PrismaClient } from "@prisma/client";
+import type * as k8s from "@kubernetes/client-node";
 import { describe, expect, it, vi } from "vitest";
 
 import { _OrgScope, _ResolvePerOrgClient } from "../../infra/auth/per-org-client.js";
 
-/** Build a Prisma stub whose clusterTenant.findUnique returns `row` for any name. */
-function _prismaReturning(row: Record<string, unknown> | null): { prisma: PrismaClient; findUnique: ReturnType<typeof vi.fn> }
+/** A Kubernetes 404 the way @kubernetes/client-node surfaces a missing cluster-scoped object. */
+function _notFound(): Error
 {
-  const findUnique = vi.fn().mockResolvedValue(row);
-  const prisma = { clusterTenant: { findUnique } } as unknown as PrismaClient;
-  return { prisma, findUnique };
+  return Object.assign(new Error("not found"), { code: 404 });
+}
+
+/**
+ * Build a CustomObjectsApi stub. `byName` maps a CR name → its CR object (a `get` for any
+ * other name rejects 404); `list` is the full set returned by a cluster-wide list (for the
+ * vanity-domain fallback).
+ */
+function _apiReturning(opts: {
+  byName?: Record<string, unknown>;
+  list?: unknown[];
+}): { api: k8s.CustomObjectsApi; getClusterCustomObject: ReturnType<typeof vi.fn>; listClusterCustomObject: ReturnType<typeof vi.fn> }
+{
+  const byName = opts.byName ?? {};
+  const getClusterCustomObject = vi.fn().mockImplementation(function _get(args: { name: string })
+  {
+    const cr = byName[args.name];
+    return cr ? Promise.resolve(cr) : Promise.reject(_notFound());
+  });
+  const listClusterCustomObject = vi.fn().mockResolvedValue({ items: opts.list ?? [] });
+  const api = { getClusterCustomObject, listClusterCustomObject } as unknown as k8s.CustomObjectsApi;
+  return { api, getClusterCustomObject, listClusterCustomObject };
+}
+
+/** A fully-provisioned ClusterTenant CR for the org `name`. */
+function _cr(name: string, vanityDomain?: string): Record<string, unknown>
+{
+  return {
+    metadata: { name },
+    spec: {
+      ...(vanityDomain ? { vanityDomain } : {}),
+      zitadel: { clientId: `client-${name}`, orgId: `org-${name}`, redirectUri: `https://${name}.dev.opencrane.ai/api/v1/auth/callback` },
+    },
+  };
 }
 
 describe("_OrgScope — Zitadel org-restriction login scope (S3b)", function _scopeSuite()
@@ -19,18 +50,13 @@ describe("_OrgScope — Zitadel org-restriction login scope (S3b)", function _sc
   });
 });
 
-describe("_ResolvePerOrgClient — host→CT→per-org client (S3b)", function _resolveSuite()
+describe("_ResolvePerOrgClient — host→ClusterTenant CR→per-org client (Option A)", function _resolveSuite()
 {
-  it("resolves a per-org host to its client_id + org id + redirect URI", async function _resolves()
+  it("resolves a per-org host to its client_id + org id + redirect URI from the CR", async function _resolves()
   {
-    const { prisma, findUnique } = _prismaReturning({
-      name: "acme",
-      zitadelClientId: "client-acme",
-      zitadelOrgId: "org-acme",
-      zitadelRedirectUri: "https://acme.dev.opencrane.ai/api/v1/auth/callback",
-    });
+    const { api, getClusterCustomObject } = _apiReturning({ byName: { acme: _cr("acme") } });
 
-    const resolved = await _ResolvePerOrgClient(prisma, "acme.dev.opencrane.ai");
+    const resolved = await _ResolvePerOrgClient(api, "acme.dev.opencrane.ai");
 
     expect(resolved).toEqual({
       clusterTenant: "acme",
@@ -38,60 +64,59 @@ describe("_ResolvePerOrgClient — host→CT→per-org client (S3b)", function _
       orgId: "org-acme",
       redirectUri: "https://acme.dev.opencrane.ai/api/v1/auth/callback",
     });
-    // The lookup is keyed by the host's first DNS label — never request-supplied input.
-    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { name: "acme" } }));
+    // The CR is read by the host's first DNS label — never request-supplied input.
+    expect(getClusterCustomObject).toHaveBeenCalledWith(expect.objectContaining({ name: "acme" }));
   });
 
-  it("resolves a customer-vanity host to its org's client via the unique vanityDomain (S3b)", async function _resolvesVanity()
+  it("resolves a customer-vanity host via spec.vanityDomain on a listed CR (Option A)", async function _resolvesVanity()
   {
-    // The first-label lookup ("ai") misses; the full host matches a unique vanityDomain.
-    const row = { name: "acme", zitadelClientId: "client-acme", zitadelOrgId: "org-acme", zitadelRedirectUri: "https://acme.dev.opencrane.ai/api/v1/auth/callback" };
-    const findUnique = vi.fn().mockImplementation(function _find(args: { where: { name?: string; vanityDomain?: string } })
-    {
-      return Promise.resolve(args.where.vanityDomain === "ai.client-company.com" ? row : null);
+    // The first-label `get` ("ai") 404s; the full host matches a listed CR's spec.vanityDomain.
+    const { api, getClusterCustomObject, listClusterCustomObject } = _apiReturning({
+      list: [_cr("acme", "ai.client-company.com")],
     });
-    const prisma = { clusterTenant: { findUnique } } as unknown as PrismaClient;
 
-    const resolved = await _ResolvePerOrgClient(prisma, "ai.client-company.com");
+    const resolved = await _ResolvePerOrgClient(api, "ai.client-company.com");
 
     expect(resolved).toMatchObject({ clusterTenant: "acme", clientId: "client-acme", orgId: "org-acme" });
-    // The first-label miss is followed by an exact vanity-domain lookup on the full host.
-    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { name: "ai" } }));
-    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { vanityDomain: "ai.client-company.com" } }));
+    expect(getClusterCustomObject).toHaveBeenCalledWith(expect.objectContaining({ name: "ai" }));
+    expect(listClusterCustomObject).toHaveBeenCalled();
   });
 
-  it("returns null for the platform host (bare host, no derivable silo) — masters fallback", async function _platformHost()
+  it("returns null when no cluster client is wired (dev/test) — masters fallback", async function _noApi()
   {
-    const { prisma, findUnique } = _prismaReturning(null);
-
-    // No host ⇒ no derivable silo label ⇒ we never hit the DB and fall through.
-    expect(await _ResolvePerOrgClient(prisma, undefined)).toBeNull();
-    expect(findUnique).not.toHaveBeenCalled();
+    expect(await _ResolvePerOrgClient(null, "acme.dev.opencrane.ai")).toBeNull();
   });
 
-  it("returns null for the platform host — its label matches no ClusterTenant (fail-closed)", async function _platformHost()
+  it("returns null for no host (no derivable silo) — masters fallback", async function _noHost()
   {
-    // `platform.<base>` yields the label "platform"; no CT is named that, so the DB lookup
-    // returns null and login falls through to the masters client.
-    const { prisma } = _prismaReturning(null);
-    expect(await _ResolvePerOrgClient(prisma, "platform.dev.opencrane.ai")).toBeNull();
+    const { api, getClusterCustomObject } = _apiReturning({});
+    expect(await _ResolvePerOrgClient(api, undefined)).toBeNull();
+    expect(getClusterCustomObject).not.toHaveBeenCalled();
   });
 
-  it("returns null for an unknown host label that matches no ClusterTenant (fail-closed)", async function _unknownHost()
+  it("returns null for the platform host — its label matches no ClusterTenant CR (fail-closed)", async function _platformHost()
   {
-    const { prisma } = _prismaReturning(null);
-    expect(await _ResolvePerOrgClient(prisma, "ghost.dev.opencrane.ai")).toBeNull();
+    const { api } = _apiReturning({});
+    expect(await _ResolvePerOrgClient(api, "platform.dev.opencrane.ai")).toBeNull();
   });
 
-  it("returns null when the ClusterTenant has no provisioned client_id (fail-closed)", async function _noClientId()
+  it("returns null for an unknown host label that matches no ClusterTenant CR (fail-closed)", async function _unknownHost()
   {
-    const { prisma } = _prismaReturning({ name: "acme", zitadelClientId: null, zitadelOrgId: "org-acme", zitadelRedirectUri: null });
-    expect(await _ResolvePerOrgClient(prisma, "acme.dev.opencrane.ai")).toBeNull();
+    const { api } = _apiReturning({});
+    expect(await _ResolvePerOrgClient(api, "ghost.dev.opencrane.ai")).toBeNull();
   });
 
-  it("returns null when the ClusterTenant has no provisioned org id (fail-closed)", async function _noOrgId()
+  it("returns null when the CR has no provisioned client_id (fail-closed)", async function _noClientId()
   {
-    const { prisma } = _prismaReturning({ name: "acme", zitadelClientId: "client-acme", zitadelOrgId: null, zitadelRedirectUri: null });
-    expect(await _ResolvePerOrgClient(prisma, "acme.dev.opencrane.ai")).toBeNull();
+    const cr = { metadata: { name: "acme" }, spec: { zitadel: { clientId: null, orgId: "org-acme" } } };
+    const { api } = _apiReturning({ byName: { acme: cr } });
+    expect(await _ResolvePerOrgClient(api, "acme.dev.opencrane.ai")).toBeNull();
+  });
+
+  it("returns null when the CR has no provisioned org id (fail-closed)", async function _noOrgId()
+  {
+    const cr = { metadata: { name: "acme" }, spec: { zitadel: { clientId: "client-acme", orgId: null } } };
+    const { api } = _apiReturning({ byName: { acme: cr } });
+    expect(await _ResolvePerOrgClient(api, "acme.dev.opencrane.ai")).toBeNull();
   });
 });

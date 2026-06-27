@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import type * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -69,10 +70,28 @@ function _reqOnHost(host: string): Request
   return { headers: { "x-forwarded-host": host }, session } as unknown as Request;
 }
 
-/** Prisma stub whose clusterTenant.findUnique returns `row`. */
-function _prismaReturning(row: Record<string, unknown> | null): PrismaClient
+/** Minimal Prisma stub — per-org login no longer reads Prisma (it reads the CR via customApi). */
+function _prismaStub(): PrismaClient
 {
-  return { clusterTenant: { findUnique: vi.fn().mockResolvedValue(row) } } as unknown as PrismaClient;
+  return { orgMembership: { findMany: vi.fn().mockResolvedValue([]) } } as unknown as PrismaClient;
+}
+
+/**
+ * CustomObjectsApi stub returning the ClusterTenant CR for `name` (a `get` for any other name
+ * 404s). Pass `null` zitadel ids to model an unprovisioned org. `null` → no cluster wired.
+ */
+function _apiWithCr(name: string, zitadel: { clientId: string | null; orgId: string | null } | null): k8s.CustomObjectsApi
+{
+  const cr = zitadel === null
+    ? null
+    : { metadata: { name }, spec: { zitadel: { clientId: zitadel.clientId, orgId: zitadel.orgId, redirectUri: null } } };
+  return {
+    getClusterCustomObject: vi.fn().mockImplementation(function _get(args: { name: string })
+    {
+      return args.name === name && cr ? Promise.resolve(cr) : Promise.reject(Object.assign(new Error("not found"), { code: 404 }));
+    }),
+    listClusterCustomObject: vi.fn().mockResolvedValue({ items: cr ? [cr] : [] }),
+  } as unknown as k8s.CustomObjectsApi;
 }
 
 describe("OidcAuthService.buildLoginUrl — per-org client resolution (S3b)", function _suite()
@@ -82,8 +101,8 @@ describe("OidcAuthService.buildLoginUrl — per-org client resolution (S3b)", fu
 
   it("uses the per-org client + org-restriction scope for a provisioned org host", async function _perOrg()
   {
-    const prisma = _prismaReturning({ name: "acme", zitadelClientId: "client-acme", zitadelOrgId: "org-acme", zitadelRedirectUri: null });
-    const service = ___CreateOidcAuthService(pino({ enabled: false }), prisma);
+    const api = _apiWithCr("acme", { clientId: "client-acme", orgId: "org-acme" });
+    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaStub(), api);
     const req = _reqOnHost("acme.dev.opencrane.ai");
 
     const url = await service.buildLoginUrl(req, "/");
@@ -99,8 +118,8 @@ describe("OidcAuthService.buildLoginUrl — per-org client resolution (S3b)", fu
 
   it("uses the masters client (no org scope) for the platform host", async function _platform()
   {
-    const prisma = _prismaReturning(null);
-    const service = ___CreateOidcAuthService(pino({ enabled: false }), prisma);
+    const api = _apiWithCr("acme", null); // no CR for "platform" → 404 + empty list
+    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaStub(), api);
     const req = _reqOnHost("platform.dev.opencrane.ai");
 
     const url = await service.buildLoginUrl(req, "/");
@@ -114,9 +133,9 @@ describe("OidcAuthService.buildLoginUrl — per-org client resolution (S3b)", fu
 
   it("falls through to the masters client for an unprovisioned org host (fail-closed)", async function _unprovisioned()
   {
-    // The CT exists but has no client_id yet (mid-provisioning / unconfigured Zitadel).
-    const prisma = _prismaReturning({ name: "acme", zitadelClientId: null, zitadelOrgId: null, zitadelRedirectUri: null });
-    const service = ___CreateOidcAuthService(pino({ enabled: false }), prisma);
+    // The CR exists but has no client_id yet (mid-provisioning / unconfigured Zitadel).
+    const api = _apiWithCr("acme", { clientId: null, orgId: null });
+    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaStub(), api);
     const req = _reqOnHost("acme.dev.opencrane.ai");
 
     const url = await service.buildLoginUrl(req, "/");
@@ -145,7 +164,7 @@ describe("OidcAuthService.completeLogin — token exchange uses the per-org clie
 
   it("exchanges the code against the per-org client recorded at buildLoginUrl", async function _perOrgExchange()
   {
-    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaReturning(null));
+    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaStub());
 
     await service.completeLogin(_callbackReq("client-acme"));
 
@@ -156,7 +175,7 @@ describe("OidcAuthService.completeLogin — token exchange uses the per-org clie
 
   it("exchanges the code against the masters client when no per-org client was recorded", async function _mastersExchange()
   {
-    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaReturning(null));
+    const service = ___CreateOidcAuthService(pino({ enabled: false }), _prismaStub());
 
     await service.completeLogin(_callbackReq(undefined));
 

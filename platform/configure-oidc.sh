@@ -6,7 +6,7 @@
 # (no CNPG / ingress-nginx / cert-manager / external-dns work) — it only:
 #   1. creates/updates the `opencrane-oidc` Secret (client + session secret), and
 #   2. `helm upgrade --reuse-values` of the `opencrane` release, overriding ONLY
-#      the controlPlane.oidc.* values.
+#      the clustertenantManager.oidc.* values.
 # The control-plane pod template gains the OIDC env, so Kubernetes rolls just the
 # control-plane Deployment; everything else is left exactly as deployed.
 #
@@ -140,9 +140,9 @@ if [[ -s "$VALUES_TMP" ]] && ! grep -qx 'null' "$VALUES_TMP"; then helm_args+=(-
 #    keeps the same session secret and existing cookies survive.
 if [[ "$DISABLE" -eq 1 ]]; then
   warn "Disabling OIDC on release '$RELEASE' (context: $_active_context) — control-plane reverts to token/dev auth."
-  helm_args+=(--set-string "controlPlane.oidc.issuerUrl=")
+  helm_args+=(--set-string "clustertenantManager.oidc.issuerUrl=")
   helm "${helm_args[@]}"
-  [[ "$DRY_RUN" -eq 0 ]] && kubectl ${KCTL[@]+"${KCTL[@]}"} -n "$NAMESPACE" rollout status deploy/"$RELEASE"-control-plane --timeout=180s
+  [[ "$DRY_RUN" -eq 0 ]] && kubectl ${KCTL[@]+"${KCTL[@]}"} -n "$NAMESPACE" rollout status deploy/"$RELEASE"-clustertenant-manager --timeout=180s
   log "OIDC disabled."
   exit 0
 fi
@@ -185,25 +185,25 @@ else
   log "[dry-run] would upsert Secret '$OIDC_SECRET_NAME'."
 fi
 
-# ── 2. helm upgrade --reuse-values, overriding ONLY controlPlane.oidc.*
-helm_args+=(--set-string "controlPlane.oidc.issuerUrl=$ISSUER_URL")
-helm_args+=(--set-string "controlPlane.oidc.clientId=$CLIENT_ID")
-helm_args+=(--set-string "controlPlane.oidc.redirectUri=$REDIRECT_URI")
-helm_args+=(--set-string "controlPlane.oidc.existingSecret=$OIDC_SECRET_NAME")
-helm_args+=(--set-string "controlPlane.oidc.groupsClaim=$GROUPS_CLAIM")
-helm_args+=(--set-string "controlPlane.oidc.rolesClaim=$ROLES_CLAIM")
+# ── 2. helm upgrade --reuse-values, overriding ONLY clustertenantManager.oidc.*
+helm_args+=(--set-string "clustertenantManager.oidc.issuerUrl=$ISSUER_URL")
+helm_args+=(--set-string "clustertenantManager.oidc.clientId=$CLIENT_ID")
+helm_args+=(--set-string "clustertenantManager.oidc.redirectUri=$REDIRECT_URI")
+helm_args+=(--set-string "clustertenantManager.oidc.existingSecret=$OIDC_SECRET_NAME")
+helm_args+=(--set-string "clustertenantManager.oidc.groupsClaim=$GROUPS_CLAIM")
+helm_args+=(--set-string "clustertenantManager.oidc.rolesClaim=$ROLES_CLAIM")
 # org-admin is org-scoped (safe). Set only when provided so an empty value never
 # overrides a previously-configured group via --reuse-values.
-[[ -n "$ORG_ADMIN_GROUPS" ]] && helm_args+=(--set-string "controlPlane.oidc.orgAdminGroups=$ORG_ADMIN_GROUPS")
+[[ -n "$ORG_ADMIN_GROUPS" ]] && helm_args+=(--set-string "clustertenantManager.oidc.orgAdminGroups=$ORG_ADMIN_GROUPS")
 
 # ── Cross-org guardrail: platform-operator grants are EXPLICIT + loudly warned.
 if [[ -n "$PLATFORM_OPERATOR_GROUPS" ]]; then
   warn "Granting PLATFORM-OPERATOR (cross-ClusterTenant) to group(s): $PLATFORM_OPERATOR_GROUPS — these can manage EVERY org."
-  helm_args+=(--set-string "controlPlane.oidc.platformOperatorGroups=$PLATFORM_OPERATOR_GROUPS")
+  helm_args+=(--set-string "clustertenantManager.oidc.platformOperatorGroups=$PLATFORM_OPERATOR_GROUPS")
 fi
 if [[ -n "$PLATFORM_OPERATOR_SEED_EMAIL" ]]; then
   warn "Seeding PLATFORM-OPERATOR by verified email: $PLATFORM_OPERATOR_SEED_EMAIL — remove the seed once a group mapping exists."
-  helm_args+=(--set-string "controlPlane.oidc.platformOperatorSeedEmail=$PLATFORM_OPERATOR_SEED_EMAIL")
+  helm_args+=(--set-string "clustertenantManager.oidc.platformOperatorSeedEmail=$PLATFORM_OPERATOR_SEED_EMAIL")
 fi
 if [[ -z "$PLATFORM_OPERATOR_GROUPS" && -z "$PLATFORM_OPERATOR_SEED_EMAIL" ]]; then
   log "No platform-operator grant supplied — cross-org access stays fail-closed (nobody is an operator)."
@@ -213,7 +213,7 @@ log "helm upgrade '$RELEASE' (existing values preserved, OIDC layered on top)…
 helm "${helm_args[@]}"
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
-  kubectl ${KCTL[@]+"${KCTL[@]}"} -n "$NAMESPACE" rollout status deploy/"$RELEASE"-control-plane --timeout=180s
+  kubectl ${KCTL[@]+"${KCTL[@]}"} -n "$NAMESPACE" rollout status deploy/"$RELEASE"-clustertenant-manager --timeout=180s
   log "OIDC configured. Issuer: $ISSUER_URL  ·  redirect: $REDIRECT_URI  ·  context: $_active_context"
   log "Verify discovery is reachable from the control-plane and that '${ISSUER_URL%/}/.well-known/openid-configuration' resolves."
 else

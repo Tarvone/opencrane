@@ -252,11 +252,14 @@ helm upgrade --install opencrane-silo "$ROOT_DIR/apps/clustertenant-platform" \
   --set "clustertenantManager.database.existingSecret=opencrane-silo-db" \
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db"
 
-kubectl rollout status deployment/opencrane-clustertenant-manager -n "$NAMESPACE" --timeout=180s
+# Silo resources are prefixed by the silo RELEASE name (opencrane-silo) because nameOverride
+# (opencrane) is a prefix of it, so Helm's fullname == the release name → opencrane-silo-<component>
+# (the fleet release is plain "opencrane", hence opencrane-fleet-manager above).
+kubectl rollout status deployment/opencrane-silo-clustertenant-manager -n "$NAMESPACE" --timeout=180s
 
 # Wait for LiteLLM (a silo plane) when cost routing is enabled by chart values.
-if kubectl get deployment/opencrane-litellm -n "$NAMESPACE" >/dev/null 2>&1; then
-  kubectl rollout status deployment/opencrane-litellm -n "$NAMESPACE" --timeout=240s
+if kubectl get deployment/opencrane-silo-litellm -n "$NAMESPACE" >/dev/null 2>&1; then
+  kubectl rollout status deployment/opencrane-silo-litellm -n "$NAMESPACE" --timeout=240s
 fi
 
 # 7. Create a Tenant CR and let the operator reconcile child resources.

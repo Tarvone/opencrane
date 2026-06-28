@@ -234,7 +234,8 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/fleet-platform" \
   --namespace "$NAMESPACE" \
   --create-namespace \
   --values "$ROOT_DIR/libs/k8s-platform/tests/values-k3d-e2e.yaml" \
-  --set "fleetManager.database.existingSecret=$DB_SECRET_NAME"
+  --set "fleetManager.database.existingSecret=$DB_SECRET_NAME" \
+  --set "fleetManager.clusterTenantApi.enabled=false"
 
 # Wait for the fleet-manager (skip helm --wait because local-path PVCs don't bind until a pod
 # mounts them, creating a chicken-and-egg with Helm's readiness checks).

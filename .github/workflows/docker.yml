@@ -61,7 +61,7 @@ jobs:
         uses: azure/setup-helm@v5
 
       - name: Run k3d e2e smoke test
-        run: ./platform/tests/k3d-e2e.sh
+        run: ./libs/k8s-platform/tests/k3d-e2e.sh
         env:
           KEEP_CLUSTER: "0"
           TIMEOUT_SECONDS: "300"

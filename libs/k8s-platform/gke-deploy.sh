@@ -68,9 +68,11 @@ terraform -chdir="$TF_DIR" apply -input=false -auto-approve \
 log "Fetching cluster credentials…"
 gcloud container clusters get-credentials "$CLUSTER" --region "$REGION" --project "$PROJECT_ID"
 
-# 4. Install OpenCrane (published images, GKE default StorageClass).
-log "Installing OpenCrane…"
-"$SCRIPT_DIR/k8s-deploy.sh" ${BASE_DOMAIN:+--base-domain "$BASE_DOMAIN"}
+# 4. Install OpenCrane — the cluster-wide FLEET (multi-tenant; silos added per-org afterwards).
+#    The fleet role wrapper sets OPENCRANE_CHART_DIR + the multi-tenant profile, then drives the
+#    shared engine. (GKE = production multi-tenant; for one org use deploy-single-tenant.sh.)
+log "Installing OpenCrane (fleet)…"
+"$SCRIPT_DIR/../../apps/fleet-platform/deploy.sh" ${BASE_DOMAIN:+--base-domain "$BASE_DOMAIN"}
 
 # 5. Next steps. k8s-deploy.sh bundles ingress-nginx by default (auto-skipped if a
 # controller is already present), so a fresh GKE cluster gets one with no extra step.

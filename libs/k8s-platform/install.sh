@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 function _usage()
 {
@@ -10,18 +10,18 @@ function _usage()
 OpenCrane Phase 1 installer
 
 Usage:
-  ./platform/install.sh local [--keep-cluster] [--cluster-name NAME] [--namespace NS] [--profile PROFILE]
-  ./platform/install.sh gcp [--project-id ID] [--region REGION] [--domain DOMAIN] [--environment ENV] [--yes]
+  ./libs/k8s-platform/install.sh local [--keep-cluster] [--cluster-name NAME] [--namespace NS] [--profile PROFILE]
+  ./libs/k8s-platform/install.sh gcp [--project-id ID] [--region REGION] [--domain DOMAIN] [--environment ENV] [--yes]
 
 Examples:
-  ./platform/install.sh local --keep-cluster
-  ./platform/install.sh local --profile strict
-  ./platform/install.sh gcp --project-id my-gcp-project --domain opencrane.example.com --yes
+  ./libs/k8s-platform/install.sh local --keep-cluster
+  ./libs/k8s-platform/install.sh local --profile strict
+  ./libs/k8s-platform/install.sh gcp --project-id my-gcp-project --domain opencrane.example.com --yes
 
 Notes:
   - local mode uses k3d + Helm full-stack install and keeps cluster by default.
   - local profiles: `default` (fast dev) and `strict` (prod-like validation + explicit LiteLLM secret flow).
-  - gcp mode delegates to ./platform/gke-deploy.sh (interactive unless --yes with --project-id).
+  - gcp mode delegates to libs/k8s-platform/gke-deploy.sh (interactive unless --yes with --project-id).
 EOF
 }
 
@@ -150,7 +150,7 @@ function _run_local()
   _require_cmd k3d
 
   echo "[install] Running local full-stack install on k3d..."
-  KEEP_CLUSTER="$keep_cluster" CLUSTER_NAME="$cluster_name" NAMESPACE="$namespace" LOCAL_PROFILE="$profile" bash "$ROOT_DIR/platform/tests/k3d-local.sh"
+  KEEP_CLUSTER="$keep_cluster" CLUSTER_NAME="$cluster_name" NAMESPACE="$namespace" LOCAL_PROFILE="$profile" bash "$SCRIPT_DIR/tests/k3d-local.sh"
   echo "[install] Local install complete."
   echo "[install] Cluster: $cluster_name, Namespace: $namespace, Profile: $profile"
 }
@@ -200,7 +200,7 @@ function _run_gcp()
   # Interactive GKE deploy when no project is given (gke-deploy.sh prompts).
   if [[ -z "$project_id" ]]; then
     echo "[install] Running interactive GKE deploy..."
-    "$ROOT_DIR/platform/gke-deploy.sh" ${domain:+--domain "$domain"}
+    "$SCRIPT_DIR/gke-deploy.sh" ${domain:+--domain "$domain"}
     return
   fi
 
@@ -213,7 +213,7 @@ function _run_gcp()
   fi
 
   echo "[install] Running non-interactive GKE deploy..."
-  "$ROOT_DIR/platform/gke-deploy.sh" \
+  "$SCRIPT_DIR/gke-deploy.sh" \
     --project-id "$project_id" --region "$region" ${domain:+--domain "$domain"} --yes
 }
 

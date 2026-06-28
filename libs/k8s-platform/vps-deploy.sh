@@ -6,10 +6,10 @@
 # installs OpenCrane onto it. Ideal for a VM, a VPS, or a single server.
 #
 # Usage:
-#   sudo ./platform/vps-deploy.sh [--domain DOMAIN]
+#   sudo ./libs/k8s-platform/vps-deploy.sh [--domain DOMAIN]
 #
 # Prereqs: a Linux host with curl + helm (this script installs k3s for you).
-# For laptop/dev on macOS or Windows, use ./platform/install.sh local (k3d).
+# For laptop/dev on macOS or Windows, use ./libs/k8s-platform/install.sh local (k3d).
 # =============================================================================
 set -euo pipefail
 
@@ -28,7 +28,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "$(uname -s)" == "Linux" ]] || { err "k3s needs Linux. On a laptop use ./platform/install.sh local (k3d)."; exit 1; }
+[[ "$(uname -s)" == "Linux" ]] || { err "k3s needs Linux. On a laptop use ./libs/k8s-platform/install.sh local (k3d)."; exit 1; }
 command -v helm >/dev/null 2>&1 || { err "Missing required command: helm (https://helm.sh/docs/intro/install/)"; exit 1; }
 
 # 1. Install k3s (idempotent — skips if already present) → a one-node cluster.
@@ -48,6 +48,9 @@ if [[ ! -r "$KUBECONFIG" ]]; then
 fi
 [[ -r "$KUBECONFIG" ]] || { err "Cannot read $KUBECONFIG (run with sudo, or set KUBECONFIG)."; exit 1; }
 
-log "Cluster ready. Installing OpenCrane…"
+log "Cluster ready. Installing OpenCrane (fleet)…"
 # k3s ships the 'local-path' default StorageClass and a Traefik ingress out of the box.
-exec "$SCRIPT_DIR/k8s-deploy.sh" ${DOMAIN:+--domain "$DOMAIN"} --set ingress.className=traefik --set networkPolicy.ingressNamespace=kube-system "${PASSTHROUGH[@]}"
+# Install the cluster-wide FLEET (multi-tenant) via its role wrapper, which sets the chart dir +
+# profile and drives the shared engine. --domain maps to the fleet's required --base-domain.
+# (For a one-org box, use deploy-single-tenant.sh instead.)
+exec "$SCRIPT_DIR/../../apps/fleet-platform/deploy.sh" ${DOMAIN:+--base-domain "$DOMAIN"} --set ingress.className=traefik --set networkPolicy.ingressNamespace=kube-system "${PASSTHROUGH[@]}"

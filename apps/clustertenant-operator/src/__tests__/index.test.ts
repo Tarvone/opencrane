@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
 
-import { _CheckDbHealth } from "@opencrane/infra-http";
+import { _CheckDbHealth, _RateLimit } from "@opencrane/infra-http";
 
 /**
  * Build a minimal Express app with a mocked database health handler.
@@ -37,6 +37,8 @@ async function _buildAuthApp(): Promise<Express>
   const { ___AuthMiddleware } = await import("@opencrane/infra-auth");
   const app = express();
   app.use(express.json());
+  // Mirror production middleware order: the per-IP limiter is mounted before auth + routes.
+  app.use(_RateLimit());
   // Prisma omitted intentionally — tests target the env-var and dev-mode paths.
   app.use(___AuthMiddleware());
 

@@ -110,6 +110,9 @@ async function _registerLive(endpoint: string, masterKey: string, input: LiteLlm
 function _placeholderModelId(input: LiteLlmModelRegistration): string
 {
   const parts = [input.scope, input.clusterTenant ?? "", input.publicModelName].join(":");
-  const slug = parts.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Collapse every run of non-alphanumerics to a single dash first, so at most one leading/
+  // trailing dash can remain — then strip that single dash. Trimming with `-+` here would be a
+  // polynomial-ReDoS sink on attacker-influenced model names; the single-char `^-|-$` is linear.
+  const slug = parts.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return `placeholder:${slug}`;
 }

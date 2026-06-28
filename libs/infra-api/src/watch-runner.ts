@@ -98,7 +98,7 @@ export async function _RunWatchLoop<T>(config: WatchRunnerConfig<T>): Promise<vo
             config.log.error({ err }, "event handler failed");
           });
         },
-        (err) => {
+        (err: unknown) => {
           if (err)
           {
             config.log.error({ err }, config.reconnectMessage);

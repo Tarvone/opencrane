@@ -6,7 +6,7 @@ import { defaultConfig, _makeClusterTenant } from "../fixtures.js";
 import { ClusterTenantOperator } from "../../cluster-tenants/operator.js";
 import { ClusterTenantStatusWriter } from "../../cluster-tenants/internal/cluster-tenant-status-writer.js";
 import type { OrgDomainProvisioner, OrgDomainProvisionRequest, OrgDomainProvisionResult } from "../../cluster-tenants/internal/org-domain-provisioner.types.js";
-import type { ClusterTenantResource } from "../../tenants/internal/cluster-tenant-resolution.types.js";
+import type { ClusterTenantResource } from "@opencrane/infra-api";
 
 const log = pino({ level: "silent" });
 
@@ -283,15 +283,16 @@ describe("ClusterTenantOperator.reconcile", () =>
   });
 });
 
-describe("ClusterTenantOperator default-tenant seed (Option A — operator owns the CRD)", () =>
+describe("ClusterTenantOperator default-tenant seed (Stage 5 — fleet stops at CT lifecycle)", () =>
 {
   beforeEach(() => vi.clearAllMocks());
 
-  it("seeds the owner's <org>-default Tenant CRD on ready, attributed to spec.owner", async () =>
+  it("does NOT seed any Tenant CRD on ready — the silo seeds its own from the CR owner", async () =>
   {
-    // Option A: the fleet registry has no `Tenant` table, so the operator creates the workspace
-    // CRD once the org's namespace is bound (owner from the CR spec). The TenantOperator then
-    // reconciles it into a running openclaw and the silo projects the CRD into its own DB.
+    // Stage 5: the fleet-manager watches only the cluster-scoped ClusterTenant CR and touches
+    // nothing inside a silo. Driving an org to ready binds the namespace + domain only; the
+    // owner's `<org>-default` workspace is seeded by the silo on boot (it owns the in-silo
+    // TenantOperator + reads this CR's spec.owner), so the fleet creates no Tenant CRD.
     const { api: customApi, seeds, patches } = _makeStubCustomApi();
     const { api: coreApi } = _makeStubCoreApi();
     const { provisioner } = _makeDomainProvisioner({ skipped: true, ready: false });
@@ -299,24 +300,6 @@ describe("ClusterTenantOperator default-tenant seed (Option A — operator owns 
 
     const ct = _makeClusterTenant("acme");
     ct.spec.owner = { subject: "auth0|abc", email: "owner@acme.example" };
-    await operator.reconcile(ct);
-
-    expect(patches.at(-1)!.phase).toBe("ready");
-    expect(seeds).toHaveLength(1);
-    expect(seeds[0]).toMatchObject({ name: "acme-default", namespace: "opencrane-acme", email: "owner@acme.example", clusterTenantRef: "acme" });
-  });
-
-  it("skips the seed (no CRD) when the owner has no email, but the org still reaches ready", async () =>
-  {
-    // Without a contact email the Tenant contract cannot compile (the dev-auth path carries
-    // only a subject), so the seed is skipped — the org is still ready.
-    const { api: customApi, seeds, patches } = _makeStubCustomApi();
-    const { api: coreApi } = _makeStubCoreApi();
-    const { provisioner } = _makeDomainProvisioner({ skipped: true, ready: false });
-    const operator = _buildOperator(customApi, coreApi, provisioner);
-
-    const ct = _makeClusterTenant("acme");
-    ct.spec.owner = { subject: "auth0|abc" };
     await operator.reconcile(ct);
 
     expect(patches.at(-1)!.phase).toBe("ready");

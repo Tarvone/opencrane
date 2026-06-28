@@ -14,12 +14,6 @@ import type {
  */
 const _LINKERD_IDENTITY_SUFFIX = "serviceaccount.identity.linkerd.cluster.local";
 
-/** The namespace-injection annotation that opts a namespace's pods into the Linkerd mesh. */
-export const LINKERD_INJECT_ANNOTATION = "linkerd.io/inject";
-
-/** The annotation value enabling automatic sidecar/identity injection. */
-export const LINKERD_INJECT_ENABLED = "enabled";
-
 /**
  * Wildcard mesh-identity string matching every ServiceAccount in a namespace.
  *

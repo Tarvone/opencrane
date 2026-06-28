@@ -1,6 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 
-import { LINKERD_INJECT_ANNOTATION, LINKERD_INJECT_ENABLED } from "./silo-linkerd-identity.js";
+import { LINKERD_INJECT_ANNOTATION, LINKERD_INJECT_ENABLED } from "./linkerd.js";
 
 /**
  * Build the per-ClusterTenant Namespace, labelled for Pod Security Admission

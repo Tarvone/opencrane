@@ -17,6 +17,10 @@
     "test": "vitest run",
     "lint": "tsc --noEmit"
   },
+  "dependencies": {
+    "@kubernetes/client-node": "^1.0.0",
+    "pino": "^9.6.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",

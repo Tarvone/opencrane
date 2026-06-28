@@ -4,7 +4,7 @@ import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
 import type { OpenClawTenantOperatorConfig } from "../../config.js";
-import { __K8sApplyResource } from "../../infra/k8s.js";
+import { __K8sApplyResource } from "@opencrane/infra-api";
 import { _BuildTenantLabels } from "../deploy/tenant-labels.js";
 import type { Tenant } from "../models/tenant.interface.js";
 import type { TenantModelSet } from "@opencrane/contracts";

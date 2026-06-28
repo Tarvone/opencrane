@@ -65,6 +65,9 @@ importers:
       express-session:
         specifier: ^1.19.0
         version: 1.19.0
+      http-proxy:
+        specifier: ^1.18.1
+        version: 1.18.1
       openid-client:
         specifier: ^6.8.4
         version: 6.8.4
@@ -77,10 +80,16 @@ importers:
       prisma:
         specifier: ^6.0.0
         version: 6.19.2(typescript@5.8.2)
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
     devDependencies:
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.6
+      '@types/http-proxy':
+        specifier: ^1.17.14
+        version: 1.17.17
       '@types/node':
         specifier: ^22.0.0
         version: 22.15.31
@@ -99,6 +108,10 @@ importers:
       vitest:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)
+    optionalDependencies:
+      '@google-cloud/storage':
+        specifier: ^7.0.0
+        version: 7.19.0(encoding@0.1.13)
 
   apps/fleet-platform:
     dependencies:
@@ -123,22 +136,13 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.2.1
-      http-proxy:
-        specifier: ^1.18.1
-        version: 1.18.1
       pino:
         specifier: ^9.6.0
         version: 9.14.0
-      zod:
-        specifier: ^3.25.0
-        version: 3.25.76
     devDependencies:
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.6
-      '@types/http-proxy':
-        specifier: ^1.17.14
-        version: 1.17.17
       '@types/node':
         specifier: ^22.0.0
         version: 22.15.31
@@ -160,10 +164,6 @@ importers:
       vitest:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)
-    optionalDependencies:
-      '@google-cloud/storage':
-        specifier: ^7.0.0
-        version: 7.19.0(encoding@0.1.13)
 
   apps/harvesting-agent:
     dependencies:
@@ -253,6 +253,13 @@ importers:
         version: 5.8.2
 
   libs/infra-api:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -302,7 +309,7 @@ importers:
         version: 1.9.1
       '@opentelemetry/auto-instrumentations-node':
         specifier: ^0.56.0
-        version: 0.56.1(@opentelemetry/api@1.9.1)
+        version: 0.56.1(@opentelemetry/api@1.9.1)(encoding@0.1.13)
       '@opentelemetry/exporter-trace-otlp-proto':
         specifier: ^0.57.0
         version: 0.57.2(@opentelemetry/api@1.9.1)
@@ -4215,7 +4222,7 @@ snapshots:
 
   '@opentelemetry/api@1.9.1': {}
 
-  '@opentelemetry/auto-instrumentations-node@0.56.1(@opentelemetry/api@1.9.1)':
+  '@opentelemetry/auto-instrumentations-node@0.56.1(@opentelemetry/api@1.9.1)(encoding@0.1.13)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/instrumentation': 0.57.2(@opentelemetry/api@1.9.1)
@@ -4262,7 +4269,7 @@ snapshots:
       '@opentelemetry/resource-detector-aws': 1.12.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/resource-detector-azure': 0.6.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/resource-detector-container': 0.6.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/resource-detector-gcp': 0.33.1(@opentelemetry/api@1.9.1)
+      '@opentelemetry/resource-detector-gcp': 0.33.1(@opentelemetry/api@1.9.1)(encoding@0.1.13)
       '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-node': 0.57.2(@opentelemetry/api@1.9.1)
     transitivePeerDependencies:
@@ -4799,7 +4806,7 @@ snapshots:
       '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions': 1.41.1
 
-  '@opentelemetry/resource-detector-gcp@0.33.1(@opentelemetry/api@1.9.1)':
+  '@opentelemetry/resource-detector-gcp@0.33.1(@opentelemetry/api@1.9.1)(encoding@0.1.13)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 1.30.1(@opentelemetry/api@1.9.1)

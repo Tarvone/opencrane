@@ -1,6 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 
-import type { OpenClawTenantOperatorConfig } from "../../config.js";
+import type { FleetOperatorConfig } from "../../config.js";
 import { CertManagerClient } from "./cert-manager.client.js";
 import { DnsEndpointClient } from "./dns-endpoint.client.js";
 import { DefaultOrgDomainProvisioner } from "./org-domain.provisioner.js";
@@ -20,7 +20,7 @@ import type { OrgDomainProvisioner } from "./org-domain-provisioner.types.js";
  * @param config - Operator runtime configuration.
  * @returns A wired provisioner.
  */
-export function _BuildOrgDomainProvisioner(customApi: k8s.CustomObjectsApi, config: OpenClawTenantOperatorConfig): OrgDomainProvisioner
+export function _BuildOrgDomainProvisioner(customApi: k8s.CustomObjectsApi, config: FleetOperatorConfig): OrgDomainProvisioner
 {
   return new DefaultOrgDomainProvisioner(
     new CertManagerClient(customApi),

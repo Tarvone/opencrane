@@ -1,15 +1,20 @@
 import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
-import type { OpenClawTenantOperatorConfig } from "../config.js";
-import { __K8sApplyResource } from "../infra/k8s.js";
-import { _RunWatchLoop, K8sWatchEventType } from "../shared/watch-runner.js";
-import { CLUSTER_TENANT_CRD_PLURAL, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION } from "@opencrane/infra-api";
-import { _BuildClusterTenantNamespace } from "../tenants/deploy/index.js";
-import type { ClusterTenantResource } from "../tenants/internal/cluster-tenant-resolution.types.js";
+import {
+  CLUSTER_TENANT_CRD_PLURAL,
+  OPENCRANE_API_GROUP,
+  OPENCRANE_API_VERSION,
+  K8sWatchEventType,
+  _RunWatchLoop,
+  __K8sApplyResource,
+  _BuildClusterTenantNamespace,
+  type ClusterTenantResource,
+} from "@opencrane/infra-api";
+
+import type { FleetOperatorConfig } from "../config.js";
 
 import { ClusterTenantStatusWriter } from "./internal/cluster-tenant-status-writer.js";
-import { _EnsureOwnerDefaultTenantCr } from "./internal/default-tenant-cr.js";
 import { _NamespaceForOrg, _ProvisionBoundary } from "./internal/shared-cluster.provisioner.js";
 import { ClusterTenantReconcilePhase } from "./internal/shared-cluster.provisioner.types.js";
 import type { OrgDomainProvisioner } from "./internal/org-domain-provisioner.types.js";
@@ -58,7 +63,7 @@ export class ClusterTenantOperator
   private domainProvisioner: OrgDomainProvisioner;
 
   /** Operator runtime configuration loaded from environment. */
-  private config: OpenClawTenantOperatorConfig;
+  private config: FleetOperatorConfig;
 
   /** Scoped logger. */
   private log: Logger;
@@ -91,7 +96,7 @@ export class ClusterTenantOperator
               coreApi: k8s.CoreV1Api,
               statusWriter: ClusterTenantStatusWriter,
               domainProvisioner: OrgDomainProvisioner,
-              config: OpenClawTenantOperatorConfig,
+              config: FleetOperatorConfig,
               log: Logger)
   {
     this.watch = watch;
@@ -278,20 +283,10 @@ export class ClusterTenantOperator
 
       this.log.info({ name, boundNamespace: boundary.boundNamespace }, "cluster tenant ready");
 
-      // Seed the owner's first workspace Tenant CRD now the org's namespace is bound (Option A).
-      // The fleet registry has no `Tenant` table, so the operator creates only the CRD — the
-      // TenantOperator reconciles it into a running openclaw, and the silo projects the CRD into
-      // its own DB (Tenant projection-repair) so it appears in the silo's management API. The
-      // owner identity rides on the CR spec (the operator has no DB access). Best-effort: a seed
-      // hiccup never fails the org reconcile (the org is already ready).
-      await _EnsureOwnerDefaultTenantCr({
-        customApi: this.customApi,
-        log: this.log,
-        namespace: boundary.boundNamespace,
-        orgName: name,
-        orgDisplayName: clusterTenant.spec.displayName ?? name,
-        owner: clusterTenant.spec.owner,
-      });
+      // The owner's first workspace Tenant is NOT seeded here (Stage 5). The fleet stops at
+      // ClusterTenant lifecycle and watches nothing inside the silo; the silo seeds its own
+      // `<org>-default` Tenant on boot from this CR's `spec.owner` (it watches/reconciles
+      // Tenant CRs in its own namespace), so a silo stands on its own.
     }
     catch (err)
     {
@@ -353,7 +348,7 @@ export class ClusterTenantOperator
  * @param config - Operator runtime configuration.
  * @param baseLog - Root logger; scoped to `cluster-tenant-operator` inside.
  */
-export function _CreateClusterTenantOperator(kc: k8s.KubeConfig, config: OpenClawTenantOperatorConfig, baseLog: Logger): ClusterTenantOperator
+export function _CreateClusterTenantOperator(kc: k8s.KubeConfig, config: FleetOperatorConfig, baseLog: Logger): ClusterTenantOperator
 {
   const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);

@@ -1,6 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 
-import { _IsConflict, _IsCrdAbsent, _IsNotFound } from "./k8s-api-errors.js";
+import { _IsConflict, _IsCrdAbsent, _IsNotFound } from "@opencrane/infra-api";
 import type { CertManagerOperations, CertificateReadiness } from "./org-domain-provisioner.types.js";
 
 /** cert-manager API group for the Certificate custom resource. */

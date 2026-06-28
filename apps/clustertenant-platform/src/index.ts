@@ -12,7 +12,7 @@ import express from "express";
 import type { Express } from "express";
 import type { PrismaClient } from "@prisma/client";
 
-import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry } from "@opencrane/observability";
+import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry, ___DoWithTrace } from "@opencrane/observability";
 
 import { ___AuthRouter } from "./infra/auth/auth.router.js";
 import { _BuildGatewayAdmin } from "./core/connections/gateway-admin.js";
@@ -25,6 +25,18 @@ import { _ErrorHandler } from "./middleware/error-handler.js";
 import { _log as log } from "./log.js";
 import { _RegisterRoutes } from "./routes.js";
 import { TenantProjectionRepairer } from "./infra/tenant-projection-repairer.js";
+
+// In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
+// namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped
+// ClusterTenant CR and nothing inside a silo.
+import { _LoadOperatorConfig } from "./config.js";
+import { _CreateTenantOperator, IdleChecker } from "./tenants/index.js";
+import { PolicyOperator } from "./policies/operator.js";
+import { RuntimePlaneDriftRepairer } from "./runtime-planes/drift-repairer.js";
+import { _ReadTenantRolloutConfig, TenantUpdateWithCanaryStrategyController } from "./tenant-rollout/tenant-update-with-canary-strategy.controller.js";
+import { GatewayProxyServer } from "./gateway-proxy/server.js";
+import { ObotHealthChecker } from "./mcp-gateway/obot-health-checker.js";
+import { _SeedOwnDefaultTenant } from "./core/cluster-tenants/seed-own-default-tenant.js";
 
 // Route any stray console.* call (first-party or third-party) through the
 // structured logger so nothing reaches stdout unstructured / uncorrelated.
@@ -120,6 +132,121 @@ const _projectionRepairIntervalMs = Number(process.env.OPENCRANE_PROJECTION_REPA
 const tenantProjectionRepairer = new TenantProjectionRepairer(customApi, prisma, _projectionRepairNamespace, log, _projectionRepairIntervalMs);
 tenantProjectionRepairer.start();
 
+/** Idle-checker handle, set during controller bootstrap for shutdown access. */
+let _idleCheckerRef: IdleChecker | null = null;
+
+/** Runtime-plane drift repairer handle, for graceful shutdown. */
+let _driftRepairerRef: RuntimePlaneDriftRepairer | null = null;
+
+/** In-process gateway proxy server handle, for graceful shutdown. */
+let _gatewayProxyRef: GatewayProxyServer | null = null;
+
+/**
+ * Start every in-silo reconcile loop over this silo's OWN namespace (Stage 5).
+ *
+ * The fleet-manager stops at ClusterTenant lifecycle; the silo owns the tenant runtime:
+ * the TenantOperator (openclaw pods/ConfigMaps/Services + LiteLLM keys), the PolicyOperator
+ * (AccessPolicy → NetworkPolicy), the idle-suspend checker, the runtime-plane drift repairer,
+ * the rollout canary controller, the Obot health checker, and the identity-routing gateway
+ * proxy — all scoped to `config.watchNamespace` (this silo's namespace). Because the operator
+ * is DB-less, its internal-API calls hit the silo's OWN API (its own Service), so a silo is
+ * self-contained.
+ *
+ * Fail-soft: a controller bootstrap error is logged but never crashes the pod — the silo's
+ * management API + health endpoint stay up so the misconfiguration is diagnosable rather than
+ * crash-looping.
+ */
+async function _startInSiloControllers(): Promise<void>
+{
+  try
+  {
+    const config = _LoadOperatorConfig();
+    log.info({ watchNamespace: config.watchNamespace }, "starting in-silo controllers");
+
+    // Seed this silo's own `<org>-default` workspace Tenant from its ClusterTenant CR owner.
+    void _SeedOwnDefaultTenant(customApi, prisma, _projectionRepairNamespace, log);
+
+    const tenantOperator = _CreateTenantOperator(kc, config, log);
+    const policyOperator = new PolicyOperator(kc, config, log);
+
+    const idleChecker = new IdleChecker(kc, config, log);
+    _idleCheckerRef = idleChecker;
+    idleChecker.start();
+
+    const appsApi = kc.makeApiClient(k8s.AppsV1Api);
+    const driftRepairer = new RuntimePlaneDriftRepairer(appsApi, config, log);
+    _driftRepairerRef = driftRepairer;
+    driftRepairer.start();
+
+    // Tenant rollout canary release polling (only when auto-update is enabled).
+    const tenantRolloutConfig = _ReadTenantRolloutConfig();
+    if (tenantRolloutConfig.autoUpdateEnabled)
+    {
+      const rolloutCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
+      const rolloutController = new TenantUpdateWithCanaryStrategyController(rolloutCustomApi, appsApi, log, config.watchNamespace, tenantRolloutConfig);
+      log.info({ releaseTag: tenantRolloutConfig.releaseTag }, "tenant rollout canary controller enabled");
+      setInterval(function _pollRelease()
+      {
+        void ___DoWithTrace("tenant.rollout.poll", { releaseTag: tenantRolloutConfig.releaseTag }, async function _poll()
+        {
+          try
+          {
+            const latest = await rolloutController.getLatestRelease();
+            if (latest !== null) log.debug({ latest }, "tenant rollout release poll");
+          }
+          catch (err)
+          {
+            log.warn({ err }, "tenant rollout release poll failed; will retry next interval");
+          }
+        });
+      }, 15 * 60 * 1000);
+    }
+    else
+    {
+      log.info("tenant rollout auto-update disabled (OPENCRANE_AUTO_UPDATE_ENABLED not set to true)");
+    }
+
+    // Obot MCP gateway health checker (Obot self-syncs its catalog; this only monitors reachability).
+    if (config.mcpGatewayUrl)
+    {
+      new ObotHealthChecker(config.mcpGatewayUrl, log).start();
+    }
+
+    // In-process identity-routing gateway proxy (DOMAIN.T4): serves the gateway WebSocket,
+    // delegates auth to the silo control plane, injects X-Forwarded-User, reverse-proxies to
+    // the user's pod. Holds no Kubernetes client and no secrets.
+    if (config.gatewayProxyEnabled)
+    {
+      const gatewayProxy = new GatewayProxyServer({
+        port: config.gatewayProxyPort,
+        controlPlaneUrl: config.controlPlaneInternalUrl,
+        gatewayPort: config.gatewayPort,
+        clusterDomain: config.clusterDomain,
+        userHeader: config.gatewayTrustedProxyUserHeader,
+        allowedOrigins: config.gatewayProxyAllowedOrigins,
+        allowedOriginBaseDomains: config.gatewayProxyAllowedOriginBaseDomains,
+        rateLimitPerMinute: config.gatewayProxyRateLimitPerMinute,
+      }, log);
+      gatewayProxy.start();
+      _gatewayProxyRef = gatewayProxy;
+    }
+    else
+    {
+      log.info("in-silo gateway proxy disabled (GATEWAY_PROXY_ENABLED not true)");
+    }
+
+    // Start the watch loops concurrently — these reconcile Tenant + AccessPolicy CRs in the
+    // silo's own namespace.
+    await Promise.all([tenantOperator.start(), policyOperator.start()]);
+  }
+  catch (err)
+  {
+    log.error({ err }, "in-silo controller bootstrap failed; the silo API stays up but the tenant runtime is NOT reconciling");
+  }
+}
+
+void _startInSiloControllers();
+
 /**
  * Gracefully drain the server, disconnect Prisma, flush telemetry, and restore
  * console before exiting. A hard-exit timer guards against a stuck close so the
@@ -134,8 +261,11 @@ async function _shutdown(signal: string): Promise<void>
   const hardExit = setTimeout(function _force() { process.exit(1); }, 10_000);
   hardExit.unref();
 
-  // Stop the projection-repair loop so no sweep races the Prisma disconnect below.
+  // Stop the projection-repair loop + in-silo controllers so no sweep races the disconnect below.
   tenantProjectionRepairer.stop();
+  _idleCheckerRef?.stop();
+  _driftRepairerRef?.stop();
+  await _gatewayProxyRef?.stop();
 
   try
   {

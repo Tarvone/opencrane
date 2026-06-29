@@ -14,7 +14,7 @@
 # script only presets the multi-tenant value flags and forwards everything else.
 #
 # Usage:
-#   ./platform/deploy-multi-tenant.sh \
+#   apps/fleet-platform/deploy.sh \
 #       --base-domain dev.opencrane.ai \
 #       [--ingress-ip 34.1.2.3] [--dns-managed-zone my-zone] \
 #       [ANY k8s-deploy.sh flag, e.g. --cert-manager --acme-email … --dns01-provider clouddns]

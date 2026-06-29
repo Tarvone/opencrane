@@ -10,8 +10,9 @@
 # This is the shared core. the deploy scripts' --provision (provision.sh) provisions a cluster
 # and then call this script.
 #
-# Usage:
-#   ./platform/k8s-deploy.sh [--base-domain DOMAIN] [--namespace NS] [--release NAME]
+# Usage (normally invoked via a profile — apps/fleet-platform/deploy.sh or
+# apps/clustertenant-platform/deploy.sh — which preset the value flags and exec this core):
+#   libs/k8s-platform/k8s-deploy.sh [--base-domain DOMAIN] [--namespace NS] [--release NAME]
 #                            [--image-tag TAG] [--storage-class SC]
 #                            [--control-plane-tag TAG] [--operator-tag TAG]
 #                            [--tenant-tag TAG]
@@ -176,7 +177,7 @@ INGRESS_NGINX_NAMESPACE="ingress-nginx"
 INSTALL_EXTERNAL_DNS="${OPENCRANE_INSTALL_EXTERNAL_DNS:-1}"
 EXTERNAL_DNS_NAMESPACE="external-dns"
 # The CloudNativePG operator is a CLUSTER-WIDE singleton (one deployment watches every
-# namespace). The central install brings it up once; a per-silo install (deploy-silo.sh) must
+# namespace). The central install brings it up once; a per-silo install (apps/clustertenant-platform/deploy.sh) must
 # NOT re-install it — a second cluster-wide operator would fight the first over the same CRs.
 # `--no-db-operator` (or OPENCRANE_INSTALL_DB_OPERATOR=0) skips the operator install while STILL
 # applying this release's own per-namespace CNPG `Cluster` CR + secrets (reconciled by the
@@ -472,7 +473,7 @@ if [[ "$INSTALL_DB_OPERATOR" == "1" ]]; then
     --namespace "$NAMESPACE" --create-namespace --wait \
     --set-string monitoring.podMonitor.enabled=false
 else
-  log "CloudNativePG operator: install skipped (--no-db-operator) — ASSUMING a cluster-wide operator is already running (installed by the central release). This release's per-namespace Cluster CR is applied and only reconciles if that operator exists; deploy-silo.sh preflights for it."
+  log "CloudNativePG operator: install skipped (--no-db-operator) — ASSUMING a cluster-wide operator is already running (installed by the central release). This release's per-namespace Cluster CR is applied and only reconciles if that operator exists; apps/clustertenant-platform/deploy.sh preflights for it."
 fi
 
 log "Creating database credentials…"
@@ -939,6 +940,22 @@ for _comp in fleet-manager clustertenant-manager; do
   fi
 done
 
+# Read the ACTUAL control-plane host(s) off the deployed ingress(es). Never assume platform.<base>:
+# the fleet may serve the apex (controlPlaneHost=<base>), a silo serves <org>.<base>, and only the
+# unset default is platform.<base>. Ask the cluster what was rendered; fall back to platform.<base>
+# when no ingress exposes a host (e.g. ingress disabled) so callers still get a sensible hint.
+_control_plane_hosts() {
+  local hosts
+  hosts="$(kubectl get ingress -n "$NAMESPACE" \
+    -o jsonpath='{range .items[*]}{range .spec.rules[*]}{.host}{"\n"}{end}{end}' 2>/dev/null \
+    | grep -v '^$' | sort -u)"
+  if [[ -n "$hosts" ]]; then
+    echo "$hosts"
+  elif [[ -n "$BASE_DOMAIN" ]]; then
+    echo "platform.$BASE_DOMAIN"
+  fi
+}
+
 # 5. Post-deploy verify (opt-in, --verify). Advisory only — surfaces the failure modes that
 # leave a "green" install unreachable (pods not Running, no DNSEndpoints, external-dns auth
 # errors, host not resolving) so they are caught here instead of in a confused browser session.
@@ -975,19 +992,26 @@ _post_deploy_verify() {
     fi
   fi
 
-  # 4. Control-plane host resolves to the ingress — the end of the chain a user hits first.
-  if [[ -n "$BASE_DOMAIN" ]] && command -v dig >/dev/null 2>&1; then
-    local host="platform.$BASE_DOMAIN" resolved
-    resolved="$(dig +short "$host" 2>/dev/null | tail -1)"
-    if [[ -n "$resolved" ]]; then
-      log "  ✓ $host resolves to $resolved"
-    else
-      warn "  ✗ $host does not resolve yet (DNS propagation lag or a missing record)."
-    fi
+  # 4. Control-plane host(s) resolve to the ingress — the end of the chain a user hits first.
+  #    Read the rendered host(s) off the ingress so the apex / org host is checked, not platform.<base>.
+  if command -v dig >/dev/null 2>&1; then
+    local host resolved
+    for host in $(_control_plane_hosts); do
+      resolved="$(dig +short "$host" 2>/dev/null | tail -1)"
+      if [[ -n "$resolved" ]]; then
+        log "  ✓ $host resolves to $resolved"
+      else
+        warn "  ✗ $host does not resolve yet (DNS propagation lag or a missing record)."
+      fi
+    done
   fi
 }
 _post_deploy_verify
 
 log "Done. OpenCrane is installed in namespace '$NAMESPACE'."
-[[ -n "$BASE_DOMAIN" ]] && log "Point your DNS at the ingress, then visit https://platform.${BASE_DOMAIN}"
+_cp_hosts="$(_control_plane_hosts)"
+if [[ -n "$_cp_hosts" ]]; then
+  log "Point your DNS at the ingress, then visit:"
+  while IFS= read -r _h; do [[ -n "$_h" ]] && log "  https://$_h"; done <<< "$_cp_hosts"
+fi
 log "Ingress: kubectl get ingress -n $NAMESPACE"

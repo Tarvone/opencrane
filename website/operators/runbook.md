@@ -564,4 +564,4 @@ Set `OPENCRANE_DRIFT_WEBHOOK_URL` to a Slack incoming webhook or PagerDuty event
 
 ---
 
-*Last updated: 2026-05-28 — document this runbook in the same commit as any procedure change.*
+*Last updated: 2026-06-29 — document this runbook in the same commit as any procedure change.*

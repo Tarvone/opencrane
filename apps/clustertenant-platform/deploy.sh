@@ -9,7 +9,7 @@
 # serving the silo control-plane + its planes), with self-service manager/billing OFF.
 #
 # The CLUSTER-WIDE infra (ingress-nginx, external-dns, the CloudNativePG operator,
-# cert-manager) is installed ONCE by the CENTRAL release (deploy-multi-tenant.sh); a
+# cert-manager) is installed ONCE by the CENTRAL release (apps/fleet-platform/deploy.sh); a
 # silo reuses it, so this profile passes --no-ingress-nginx --no-external-dns
 # --no-db-operator and does not re-install cert-manager. The silo's own namespaced
 # resources (its CNPG Cluster CR, planes, per-org ingress + Certificate) are still
@@ -19,7 +19,7 @@
 # ClusterTenant; the fleet is managed by the central super-admin control-plane).
 #
 # Usage:
-#   ./platform/deploy-silo.sh \
+#   apps/clustertenant-platform/deploy.sh \
 #       --base-domain dev.opencrane.ai \
 #       --cluster-tenant acme \
 #       [--namespace opencrane-acme] [--ingress-ip 34.1.2.3] \
@@ -69,7 +69,7 @@ done
 # enforces the central-before-silo sequencing the prereq note describes.
 command -v kubectl >/dev/null 2>&1 || { err "kubectl not found."; exit 1; }
 if ! kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1; then
-  err "CloudNativePG operator not found (CRD clusters.postgresql.cnpg.io absent). Install the central release first (deploy-multi-tenant.sh) — it brings up the cluster-wide CNPG operator a silo reuses."
+  err "CloudNativePG operator not found (CRD clusters.postgresql.cnpg.io absent). Install the central release first (apps/fleet-platform/deploy.sh) — it brings up the cluster-wide CNPG operator a silo reuses."
   exit 1
 fi
 
@@ -87,15 +87,20 @@ PROFILE_SET=(
   --no-external-dns
   --no-db-operator
   # A silo NEVER runs the cluster-wide fleet-manager — that singleton lives in the fleet install
-  # (deploy-multi-tenant.sh). Two fleet-managers would contend over the ClusterTenant CRs + IAM.
+  # (apps/fleet-platform/deploy.sh). Two fleet-managers would contend over the ClusterTenant CRs + IAM.
   --set "fleetManager.enabled=false"
   --set "fleetManager.clusterTenantApi.enabled=false"
   --set "billing.enabled=false"
   --set "multiInstance.enabled=false"
   --set "ingress.tls.enabled=true"
+  # Issue the silo's OWN TLS cert (clustertenant-manager-certificate.yaml) via the cluster-wide
+  # ClusterIssuer the central release created. A k8s Ingress can only reference a TLS secret in its
+  # OWN namespace, so each silo provisions its cert here rather than borrowing the fleet's wildcard
+  # secret. No per-silo Issuer is created — only the Certificate, pointed at certManager.issuerName.
+  --set "certManager.enabled=true"
   # The silo's control-plane (clustertenant-manager) serves at the ORG host
   # `<cluster-tenant>.<base>` — NOT the chart default `platform.<base>`, which is the FLEET's
-  # super-admin host (deploy-multi-tenant). Without this, the silo's clustertenant-manager Ingress
+  # super-admin host (the fleet install). Without this, the silo's clustertenant-manager Ingress
   # collides with the fleet's at platform.<base>. A caller --set later overrides this default.
   --set "ingress.controlPlaneHost=${CLUSTER_TENANT}.${BASE_DOMAIN}"
 )

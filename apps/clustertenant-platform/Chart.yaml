@@ -4,8 +4,8 @@ description: >-
   OpenCrane SILO install — one per ClusterTenant, into the org's own namespace: the
   clustertenant-manager (per-silo control plane + in-silo controllers) plus its dedicated
   runtime planes (Cognee, LiteLLM, Obot/MCP gateway, skill-registry, Langfuse), per-silo
-  NetworkPolicies, and the identity-routing gateway. Installed after the fleet
-  (deploy-silo.sh); depends on the fleet having established CRDs + the cert-manager issuer.
+  NetworkPolicies, and the identity-routing gateway. Installed with apps/clustertenant-platform/deploy.sh
+  after the fleet; depends on the fleet having established CRDs + the cert-manager issuer.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

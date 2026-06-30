@@ -38,8 +38,14 @@ const _WORKSPACE_PATH = "/data/openclaw/workspace";
  *        `litellm-proxy` provider is restricted to those models and the default
  *        model is surfaced; when empty/null the provider keeps `models: []`
  *        (unchanged today's behaviour — OpenClaw treats `[]` as the proxy default).
+ * @param servingHost - The host the org's Control UI is served at (`<org>.<base>` or
+ *        vanity), used to allowlist the browser Origin in `gateway.controlUi.allowedOrigins`.
+ *        With `bind: lan` the gateway rejects a Control-UI WS whose Origin is not allowlisted
+ *        (`CONTROL_UI_ORIGIN_NOT_ALLOWED`); the SPA reaches the gateway via this host, so its
+ *        `https://<host>` origin must be allowed. Omitted ⇒ no origin is added (the gateway's
+ *        own localhost seeding applies — the pre-same-origin behaviour).
  */
-export function _BuildConfigMap(config: OpenClawTenantOperatorConfig, tenant: Tenant, namespace: string, effectivePolicy?: AccessPolicy, modelSet?: TenantModelSet | null): k8s.V1ConfigMap
+export function _BuildConfigMap(config: OpenClawTenantOperatorConfig, tenant: Tenant, namespace: string, effectivePolicy?: AccessPolicy, modelSet?: TenantModelSet | null, servingHost?: string): k8s.V1ConfigMap
 {
   const name = tenant.metadata!.name!;
 
@@ -62,6 +68,12 @@ export function _BuildConfigMap(config: OpenClawTenantOperatorConfig, tenant: Te
       mode: "local",
       port: config.gatewayPort,
       bind: "lan",
+      // With bind:lan the gateway enforces a Control-UI Origin allowlist (since
+      // v2026.2.26): a WS whose Origin isn't allowlisted is refused with
+      // CONTROL_UI_ORIGIN_NOT_ALLOWED. The org-admin SPA reaches the gateway through the
+      // org host, so allow its `https://<host>` origin. Omitted host ⇒ leave the gateway's
+      // own localhost seeding (ref-less / pre-same-origin default).
+      ...(servingHost ? { controlUi: { allowedOrigins: [`https://${servingHost}`] } } : {}),
       // OC-2 / CONN.4 — the gateway delegates auth to the control-plane: the pod
       // ingress validates the OIDC session and injects the user header, and the
       // gateway trusts it only from the configured proxy source. No shared token

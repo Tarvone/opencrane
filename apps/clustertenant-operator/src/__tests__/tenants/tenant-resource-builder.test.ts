@@ -71,6 +71,28 @@ describe("TenantResourceBuilder", () =>
     expect(payload.gateway.auth.trustedProxy.allowUsers).toEqual(["mike.owner@example.com"]);
   });
 
+  it("allowlists the org Control-UI origin when a serving host is given (CONTROL_UI_ORIGIN_NOT_ALLOWED)", () =>
+  {
+    // With bind:lan the gateway refuses a Control-UI WS whose Origin isn't allowlisted.
+    // The org-admin SPA connects through the org host, so its https origin must be allowed.
+    const tenant = _makeTenant("acme-user");
+    const configMap = _BuildConfigMap(defaultConfig, tenant, "default", undefined, undefined, "acme.dev.opencrane.ai");
+    const payload = JSON.parse(configMap.data?.["openclaw.json"] ?? "{}");
+
+    expect(payload.gateway.controlUi.allowedOrigins).toEqual(["https://acme.dev.opencrane.ai"]);
+    // Survives the step-3b gateway re-pin (controlUi is part of the platform-owned block).
+    expect(payload.gateway.auth.trustedProxy.allowUsers).toEqual(["acme-user@example.com"]);
+  });
+
+  it("omits the Control-UI origin allowlist when no serving host is given (ref-less default)", () =>
+  {
+    const tenant = _makeTenant("plain");
+    const configMap = _BuildConfigMap(defaultConfig, tenant, "default");
+    const payload = JSON.parse(configMap.data?.["openclaw.json"] ?? "{}");
+
+    expect(payload.gateway).not.toHaveProperty("controlUi");
+  });
+
   it("renders an unambiguous trust-nothing gateway config when no proxy is configured (OC-2 / CONN.4)", () =>
   {
     // An operator with no GATEWAY_TRUSTED_PROXIES resolves to trust-nothing. We rely

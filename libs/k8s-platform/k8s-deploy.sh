@@ -861,7 +861,17 @@ log "Installing the OpenCrane Helm release '$RELEASE'…"
 # STORE_MODEL_IN_DB on, so models/keys are stored and seeded at runtime via the admin API. The
 # Prisma query-engine crash on the Chainguard/wolfi base is fixed by the non_root image variant
 # (pre-baked engine binaries), set in the chart — see values.yaml litellm.image.
+# --force-conflicts: Helm 4 applies server-side, so any out-of-band actor that has
+# claimed field ownership of a chart-rendered field (e.g. a `kubectl patch`/`kubectl set
+# image` leaving a `kubectl-*` manager, or a now-removed operator drift-repairer whose
+# stale `node-fetch` ownership persists on the live object — see the warning above and
+# issue #146) makes `helm upgrade` fail with a field-ownership conflict. This engine's
+# contract is that Helm is the SOLE owner of chart-rendered fields, so on conflict Helm
+# should always reclaim them. Idempotent: a no-op when there is no conflicting manager,
+# and it only forces fields the chart actually applies (foreign managers of OTHER fields
+# are untouched). Without it a single stray imperative patch wedges every future upgrade.
 helm_args=(upgrade --install "$RELEASE" "$CHART_DIR" --namespace "$NAMESPACE" --create-namespace
+  --force-conflicts
   --set "clustertenantManager.database.existingSecret=$DB_SECRET"
   --set "fleetManager.database.existingSecret=$DB_SECRET"
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db"

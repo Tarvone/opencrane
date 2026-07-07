@@ -88,13 +88,8 @@ const _SCOPES_HEADER = "x-openclaw-scopes";
  * `operator.admin` — so the Control UI's config/nodes/admin surfaces are refused at the
  * gateway, not merely hidden. The proxy is the trust boundary, so a client cannot widen
  * this by self-declaring the header (we strip any inbound copy before injecting ours).
- *
- * COMMA-separated: openclaw's `resolveTrustedProxyControlUiScopes` parses this header
- * with `split(",")` (verified against openclaw@2026.6.9 dist). A space-separated value
- * reads as ONE unknown scope, the intersection goes empty, and the session gets NO
- * scopes ("this connection is missing operator.read").
  */
-const _CHAT_SCOPES = "operator.read,operator.write";
+const _CHAT_SCOPES = "operator.read operator.write";
 
 /**
  * Strip a leading `/gateway` segment from the upgrade request path so the upstream
@@ -227,30 +222,6 @@ export function _IsControlUiRequest(url: string | undefined): boolean
 {
   const u = url ?? "";
   return u === _CONTROL_UI_PATH_PREFIX || u.startsWith(`${_CONTROL_UI_PATH_PREFIX}/`) || u.startsWith(`${_CONTROL_UI_PATH_PREFIX}?`);
-}
-
-/**
- * Relax the gateway's frame-blocking headers on Control UI responses so the org-admin
- * SPA can embed the chat surface in a SAME-ORIGIN iframe.
- *
- * OpenClaw serves the Control UI with `X-Frame-Options: DENY` and a CSP containing
- * `frame-ancestors 'none'` (verified against openclaw@2026.6.9), which blocks ALL
- * framing — including our own same-origin embed. The proxy rewrites these to the
- * same-origin equivalents: drop `X-Frame-Options` (superseded by CSP frame-ancestors
- * in every modern browser) and rewrite `frame-ancestors 'none'` → `'self'`, so ONLY
- * the org host itself may frame it — clickjacking protection is preserved, third-party
- * framing stays refused. Every other CSP directive is left untouched.
- *
- * @param headers - The upstream response headers, mutated in place.
- */
-export function _RelaxControlUiFrameHeaders(headers: Record<string, unknown>): void
-{
-  delete headers["x-frame-options"];
-  const csp = headers["content-security-policy"];
-  if (typeof csp === "string")
-  {
-    headers["content-security-policy"] = csp.replace(/frame-ancestors 'none'/g, "frame-ancestors 'self'");
-  }
 }
 
 /**

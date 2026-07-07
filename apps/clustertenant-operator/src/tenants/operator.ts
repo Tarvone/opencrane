@@ -403,7 +403,7 @@ export class TenantOperator
       const stateVolume = this.hosting.buildStateVolume(name);
       if (stateVolume.requiresPvc)
       {
-        await __K8sApplyResource(this.coreApi, _BuildStatePvc(name, namespace), this.log);
+        await __K8sApplyResource(this.coreApi, _BuildStatePvc(name, namespace, this.config.tenantStorageClassName), this.log);
       }
 
       // 7. Deployment — single-replica pod running the tenant's OpenClaw gateway.

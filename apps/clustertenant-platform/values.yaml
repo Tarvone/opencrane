@@ -473,6 +473,13 @@ tenant:
     limits:
       cpu: "1"
       memory: 4Gi
+  # -- Per-tenant state volume (on-prem/non-cloud installs only; the cloud path mounts a
+  #    tenant-scoped bucket via CSI and this is unused).
+  storage:
+    # -- StorageClass stamped on the tenant state PVC. Empty ⇒ the cluster's default
+    #    StorageClass (byte-for-byte unchanged from today). Set it to pin the PVC to an
+    #    encrypted/CMEK class for multi-CT installs. Wired to the operator as TENANT_STORAGE_CLASS.
+    storageClassName: ""
   # -- OpenClaw gateway port inside tenant pods
   gatewayPort: 18789
   # -- OpenClaw gateway trusted-proxy auth (OC-2 / CONN.4).

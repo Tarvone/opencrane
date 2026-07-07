@@ -34,6 +34,7 @@ export const defaultConfig: OpenClawTenantOperatorConfig = {
   gatewayProxyAllowedOriginBaseDomains: [],
   gatewayProxyRateLimitPerMinute: 60,
   hostingProvider: HostingProvider.OnPrem,
+  tenantStorageClassName: "",
   idleTimeoutMinutes: 30,
   idleCheckIntervalSeconds: 60,
   liteLlmEnabled: false,

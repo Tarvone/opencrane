@@ -315,6 +315,8 @@ spec:
             - name: GCP_CSI_DRIVER
               value: {{ .Values.hosting.gcp.csiDriver | quote }}
             {{- end }}
+            - name: TENANT_STORAGE_CLASS
+              value: {{ .Values.tenant.storage.storageClassName | quote }}
             - name: IDLE_TIMEOUT_MINUTES
               value: {{ .Values.fleetManager.idleTimeoutMinutes | quote }}
             - name: IDLE_CHECK_INTERVAL_SECONDS

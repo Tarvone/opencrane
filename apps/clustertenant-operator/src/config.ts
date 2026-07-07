@@ -106,6 +106,14 @@ export interface OpenClawTenantOperatorConfig
   /** GCP-specific config; present only when hostingProvider === Gcp. */
   gcp?: GcpHostingConfig;
 
+  /**
+   * StorageClass stamped on the per-tenant state PVC (on-prem/non-cloud path). Empty ⇒
+   * the PVC omits `storageClassName` and binds to the cluster default StorageClass
+   * (byte-for-byte unchanged from before this knob existed). Set it to pin the PVC to an
+   * encrypted/CMEK class for multi-CT installs.
+   */
+  tenantStorageClassName: string;
+
   /** Minutes of inactivity before a tenant is auto-suspended (0 = disabled). */
   idleTimeoutMinutes: number;
 
@@ -259,6 +267,7 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
           csiDriver: _readEnvValue<string>("GCP_CSI_DRIVER", "string", false, "gcsfuse.csi.storage.gke.io"),
         }
       : undefined,
+    tenantStorageClassName: _readEnvValue<string>("TENANT_STORAGE_CLASS", "string", false, ""),
     idleTimeoutMinutes: _readEnvValue<number>("IDLE_TIMEOUT_MINUTES", "number"),
     idleCheckIntervalSeconds: _readEnvValue<number>("IDLE_CHECK_INTERVAL_SECONDS", "number"),
     liteLlmEnabled: _readEnvValue<boolean>("LITELLM_ENABLED", "boolean"),

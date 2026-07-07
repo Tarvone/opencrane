@@ -1,6 +1,7 @@
 import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
+import { _OperatorConfigChecksum } from "../config.js";
 import type { OpenClawTenantOperatorConfig } from "../config.js";
 import { _BuildHostingAdapter, type HostingAdapter } from "../hosting/index.js";
 
@@ -86,6 +87,16 @@ export class TenantOperator
   private readonly pending = new Map<string, Tenant>();
 
   /**
+   * Checksum of the operator's OWN config, computed once at construction. Stamped on each
+   * tenant's `Running` status as `observedConfigChecksum`; the reconcile guard skips a
+   * converged tenant only when its stamped checksum still matches this value, so a
+   * `helm upgrade` that changes operator config re-arms a full reconcile of every tenant
+   * without a manual restart or per-tenant spec edit (the operator-input analogue of the
+   * tenant-pod config-checksum roll).
+   */
+  private readonly configChecksum: string;
+
+  /**
    * Create a new TenantOperator with pre-wired dependencies.
    * Prefer {@link _CreateTenantOperator} in production entry-points.
    */
@@ -114,6 +125,7 @@ export class TenantOperator
     this.statusWriter = statusWriter;
     this.encryptionKeys = encryptionKeys;
     this.liteLlmKeys = liteLlmKeys;
+    this.configChecksum = _OperatorConfigChecksum(config);
   }
 
   /**
@@ -232,18 +244,24 @@ export class TenantOperator
     // target that namespace regardless of where child resources are deployed.
     const crNamespace = tenant.metadata!.namespace ?? "default";
 
-    // Skip the full redeploy when an already-Running Tenant's spec is unchanged — the
-    // watch-replay case. `metadata.generation` bumps only on a spec change (status writes
-    // do not), so a converged Tenant has `observedGeneration === generation`. Without this,
-    // every watch event (including the operator's OWN status writes) re-runs the entire
-    // reconcile, and a persistently failing one (e.g. a quota 403) self-loops via its Error
-    // status write. A Tenant with no generation still reconciles, then stamps it below.
+    // Skip the full redeploy when an already-Running Tenant's spec is unchanged AND the
+    // operator config it was reconciled under is unchanged — the watch-replay case.
+    // `metadata.generation` bumps only on a spec change (status writes do not), so a
+    // converged Tenant has `observedGeneration === generation`. Without this, every watch
+    // event (including the operator's OWN status writes) re-runs the entire reconcile, and a
+    // persistently failing one (e.g. a quota 403) self-loops via its Error status write.
+    // The config-checksum arm forces a full re-reconcile after a `helm upgrade` changed
+    // operator config (the operator-input analogue of the tenant-pod config-checksum roll):
+    // `generation` only tracks the tenant's own spec, so without it an operator-config change
+    // would never reach existing tenants. A Tenant with no generation still reconciles, then
+    // stamps both below.
     const generation = tenant.metadata?.generation;
     if (tenant.status?.phase === TenantStatusPhase.Running
         && typeof generation === "number"
-        && tenant.status?.observedGeneration === generation)
+        && tenant.status?.observedGeneration === generation
+        && tenant.status?.observedConfigChecksum === this.configChecksum)
     {
-      this.log.debug({ name, generation }, "tenant already reconciled at this generation; skipping");
+      this.log.debug({ name, generation }, "tenant already reconciled at this generation and config; skipping");
       return;
     }
 
@@ -426,6 +444,10 @@ export class TenantOperator
         // skips the next watch replay of this unchanged Tenant. A spec edit bumps generation
         // and re-arms a full reconcile. Left UNSET while degraded so the fetch is retried.
         observedGeneration: degradedReason ? undefined : tenant.metadata?.generation,
+        // Record the operator config we converged under so the same guard re-arms a full
+        // reconcile after a `helm upgrade` changes operator config. Left UNSET while degraded
+        // alongside observedGeneration so the guard never short-circuits the fetch retry.
+        observedConfigChecksum: degradedReason ? undefined : this.configChecksum,
       });
     }
     catch (err)
@@ -560,6 +582,24 @@ export class TenantOperator
     // regardless of where the (suspended) Deployment is rebuilt.
     const crNamespace = tenant.metadata!.namespace ?? "default";
 
+    // Skip when this tenant is already Suspended at the current generation — the
+    // self-loop case. Writing the Suspended status below fires a Modified watch event,
+    // which re-dispatches; because `spec.suspended` is still true it routes back here,
+    // and without this guard suspendTenant re-runs on its OWN status write forever
+    // (churning the API with 409s). Mirrors the reconcileTenant generation guard: a
+    // status write does not bump `metadata.generation`, so an unchanged suspended Tenant
+    // has `observedGeneration === generation`. A spec edit (e.g. un-suspend) bumps
+    // generation and re-arms the suspend/reconcile branch. This path never sets Degraded,
+    // so it does not interact with #144's degraded-retry (observedGeneration stays set).
+    const generation = tenant.metadata?.generation;
+    if (tenant.status?.phase === TenantStatusPhase.Suspended
+        && typeof generation === "number"
+        && tenant.status?.observedGeneration === generation)
+    {
+      this.log.debug({ name, generation }, "tenant already suspended at this generation; skipping");
+      return;
+    }
+
     this.log.info({ name }, "suspending tenant");
 
     // 1. Resolve the parent ClusterTenant so the suspended Deployment is rebuilt in
@@ -577,10 +617,13 @@ export class TenantOperator
     deployment.spec!.replicas = 0;
     await __K8sApplyResource(this.appsApi, deployment, this.log);
 
-    // 3. Record the suspended phase against the CR namespace.
+    // 3. Record the suspended phase against the CR namespace. Stamp observedGeneration so
+    //    the guard above short-circuits the Modified event this write triggers — the
+    //    self-loop breaker. A spec edit (bumping generation) re-arms the branch.
     await this.statusWriter.patchStatus(tenant, crNamespace, {
       phase: TenantStatusPhase.Suspended,
       lastReconciled: new Date().toISOString(),
+      observedGeneration: tenant.metadata?.generation,
     });
   }
 

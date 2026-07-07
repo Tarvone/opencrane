@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { HostingProvider } from "./hosting/hosting-adapter.types.js";
 import type { GcpHostingConfig } from "./hosting/hosting-adapter.types.js";
 import { _ParseTrustedProxies, _DeriveTrustedProxyCidr, _AUTO_TRUSTED_PROXY_TOKEN, _DEFAULT_AUTO_TRUSTED_PROXY_MASK } from "./trusted-proxies.js";
@@ -288,6 +290,33 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
   }
 
   return config;
+}
+
+/**
+ * Deterministic SHA-256 over the operator's OWN reconcile-affecting config, the
+ * operator-input analogue of {@link _ConfigChecksum} (which rolls a TENANT pod when
+ * its ConfigMap changes).
+ *
+ * WHY: the operator renders this config into every tenant's child resources (config
+ * env, network policy, trusted-proxy list, runtime-plane URLs, …), but the reconcile
+ * guard skips an already-`Running` tenant whose `observedGeneration` matches — a
+ * status-only field that a config/values change does NOT bump. So a `helm upgrade`
+ * that changes operator values (e.g. `trustedProxies`, a runtime-plane URL) never
+ * reaches existing tenants until each Tenant spec is touched by hand.
+ *
+ * Folding this digest into the guard makes an operator-config change re-arm a full
+ * reconcile for every tenant automatically: the checksum stamped on the last
+ * `Running` status no longer matches, so the guard stops short-circuiting. Composes
+ * with the generation guard (skip requires BOTH to match) — it only ever makes the
+ * guard skip LESS, so it never suppresses a needed reconcile.
+ *
+ * @param config - The loaded operator config to digest.
+ * @returns Hex SHA-256 of the canonical (sorted-key) config JSON.
+ */
+export function _OperatorConfigChecksum(config: OpenClawTenantOperatorConfig): string
+{
+  const canonical = JSON.stringify(config, Object.keys(config).sort());
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 /**

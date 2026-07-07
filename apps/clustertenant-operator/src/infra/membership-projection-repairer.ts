@@ -1,0 +1,260 @@
+import type { Logger } from "pino";
+import type { PrismaClient } from "@prisma/client";
+
+import type { FleetMembershipReader, FleetMembershipRow } from "./membership-projection-repairer.types.js";
+
+/** Default interval (seconds) between membership-projection sweeps. */
+const _DEFAULT_INTERVAL_SECONDS = 60;
+
+/** The org roles the silo read-model stores (mirrors the Prisma `OrgRole` enum). */
+const _ORG_ROLES = ["Owner", "Admin", "Member"] as const;
+
+/** One org role the silo persists. */
+type OrgRoleValue = (typeof _ORG_ROLES)[number];
+
+/** Whether a value is one of the three valid org roles. */
+function _isOrgRole(value: unknown): value is OrgRoleValue
+{
+  return typeof value === "string" && (_ORG_ROLES as readonly string[]).includes(value);
+}
+
+/**
+ * Build the default HTTP membership reader over the fleet internal endpoint
+ * (`GET <fleetInternalUrl>/api/internal/cluster-tenants/<org>/members`).
+ *
+ * Returns null (⇒ repairer no-op) when the fleet URL is unset — the #151 standalone case,
+ * where membership is managed locally and there is no fleet to pull from. Presents the
+ * `OPENCRANE_API_TOKEN` bearer when set (the fleet's `/api/internal/*` auth). Any transport
+ * error or non-OK status also yields null so an unreachable fleet never crashes the loop or
+ * clears the local read-model.
+ *
+ * @param fleetInternalUrl - Base URL of the fleet internal listener, empty ⇒ standalone (no-op).
+ * @param token            - Shared service bearer for the fleet internal API (empty ⇒ omitted).
+ * @param log              - Scoped logger.
+ * @param fetchImpl        - Injectable fetch (defaults to global `fetch`) for testability.
+ */
+export function _BuildHttpFleetMembershipReader(fleetInternalUrl: string, token: string, log: Logger,
+                                                fetchImpl: typeof fetch = fetch): FleetMembershipReader
+{
+  const base = fleetInternalUrl.trim().replace(/\/+$/, "");
+  return {
+    async read(clusterTenant: string): Promise<FleetMembershipRow[] | null>
+    {
+      // Standalone (#151): no fleet configured ⇒ membership is managed locally; no-op.
+      if (!base)
+      {
+        return null;
+      }
+      const url = `${base}/api/internal/cluster-tenants/${encodeURIComponent(clusterTenant)}/members`;
+      const headers: Record<string, string> = {};
+      if (token)
+      {
+        headers.authorization = `Bearer ${token}`;
+      }
+      try
+      {
+        const res = await fetchImpl(url, { headers });
+        if (!res.ok)
+        {
+          log.warn({ clusterTenant, status: res.status }, "fleet membership read returned non-OK; skipping sweep");
+          return null;
+        }
+        const body = await res.json() as { members?: unknown };
+        if (!Array.isArray(body.members))
+        {
+          log.warn({ clusterTenant }, "fleet membership read had no members array; skipping sweep");
+          return null;
+        }
+        return body.members.filter(_isFleetMembershipRow);
+      }
+      catch (err)
+      {
+        log.warn({ err, clusterTenant }, "fleet membership read failed; skipping sweep (membership managed locally until fleet is reachable)");
+        return null;
+      }
+    },
+  };
+}
+
+/** Narrow an unknown list entry to a `{ subject, role }` row. */
+function _isFleetMembershipRow(value: unknown): value is FleetMembershipRow
+{
+  const row = value as { subject?: unknown; role?: unknown };
+  return typeof row?.subject === "string" && row.subject.length > 0 && typeof row?.role === "string";
+}
+
+/**
+ * Periodic fleet → silo OrgMembership projection repairer.
+ *
+ * The fleet registry owns the authoritative `OrgMembership` rows; the silo's local
+ * `OrgMembership` table is a read-model the org-admin gate + `POST /tenants` membership
+ * validation (S1) depend on, but the silo cannot read the fleet DB across the boundary.
+ * This loop closes the gap the same way {@link TenantProjectionRepairer} does for Tenants:
+ * it periodically pulls the org's authoritative membership from the fleet internal endpoint
+ * and upserts the silo's local rows (adding new members, correcting drifted roles, removing
+ * members the fleet has dropped).
+ *
+ * Fail-soft + standalone-safe: when the fleet is unconfigured (#151) or unreachable, the
+ * reader returns null and the sweep is a no-op — the local rows are left intact so
+ * locally-managed membership survives. Idempotent (a converged org is silent) and a sweep
+ * error is logged, not thrown, so the loop and the pod both survive.
+ */
+export class MembershipProjectionRepairer
+{
+  /** Prisma client for the silo's OrgMembership read-model. */
+  private readonly _prisma: PrismaClient;
+
+  /** Reader over the fleet's authoritative membership. */
+  private readonly _reader: FleetMembershipReader;
+
+  /** The org (ClusterTenant) this silo hosts, whose membership is reconciled. */
+  private readonly _clusterTenant: string;
+
+  /** Scoped logger. */
+  private readonly _log: Logger;
+
+  /** Sweep interval in milliseconds; 0 disables the loop. */
+  private readonly _intervalMs: number;
+
+  /** Active interval handle; null when stopped/disabled. */
+  private _timer: ReturnType<typeof setInterval> | null = null;
+
+  /** Guards against overlapping sweeps when one runs longer than the interval. */
+  private _running = false;
+
+  /**
+   * @param prisma        - Prisma client for the silo OrgMembership rows.
+   * @param reader        - Reader over the fleet's authoritative membership.
+   * @param clusterTenant - The org whose membership to reconcile (this silo's org).
+   * @param log           - Pino logger; a scoped child is derived.
+   * @param intervalMs    - Sweep interval in ms (default 60 000; 0 disables).
+   */
+  constructor(prisma: PrismaClient, reader: FleetMembershipReader, clusterTenant: string, log: Logger,
+              intervalMs = _DEFAULT_INTERVAL_SECONDS * 1000)
+  {
+    this._prisma = prisma;
+    this._reader = reader;
+    this._clusterTenant = clusterTenant;
+    this._log = log.child({ component: "membership-projection-repairer" });
+    this._intervalMs = intervalMs;
+  }
+
+  /**
+   * Start the periodic repair loop. A sweep fires immediately so a freshly-added member
+   * surfaces without waiting a full interval. A non-positive interval OR an empty
+   * ClusterTenant disables the loop (nothing to reconcile).
+   */
+  start(): void
+  {
+    if (this._intervalMs <= 0)
+    {
+      this._log.info("membership projection repairer disabled (interval <= 0)");
+      return;
+    }
+    if (!this._clusterTenant.trim())
+    {
+      this._log.info("membership projection repairer disabled (no cluster tenant configured)");
+      return;
+    }
+    this._log.info({ clusterTenant: this._clusterTenant, intervalMs: this._intervalMs }, "membership projection repairer started");
+    const repairer = this;
+    this._timer = setInterval(function _tick() { void repairer._sweep(); }, this._intervalMs);
+    void this._sweep();
+  }
+
+  /** Stop the loop and release the interval handle. */
+  stop(): void
+  {
+    if (this._timer !== null)
+    {
+      clearInterval(this._timer);
+      this._timer = null;
+    }
+  }
+
+  /**
+   * Run one repair sweep: pull the org's authoritative membership from the fleet and
+   * reconcile the silo rows to it. A null read (unconfigured/unreachable) is a safe
+   * no-op. Skips when a previous sweep is still running; never throws.
+   */
+  private async _sweep(): Promise<void>
+  {
+    if (this._running) return;
+    this._running = true;
+    try
+    {
+      const fleetRows = await this._reader.read(this._clusterTenant);
+      if (fleetRows === null)
+      {
+        // Source unavailable — leave the local read-model untouched (no destructive wipe).
+        return;
+      }
+      const changed = await this._reconcile(fleetRows);
+      if (changed > 0)
+      {
+        this._log.info({ clusterTenant: this._clusterTenant, changed }, "membership projection reconciled drifted rows");
+      }
+    }
+    catch (err)
+    {
+      this._log.warn({ err, clusterTenant: this._clusterTenant }, "membership projection sweep failed; will retry next interval");
+    }
+    finally
+    {
+      this._running = false;
+    }
+  }
+
+  /**
+   * Reconcile the silo's OrgMembership rows to the fleet's authoritative set: upsert every
+   * fleet row (add/correct role) and delete local rows the fleet no longer has. Returns the
+   * count of rows changed (created/updated/deleted) for logging.
+   *
+   * @param fleetRows - The org's authoritative membership from the fleet.
+   * @returns The number of local rows created, updated, or deleted.
+   */
+  private async _reconcile(fleetRows: FleetMembershipRow[]): Promise<number>
+  {
+    const clusterTenant = this._clusterTenant;
+    const desired = fleetRows.filter(function _valid(row) { return _isOrgRole(row.role); });
+    const desiredSubjects = new Set(desired.map(function _sub(row) { return row.subject; }));
+
+    const existing = await this._prisma.orgMembership.findMany({
+      where: { clusterTenant },
+      select: { subject: true, role: true },
+    });
+    const existingBySubject = new Map(existing.map(function _entry(row) { return [row.subject, row.role]; }));
+
+    let changed = 0;
+
+    // Upsert every desired member: create the missing, correct the drifted role.
+    for (const row of desired)
+    {
+      const currentRole = existingBySubject.get(row.subject);
+      if (currentRole === row.role)
+      {
+        continue;
+      }
+      await this._prisma.orgMembership.upsert({
+        where: { clusterTenant_subject: { clusterTenant, subject: row.subject } },
+        create: { clusterTenant, subject: row.subject, role: row.role as OrgRoleValue },
+        update: { role: row.role as OrgRoleValue },
+      });
+      changed += 1;
+    }
+
+    // Remove local rows the fleet no longer lists (offboarded members). Bounded to this org.
+    for (const row of existing)
+    {
+      if (!desiredSubjects.has(row.subject))
+      {
+        await this._prisma.orgMembership.delete({
+          where: { clusterTenant_subject: { clusterTenant, subject: row.subject } },
+        });
+        changed += 1;
+      }
+    }
+
+    return changed;
+  }
+}

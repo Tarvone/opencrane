@@ -10,6 +10,7 @@ import { _BuildZitadelManagementClient } from "./infra/zitadel/zitadel-client.js
 import { _BuildZitadelKeySecretStore } from "./infra/zitadel/key-secret-store.js";
 import { clusterTenantsRouter } from "./routes/cluster-tenants.js";
 import { clusterTenantMembersRouter } from "./routes/cluster-tenant-members.js";
+import { _RegisterInternalClusterTenantMembers } from "./routes/internal/cluster-tenant-members.js";
 import { billingAccountsRouter } from "./routes/billing-accounts.js";
 import { platformDnsRouter } from "./routes/platform-dns.js";
 import { zitadelKeyRouter } from "./routes/admin/zitadel-key.js";
@@ -66,7 +67,12 @@ export function _RegisterFleetRoutes(
 
     app.use("/api/v1/cluster-tenants", clusterTenantsRouter(prisma, registry, customApi, zitadelClient));
     // Org membership registry mounted under the parent org's `:name` (mergeParams).
-    app.use("/api/v1/cluster-tenants/:name/members", clusterTenantMembersRouter(prisma));
+    // Shares the live Zitadel client so a member upsert seats the member's project role.
+    app.use("/api/v1/cluster-tenants/:name/members", clusterTenantMembersRouter(prisma, zitadelClient));
+    // Internal (fleet → silo) membership projection source — the silo repairer pulls org
+    // membership from here (bearer-token + NetworkPolicy gated, read-only). Not on the public
+    // ingress path in the same sense as the versioned surface, but auth'd by the same middleware.
+    app.use("/api/internal/cluster-tenants", _RegisterInternalClusterTenantMembers(prisma));
 
     // Superadmin-gated rotation of the platform's Zitadel SA key (the master IdP credential),
     // and idempotent reconcile/backfill of half-provisioned orgs — both on the same live client.

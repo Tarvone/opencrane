@@ -418,14 +418,13 @@ function _contract_poll_loop()
         _pull_entitled_skills "$writable_path"
 
         # Only trigger the file-watch reload when a reload would actually change what the
-        # agent sees. Rewriting openclaw.json makes OpenClaw dispose + re-spawn its stdio MCP
-        # servers (incl. org-memory); doing that for a no-op delta needlessly risks a
-        # `-32000 Connection closed` spawn race, so skip it when docs+skills are unchanged.
+        # agent sees. A no-op openclaw.json rewrite still makes OpenClaw re-read its config and
+        # re-init plugins for nothing, so skip it when workspace docs + skills are unchanged.
         if [ "$new_fp" != "$old_fp" ]; then
           echo "[opencrane] Reload-relevant fields (workspace docs/skills) changed; triggering hot-reload" >&2
           _trigger_openclaw_reload
         else
-          echo "[opencrane] Contract change is not reload-relevant; skipping MCP re-spawn" >&2
+          echo "[opencrane] Contract change is not reload-relevant; skipping reload" >&2
         fi
       else
         rm -f "$tmp_path"

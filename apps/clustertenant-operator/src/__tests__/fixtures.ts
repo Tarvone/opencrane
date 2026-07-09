@@ -44,6 +44,7 @@ export const defaultConfig: OpenClawTenantOperatorConfig = {
   liteLlmBudgetDuration: "30d",
   liteLlmDefaultTpmLimit: 0,
   liteLlmDefaultRpmLimit: 0,
+  cogneeLiteLlmMonthlyBudgetUsd: 10,
   mcpGatewayUrl: "http://opencrane-mcp-gateway.default.svc:8080",
   skillRegistryUrl: "http://opencrane-skill-registry.default.svc:5000",
   cogneeEndpoint: "",

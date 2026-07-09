@@ -323,6 +323,31 @@ clustertenantManager:
       limits:
         cpu: "1"
         memory: 1Gi
+    # -- Cognee's own embedding + LLM (graph-extraction) provider, routed through this
+    #    release's LiteLLM proxy via a DEDICATED virtual key the operator mints at boot
+    #    (see cognee-litellm-key.ts) — Cognee's spend is tracked as its own identity, never
+    #    folded into a tenant's budget. Only rendered when `litellm.enabled` is true; without
+    #    it Cognee has no embedding/LLM credentials and every memory-capture attempt aborts
+    #    after ~60s of failed embedding calls (the pre-fix symptom).
+    #
+    #    IMPORTANT — the model names below are PLACEHOLDERS. Verify they are actually
+    #    registered/routable on this cluster's live LiteLLM proxy before relying on them in
+    #    production (e.g. `curl $LITELLM_ENDPOINT/v1/models`); override per-deploy with
+    #    `--set clustertenantManager.cognee.llm.model=...` /
+    #    `--set clustertenantManager.cognee.embedding.model=...` if they differ.
+    llm:
+      # -- "openai" matches Cognee's own default AND this platform's litellm-proxy
+      #    convention (api: openai-completions) for an OpenAI-compatible upstream.
+      provider: "openai"
+      model: "openai/gpt-4o-mini"
+    embedding:
+      # -- "custom" (NOT "openai") — verified against Cognee's own docs: the "custom"
+      #    provider passes EMBEDDING_ENDPOINT straight through to LiteLLM as `api_base`
+      #    with no automatic /v1 append or /embeddings strip, which the "openai" provider
+      #    does and which breaks routing through a proxy base URL.
+      provider: "custom"
+      model: "openai/text-embedding-3-large"
+      dimensions: 3072
   # -- OIDC human-login session config for the control-plane. Zitadel is the single
   #    trusted issuer (Mode-2 broker, no upstream Entra), but nothing here is
   #    Zitadel-specific — any spec-compliant issuer works. OIDC is OFF unless

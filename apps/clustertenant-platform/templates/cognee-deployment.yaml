@@ -68,6 +68,42 @@ spec:
               value: "0.0.0.0"
             - name: PORT
               value: {{ .Values.clustertenantManager.cognee.service.port | quote }}
+            {{- if .Values.litellm.enabled }}
+            # Embedding + LLM (graph-extraction) provider, routed through this release's
+            # LiteLLM proxy via a DEDICATED key the operator mints at boot (Secret name here
+            # MUST match cognee-litellm-key.ts's COGNEE_LITELLM_KEY_SECRET_NAME literal —
+            # the operator has no way to compute this chart's release-prefixed fullname).
+            # `optional: true`: on first install the Secret doesn't exist yet until the
+            # operator's boot-time reconcile creates it, so Cognee must start without it
+            # rather than crash-loop; embedding/LLM calls fail until the key appears and this
+            # pod is restarted (same bootstrap posture already accepted for tenant LiteLLM keys).
+            - name: LLM_PROVIDER
+              value: {{ .Values.clustertenantManager.cognee.llm.provider | quote }}
+            - name: LLM_MODEL
+              value: {{ .Values.clustertenantManager.cognee.llm.model | quote }}
+            - name: LLM_ENDPOINT
+              value: {{ include "opencrane.litellmEndpoint" . | quote }}
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cognee-litellm-key
+                  key: apiKey
+                  optional: true
+            - name: EMBEDDING_PROVIDER
+              value: {{ .Values.clustertenantManager.cognee.embedding.provider | quote }}
+            - name: EMBEDDING_MODEL
+              value: {{ .Values.clustertenantManager.cognee.embedding.model | quote }}
+            - name: EMBEDDING_DIMENSIONS
+              value: {{ .Values.clustertenantManager.cognee.embedding.dimensions | quote }}
+            - name: EMBEDDING_ENDPOINT
+              value: {{ include "opencrane.litellmEndpoint" . | quote }}
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cognee-litellm-key
+                  key: apiKey
+                  optional: true
+            {{- end }}
           resources:
             {{- toYaml .Values.clustertenantManager.cognee.resources | nindent 12 }}
 {{- if .Values.networkPolicy.enabled }}

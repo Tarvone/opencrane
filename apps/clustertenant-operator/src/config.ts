@@ -152,6 +152,15 @@ export interface OpenClawTenantOperatorConfig
    */
   liteLlmDefaultRpmLimit: number;
 
+  /**
+   * Monthly budget (USD) for this silo's dedicated Cognee LiteLLM key (embedding +
+   * graph-extraction LLM calls). Deliberately a SEPARATE key/budget from tenant chat
+   * spend — Cognee's spend must be trackable as its own identity, not folded into a
+   * tenant's cap. No `team_id` is ever attached (LiteLLM's Team object is not
+   * provisioned anywhere in this codebase yet; see tenant-litellm-keys.ts).
+   */
+  cogneeLiteLlmMonthlyBudgetUsd: number;
+
   /** Optional default AccessPolicy name used when no explicit or selector match is found. */
   defaultTenantPolicyRef?: string;
 
@@ -289,6 +298,7 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     liteLlmBudgetDuration: _readEnvValue<string>("LITELLM_BUDGET_DURATION", "string", false, "30d"),
     liteLlmDefaultTpmLimit: _readEnvValue<number>("LITELLM_DEFAULT_TPM_LIMIT", "number", false, 0),
     liteLlmDefaultRpmLimit: _readEnvValue<number>("LITELLM_DEFAULT_RPM_LIMIT", "number", false, 0),
+    cogneeLiteLlmMonthlyBudgetUsd: _readEnvValue<number>("COGNEE_LITELLM_MONTHLY_BUDGET_USD", "number", false, 10),
     defaultTenantPolicyRef: _readEnvValue<string>("DEFAULT_TENANT_POLICY_REF", "string", false, ""),
     mcpGatewayUrl: _readEnvValue<string>("MCP_GATEWAY_URL", "string", false, `http://opencrane-mcp-gateway.${ownNamespace}.svc:8080`),
     skillRegistryUrl: _readEnvValue<string>("SKILL_REGISTRY_URL", "string", false, `http://opencrane-skill-registry.${ownNamespace}.svc:5000`),

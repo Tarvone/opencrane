@@ -25,6 +25,7 @@ import { _RegisterInternalRoutes, _RegisterRoutes } from "./routes.js";
 import { TenantProjectionRepairer } from "./infra/tenant-projection-repairer.js";
 import { MembershipProjectionRepairer, _BuildHttpFleetMembershipReader, _BuildHttpFleetMembershipWriter } from "./infra/membership-projection-repairer.js";
 import { _ResolveOwnClusterTenantName } from "./core/cluster-tenants/resolve-own-cluster-tenant.js";
+import { CogneeLiteLlmKey } from "./tenants/internal/cognee-litellm-key.js";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped
@@ -282,6 +283,31 @@ async function _startInSiloControllers(): Promise<void>
     // lands where the TenantOperator will pick it up — not the projection-repair namespace,
     // which is derived independently and could diverge under manual env overrides.
     void _SeedOwnDefaultTenant(customApi, prisma, config.watchNamespace, log);
+
+    // Ensure this silo's Cognee has its own dedicated LiteLLM virtual key — a SEPARATE
+    // identity/budget from tenant chat spend (Cognee's embedding + graph-extraction calls
+    // must be trackable on their own, not folded into a tenant's cap). One-shot at boot:
+    // there is exactly one Cognee per silo and its params rarely change, unlike per-tenant
+    // keys which reconcile every tenant-CR poll. Best-effort — a LiteLLM outage at boot
+    // must not block the tenant/policy operators from starting.
+    void (async function _ensureCogneeLiteLlmKey()
+    {
+      const clusterTenantName = await _ResolveOwnClusterTenantName(customApi, config.watchNamespace, log);
+      if (!clusterTenantName)
+      {
+        log.info({ namespace: config.watchNamespace }, "no ClusterTenant bound to this namespace yet; cognee litellm key provisioning idle");
+        return;
+      }
+      const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
+      try
+      {
+        await new CogneeLiteLlmKey(config, coreApi, objectApi, log).ensureCogneeLiteLlmKeySecret(clusterTenantName, config.watchNamespace);
+      }
+      catch (err)
+      {
+        log.warn({ err, clusterTenantName }, "cognee litellm key provisioning failed; cognee will run without embedding/LLM credentials until this is retried");
+      }
+    })();
 
     const tenantOperator = _CreateTenantOperator(kc, config, log);
     const policyOperator = new PolicyOperator(kc, config, log);

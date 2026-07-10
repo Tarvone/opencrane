@@ -8,6 +8,9 @@ const _NAMESPACE_NAME_LABEL = "kubernetes.io/metadata.name";
 /** The cluster DNS namespace whose kube-dns/CoreDNS every pod must be able to reach. */
 const _DNS_NAMESPACE = "kube-system";
 
+/** Component label the bundled Cognee pod carries (`cognee-deployment.yaml`). */
+const _COGNEE_COMPONENT_LABEL = "cognee";
+
 /**
  * Build the per-silo baseline NetworkPolicy — the default-deny edge of a
  * ClusterTenant namespace (S2 / silo Phase 1, task_08734d58 + task_d6404452).
@@ -21,15 +24,27 @@ const _DNS_NAMESPACE = "kube-system";
  * - **Ingress** from the same silo namespace (intra-silo) and from the
  *   control-plane/operator namespace (the super-admin plane is the only principal
  *   allowed to reach in — it brokers the gateway connection).
- * - **Egress** to cluster DNS, to the same silo namespace, to the control-plane
+ * - **Egress** to cluster DNS, and to the same silo namespace + the control-plane
  *   namespace (the shared planes — control-plane, Obot/MCP, skill-registry, LiteLLM,
- *   Cognee — live there in the shared tier), and to external HTTPS (LLM/MCP/Git).
+ *   Cognee — live there in the shared tier).
+ *
+ * External HTTPS (LLM/MCP/Git) is deliberately NOT in this policy — see
+ * {@link _BuildSiloExternalEgressNetworkPolicy}, a separate policy so Cognee can be
+ * excluded from it (an unpatched Cognee vuln — topoteretes/cognee#3084 — lets ANY
+ * authenticated Cognee user overwrite the process-wide LLM/embedding endpoint with no
+ * admin check; unrestricted external egress would let that be pointed at an
+ * attacker-controlled host to exfiltrate every tenant's data flowing through this
+ * silo's shared Cognee instance). NetworkPolicy is purely additive — a workload
+ * covered by this baseline's intra-silo/DNS rules can still be excluded from a
+ * DIFFERENT policy's broader grant, but the reverse (one policy narrowing what
+ * another already allows) is not expressible in one resource, hence the split.
  *
  * This replaces the old single `opencrane-tenant-default` policy that sat in the
  * install namespace and (mis)selected tenant pods cluster-wide; the operator now
- * emits one correctly-scoped policy per silo namespace it provisions. The companion
- * {@link _BuildGatewayNetworkPolicy} narrows the gateway PORT to the operator on top
- * of this baseline (NetworkPolicy rules are additive, so the two compose).
+ * emits one correctly-scoped policy per silo namespace it provisions. The companions
+ * {@link _BuildGatewayNetworkPolicy} and {@link _BuildSiloExternalEgressNetworkPolicy}
+ * narrow/extend on top of this baseline (NetworkPolicy rules are additive, so all
+ * three compose).
  *
  * NOTE: this is an L3/L4 namespace-scoped floor — the identity-based (SPIFFE/Cilium)
  * enforcement of the silo model lands later (S5). It only takes effect on a
@@ -91,13 +106,68 @@ export function _BuildSiloBaselineNetworkPolicy(
           ],
         },
         // Intra-silo + the shared platform planes (control-plane, Obot, skills, LiteLLM, Cognee).
+        // Unrestricted by port — this is namespace/platform-scoped only (not an exfiltration
+        // path to an external attacker), and Cognee legitimately needs it to reach LiteLLM in
+        // the same namespace. External HTTPS is deliberately NOT here — see
+        // _BuildSiloExternalEgressNetworkPolicy.
         {
           to: [
             { podSelector: {} },
             { namespaceSelector: { matchLabels: { [_NAMESPACE_NAME_LABEL]: platformNamespace } } },
           ],
         },
-        // External HTTPS — the agent legitimately calls out to LLM/MCP/Git endpoints.
+      ],
+    },
+  };
+}
+
+/**
+ * Build the silo's external-HTTPS egress allowance — split OUT of
+ * {@link _BuildSiloBaselineNetworkPolicy} so Cognee can be excluded from it.
+ *
+ * The baseline's own egress rules (DNS + intra-silo/platform) are safe to leave
+ * unrestricted-by-destination because they never leave the cluster. "External HTTPS
+ * to anywhere" is different: it is exactly the egress an unpatched Cognee
+ * vulnerability (topoteretes/cognee#3084) would need to exploit. That bug lets ANY
+ * authenticated Cognee user overwrite the process-wide LLM/embedding endpoint
+ * (`POST /api/v1/settings` has no admin/superuser check) — if Cognee could reach an
+ * attacker-controlled host on 443, every tenant's prompts/entities/graph data flowing
+ * through this silo's shared Cognee instance would be exfiltrated the moment anyone
+ * points that endpoint off-cluster. The rest of the silo (the openclaw agent itself)
+ * legitimately calls out to LLM/MCP/Git providers over HTTPS, so it keeps this grant —
+ * only Cognee's pod is carved out via the `NotIn` match below.
+ *
+ * @param namespace - The silo (ClusterTenant) namespace the policy is created in.
+ * @param clusterTenantName - Parent ClusterTenant name, recorded as a label.
+ * @returns The external-HTTPS egress policy, excluding the bundled Cognee pod.
+ */
+export function _BuildSiloExternalEgressNetworkPolicy(
+  namespace: string,
+  clusterTenantName: string,
+): k8s.V1NetworkPolicy
+{
+  return {
+    apiVersion: "networking.k8s.io/v1",
+    kind: "NetworkPolicy",
+    metadata: {
+      name: `opencrane-${clusterTenantName}-external-egress`,
+      namespace,
+      labels: {
+        "app.kubernetes.io/part-of": "opencrane",
+        "app.kubernetes.io/managed-by": "opencrane-fleet-manager",
+        "app.kubernetes.io/component": "silo-isolation",
+        "opencrane.io/cluster-tenant": clusterTenantName,
+      },
+    },
+    spec: {
+      // Every pod in the namespace EXCEPT Cognee (see the doc comment above for why).
+      podSelector: {
+        matchExpressions: [
+          { key: "app.kubernetes.io/component", operator: "NotIn", values: [_COGNEE_COMPONENT_LABEL] },
+        ],
+      },
+      policyTypes: ["Egress"],
+      egress: [
         {
           ports: [{ protocol: "TCP", port: 443 }],
         },

@@ -8,6 +8,7 @@ import type { OpenClawTenantOperatorConfig } from "../../config.js";
 import { __K8sApplyResource } from "@opencrane/infra-api";
 import { _BuildTenantLabels } from "../deploy/tenant-labels.js";
 import type { Tenant } from "../models/tenant.interface.js";
+import { _ReadSiloOwnerState } from "./cognee-silo-tenant.js";
 
 /**
  * Provisions a REAL, per-openclaw-tenant Cognee user account — the tenant's pod
@@ -112,23 +113,63 @@ export class CogneeTenantIdentity
     // 4. Persist the login as a per-tenant Secret. `_BuildDeployment` mounts `username`/
     //    `password` as COGNEE_USERNAME/COGNEE_PASSWORD env vars (secretKeyRef); the plugin
     //    reads those directly since `2-config-map.ts` renders no username/password/apiKey.
-    const secret: k8s.V1Secret = {
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: {
-        name: secretName,
-        namespace,
-        labels: _BuildTenantLabels(name),
-      },
-      type: "Opaque",
-      data: {
-        username: Buffer.from(email).toString("base64"),
-        password: Buffer.from(password).toString("base64"),
-      },
-    };
-
-    await __K8sApplyResource(this.objectApi, secret, this.log);
+    //    `tenantId` starts empty — populated once `ensureTenantJoinedToSiloTenant` succeeds.
+    await this._writeCredentialsSecret(namespace, name, { username: email, password, tenantId: "" });
     this.log.info({ name, secretName, email }, "created cognee tenant identity");
+  }
+
+  /**
+   * Join this tenant's Cognee login to the silo's shared Cognee Tenant (see
+   * `CogneeSiloTenant`), and make it that login's ACTIVE tenant. Without this, the tenant's
+   * login has `tenant_id = NULL` and the plugin's `companyDataset` scope silently becomes a
+   * private, non-shared dataset instead of the org-wide shared one — see the class doc
+   * comment for the full Cognee-side mechanics.
+   *
+   * No-ops when: Cognee is not configured; this tenant has no credentials yet (call after
+   * `ensureTenantCogneeIdentity` in the same reconcile pass); membership was already
+   * resolved by a prior reconcile; or the silo's owner/Tenant isn't provisioned yet (best
+   * effort — retried automatically on a later reconcile once `CogneeSiloTenant` catches up).
+   *
+   * @param tenant - The Tenant CR being reconciled.
+   * @param namespace - Namespace both this tenant's and the silo owner's Secrets live in.
+   */
+  async ensureTenantJoinedToSiloTenant(tenant: Tenant, namespace: string): Promise<void>
+  {
+    if (!this.config.cogneeEndpoint)
+    {
+      return;
+    }
+
+    const name = tenant.metadata!.name!;
+    const credentials = await this._readCredentialsSecret(namespace, name);
+    if (credentials === undefined)
+    {
+      this.log.debug({ name }, "cognee tenant identity not provisioned yet; skipping silo-tenant join");
+      return;
+    }
+
+    if (credentials.tenantId)
+    {
+      this.log.debug({ name }, "cognee tenant identity already joined to the silo tenant");
+      return;
+    }
+
+    const owner = await _ReadSiloOwnerState(this.coreApi, namespace);
+    if (owner === undefined || !owner.tenantId)
+    {
+      this.log.debug({ name }, "cognee silo owner/tenant not resolved yet; will retry joining on a later reconcile");
+      return;
+    }
+
+    const ownerToken = await this._loginCognee(owner.username, owner.password, `${name} (as silo owner)`);
+    const userId = await this._getUserIdByEmail(ownerToken, credentials.username, name);
+    await this._addUserToTenant(ownerToken, userId, owner.tenantId, name);
+
+    const userToken = await this._loginCognee(credentials.username, credentials.password, name);
+    await this._selectTenant(userToken, owner.tenantId, name);
+
+    await this._writeCredentialsSecret(namespace, name, { ...credentials, tenantId: owner.tenantId });
+    this.log.info({ name, tenantId: owner.tenantId }, "joined cognee tenant identity to the silo tenant");
   }
 
   /**
@@ -179,6 +220,151 @@ export class CogneeTenantIdentity
     const keyBytes = Buffer.from(encoded, "base64");
     return createHmac("sha256", keyBytes).update(`cognee-tenant-identity-v1:${email}`).digest("base64url");
   }
+
+  /** Log in to Cognee and return a bearer JWT. */
+  private async _loginCognee(email: string, password: string, context: string): Promise<string>
+  {
+    const response = await fetch(`${this.config.cogneeEndpoint}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username: email, password }),
+    });
+
+    if (!response.ok)
+    {
+      const body = await response.text();
+      throw new Error(`Cognee login failed for ${context} (${response.status}): ${body}`);
+    }
+
+    const payload = await response.json() as { access_token?: string };
+    if (!payload.access_token)
+    {
+      throw new Error(`Cognee login for ${context} returned no access_token`);
+    }
+
+    return payload.access_token;
+  }
+
+  /** Resolve a Cognee user's UUID from their email, authenticated as the silo owner. */
+  private async _getUserIdByEmail(ownerToken: string, email: string, tenantName: string): Promise<string>
+  {
+    const response = await fetch(`${this.config.cogneeEndpoint}/api/v1/users/get-user-id`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${ownerToken}` },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok)
+    {
+      const body = await response.text();
+      throw new Error(`Cognee get-user-id failed for ${tenantName} (${response.status}): ${body}`);
+    }
+
+    const payload = await response.json() as { user_id?: string };
+    if (!payload.user_id)
+    {
+      throw new Error(`Cognee get-user-id for ${tenantName} returned no user_id`);
+    }
+
+    return payload.user_id;
+  }
+
+  /**
+   * Add `userId` to the silo's Cognee Tenant, authenticated as the silo owner (the tenant
+   * owner). A 409 (Cognee's `EntityAlreadyExistsError` for "User is already part of group")
+   * is treated as success — this call is safe to repeat across reconciles.
+   */
+  private async _addUserToTenant(ownerToken: string, userId: string, tenantId: string, tenantName: string): Promise<void>
+  {
+    const response = await fetch(
+      `${this.config.cogneeEndpoint}/api/v1/permissions/users/${userId}/tenants?tenant_id=${tenantId}`,
+      { method: "POST", headers: { Authorization: `Bearer ${ownerToken}` } },
+    );
+
+    if (response.ok || response.status === 409)
+    {
+      return;
+    }
+
+    const body = await response.text();
+    throw new Error(`Cognee add-user-to-tenant failed for ${tenantName} (${response.status}): ${body}`);
+  }
+
+  /**
+   * Make `tenantId` the CALLER's active Cognee tenant (authenticated as the tenant's own
+   * login, not the owner — `select_tenant` only ever operates on the authenticated caller).
+   * This is what actually makes `user.tenant_id` match the silo tenant's datasets — plain
+   * membership (`_addUserToTenant`) alone is not enough, per Cognee's own
+   * `get_all_user_permission_datasets` dataset filter.
+   */
+  private async _selectTenant(userToken: string, tenantId: string, tenantName: string): Promise<void>
+  {
+    const response = await fetch(`${this.config.cogneeEndpoint}/api/v1/permissions/tenants/select`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${userToken}` },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+
+    if (!response.ok)
+    {
+      const body = await response.text();
+      throw new Error(`Cognee select-tenant failed for ${tenantName} (${response.status}): ${body}`);
+    }
+  }
+
+  /** Read this tenant's Cognee login + silo-tenant-membership state, or `undefined` if absent. */
+  private async _readCredentialsSecret(namespace: string, tenantName: string): Promise<_CogneeCredentials | undefined>
+  {
+    try
+    {
+      const secret = await this.coreApi.readNamespacedSecret({ name: _CredentialsSecretName(tenantName), namespace });
+      const data = secret.data ?? {};
+      const username = data["username"] ? Buffer.from(data["username"], "base64").toString("utf8") : "";
+      const password = data["password"] ? Buffer.from(data["password"], "base64").toString("utf8") : "";
+      const tenantId = data["tenantId"] ? Buffer.from(data["tenantId"], "base64").toString("utf8") : "";
+      if (!username || !password)
+      {
+        return undefined;
+      }
+
+      return { username, password, tenantId };
+    }
+    catch
+    {
+      return undefined;
+    }
+  }
+
+  /** Write this tenant's Cognee login + silo-tenant-membership state (create-or-replace). */
+  private async _writeCredentialsSecret(namespace: string, tenantName: string, credentials: _CogneeCredentials): Promise<void>
+  {
+    const secret: k8s.V1Secret = {
+      apiVersion: "v1",
+      kind: "Secret",
+      metadata: {
+        name: _CredentialsSecretName(tenantName),
+        namespace,
+        labels: _BuildTenantLabels(tenantName),
+      },
+      type: "Opaque",
+      data: {
+        username: Buffer.from(credentials.username).toString("base64"),
+        password: Buffer.from(credentials.password).toString("base64"),
+        tenantId: Buffer.from(credentials.tenantId).toString("base64"),
+      },
+    };
+
+    await __K8sApplyResource(this.objectApi, secret, this.log);
+  }
+}
+
+/** Decoded shape persisted in a tenant's `_CredentialsSecretName` Secret. */
+interface _CogneeCredentials
+{
+  username: string;
+  password: string;
+  /** Empty until `ensureTenantJoinedToSiloTenant` resolves the silo's shared Cognee Tenant. */
+  tenantId: string;
 }
 
 /**

@@ -120,7 +120,10 @@ function _makeOperator(core: RecordingClient, apps: RecordingClient, networking:
   const statusWriter = { async patchStatus(_t: unknown, _ns: unknown, status: Record<string, unknown>): Promise<void> { statusSink?.push(status); } } as never;
   const encryptionKeys = { async ensureEncryptionKeySecret(): Promise<void> {} } as never;
   const liteLlmKeys = { async ensureLiteLlmKeySecret(): Promise<void> {} } as never;
-  const cogneeTenantIdentity = { async ensureTenantCogneeIdentity(): Promise<void> {} } as never;
+  const cogneeTenantIdentity = {
+    async ensureTenantCogneeIdentity(): Promise<void> {},
+    async ensureTenantJoinedToSiloTenant(): Promise<void> {},
+  } as never;
   const cleanup = { async cleanupTenant(): Promise<void> {} } as never;
 
   return new TenantOperator(

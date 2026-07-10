@@ -376,6 +376,20 @@ export class TenantOperator
         this.log.warn({ err, name }, "cognee tenant identity provisioning failed; continuing reconcile");
       }
 
+      // 5b. Join that login to the silo's shared Cognee Tenant (see CogneeSiloTenant), so the
+      //     plugin's companyDataset scope is actually shared across every openclaw tenant in
+      //     this silo instead of becoming a private dataset per tenant. Independent try/catch:
+      //     a failure here must not block step 5's login from having already been created, and
+      //     is itself retried on the next reconcile regardless of this one's outcome.
+      try
+      {
+        await this.cogneeTenantIdentity.ensureTenantJoinedToSiloTenant(effectiveTenant, namespace);
+      }
+      catch (err)
+      {
+        this.log.warn({ err, name }, "cognee silo-tenant join failed; continuing reconcile");
+      }
+
       // 6. ConfigMap — serialises the base OpenClaw JSON config merged with any
       //    spec.configOverrides the tenant author provided. Capture it so its
       //    checksum can roll the pod when the config changes (step 7).

@@ -12,7 +12,7 @@ import type { TenantDegradedReason } from "./models/tenant-status.interface.js";
 import { __K8sApplyResource, _IsK8sNotFound } from "@opencrane/infra-api";
 import { _RunWatchLoop, K8sWatchEventType } from "@opencrane/infra-api";
 import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "@opencrane/infra-api";
-import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildService, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum, _ResolveTenantModelGate } from "./deploy/index.js";
+import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildService, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloExternalEgressNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum, _ResolveTenantModelGate } from "./deploy/index.js";
 import { TenantCleanup } from "./destroy/tenant-cleanup.js";
 import { LinkerdIdentityClient } from "./internal/linkerd-identity.client.js";
 
@@ -532,9 +532,17 @@ export class TenantOperator
 
     // 1b. Silo baseline NetworkPolicy — flip the namespace to default-deny (S2 /
     //     Phase 1) right after it exists and before any workload lands, so the silo
-    //     edge is closed from the start: only intra-silo + the control-plane plane,
-    //     DNS, and external HTTPS are allowed; no silo→silo path is ever created.
+    //     edge is closed from the start: only intra-silo + the control-plane plane
+    //     and DNS are allowed; no silo→silo path is ever created.
     await __K8sApplyResource(this.networkingApi, _BuildSiloBaselineNetworkPolicy(namespace, clusterTenantName, this.config), this.log);
+
+    // 1b-2. External-HTTPS egress — a SEPARATE policy from the baseline above (see its
+    //       doc comment) so the bundled Cognee pod can be excluded from it. An
+    //       unpatched Cognee vuln (topoteretes/cognee#3084) lets any authenticated
+    //       Cognee user redirect its process-wide LLM endpoint with no admin check;
+    //       without this exclusion Cognee could exfiltrate the silo's data to an
+    //       attacker-controlled host the moment that's exploited.
+    await __K8sApplyResource(this.networkingApi, _BuildSiloExternalEgressNetworkPolicy(namespace, clusterTenantName), this.log);
 
     // 1c. Linkerd identity layer (S5 / ADR 0001) — gated OFF by default. When on, lay
     //     the meshed mTLS-identity analogue of the S2 baseline ON TOP of the L3/4 floor:

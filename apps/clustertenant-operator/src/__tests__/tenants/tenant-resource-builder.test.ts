@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultConfig, gcpConfig, gcpAdapter, onPremAdapter, _makeAccessPolicy, _makeTenant } from "../fixtures.js";
-import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildClusterTenantScheduling, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum } from "../../tenants/deploy/index.js";
+import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildClusterTenantScheduling, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloExternalEgressNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum } from "../../tenants/deploy/index.js";
 
 describe("TenantResourceBuilder", () =>
 {
@@ -470,17 +470,18 @@ describe("Silo baseline NetworkPolicy (S2 / Phase 1 — default-deny silo edge)"
     expect(rule?._from).toContainEqual({ namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": "opencrane-system" } } });
   });
 
-  it("allows egress to DNS, the platform namespace, intra-silo, and external HTTPS only", () =>
+  it("allows egress to DNS and the platform namespace/intra-silo — NOT external HTTPS (split out)", () =>
   {
     const egress = netpol.spec?.egress ?? [];
     // DNS on 53/UDP+TCP to kube-system.
     const dns = egress.find(e => e.to?.some(t => t.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"] === "kube-system"));
     expect(dns?.ports).toEqual([{ protocol: "UDP", port: 53 }, { protocol: "TCP", port: 53 }]);
-    // External HTTPS on 443 (no `to` ⇒ any destination) for LLM/MCP/Git.
-    expect(egress).toContainEqual({ ports: [{ protocol: "TCP", port: 443 }] });
     // Platform-plane reachability.
     const platform = egress.find(e => e.to?.some(t => t.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"] === "opencrane-system"));
     expect(platform).toBeDefined();
+    // External HTTPS (443, no `to`) is NOT here — it moved to _BuildSiloExternalEgressNetworkPolicy
+    // so the bundled Cognee pod can be excluded from it (topoteretes/cognee#3084).
+    expect(egress).not.toContainEqual({ ports: [{ protocol: "TCP", port: 443 }] });
   });
 
   it("creates NO silo→silo path (no rule names another silo namespace)", () =>
@@ -491,6 +492,31 @@ describe("Silo baseline NetworkPolicy (S2 / Phase 1 — default-deny silo edge)"
     expect(serialized).not.toContain("opencrane-bcorp");
     const nsNames = [...serialized.matchAll(/"kubernetes\.io\/metadata\.name":"([^"]+)"/g)].map(m => m[1]);
     expect(new Set(nsNames)).toEqual(new Set(["opencrane-system", "kube-system"]));
+  });
+});
+
+describe("Silo external-egress NetworkPolicy (Cognee excluded — topoteretes/cognee#3084)", () =>
+{
+  const netpol = _BuildSiloExternalEgressNetworkPolicy("opencrane-acme", "acme");
+
+  it("targets the silo namespace and records the ClusterTenant label", () =>
+  {
+    expect(netpol.metadata?.namespace).toBe("opencrane-acme");
+    expect(netpol.metadata?.labels?.["opencrane.io/cluster-tenant"]).toBe("acme");
+    expect(netpol.spec?.policyTypes).toEqual(["Egress"]);
+  });
+
+  it("excludes the Cognee pod via a NotIn podSelector (not an empty selector)", () =>
+  {
+    expect(netpol.spec?.podSelector).not.toEqual({});
+    const expr = netpol.spec?.podSelector?.matchExpressions?.[0];
+    expect(expr).toEqual({ key: "app.kubernetes.io/component", operator: "NotIn", values: ["cognee"] });
+  });
+
+  it("allows unrestricted-destination HTTPS on 443 for every non-Cognee pod", () =>
+  {
+    const egress = netpol.spec?.egress ?? [];
+    expect(egress).toContainEqual({ ports: [{ protocol: "TCP", port: 443 }] });
   });
 });
 

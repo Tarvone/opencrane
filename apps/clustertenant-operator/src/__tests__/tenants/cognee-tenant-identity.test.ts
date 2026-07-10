@@ -244,3 +244,217 @@ describe("CogneeTenantIdentity", () =>
     expect(body["email"]).toBe("acme.owner@example.com");
   });
 });
+
+/** Decode a stored Secret's field back to a plain string. */
+function _field(secret: k8s.V1Secret, key: string): string
+{
+  return Buffer.from(secret.data![key]!, "base64").toString("utf8");
+}
+
+/**
+ * A tiny in-memory Secret store shared by a coreApi/objectApi pair, mirroring
+ * cognee-silo-tenant.test.ts's helper — needed here because `ensureTenantJoinedToSiloTenant`
+ * reads BOTH this tenant's credentials Secret and the silo owner's Secret, and a test needs
+ * to observe the write that lands afterward.
+ */
+function _makeStatefulApis(): { coreApi: k8s.CoreV1Api; objectApi: k8s.KubernetesObjectApi; store: Map<string, k8s.V1Secret> }
+{
+  const store = new Map<string, k8s.V1Secret>();
+
+  const coreApi = {
+    readNamespacedSecret: vi.fn().mockImplementation(function _read({ name, namespace }: { name: string; namespace: string }): Promise<k8s.V1Secret>
+    {
+      const secret = store.get(`${namespace}/${name}`);
+      return secret ? Promise.resolve(secret) : Promise.reject(new Error("404 not found"));
+    }),
+  } as unknown as k8s.CoreV1Api;
+
+  const objectApi = {
+    read: vi.fn().mockImplementation(function _read(resource: k8s.KubernetesObject): Promise<{ body: k8s.V1Secret }>
+    {
+      const secret = store.get(`${resource.metadata!.namespace}/${resource.metadata!.name}`);
+      return secret ? Promise.resolve({ body: secret }) : Promise.reject(new Error("not found"));
+    }),
+    create: vi.fn().mockImplementation(function _create(resource: k8s.V1Secret): Promise<{ body: k8s.V1Secret }>
+    {
+      store.set(`${resource.metadata!.namespace}/${resource.metadata!.name}`, resource);
+      return Promise.resolve({ body: resource });
+    }),
+    patch: vi.fn().mockImplementation(function _patch(resource: k8s.V1Secret): Promise<{ body: k8s.V1Secret }>
+    {
+      store.set(`${resource.metadata!.namespace}/${resource.metadata!.name}`, resource);
+      return Promise.resolve({ body: resource });
+    }),
+  } as unknown as k8s.KubernetesObjectApi;
+
+  return { coreApi, objectApi, store };
+}
+
+function _seedCredentials(store: Map<string, k8s.V1Secret>, namespace: string, tenantName: string, opts: { username: string; password: string; tenantId?: string }): void
+{
+  store.set(`${namespace}/${_CredentialsSecretName(tenantName)}`, {
+    metadata: { name: _CredentialsSecretName(tenantName), namespace },
+    data: {
+      username: Buffer.from(opts.username).toString("base64"),
+      password: Buffer.from(opts.password).toString("base64"),
+      tenantId: Buffer.from(opts.tenantId ?? "").toString("base64"),
+    },
+  } as unknown as k8s.V1Secret);
+}
+
+function _seedOwner(store: Map<string, k8s.V1Secret>, namespace: string, opts: { username: string; password: string; tenantId?: string }): void
+{
+  store.set(`${namespace}/cognee-silo-owner`, {
+    metadata: { name: "cognee-silo-owner", namespace },
+    data: {
+      username: Buffer.from(opts.username).toString("base64"),
+      password: Buffer.from(opts.password).toString("base64"),
+      tenantId: Buffer.from(opts.tenantId ?? "").toString("base64"),
+    },
+  } as unknown as k8s.V1Secret);
+}
+
+describe("CogneeTenantIdentity.ensureTenantJoinedToSiloTenant", () =>
+{
+  beforeEach(() =>
+  {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() =>
+  {
+    vi.unstubAllGlobals();
+  });
+
+  it("is a no-op when Cognee is not configured", async () =>
+  {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi } = _makeStatefulApis();
+
+    await new CogneeTenantIdentity(defaultConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when this tenant has no Cognee credentials yet", async () =>
+  {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi } = _makeStatefulApis();
+
+    await new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when this tenant is already joined (tenantId already set)", async () =>
+  {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi, store } = _makeStatefulApis();
+    _seedCredentials(store, "default", "acme", { username: "acme@example.com", password: "pw", tenantId: "already-joined" });
+
+    await new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("no-ops (retried later) when the silo owner's Cognee Tenant isn't resolved yet", async () =>
+  {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi, store } = _makeStatefulApis();
+    _seedCredentials(store, "default", "acme", { username: "acme@example.com", password: "pw" });
+    // Owner Secret doesn't exist at all — CogneeSiloTenant hasn't run yet.
+
+    await new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("logs in as owner, resolves the user id, joins the tenant, then selects it as the user's active tenant", async () =>
+  {
+    const calls: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) =>
+    {
+      calls.push(url);
+      if (url.endsWith("/auth/login"))
+      {
+        const body = new URLSearchParams(init!.body as string);
+        const token = body.get("username") === "silo-owner@opencrane.internal" ? "jwt-owner" : "jwt-user";
+        return new Response(JSON.stringify({ access_token: token }), { status: 200 });
+      }
+      if (url.endsWith("/api/v1/users/get-user-id"))
+      {
+        expect(init!.headers).toMatchObject({ Authorization: "Bearer jwt-owner" });
+        return new Response(JSON.stringify({ user_id: "user-uuid-acme" }), { status: 200 });
+      }
+      if (url.includes("/api/v1/permissions/users/user-uuid-acme/tenants"))
+      {
+        expect(url).toContain("tenant_id=tenant-silo-1");
+        expect(init!.headers).toMatchObject({ Authorization: "Bearer jwt-owner" });
+        return new Response("{}", { status: 200 });
+      }
+      if (url.endsWith("/api/v1/permissions/tenants/select"))
+      {
+        expect(init!.headers).toMatchObject({ Authorization: "Bearer jwt-user" });
+        expect(JSON.parse(init!.body as string)).toEqual({ tenant_id: "tenant-silo-1" });
+        return new Response("{}", { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi, store } = _makeStatefulApis();
+    _seedCredentials(store, "opencrane-elewa", "acme", { username: "acme@example.com", password: "tenant-pw" });
+    _seedOwner(store, "opencrane-elewa", { username: "silo-owner@opencrane.internal", password: "owner-pw", tenantId: "tenant-silo-1" });
+
+    await new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "opencrane-elewa");
+
+    expect(calls).toEqual([
+      "http://cognee:8000/api/v1/auth/login",
+      "http://cognee:8000/api/v1/users/get-user-id",
+      "http://cognee:8000/api/v1/permissions/users/user-uuid-acme/tenants?tenant_id=tenant-silo-1",
+      "http://cognee:8000/api/v1/auth/login",
+      "http://cognee:8000/api/v1/permissions/tenants/select",
+    ]);
+    expect(_field(store.get("opencrane-elewa/" + _CredentialsSecretName("acme"))!, "tenantId")).toBe("tenant-silo-1");
+  });
+
+  it("tolerates a 409 (already a member) when adding the user to the tenant", async () =>
+  {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+    {
+      if (url.endsWith("/auth/login")) return new Response(JSON.stringify({ access_token: "jwt" }), { status: 200 });
+      if (url.endsWith("/api/v1/users/get-user-id")) return new Response(JSON.stringify({ user_id: "user-uuid" }), { status: 200 });
+      if (url.includes("/tenants?tenant_id=")) return new Response("already a member", { status: 409 });
+      if (url.endsWith("/api/v1/permissions/tenants/select")) return new Response("{}", { status: 200 });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi, store } = _makeStatefulApis();
+    _seedCredentials(store, "default", "acme", { username: "acme@example.com", password: "tenant-pw" });
+    _seedOwner(store, "default", { username: "owner@x", password: "owner-pw", tenantId: "tenant-1" });
+
+    await expect(new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default"))
+      .resolves.toBeUndefined();
+    expect(_field(store.get("default/" + _CredentialsSecretName("acme"))!, "tenantId")).toBe("tenant-1");
+  });
+
+  it("throws when the user-id lookup fails", async () =>
+  {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+    {
+      if (url.endsWith("/auth/login")) return new Response(JSON.stringify({ access_token: "jwt" }), { status: 200 });
+      if (url.endsWith("/api/v1/users/get-user-id")) return new Response("not found", { status: 404 });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { coreApi, objectApi, store } = _makeStatefulApis();
+    _seedCredentials(store, "default", "acme", { username: "acme@example.com", password: "tenant-pw" });
+    _seedOwner(store, "default", { username: "owner@x", password: "owner-pw", tenantId: "tenant-1" });
+
+    await expect(new CogneeTenantIdentity(_enabledConfig, coreApi, objectApi, _log).ensureTenantJoinedToSiloTenant(_makeTenant("acme"), "default"))
+      .rejects.toThrow(/Cognee get-user-id failed/);
+  });
+});

@@ -151,7 +151,10 @@ function _buildHarness(options: { existingConfigMap?: k8s.V1ConfigMap | null })
 
   const encryptionKeys = { ensureEncryptionKeySecret: vi.fn(async () => {}) } as unknown as import("../../tenants/internal/tenant-encryption-keys.js").TenantEncryptionKeys;
   const liteLlmKeys = { ensureLiteLlmKeySecret: vi.fn(async () => {}) } as unknown as import("../../tenants/internal/tenant-litellm-keys.js").TenantLiteLlmKeys;
-  const cogneeTenantIdentity = { ensureTenantCogneeIdentity: vi.fn(async () => {}) } as unknown as import("../../tenants/internal/cognee-tenant-identity.js").CogneeTenantIdentity;
+  const cogneeTenantIdentity = {
+    ensureTenantCogneeIdentity: vi.fn(async () => {}),
+    ensureTenantJoinedToSiloTenant: vi.fn(async () => {}),
+  } as unknown as import("../../tenants/internal/cognee-tenant-identity.js").CogneeTenantIdentity;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stub = {} as any;

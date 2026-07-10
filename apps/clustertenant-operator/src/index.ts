@@ -26,6 +26,7 @@ import { TenantProjectionRepairer } from "./infra/tenant-projection-repairer.js"
 import { MembershipProjectionRepairer, _BuildHttpFleetMembershipReader, _BuildHttpFleetMembershipWriter } from "./infra/membership-projection-repairer.js";
 import { _ResolveOwnClusterTenantName } from "./core/cluster-tenants/resolve-own-cluster-tenant.js";
 import { CogneeLiteLlmKey } from "./tenants/internal/cognee-litellm-key.js";
+import { CogneeSiloTenant } from "./tenants/internal/cognee-silo-tenant.js";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped
@@ -307,6 +308,21 @@ async function _startInSiloControllers(): Promise<void>
       catch (err)
       {
         log.warn({ err, clusterTenantName }, "cognee litellm key provisioning failed; cognee will run without embedding/LLM credentials until this is retried");
+      }
+
+      // Ensure this silo has ONE Cognee owner account + Cognee Tenant — the grouping every
+      // per-openclaw-tenant Cognee login (CogneeTenantIdentity) joins so the plugin's
+      // companyDataset scope is actually shared silo-wide instead of a private dataset per
+      // tenant (see CogneeSiloTenant's doc comment). Independent try/catch: this has no
+      // dependency on the LiteLLM key above other than running after it in this same IIFE;
+      // a failure here must not affect that key already having been provisioned.
+      try
+      {
+        await new CogneeSiloTenant(config, coreApi, objectApi, log).ensureSiloTenant(clusterTenantName, config.watchNamespace);
+      }
+      catch (err)
+      {
+        log.warn({ err, clusterTenantName }, "cognee silo tenant provisioning failed; per-tenant logins will join it once this is retried");
       }
     })();
 

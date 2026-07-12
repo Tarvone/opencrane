@@ -4,7 +4,7 @@
 
 import type * as k8s from "@kubernetes/client-node";
 
-import type { OpenClawGatewayAdmin } from "../core/connections/gateway-admin.types.js";
+import type { OpenClawGatewayAdmin } from "@opencrane/domain-connections";
 
 /**
  * The Kubernetes + gateway clients the repairer needs to ENFORCE a suspension (#126): cut the

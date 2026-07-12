@@ -1,4 +1,6 @@
 packages:
+  - libs/util
+  - libs/domain/*/main
   - libs/contracts
   - libs/awareness
   - libs/observability

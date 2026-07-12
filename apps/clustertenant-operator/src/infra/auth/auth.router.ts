@@ -11,9 +11,7 @@ import { _AuthorizeDeviceGrant, _CreateDeviceGrant, _FindGrantByUserCode, _PollD
 import { _ResolveOpenClawPairing } from "./openclaw-pairing.js";
 import { _ClusterTenantFromHost } from "./request-silo.js";
 import { _RecordBrokeredDevice } from "./brokered-device.js";
-import { _CutTenant } from "../../core/connections/cut-tenant.js";
-import type { OpenClawGatewayAdmin } from "../../core/connections/gateway-admin.types.js";
-import { _IsMemberSuspended, _ResolveGatewayTarget } from "../../core/connections/gateway-resolve.js";
+import { _CutTenant, type OpenClawGatewayAdmin, _IsMemberSuspended, _ResolveGatewayTarget } from "@opencrane/domain-connections";
 
 /**
  * Build the auth router covering:

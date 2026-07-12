@@ -1,6 +1,5 @@
 import type { AccessPolicy } from "../policies/types.js";
-import type { OpenClawTenantOperatorConfig } from "../config.js";
-import { HostingProvider } from "../config.js";
+import { type OpenClawTenantOperatorConfig, HostingProvider } from "../config.js";
 import type { Tenant } from "../tenants/models/tenant.interface.js";
 import { TenantStatusPhase } from "../tenants/models/tenant-status.interface.js";
 import type { ClusterTenantResource } from "@opencrane/infra-api";

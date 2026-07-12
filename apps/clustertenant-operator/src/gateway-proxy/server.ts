@@ -1,12 +1,10 @@
-import { createServer } from "node:http";
-import type { Server, IncomingMessage, ServerResponse } from "node:http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 
 import httpProxy from "http-proxy";
 import type { Logger } from "pino";
 
-import { _HandleUpgrade } from "./proxy.js";
-import type { GatewayProxyRuntime, WsProxy } from "./proxy.js";
+import { _HandleUpgrade, type GatewayProxyRuntime, type WsProxy } from "./proxy.js";
 import { FixedWindowRateLimiter } from "./rate-limit.js";
 
 /** Everything the in-operator proxy server needs, derived from the operator config. */

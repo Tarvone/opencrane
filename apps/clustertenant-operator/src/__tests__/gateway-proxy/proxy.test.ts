@@ -3,8 +3,7 @@ import type { Duplex } from "node:stream";
 import pino from "pino";
 import { describe, expect, it, vi } from "vitest";
 
-import { _HandleUpgrade, _StripGatewayPrefix } from "../../gateway-proxy/proxy.js";
-import type { UpgradeDeps, WsProxy, GatewayProxyRuntime } from "../../gateway-proxy/proxy.js";
+import { _HandleUpgrade, _StripGatewayPrefix, type UpgradeDeps, type WsProxy, type GatewayProxyRuntime } from "../../gateway-proxy/proxy.js";
 import type { ResolveOutcome } from "../../gateway-proxy/auth-client.js";
 import { FixedWindowRateLimiter } from "../../gateway-proxy/rate-limit.js";
 

@@ -7,8 +7,7 @@ import { _ResolveTenantModelGate } from "../../tenants/deploy/model-gate.js";
 import { _BuildConfigMap, _ConfigChecksum } from "../../tenants/deploy/index.js";
 import { TenantOperator } from "../../tenants/operator.js";
 import { TenantStatusWriter } from "../../tenants/internal/tenant-status-writer.js";
-import { TenantDegradedReason, TenantStatusPhase } from "../../tenants/models/tenant-status.interface.js";
-import type { TenantStatus } from "../../tenants/models/tenant-status.interface.js";
+import { TenantDegradedReason, TenantStatusPhase, type TenantStatus } from "../../tenants/models/tenant-status.interface.js";
 import type { TenantModelSet } from "@opencrane/contracts";
 
 const _log = pino({ level: "silent" });

@@ -10,8 +10,7 @@
  * Safe to import from anywhere in the app because `index.ts` initialises
  * OpenTelemetry (`./instrument.js`) before this module's pino is loaded.
  */
-import { ___CreateLogger } from "@opencrane/observability";
-import type { Logger } from "@opencrane/observability";
+import { ___CreateLogger, type Logger } from "@opencrane/observability";
 
 /** Process-wide control-plane logger. */
 export const _log: Logger = ___CreateLogger("clustertenant-manager");

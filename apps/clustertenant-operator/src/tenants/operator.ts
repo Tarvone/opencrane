@@ -1,17 +1,13 @@
 import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
-import { _OperatorConfigChecksum } from "../config.js";
-import type { OpenClawTenantOperatorConfig } from "../config.js";
+import { _OperatorConfigChecksum, type OpenClawTenantOperatorConfig } from "../config.js";
 import { _BuildHostingAdapter, type HostingAdapter } from "../hosting/index.js";
 
 import type { Tenant } from "./models/tenant.interface.js";
-import { TenantPolicyResolutionState, TenantStatusPhase } from "./models/tenant-status.interface.js";
-import type { TenantDegradedReason } from "./models/tenant-status.interface.js";
+import { TenantPolicyResolutionState, TenantStatusPhase, type TenantDegradedReason } from "./models/tenant-status.interface.js";
 
-import { __K8sApplyResource, _IsK8sNotFound } from "@opencrane/infra-api";
-import { _RunWatchLoop, K8sWatchEventType } from "@opencrane/infra-api";
-import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "@opencrane/infra-api";
+import { __K8sApplyResource, _IsK8sNotFound, _RunWatchLoop, K8sWatchEventType, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL, type ClusterTenantResource } from "@opencrane/infra-api";
 import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildService, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloExternalEgressNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum, _ResolveTenantModelGate } from "./deploy/index.js";
 import { TenantCleanup } from "./destroy/tenant-cleanup.js";
 import { LinkerdIdentityClient } from "./internal/linkerd-identity.client.js";
@@ -22,7 +18,6 @@ import { CogneeTenantIdentity } from "./internal/cognee-tenant-identity.js";
 import { _ResolveTenantPolicy } from "./internal/policy-resolution.js";
 import { _FetchTenantModels } from "./internal/tenant-models.js";
 import { _ResolveClusterTenant } from "./internal/cluster-tenant-resolution.js";
-import type { ClusterTenantResource } from "@opencrane/infra-api";
 import { _ResolveOrgServingDomain } from "./internal/org-serving-domain.js";
 import { TenantStatusWriter } from "./internal/tenant-status-writer.js";
 

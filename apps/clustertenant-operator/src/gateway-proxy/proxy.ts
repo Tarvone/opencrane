@@ -5,8 +5,7 @@ import type { Logger } from "pino";
 
 import { _OriginAllowed } from "./origin.js";
 import type { FixedWindowRateLimiter } from "./rate-limit.js";
-import { _ResolveTarget } from "./auth-client.js";
-import type { ResolveOutcome } from "./auth-client.js";
+import { _ResolveTarget, type ResolveOutcome } from "./auth-client.js";
 
 /** The proxy runtime settings the handler needs (a subset of the operator config). */
 export interface GatewayProxyRuntime

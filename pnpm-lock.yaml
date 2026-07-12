@@ -60,6 +60,66 @@ importers:
       '@opencrane/contracts':
         specifier: workspace:*
         version: link:../../libs/contracts
+      '@opencrane/domain-access-tokens':
+        specifier: workspace:*
+        version: link:../../libs/domain/access-tokens/main
+      '@opencrane/domain-audit':
+        specifier: workspace:*
+        version: link:../../libs/domain/audit/main
+      '@opencrane/domain-awareness':
+        specifier: workspace:*
+        version: link:../../libs/domain/awareness/main
+      '@opencrane/domain-cluster-tenants':
+        specifier: workspace:*
+        version: link:../../libs/domain/cluster-tenants/main
+      '@opencrane/domain-company-docs':
+        specifier: workspace:*
+        version: link:../../libs/domain/company-docs/main
+      '@opencrane/domain-connections':
+        specifier: workspace:*
+        version: link:../../libs/domain/connections/main
+      '@opencrane/domain-contract':
+        specifier: workspace:*
+        version: link:../../libs/domain/contract/main
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../libs/domain/grants/main
+      '@opencrane/domain-groups':
+        specifier: workspace:*
+        version: link:../../libs/domain/groups/main
+      '@opencrane/domain-mcp':
+        specifier: workspace:*
+        version: link:../../libs/domain/mcp/main
+      '@opencrane/domain-metrics':
+        specifier: workspace:*
+        version: link:../../libs/domain/metrics/main
+      '@opencrane/domain-model-routing':
+        specifier: workspace:*
+        version: link:../../libs/domain/model-routing/main
+      '@opencrane/domain-policies':
+        specifier: workspace:*
+        version: link:../../libs/domain/policies/main
+      '@opencrane/domain-projection':
+        specifier: workspace:*
+        version: link:../../libs/domain/projection/main
+      '@opencrane/domain-providers':
+        specifier: workspace:*
+        version: link:../../libs/domain/providers/main
+      '@opencrane/domain-retrieval':
+        specifier: workspace:*
+        version: link:../../libs/domain/retrieval/main
+      '@opencrane/domain-sessions':
+        specifier: workspace:*
+        version: link:../../libs/domain/sessions/main
+      '@opencrane/domain-skills':
+        specifier: workspace:*
+        version: link:../../libs/domain/skills/main
+      '@opencrane/domain-spend':
+        specifier: workspace:*
+        version: link:../../libs/domain/spend/main
+      '@opencrane/domain-tenants':
+        specifier: workspace:*
+        version: link:../../libs/domain/tenants/main
       '@opencrane/infra-api':
         specifier: workspace:*
         version: link:../../libs/infra-api
@@ -274,6 +334,800 @@ importers:
         specifier: ^5.7.0
         version: 5.8.2
 
+  libs/domain/access-tokens/main:
+    dependencies:
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/audit/main:
+    dependencies:
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/awareness/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/awareness':
+        specifier: workspace:*
+        version: link:../../../awareness
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/cluster-tenants/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/infra-api':
+        specifier: workspace:*
+        version: link:../../../infra-api
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/company-docs/main:
+    dependencies:
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/connections/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+    devDependencies:
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/contract/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/domain-awareness':
+        specifier: workspace:*
+        version: link:../../awareness/main
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../grants/main
+      '@opencrane/domain-model-routing':
+        specifier: workspace:*
+        version: link:../../model-routing/main
+      '@opencrane/domain-tenants':
+        specifier: workspace:*
+        version: link:../../tenants/main
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/grants/main:
+    dependencies:
+      '@opencrane/domain-retrieval':
+        specifier: workspace:*
+        version: link:../../retrieval/main
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@opencrane/util':
+        specifier: workspace:*
+        version: link:../../../util
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/groups/main:
+    dependencies:
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/util':
+        specifier: workspace:*
+        version: link:../../../util
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/mcp/main:
+    dependencies:
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@opencrane/util':
+        specifier: workspace:*
+        version: link:../../../util
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/metrics/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/domain-awareness':
+        specifier: workspace:*
+        version: link:../../awareness/main
+      '@opencrane/domain-projection':
+        specifier: workspace:*
+        version: link:../../projection/main
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/model-routing/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/domain-cluster-tenants':
+        specifier: workspace:*
+        version: link:../../cluster-tenants/main
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+      pino:
+        specifier: ^9.6.0
+        version: 9.14.0
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/policies/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../grants/main
+      '@opencrane/domain-projection':
+        specifier: workspace:*
+        version: link:../../projection/main
+      '@opencrane/infra-api':
+        specifier: workspace:*
+        version: link:../../../infra-api
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/projection/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/infra-api':
+        specifier: workspace:*
+        version: link:../../../infra-api
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+    devDependencies:
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/providers/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/domain-cluster-tenants':
+        specifier: workspace:*
+        version: link:../../cluster-tenants/main
+      '@opencrane/domain-model-routing':
+        specifier: workspace:*
+        version: link:../../model-routing/main
+      '@opencrane/infra-auth':
+        specifier: workspace:*
+        version: link:../../../infra-auth
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/retrieval/main:
+    dependencies:
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/sessions/main:
+    dependencies:
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../grants/main
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/skills/main:
+    dependencies:
+      '@opencrane/contracts':
+        specifier: workspace:*
+        version: link:../../../contracts
+      '@opencrane/domain-cluster-tenants':
+        specifier: workspace:*
+        version: link:../../cluster-tenants/main
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../grants/main
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/spend/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      '@types/supertest':
+        specifier: ^6.0.0
+        version: 6.0.3
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/domain/tenants/main:
+    dependencies:
+      '@kubernetes/client-node':
+        specifier: ^1.0.0
+        version: 1.4.0(encoding@0.1.13)
+      '@opencrane/domain-connections':
+        specifier: workspace:*
+        version: link:../../connections/main
+      '@opencrane/domain-grants':
+        specifier: workspace:*
+        version: link:../../grants/main
+      '@opencrane/domain-projection':
+        specifier: workspace:*
+        version: link:../../projection/main
+      '@opencrane/domain-retrieval':
+        specifier: workspace:*
+        version: link:../../retrieval/main
+      '@opencrane/domain-spend':
+        specifier: workspace:*
+        version: link:../../spend/main
+      '@opencrane/infra-api':
+        specifier: workspace:*
+        version: link:../../../infra-api
+      '@opencrane/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@prisma/client':
+        specifier: ^6.0.0
+        version: 6.19.2(prisma@6.19.2(typescript@5.8.2))(typescript@5.8.2)
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/express-session':
+        specifier: ^1.18.0
+        version: 1.19.0
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      express-session:
+        specifier: ^1.19.0
+        version: 1.19.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
   libs/infra-api:
     dependencies:
       '@kubernetes/client-node':
@@ -376,6 +1230,18 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: ^1.30.0
         version: 1.30.1(@opentelemetry/api@1.9.1)
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.15.31
+      typescript:
+        specifier: ^5.7.0
+        version: 5.8.2
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@22.15.31)(jiti@2.6.1)(sass@1.97.1)(tsx@4.21.0)(yaml@2.9.0)
+
+  libs/util:
+    devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.15.31

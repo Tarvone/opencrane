@@ -3,9 +3,7 @@ import type { Logger } from "pino";
 
 import type { OpenClawTenantOperatorConfig } from "../config.js";
 import type { AccessPolicy } from "./types.js";
-import { __K8sApplyResource, _K8sDeleteResource } from "@opencrane/infra-api";
-import { ACCESS_POLICY_CRD_PLURAL, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION } from "@opencrane/infra-api";
-import { _RunWatchLoop, K8sWatchEventType } from "@opencrane/infra-api";
+import { __K8sApplyResource, _K8sDeleteResource, ACCESS_POLICY_CRD_PLURAL, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, _RunWatchLoop, K8sWatchEventType } from "@opencrane/infra-api";
 import { PolicyResourceBuilder } from "./policy-resource-builder.js";
 
 /**

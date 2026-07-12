@@ -23,6 +23,7 @@ function notFound(description: string): object
  * Awareness domain paths.
  * Exported as _AwarenessOpenapiPaths for composition in the main spec.
  */
+/** OpenAPI path fragments owned by the awareness domain (composed into the control-plane spec). */
 export const _AwarenessOpenapiPaths = {
   "/awareness/rollout": {
     get: {

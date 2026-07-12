@@ -20,6 +20,7 @@ function paginated(itemSchema: object)
   };
 }
 
+/** OpenAPI path fragments owned by the audit domain (composed into the control-plane spec). */
 export const _AuditOpenapiPaths = {
   "/audit": {
     get: {

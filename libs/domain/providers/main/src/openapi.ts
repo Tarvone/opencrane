@@ -31,6 +31,7 @@ function created(description: string, schema: object)
   };
 }
 
+/** OpenAPI path fragments owned by the providers domain (composed into the control-plane spec). */
 export const _ProvidersOpenapiPaths = {
   "/providers/keys": {
     get: {

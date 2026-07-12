@@ -23,6 +23,7 @@ function created(description: string, schema: object)
   };
 }
 
+/** OpenAPI path fragments owned by the access-tokens domain (composed into the control-plane spec). */
 export const _AccessTokensOpenapiPaths = {
   "/access-tokens": {
     get: {

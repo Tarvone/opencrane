@@ -23,6 +23,7 @@ function created(description: string, schema: object)
   };
 }
 
+/** OpenAPI path fragments owned by the groups domain (composed into the control-plane spec). */
 export const _GroupsOpenapiPaths = {
   "/groups": {
     get: {

@@ -7,6 +7,7 @@ function ok(description: string, schema: object)
   };
 }
 
+/** OpenAPI path fragments owned by the projection domain (composed into the control-plane spec). */
 export const _ProjectionOpenapiPaths = {
   "/tenants/drift": {
     get: {

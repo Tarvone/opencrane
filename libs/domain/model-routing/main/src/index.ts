@@ -31,3 +31,4 @@ export * from "./routes/routing-measurements.js";
 export * from "./routes/routing-measurements.types.js";
 export * from "./routes/routing-proposals.js";
 export * from "./routes/routing-proposals.types.js";
+export * from "./openapi.js";

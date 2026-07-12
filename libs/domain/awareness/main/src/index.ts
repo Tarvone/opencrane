@@ -11,3 +11,4 @@ export * from "./routes/awareness-participation.js";
 export * from "./routes/awareness-rollout.js";
 export * from "./routes/awareness-rollout.types.js";
 export * from "./routes/internal/participation.js";
+export * from "./openapi.js";

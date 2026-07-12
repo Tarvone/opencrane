@@ -12,3 +12,4 @@ export * from "./routes/skill-catalog.js";
 export * from "./routes/skill-catalog.types.js";
 export * from "./routes/skill-model-posture.js";
 export * from "./routes/skill-model-posture.types.js";
+export * from "./openapi.js";

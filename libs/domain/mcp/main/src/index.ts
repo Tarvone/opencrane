@@ -7,3 +7,4 @@ export * from "./routes/mcp-operator.js";
 export * from "./routes/mcp-operator.types.js";
 export * from "./routes/mcp-servers.js";
 export * from "./routes/mcp-servers.types.js";
+export * from "./openapi.js";

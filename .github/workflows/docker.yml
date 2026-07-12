@@ -59,8 +59,10 @@ jobs:
       - name: Test operator
         run: pnpm --filter @opencrane/fleet-operator test
 
+      # "pkg..." = the app plus its workspace dependency closure, so the
+      # libs/domain/* package tests run here too.
       - name: Test control-plane
-        run: pnpm --filter @opencrane/clustertenant-operator test
+        run: pnpm --filter "@opencrane/clustertenant-operator..." test
 
       - name: Test skill-registry
         run: pnpm --filter @opencrane/skill-registry test

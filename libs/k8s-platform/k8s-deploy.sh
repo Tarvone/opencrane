@@ -140,6 +140,11 @@ REUSE_VALUES=""      # explicit "--reuse-values": inherit last release's values 
 RESET_VALUES=""      # explicit "--reset-values": DROP prior values, start from chart defaults + this run's --set
 EXTRA_SET=()
 EXTRA_HELM_ARGS=()   # raw --helm-arg passthrough args (e.g. --take-ownership for Certificate ownership recovery)
+# OPENCRANE_HELM_EXTRA_ARGS: whitespace-separated raw helm args (env-var form of --helm-arg).
+if [[ -n "${OPENCRANE_HELM_EXTRA_ARGS:-}" ]]; then
+  read -ra _env_helm_args <<< "$OPENCRANE_HELM_EXTRA_ARGS"
+  EXTRA_HELM_ARGS+=("${_env_helm_args[@]}")
+fi
 ALLOW_TAG_FLOAT="${OPENCRANE_ALLOW_TAG_FLOAT:-0}"  # allow component images to float to chart-default
 
 # OIDC + per-cluster operator bootstrap. All default empty (OIDC stays disabled and the
@@ -986,9 +991,11 @@ _enforce_tag_pins
 CP_TAG="${CONTROL_PLANE_TAG:-$IMAGE_TAG}"
 OP_TAG="${OPERATOR_TAG:-$IMAGE_TAG}"
 TN_TAG="${TENANT_TAG:-$IMAGE_TAG}"
-[[ -n "$CP_TAG" ]] && helm_args+=(--set "clustertenantManager.image.tag=$CP_TAG")
-[[ -n "$OP_TAG" ]] && helm_args+=(--set "fleetManager.image.tag=$OP_TAG")
-[[ -n "$TN_TAG" ]] && helm_args+=(--set "tenant.image.tag=$TN_TAG")
+# --set-string: a tag like "1.2.3" or a numeric-looking sha must never be YAML-coerced
+# (same guideline as the OIDC string values below; see the deploy ledger).
+[[ -n "$CP_TAG" ]] && helm_args+=(--set-string "clustertenantManager.image.tag=$CP_TAG")
+[[ -n "$OP_TAG" ]] && helm_args+=(--set-string "fleetManager.image.tag=$OP_TAG")
+[[ -n "$TN_TAG" ]] && helm_args+=(--set-string "tenant.image.tag=$TN_TAG")
 # --base-domain drives ingress.domain; controlPlaneHost defaults to platform.<domain>
 # in the chart, and the cert-manager wildcard SANs (*.<domain>, <domain>,
 # controlPlaneHost) are derived from it. Setting it explicitly here keeps a single

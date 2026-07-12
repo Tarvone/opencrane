@@ -19,8 +19,7 @@ RUN npm ci
 
 COPY apps/clustertenant-operator/src apps/clustertenant-operator/src
 # Generate Prisma client, build dependencies first, then the app
-RUN npm run db:generate -w @opencrane/clustertenant-operator
-RUN npx nx run-many -t build --projects="@opencrane/clustertenant-operator"
+RUN npm run build -w @opencrane/clustertenant-operator
 # Stage generated Prisma client to a fixed path for the runtime stage
 RUN find /app -path '*/node_modules/.prisma/client' -type d | head -1 | \
     xargs -I{} cp -r {} /generated-prisma

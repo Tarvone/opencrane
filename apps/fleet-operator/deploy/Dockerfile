@@ -22,7 +22,7 @@ RUN npm ci
 COPY apps/fleet-operator/src apps/fleet-operator/src
 # Build all dependencies and the app. The esbuild bundles externalize node_modules deps,
 # so runtime images need only the app's own deps (installed via npm ci --omit=dev --workspace).
-RUN npm run build
+RUN npm run build -w @opencrane/fleet-operator
 
 # Runtime stage
 FROM node:22-bookworm-slim

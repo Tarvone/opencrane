@@ -11,7 +11,7 @@ COPY apps/harvesting-agent/package.json apps/harvesting-agent/tsconfig.json apps
 RUN npm ci
 
 COPY apps/harvesting-agent/src apps/harvesting-agent/src
-RUN npm run build
+RUN npm run build -w @opencrane/harvesting-agent
 
 # Runtime stage
 FROM node:22-bookworm-slim

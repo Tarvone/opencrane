@@ -11,7 +11,7 @@ COPY apps/skill-registry/package.json apps/skill-registry/tsconfig.json apps/ski
 RUN npm ci
 
 COPY apps/skill-registry/src apps/skill-registry/src
-RUN npm run build
+RUN npm run build -w @opencrane/skill-registry
 
 # Runtime stage
 FROM node:22-bookworm-slim

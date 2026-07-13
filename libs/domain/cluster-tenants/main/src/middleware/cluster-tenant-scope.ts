@@ -7,7 +7,7 @@ import { _IsDevAuthMode } from "@opencrane/infra/auth";
 
 /**
  * Reusable authorization guard for mutations (POST/PUT/DELETE) on ClusterTenant-scoped
- * control-plane resources (Track AIR — provider credentials, model definitions).
+ * opencrane-ui resources (Track AIR — provider credentials, model definitions).
  *
  * The rule (AIR.0b), in priority order:
  *   1. A platform operator (session `isPlatformOperator`) may mutate any resource at any scope.

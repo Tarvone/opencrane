@@ -12,7 +12,7 @@ export const ___DEFAULT_PARTICIPATION_STALENESS_MS = 15 * 60 * 1000;
  * Record a fleet participation event (P4B.5) idempotently and update the
  * tenant's monitoring rollup.
  *
- * Transport is the control-plane API with at-least-once delivery, so a
+ * Transport is the opencrane-ui API with at-least-once delivery, so a
  * redelivered event (same `(tenant, idempotencyKey)`) is recorded exactly once;
  * the rollup (liveness, running version, Agent Card, counters) is only advanced
  * for genuinely new events.

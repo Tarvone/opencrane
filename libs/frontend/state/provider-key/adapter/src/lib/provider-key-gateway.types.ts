@@ -3,7 +3,7 @@ import { InjectionToken } from "@angular/core";
 /**
  * A model provider that supports bring-your-own-key (BYOK) configuration.
  *
- * Mirrors the fixed enum in the pinned control-plane contract
+ * Mirrors the fixed enum in the pinned opencrane-ui contract
  * (`ByokProviderKeyStatus.provider`). The list is closed: every supported
  * provider is rendered even when no key is configured, so the screen seeds an
  * unconfigured row from this enum rather than from the server response.

@@ -8,7 +8,7 @@ import type { AwarenessGrantSyncResult, CogneeAwarenessGrant, CogneeGrantTranspo
 /** Default Cognee permissions request timeout (ms) — the propagation SLO bound. */
 const _DEFAULT_TIMEOUT_MS = 5000;
 
-/** Selector keys the control-plane DB projection can resolve (team + tenant name). */
+/** Selector keys the opencrane-ui DB projection can resolve (team + tenant name). */
 const _LABEL_TEAM = "opencrane.io/team";
 const _LABEL_TENANT = "opencrane.io/tenant";
 
@@ -65,7 +65,7 @@ export async function _SyncTenantAwarenessGrants(prisma: PrismaClient,
 
 /**
  * Resolve which tenants an AccessPolicy applies to, using only selector criteria
- * the control-plane DB projection can evaluate: `matchTeam` (or the
+ * the opencrane-ui DB projection can evaluate: `matchTeam` (or the
  * `opencrane.io/team` label) and the `opencrane.io/tenant` name label.
  *
  * Arbitrary Kubernetes labels live on the Tenant CR, not the DB projection, so a
@@ -159,7 +159,7 @@ const _defaultCogneeGrantTransport: CogneeGrantTransport = async function _push(
   const headers: Record<string, string> = {
     "content-type": "application/json",
     "x-cognee-tenant-id": tenant,
-    "x-opencrane-sync-source": "control-plane",
+    "x-opencrane-sync-source": "opencrane-ui",
   };
   if (typeof authorization === "string" && authorization.length > 0)
   {

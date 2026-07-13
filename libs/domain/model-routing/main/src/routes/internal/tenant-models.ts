@@ -43,7 +43,7 @@ function _resolveDefaultModel(ctDefault: string | null, globalDefault: string | 
  *
  * **This router is NOT behind `___AuthMiddleware`** and does not run a
  * TokenReview. Access is enforced purely at the network layer: only platform
- * pods (the operator among them) can reach the control-plane service under the
+ * pods (the operator among them) can reach the opencrane-ui service under the
  * cluster NetworkPolicy. It mounts alongside `/api/internal/bundles`, which
  * shares that NetworkPolicy-only posture.
  *
@@ -52,7 +52,7 @@ function _resolveDefaultModel(ctDefault: string | null, globalDefault: string | 
  * than a 404/500, because the operator calls it on a reconcile hot path and
  * must always get a usable answer.
  *
- * @see apps/clustertenant-platform/templates/networkpolicy-planes.yaml — NetworkPolicy that
+ * @see apps/opencrane-infra/templates/networkpolicy-planes.yaml — NetworkPolicy that
  *   governs which pods may reach this endpoint.
  *
  * @param prisma - Prisma client for database access.

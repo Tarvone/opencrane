@@ -17,8 +17,8 @@ env:
   REGISTRY: ghcr.io
   CONTROL_PLANE_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-clustertenant-manager
   TENANT_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-tenant
-  SKILL_REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-skill-registry
-  CONTROL_PLANE_SPA_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-control-plane-spa
+  SKILL_REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-feat-skill-registry
+  CONTROL_PLANE_SPA_IMAGE: ghcr.io/${{ github.repository_owner }}/opencrane-opencrane-ui-spa
 
 jobs:
   test:
@@ -53,7 +53,7 @@ jobs:
       - name: Verify generated specs and clients are up to date
         run: |
           git diff --exit-code -- \
-            apps/clustertenant-operator/openapi.json \
+            apps/opencrane-api/openapi.json \
             libs/contracts/src/generated/api.ts \
           || { echo "::error::Generated OpenAPI specs/clients are stale. Run 'npm run build' (or 'npm run generate -w @opencrane/contracts') and commit the result."; exit 1; }
 
@@ -102,8 +102,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Extract image metadata (control-plane)
-        id: meta-control-plane
+      - name: Extract image metadata (opencrane-ui)
+        id: meta-opencrane-ui
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.CONTROL_PLANE_IMAGE }}
@@ -111,14 +111,14 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push control-plane
+      - name: Build and push opencrane-ui
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/clustertenant-operator/deploy/Dockerfile
+          file: apps/opencrane-api/deploy/Dockerfile
           push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-control-plane.outputs.tags }}
-          labels: ${{ steps.meta-control-plane.outputs.labels }}
+          tags: ${{ steps.meta-opencrane-ui.outputs.tags }}
+          labels: ${{ steps.meta-opencrane-ui.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -135,15 +135,15 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/tenant/deploy/Dockerfile
+          file: apps/feat-openclaw-tenant/deploy/Dockerfile
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta-tenant.outputs.tags }}
           labels: ${{ steps.meta-tenant.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Extract image metadata (skill-registry)
-        id: meta-skill-registry
+      - name: Extract image metadata (feat-skill-registry)
+        id: meta-feat-skill-registry
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.SKILL_REGISTRY_IMAGE }}
@@ -151,19 +151,19 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push skill-registry
+      - name: Build and push feat-skill-registry
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/skill-registry/deploy/Dockerfile
+          file: apps/feat-skill-registry/deploy/Dockerfile
           push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-skill-registry.outputs.tags }}
-          labels: ${{ steps.meta-skill-registry.outputs.labels }}
+          tags: ${{ steps.meta-feat-skill-registry.outputs.tags }}
+          labels: ${{ steps.meta-feat-skill-registry.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Extract image metadata (control-plane-spa)
-        id: meta-control-plane-spa
+      - name: Extract image metadata (opencrane-ui-spa)
+        id: meta-opencrane-ui-spa
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.CONTROL_PLANE_SPA_IMAGE }}
@@ -171,13 +171,13 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push control-plane-spa
+      - name: Build and push opencrane-ui-spa
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/control-plane/deploy/Dockerfile
+          file: apps/opencrane-ui/deploy/Dockerfile
           push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-control-plane-spa.outputs.tags }}
-          labels: ${{ steps.meta-control-plane-spa.outputs.labels }}
+          tags: ${{ steps.meta-opencrane-ui-spa.outputs.tags }}
+          labels: ${{ steps.meta-opencrane-ui-spa.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

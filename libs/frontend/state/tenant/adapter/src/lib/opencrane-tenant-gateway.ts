@@ -47,7 +47,7 @@ interface UserTenantWire
 @Injectable()
 export class OpenCraneUserTenantGateway implements UserTenantGateway
 {
-	/** Typed OpenCrane control-plane client. */
+	/** Typed OpenCrane opencrane-ui client. */
 	private readonly _api = inject(ControlPlaneApiService);
 
 	/** @inheritdoc */

@@ -158,7 +158,7 @@ async function _EnsureWorkspaceTenant(opts: {
 
 /**
  * Ensure an org's first workspace Tenant (`<org>-default`, attributed to the owner)
- * exists as a control-plane dual-write: the Tenant CRD AND its DB projection row.
+ * exists as a opencrane-ui dual-write: the Tenant CRD AND its DB projection row.
  *
  * This is the single authority for default-tenant creation. The org create handler calls
  * it so a freshly-provisioned customer has a workspace row immediately (the TenantOperator

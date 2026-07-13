@@ -5,7 +5,7 @@
 # needs the moment it comes up:
 #   - `*.<domain>`          → ingress IP  (resolves every ORG APEX `<org>.<domain>`)
 #   - `<domain>` (apex)     → ingress IP
-#   - control-plane host    → ingress IP  (the fixed super-operator host, distinct
+#   - opencrane-ui host    → ingress IP  (the fixed super-operator host, distinct
 #                                           from the org wildcard)
 #
 # Per-host / per-org records are NOT written by Terraform. external-dns owns them at
@@ -59,7 +59,7 @@ resource "google_dns_record_set" "apex"
   rrdatas      = [var.ingress_ip]
 }
 
-# Fixed super-operator / control-plane host (distinct from the org wildcard). Defaults
+# Fixed super-operator / opencrane-ui host (distinct from the org wildcard). Defaults
 # to `platform.<domain>`; matches ingress.controlPlaneHost in the chart.
 resource "google_dns_record_set" "control_plane"
 {

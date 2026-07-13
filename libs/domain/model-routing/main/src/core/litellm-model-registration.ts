@@ -8,7 +8,7 @@ import type { LiteLlmModelRegistration } from "./litellm-model-registration.type
  *
  * Guarded by `LITELLM_ENDPOINT` + `LITELLM_MASTER_KEY`: when either is unset (dev / tests),
  * this returns a deterministic placeholder id derived from `publicModelName` and never calls
- * out, so the control-plane create path stays functional without a live LiteLLM. The call is
+ * out, so the opencrane-ui create path stays functional without a live LiteLLM. The call is
  * non-fatal and isolated — a LiteLLM error also falls back to the placeholder rather than
  * failing the create, mirroring the resilient-fetch posture elsewhere in the platform.
  *

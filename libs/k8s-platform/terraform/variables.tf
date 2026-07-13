@@ -43,7 +43,7 @@ variable "vpc_name"
 
 # Cloud DNS is optional. By default the deploy prints the ingress IP and you set
 # DNS manually at your registrar. Set enable_cloud_dns=true to have Terraform create
-# the managed zone, the install-time platform records (apex, *.<base>, control-plane
+# the managed zone, the install-time platform records (apex, *.<base>, opencrane-ui
 # host), and the shared roles/dns.admin Workload-Identity binding. Per-org records are
 # reconciled at runtime by external-dns from the operator's DNSEndpoint CRs.
 variable "enable_cloud_dns"

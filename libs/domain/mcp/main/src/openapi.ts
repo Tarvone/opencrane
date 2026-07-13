@@ -45,7 +45,7 @@ const McpServerCredentialInputSchema = {
   },
 };
 
-/** OpenAPI path fragments owned by the mcp domain (composed into the control-plane spec). */
+/** OpenAPI path fragments owned by the mcp domain (composed into the opencrane-ui spec). */
 export const _McpOpenapiPaths = {
   "/mcp-servers": {
     get: {

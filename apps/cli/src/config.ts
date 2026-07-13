@@ -29,7 +29,7 @@ interface _CredentialsFile
 {
   /** Plain-text access token issued via the device flow. */
   token: string;
-  /** Raw base URL of the silo control-plane instance (no /api/v1 suffix). */
+  /** Raw base URL of the silo opencrane-ui instance (no /api/v1 suffix). */
   baseUrl?: string;
 }
 
@@ -97,7 +97,7 @@ export function _ResolveConfig(opts: { url?: string }): CliConfig
 }
 
 /**
- * Create a typed control-plane HTTP client from resolved CLI config.
+ * Create a typed opencrane-ui HTTP client from resolved CLI config.
  * Exits with a clear error when no token is available so every command
  * gets the same consistent message without duplicating the check.
  *

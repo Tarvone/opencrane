@@ -1,7 +1,7 @@
 /**
  * Parameters for revoking brokered connections at a tenant's OpenClaw gateway.
  *
- * The live implementation connects to the gateway as the control-plane-held
+ * The live implementation connects to the gateway as the opencrane-ui-held
  * `operator.pairing` device (CONN.4) and calls `device.token.revoke` +
  * `device.pair.remove`. That WebSocket handshake is the live-infra seam.
  */
@@ -37,7 +37,7 @@ export interface GatewayRevokeResult
  * Abstracts the live WebSocket admin path (`device.token.revoke` /
  * `device.pair.remove`) so the kill-switch orchestration is unit-testable
  * against a mock and the production WS client can be wired in once a
- * control-plane operator device is paired (CONN.4, needs live infra).
+ * opencrane-ui operator device is paired (CONN.4, needs live infra).
  */
 export interface OpenClawGatewayAdmin
 {

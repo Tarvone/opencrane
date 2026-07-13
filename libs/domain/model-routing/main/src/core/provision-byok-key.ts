@@ -33,7 +33,7 @@ const _AUTO_MODEL_NAME = "auto";
  * alias instead of a provider-specific slug, so the operator can re-point the backing embedding
  * model without a consumer/values edit.
  *
- * MUST equal `apps/clustertenant-platform/values.yaml`'s
+ * MUST equal `apps/opencrane-infra/values.yaml`'s
  * `clustertenantManager.cognee.embedding.model` (the two agree by convention — the chart cannot
  * import this constant), exactly like the `cognee-litellm-key` Secret-name agreement.
  */
@@ -157,7 +157,7 @@ async function _applyProviderKeySecret(coreApi: k8s.CoreV1Api, namespace: string
       name,
       namespace,
       labels: {
-        "app.kubernetes.io/managed-by": "clustertenant-operator",
+        "app.kubernetes.io/managed-by": "opencrane-api",
         "opencrane.io/byok-provider": provider,
       },
     },

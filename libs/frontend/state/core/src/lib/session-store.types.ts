@@ -19,7 +19,7 @@ export interface Capabilities
 
 	/**
 	 * Whether the session is a WeOwnAI **platform** operator — one who manages
-	 * customers/ClusterTenants across the fleet from the super-control-plane app,
+	 * customers/ClusterTenants across the fleet from the super-opencrane-ui app,
 	 * as opposed to a customer admin operating within a single account.
 	 */
 	isPlatformOperator: boolean;

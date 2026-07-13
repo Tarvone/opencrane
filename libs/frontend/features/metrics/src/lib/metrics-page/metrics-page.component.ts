@@ -42,7 +42,7 @@ function _HttpErrorMessage(status: number, error: unknown): string
 })
 export class MetricsPageComponent
 {
-	/** Typed control-plane HTTP client. */
+	/** Typed opencrane-ui HTTP client. */
 	private readonly _api = inject(ControlPlaneApiService);
 
 	/** Currently selected date range. */

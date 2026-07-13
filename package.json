@@ -9,11 +9,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run db:generate -w @opencrane/clustertenant-operator && nx run-many -t build",
+    "build": "npm run db:generate -w @opencrane/api && nx run-many -t build",
     "dev": "nx run-many -t dev --parallel=10",
     "test": "nx run-many -t test",
     "test:e2e:k3d": "./libs/k8s-platform/tests/k3d-e2e.sh",
-    "test:phase1": "nx run clustertenant-operator:test && ./libs/k8s-platform/tests/k3d-e2e.sh",
+    "test:phase1": "nx run opencrane-api:test && ./libs/k8s-platform/tests/k3d-e2e.sh",
     "install:phase1:local": "KEEP_CLUSTER=1 ./libs/k8s-platform/tests/k3d-local.sh",
     "lint": "nx run-many -t lint",
     "lint:boundaries": "eslint .",
@@ -21,12 +21,12 @@
     "docs:dev": "npm run dev -w website",
     "docs:build": "npm run build -w website",
     "docs:preview": "npm run preview -w website",
-    "docker:build:tenant": "docker build -f apps/tenant/deploy/Dockerfile -t ghcr.io/italanta/opencrane-tenant:latest .",
-    "docker:build:control-plane": "docker build -f apps/clustertenant-operator/deploy/Dockerfile -t ghcr.io/italanta/opencrane-clustertenant-manager:latest .",
+    "docker:build:tenant": "docker build -f apps/feat-openclaw-tenant/deploy/Dockerfile -t ghcr.io/italanta/opencrane-tenant:latest .",
+    "docker:build:control-plane": "docker build -f apps/opencrane-api/deploy/Dockerfile -t ghcr.io/italanta/opencrane-clustertenant-manager:latest .",
     "docker:build:docs": "docker build -f website/Dockerfile -t ghcr.io/italanta/docs:latest .",
-    "docker:build:control-plane-spa": "docker build -f apps/control-plane/deploy/Dockerfile -t ghcr.io/italanta/opencrane-control-plane-spa:latest .",
-    "build:control-plane-ui": "nx build control-plane",
-    "serve:control-plane-ui": "nx serve control-plane"
+    "docker:build:opencrane-ui-spa": "docker build -f apps/opencrane-ui/deploy/Dockerfile -t ghcr.io/italanta/opencrane-ui-spa:latest .",
+    "build:opencrane-ui": "nx build opencrane-ui",
+    "serve:opencrane-ui": "nx serve opencrane-ui"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.0",

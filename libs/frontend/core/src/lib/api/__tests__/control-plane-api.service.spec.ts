@@ -48,10 +48,10 @@ describe("ControlPlaneApiService.signInUrl", () =>
 
 describe("FleetManagerApiService.signInUrl", () =>
 {
-	/** A distinct origin proves the fleet client signs in against its OWN host, not the control-plane's. */
+	/** A distinct origin proves the fleet client signs in against its OWN host, not the opencrane-ui's. */
 	const _FLEET_ORIGIN = "https://fleet.example";
 
-	it("builds the login URL against the fleet API base (self-contained auth, no control-plane delegation)", () =>
+	it("builds the login URL against the fleet API base (self-contained auth, no opencrane-ui delegation)", () =>
 	{
 		const injector = Injector.create({ providers: [{ provide: FLEET_MANAGER_BASE_URL, useValue: _FLEET_ORIGIN }, FleetManagerApiService] });
 		const service = runInInjectionContext(injector, function _resolve(): FleetManagerApiService

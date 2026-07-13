@@ -89,7 +89,7 @@ resource "kubernetes_manifest" "postgresql_cluster"
   ]
 }
 
-# ---- Kubernetes Secret with DATABASE_URL for the control-plane ----
+# ---- Kubernetes Secret with DATABASE_URL for the opencrane-ui ----
 
 resource "kubernetes_secret" "database_url"
 {
@@ -315,10 +315,10 @@ resource "kubernetes_job" "db_migrate"
         containers
         {
           name    = "migrate"
-          image   = "${var.registry_url}/control-plane:${var.image_tag}"
+          image   = "${var.registry_url}/opencrane-ui:${var.image_tag}"
           command = ["npx", "prisma", "migrate", "deploy"]
 
-          working_dir = "/app/apps/clustertenant-operator"
+          working_dir = "/app/apps/opencrane-api"
 
           env
           {

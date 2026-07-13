@@ -309,7 +309,7 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
         }),
       },
       skills: {
-        registry: process.env.SKILL_REGISTRY_URL ?? "http://skill-registry.opencrane-system.svc:5000",
+        registry: process.env.SKILL_REGISTRY_URL ?? "http://feat-skill-registry.opencrane-system.svc:5000",
         entitled: skillBundles.map(function _mapBundle(bundle)
         {
           return {
@@ -1137,7 +1137,7 @@ function _BuildCogneePermissionsHeaders(
   const headers: Record<string, string> = {
     "content-type": "application/json",
     "x-cognee-tenant-id": tenant,
-    "x-opencrane-sync-source": "control-plane",
+    "x-opencrane-sync-source": "opencrane-ui",
   };
   if (typeof authorization === "string" && authorization.length > 0)
   {

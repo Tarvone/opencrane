@@ -11,7 +11,7 @@ import { PLATFORM_SURFACE } from "./platform-surface";
  * Platform and org are strictly-separated domains with their own OIDC sessions
  * (see {@link PLATFORM_SURFACE}), so auth is read from the surface-appropriate
  * client: the `fleet` app authenticates against the Fleet Manager API, the
- * `control-plane` (org-admin) app against the Control Plane API. `me` mirrors
+ * `opencrane-ui` (org-admin) app against the Control Plane API. `me` mirrors
  * `GET /auth/me`; `currentTenant` resolves the caller's pod from `GET /tenants`
  * — an org-surface-only concept (a platform operator has no pod), so it is
  * skipped on the platform surface (interim — see `docs/architecture.md` §3.1,
@@ -53,7 +53,7 @@ export class SessionStore
 		}
 	});
 
-	/** Whether a control-plane session is established. */
+	/** Whether a opencrane-ui session is established. */
 	public readonly authenticated: Signal<boolean> = computed(() =>
 	{
 		// `value()` throws while the resource is loading or errored; read it only
@@ -86,7 +86,7 @@ export class SessionStore
 			isOrgAdmin: u.isOrgAdmin,
 			// `clusterTenant` is a silo (Control Plane) claim only — the fleet
 			// `/auth/me` carries none (the platform plane is cluster-wide), so the
-			// union narrows it away; read it defensively off the control-plane arm.
+			// union narrows it away; read it defensively off the opencrane-ui arm.
 			clusterTenant: "clusterTenant" in u ? (u.clusterTenant as string | null) : undefined
 		};
 	});
@@ -138,7 +138,7 @@ export class SessionStore
 
 	/**
 	 * Capability flags driving UI gating. Interim model: any authenticated
-	 * session is treated as an operator until the control-plane emits roles
+	 * session is treated as an operator until the opencrane-ui emits roles
 	 * (see `docs/architecture.md` §5.2). The API remains the enforcement point —
 	 * these flags only hide/disable controls.
 	 */

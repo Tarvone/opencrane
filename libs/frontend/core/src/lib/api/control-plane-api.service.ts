@@ -10,7 +10,7 @@ import { OpenCraneApiClientBase } from "./api-client.base";
  *
  * Intra-repo contract: `paths` is the SAME generated type the backend's own
  * `@opencrane/contracts` package exports, built directly from
- * `apps/clustertenant-operator/openapi.json` via `nx run contracts:generate`
+ * `apps/opencrane-api/openapi.json` via `nx run contracts:generate`
  * (`openapi-typescript`). No cross-repo spec pin — frontend and backend share
  * one generated source of truth. All feature data access must flow through
  * services in `core/api`.

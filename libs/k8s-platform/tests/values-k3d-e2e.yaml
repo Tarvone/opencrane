@@ -7,8 +7,8 @@ fleetManager:
     pullPolicy: IfNotPresent
 
 # Silo chart image (clustertenant-manager = the in-silo controllers incl. the TenantOperator
-# that reconciles the Tenant CR, plus the control-plane API). Built as
-# opencrane/clustertenant-manager:e2e from apps/clustertenant-operator.
+# that reconciles the Tenant CR, plus the opencrane-ui API). Built as
+# opencrane/clustertenant-manager:e2e from apps/opencrane-api.
 clustertenantManager:
   image:
     repository: opencrane/clustertenant-manager

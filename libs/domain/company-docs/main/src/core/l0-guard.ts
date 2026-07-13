@@ -15,7 +15,7 @@ const _L0_DIRECTIVE_PATTERNS: L0DirectivePattern[] = [
   { label: "managed-mode", pattern: /\bmanaged\s+mode\b/i },
   { label: "obot-gateway", pattern: /\bobot\b/i },
   { label: "mcp-gateway-routing", pattern: /\bmcp\s+(?:gateway|server|route|routing)\b/i },
-  { label: "skill-registry", pattern: /\bskill[-\s]?registry\b/i },
+  { label: "feat-skill-registry", pattern: /\bskill[-\s]?registry\b/i },
   { label: "effective-contract", pattern: /\beffective[-\s]?contract\b/i },
   { label: "skip-bootstrap", pattern: /\bskipBootstrap\b/i },
   { label: "opencrane-env", pattern: /\bOPENCRANE_[A-Z_]+\b/i },

@@ -34,7 +34,7 @@ import {
 @Injectable()
 export class OpenCraneSettingsGateway implements SettingsGateway
 {
-	/** Typed OpenCrane control-plane client. */
+	/** Typed OpenCrane opencrane-ui client. */
 	private readonly _api = inject(ControlPlaneApiService);
 
 	/** @inheritdoc */

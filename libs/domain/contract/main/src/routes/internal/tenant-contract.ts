@@ -10,7 +10,7 @@ import { _SyncDerivedDatasetMembership } from "@opencrane/domain/tenants";
 import { _log } from "../../log.js";
 
 /** Expected audience on the projected token the tenant pod uses to call this endpoint. */
-const _EXPECTED_AUDIENCE = "control-plane";
+const _EXPECTED_AUDIENCE = "opencrane-ui";
 
 /**
  * Extract the tenant name from a `system:serviceaccount:<ns>:<name>` subject string.
@@ -33,13 +33,13 @@ function _ParseTenantNameFromSubject(subject: string): string | null
  * contract.
  *
  * Tenant pods call this endpoint from the background contract-polling loop
- * (see `apps/tenant/deploy/entrypoint.sh`) using the projected ServiceAccount
- * token for the `control-plane` audience.  The operator injects
+ * (see `apps/feat-openclaw-tenant/deploy/entrypoint.sh`) using the projected ServiceAccount
+ * token for the `opencrane-ui` audience.  The operator injects
  * `OPENCRANE_CONTROL_PLANE_URL` and `OPENCRANE_CONTRACT_TOKEN_PATH` into every
  * tenant Deployment so the loop can reach this endpoint.
  *
  * **Identity enforcement:** the caller must present a valid projected
- * ServiceAccount token (audience `control-plane`) in the `Authorization: Bearer`
+ * ServiceAccount token (audience `opencrane-ui`) in the `Authorization: Bearer`
  * header.  The token is validated via the Kubernetes TokenReview API.  The
  * authenticated ServiceAccount name is then compared to the `:name` path param
  * so a tenant pod cannot read another tenant's contract.
@@ -48,7 +48,7 @@ function _ParseTenantNameFromSubject(subject: string): string | null
  * Authentication is handled inline via TokenReview.  NetworkPolicy further limits
  * which pods can reach this path, providing defence in depth.
  *
- * @see apps/clustertenant-platform/templates/networkpolicy-planes.yaml — NetworkPolicy.
+ * @see apps/opencrane-infra/templates/networkpolicy-planes.yaml — NetworkPolicy.
  * @see apps/fleet-operator/src/tenants/deploy/3-deployment.ts — token injection.
  *
  * @param prisma   - Prisma client for database access.
@@ -86,7 +86,7 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
       }
 
       // 2. Validate the token via TokenReview and verify audience.
-      //    The control-plane uses @kubernetes/client-node v1.x where createTokenReview
+      //    The opencrane-ui uses @kubernetes/client-node v1.x where createTokenReview
       //    accepts { body: V1TokenReview } and returns Promise<V1TokenReview> directly.
       const reviewBody = new k8s.V1TokenReview();
       reviewBody.spec = new k8s.V1TokenReviewSpec();
@@ -222,8 +222,8 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
         },
         skills: {
           // Entitled bundles carry the digest + name the pod needs to PULL each skill
-          // from the skill-registry (`GET /bundles/:digest`) and lay it down on disk as
-          // `<skills-dir>/<name>/SKILL.md` (see apps/tenant/deploy/entrypoint.sh).
+          // from the feat-skill-registry (`GET /bundles/:digest`) and lay it down on disk as
+          // `<skills-dir>/<name>/SKILL.md` (see apps/feat-openclaw-tenant/deploy/entrypoint.sh).
           // Bundles whose row no longer exists are dropped here — they cannot be pulled.
           entitled: skillBundles.map(function _toEntitledSkill(bundle)
           {
@@ -240,7 +240,7 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
         workspace: {
           // Platform-managed, contract-derived doc; the entrypoint writes this to the
           // workspace TOOLS.md when the contract changes, then SIGHUPs OpenClaw
-          // (see apps/tenant/deploy/entrypoint.sh).
+          // (see apps/feat-openclaw-tenant/deploy/entrypoint.sh).
           "TOOLS.md": toolsMarkdown,
         },
         // Version-gated tenant-editable L2 docs (P4C.5). Delivered once per version

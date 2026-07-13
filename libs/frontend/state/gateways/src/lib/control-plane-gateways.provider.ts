@@ -10,7 +10,7 @@ import { OpenCraneProviderKeyGateway, PROVIDER_KEY_GATEWAY } from "@opencrane/st
 import { GATEWAY_MODE } from "./gateway-mode.types";
 
 /**
- * Binds every swappable data gateway the **control-plane** app (org-admin
+ * Binds every swappable data gateway the **opencrane-ui** app (org-admin
  * console) consumes to their live OpenCrane implementations. All targets are on
  * the Control Plane API (per-tenant/org surface).
  *

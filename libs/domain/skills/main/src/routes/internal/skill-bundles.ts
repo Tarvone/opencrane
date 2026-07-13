@@ -43,26 +43,26 @@ export async function _ResolveBundleContent(ociStore: OciBundleStore | null, dig
 }
 
 /**
- * Internal router for skill-bundle content delivery to the skill-registry service.
+ * Internal router for skill-bundle content delivery to the feat-skill-registry service.
  *
- * The skill-registry validates the caller's projected ServiceAccount token,
+ * The feat-skill-registry validates the caller's projected ServiceAccount token,
  * extracts the tenant name, then calls this endpoint to:
  *   1. Verify the tenant is entitled to the requested digest.
  *   2. Return the bundle content if entitled.
  *
  * **Existence-hiding:** non-existent and non-entitled digests both return 404.
- * Scan-failed bundles return 422 `SCAN_FAILED` so the skill-registry can surface
+ * Scan-failed bundles return 422 `SCAN_FAILED` so the feat-skill-registry can surface
  * a meaningful reason to the tenant rather than treating it as a missing bundle.
  *
  * **This router is NOT behind `___AuthMiddleware`.**
- * Access is enforced at the network layer: only the skill-registry pod can
+ * Access is enforced at the network layer: only the feat-skill-registry pod can
  * reach this path because the Kubernetes NetworkPolicy restricts ingress to
- * the control-plane from known platform components only.
+ * the opencrane-ui from known platform components only.
  *
- * @see apps/clustertenant-platform/templates/networkpolicy-planes.yaml — NetworkPolicy
+ * @see apps/opencrane-infra/templates/networkpolicy-planes.yaml — NetworkPolicy
  *   template that governs pod-to-pod reachability for the runtime planes.
- * @see apps/clustertenant-platform/templates/skill-registry-deployment.yaml — where the
- *   skill-registry's `CONTROL_PLANE_URL` is wired to this endpoint.
+ * @see apps/opencrane-infra/templates/feat-skill-registry-deployment.yaml — where the
+ *   feat-skill-registry's `CONTROL_PLANE_URL` is wired to this endpoint.
  *
  * @param prisma   - Prisma client for database access.
  * @param ociStore - Optional OCI store; when set, content is served from it
@@ -111,7 +111,7 @@ export function _RegisterInternalBundles(prisma: PrismaClient, ociStore: OciBund
       }
 
       // Gate 2 — bundle must have passed its vulnerability scan.
-      //    This route is NetworkPolicy-restricted to the skill-registry only, so
+      //    This route is NetworkPolicy-restricted to the feat-skill-registry only, so
       //    the distinction is meaningful: the registry can surface a clear reason
       //    to the tenant rather than treating a scan failure as a missing bundle.
       if (String(bundle.scanStatus) !== "passed")
@@ -143,7 +143,7 @@ export function _RegisterInternalBundles(prisma: PrismaClient, ociStore: OciBund
       }
 
       // 5. Send the bundle content with metadata headers that allow the
-      //    skill-registry to cache and serve it without a second round-trip.
+      //    feat-skill-registry to cache and serve it without a second round-trip.
       //
       //    Content-Type: standard HTTP header (RFC 9110 §8.3) — tells the
       //      consumer how to interpret the body.  Defaults to text/markdown

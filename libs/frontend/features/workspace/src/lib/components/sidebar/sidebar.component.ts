@@ -49,7 +49,7 @@ export class SidebarComponent
 	/** App-wide identity state. */
 	private readonly _session = inject(SessionStore);
 
-	/** Whether a control-plane session is established (gates the logout button). */
+	/** Whether a opencrane-ui session is established (gates the logout button). */
 	public readonly authenticated = this._session.authenticated;
 
 	/** Display name of the signed-in user. */
@@ -85,7 +85,7 @@ export class SidebarComponent
 		return DEPARTMENTS[key];
 	}
 
-	/** Sign the current user out of the control-plane session. */
+	/** Sign the current user out of the opencrane-ui session. */
 	public logout(): void
 	{
 		void this._session.logout();

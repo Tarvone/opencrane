@@ -117,10 +117,10 @@ echo "[local] Building operator image"
 docker build -f "$FLEET_OPERATOR_DIR/deploy/Dockerfile" -t opencrane/operator:local "$ROOT_DIR"
 
 echo "[local] Building tenant image"
-docker build -f "$ROOT_DIR/apps/tenant/deploy/Dockerfile" -t opencrane/tenant:local "$ROOT_DIR"
+docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:local "$ROOT_DIR"
 
-echo "[local] Building control-plane image"
-docker build -f "$ROOT_DIR/apps/clustertenant-operator/deploy/Dockerfile" -t opencrane/clustertenant-manager:local "$ROOT_DIR"
+echo "[local] Building opencrane-ui image"
+docker build -f "$ROOT_DIR/apps/opencrane-api/deploy/Dockerfile" -t opencrane/clustertenant-manager:local "$ROOT_DIR"
 
 # 3. Create a fresh cluster for a deterministic full-stack install.
 echo "[local] Recreating k3d cluster '$CLUSTER_NAME'"
@@ -183,7 +183,7 @@ spec:
       postInitApplicationSQL:
         - CREATE DATABASE obot OWNER opencrane;
         - CREATE DATABASE litellm OWNER opencrane;
-        # The silo (clustertenant) control-plane is a SEPARATE Prisma client from the fleet
+        # The silo (clustertenant) opencrane-ui is a SEPARATE Prisma client from the fleet
         # registry — they cannot share a database (each owns its own _prisma_migrations).
         - CREATE DATABASE silo OWNER opencrane;
 EOF
@@ -198,7 +198,7 @@ kubectl create secret generic "$DB_SECRET_NAME" \
   --dry-run=client \
   -o yaml | kubectl apply -f -
 
-# Silo control-plane DB secret (separate database; see CREATE DATABASE silo above).
+# Silo opencrane-ui DB secret (separate database; see CREATE DATABASE silo above).
 kubectl create secret generic "opencrane-silo-db" \
   -n "$NAMESPACE" \
   --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/silo" \
@@ -284,7 +284,7 @@ silo_args=(
   upgrade
   --install
   opencrane-silo
-  "$ROOT_DIR/apps/clustertenant-platform"
+  "$ROOT_DIR/apps/opencrane-infra"
   --namespace
   "$NAMESPACE"
   --values

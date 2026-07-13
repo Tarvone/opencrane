@@ -1,5 +1,5 @@
 /**
- * Package-local control-plane logger.
+ * Package-local opencrane-ui logger.
  *
  * Same component name as the operator's root logger so every line from this
  * domain package lands in the one `clustertenant-manager` stream, and the

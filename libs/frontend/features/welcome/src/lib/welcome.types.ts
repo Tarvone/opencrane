@@ -5,7 +5,7 @@
  * and the PrimeNG Stepper position with a `switch`/lookup rather than magic
  * numbers. Numeric values are 1-based so they double as the Stepper `value`.
  *
- * Distinct from the control-plane signup funnel (`features/onboarding`): this
+ * Distinct from the opencrane-ui signup funnel (`features/onboarding`): this
  * flow greets an already-authenticated user landing in the operator app for the
  * first time and never writes to the control plane.
  */

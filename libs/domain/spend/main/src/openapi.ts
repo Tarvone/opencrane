@@ -23,7 +23,7 @@ function ok(description: string, schema: object)
   };
 }
 
-/** OpenAPI path fragments owned by the spend domain (composed into the control-plane spec). */
+/** OpenAPI path fragments owned by the spend domain (composed into the opencrane-ui spec). */
 export const _SpendOpenapiPaths = {
   "/ai-budget/global": {
     get: {

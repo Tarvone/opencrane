@@ -3,7 +3,7 @@ import createClient, { Client, Middleware } from "openapi-fetch";
 /**
  * Shared base for the frontend's typed OpenCrane clients.
  *
- * OpenCrane exposes two control-plane surfaces (Control Plane API + Fleet Manager
+ * OpenCrane exposes two opencrane-ui surfaces (Control Plane API + Fleet Manager
  * API), each served at its own origin and each owning its own OIDC `/auth`
  * endpoints. Both clients are therefore **self-contained**: each builds its
  * openapi-fetch client against its own `/api/v1` base, carries the cookie session

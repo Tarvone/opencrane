@@ -145,11 +145,11 @@ fi
 echo "[e2e] Building fleet-operator image"
 _retry 3 docker build -f "$FLEET_OPERATOR_DIR/deploy/Dockerfile" -t opencrane/operator:e2e "$ROOT_DIR"
 
-echo "[e2e] Building clustertenant-operator (silo) image"
-_retry 3 docker build -f "$ROOT_DIR/apps/clustertenant-operator/deploy/Dockerfile" -t opencrane/clustertenant-manager:e2e "$ROOT_DIR"
+echo "[e2e] Building opencrane-api (silo) image"
+_retry 3 docker build -f "$ROOT_DIR/apps/opencrane-api/deploy/Dockerfile" -t opencrane/clustertenant-manager:e2e "$ROOT_DIR"
 
 echo "[e2e] Building tenant image"
-_retry 3 docker build -f "$ROOT_DIR/apps/tenant/deploy/Dockerfile" -t opencrane/tenant:e2e "$ROOT_DIR"
+_retry 3 docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:e2e "$ROOT_DIR"
 
 # 3. Create a fresh cluster for deterministic test runs.
 echo "[e2e] Recreating k3d cluster '$CLUSTER_NAME'"
@@ -210,7 +210,7 @@ spec:
       postInitApplicationSQL:
         - CREATE DATABASE obot OWNER opencrane;
         - CREATE DATABASE litellm OWNER opencrane;
-        # The silo (clustertenant) control-plane is a SEPARATE Prisma client from the fleet
+        # The silo (clustertenant) opencrane-ui is a SEPARATE Prisma client from the fleet
         # registry — they cannot share a database (each owns its own _prisma_migrations), so
         # the silo gets its own DB on the same server.
         - CREATE DATABASE silo OWNER opencrane;
@@ -226,7 +226,7 @@ kubectl create secret generic "$DB_SECRET_NAME" \
   --dry-run=client \
   -o yaml | kubectl apply -f -
 
-# Silo control-plane DB secret (separate database; see CREATE DATABASE silo above).
+# Silo opencrane-ui DB secret (separate database; see CREATE DATABASE silo above).
 kubectl create secret generic "opencrane-silo-db" \
   -n "$NAMESPACE" \
   --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/silo" \
@@ -278,7 +278,7 @@ kubectl rollout status deployment/opencrane-fleet-manager -n "$NAMESPACE" --time
 #     silo's TenantOperator — the fleet chart has none (it stops at ClusterTenant lifecycle). The
 #     two charts' resource sets are disjoint, so co-installing them in one namespace is safe.
 echo "[e2e] Installing silo release 'opencrane-silo'"
-helm upgrade --install opencrane-silo "$ROOT_DIR/apps/clustertenant-platform" \
+helm upgrade --install opencrane-silo "$ROOT_DIR/apps/opencrane-infra" \
   --namespace "$NAMESPACE" \
   --values "$ROOT_DIR/libs/k8s-platform/tests/values-k3d-e2e.yaml" \
   --set "clustertenantManager.database.existingSecret=opencrane-silo-db" \

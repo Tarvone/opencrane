@@ -9,7 +9,7 @@ import type { paths } from "./generated/api.js";
 export type { paths };
 
 /**
- * Create a typed HTTP client for the per-silo clustertenant-manager (control-plane) API.
+ * Create a typed HTTP client for the per-silo clustertenant-manager (opencrane-ui) API.
  *
  * Usage:
  *   import { ___CreateControlPlaneClient } from "@opencrane/contracts";

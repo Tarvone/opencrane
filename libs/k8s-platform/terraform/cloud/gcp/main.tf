@@ -92,7 +92,7 @@ module "app_deploy"
 # ---- Phase 5: Cloud DNS (zone + platform records + shared DNS-writer WI) ----
 #
 # Provisions the managed zone, the install-time platform records (apex, `*.<base>`,
-# control-plane host) and the shared `roles/dns.admin` Workload-Identity binding that
+# opencrane-ui host) and the shared `roles/dns.admin` Workload-Identity binding that
 # external-dns and the cert-manager DNS-01 solver impersonate. Per-org/per-host records
 # are reconciled at runtime by external-dns from the operator's DNSEndpoint CRs — never
 # written here.

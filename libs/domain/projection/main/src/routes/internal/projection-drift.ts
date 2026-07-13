@@ -142,7 +142,7 @@ export async function _DetectTenantProjectionDrift(
     plural: TENANT_CRD_PLURAL,
   }) as KubernetesList<TenantCustomResource>;
 
-  // 2. Read the current PostgreSQL projection rows exposed by the control-plane.
+  // 2. Read the current PostgreSQL projection rows exposed by the opencrane-ui.
   const projections = await prisma.tenant.findMany({
     orderBy: { name: "asc" },
   });

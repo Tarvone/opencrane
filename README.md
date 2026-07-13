@@ -81,7 +81,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the capabilities shipped so far and [`pla
 OpenCrane is **Kubernetes-native** and **API-first**. A central **fleet** manages
 organisation lifecycle (ClusterTenant provisioning, CRDs, platform DNS, and identity
 brokering). Each customer organisation runs its own **silo**: a dedicated operator,
-control-plane API, LiteLLM proxy, MCP gateway (Obot), knowledge base (Cognee), skill
+opencrane-ui API, LiteLLM proxy, MCP gateway (Obot), knowledge base (Cognee), skill
 registry, and database — all in an isolated namespace, with no shared data between orgs.
 
 Within each silo:
@@ -140,10 +140,10 @@ Legend:   [live] live today      [partial] partial / gated      [desired] desire
 
 | Component | Path | Description |
 |-----------|------|-------------|
-| Silo operator | `apps/clustertenant-operator/` | Per-silo control plane: headless Express REST API (`/api/v1`) + in-silo controllers; emits `openapi.json` at build time |
-| Silo chart | `apps/clustertenant-platform/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/clustertenant-platform/deploy.sh`. |
+| Silo operator | `apps/opencrane-api/` | Per-silo control plane: headless Express REST API (`/api/v1`) + in-silo controllers; emits `openapi.json` at build time |
+| Silo chart | `apps/opencrane-infra/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/opencrane-infra/deploy.sh`. |
 | Platform library | `libs/k8s-platform/` | Helm library chart (shared named templates), shared deploy engine (`k8s-deploy.sh`, `configure-oidc.sh`) + cluster provisioning (`provision.sh`, behind `--provision`), Terraform, migrations, tests, and `deploy-single-tenant.sh` |
-| CLI | `apps/cli/` | `oc` binary — administrative surface over the per-silo control-plane API |
+| CLI | `apps/cli/` | `oc` binary — administrative surface over the per-silo opencrane-ui API |
 | Contracts | `libs/contracts/` | Generated TypeScript client + DTOs from `openapi.json`; consumed by CLI and external surfaces |
 | Docker | `apps/*/deploy/Dockerfile` | Per-app Dockerfiles (silo operator, tenant runtime, skill registry), built and published by `.github/workflows/docker.yml` |
 | Skills | `skills/shared/` | Org/team shared skill library |
@@ -199,7 +199,7 @@ The deploy scripts can provision the cluster too — `--provision local|gke|vps`
 # check that out first, e.g.: ../weownai/apps/fleet-platform/deploy.sh --provision local --base-domain opencrane.local
 
 # Add an organisation (silo) once the fleet is up:
-apps/clustertenant-platform/deploy.sh --cluster-tenant acme --base-domain opencrane.local
+apps/opencrane-infra/deploy.sh --cluster-tenant acme --base-domain opencrane.local
 ```
 
 For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k3d-local.sh` harness (k3d + local images; `LOCAL_PROFILE=strict` for prod-style Helm validation) remains available. The `strict` profile does not emulate GCP-only capabilities (Workload Identity, GCS, External Secrets, GCE ingress, Cloud DNS) — it validates the same core wiring with stricter chart inputs locally.
@@ -213,7 +213,7 @@ For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k
 #   --project-id my-project --base-domain opencrane.ai
 
 # Add a silo for an organisation (once per org)
-apps/clustertenant-platform/deploy.sh \
+apps/opencrane-infra/deploy.sh \
   --cluster-tenant acme --base-domain opencrane.ai
 
 # Or provision + deploy the fleet AND one seeded org in a single pass (FLEET_CHART_DIR must

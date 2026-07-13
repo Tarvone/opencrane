@@ -10,14 +10,14 @@ import { InjectionToken } from "@angular/core";
  *
  * - `"platform"` — the fleet/platform-operator app (`apps/fleet`): fleet-wide
  *   customer / tenant / billing management, keyed off `isPlatformOperator`.
- * - `"org"` — the customer/org app (`apps/control-plane`): the end-user workspace
+ * - `"org"` — the customer/org app (`apps/opencrane-ui`): the end-user workspace
  *   plus account-scoped org-admin screens, keyed off `isOrgAdmin`.
  */
 export type PlatformSurface = "platform" | "org";
 
 /**
  * DI token naming the surface the current app build serves. Each app provides it
- * exactly once (`fleet` → `"platform"`, `control-plane` → `"org"`);
+ * exactly once (`fleet` → `"platform"`, `opencrane-ui` → `"org"`);
  * {@link SessionStore} reads it so a role claim only ever unlocks controls on its
  * own surface — a cross-domain token grants nothing.
  */

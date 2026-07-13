@@ -6,7 +6,7 @@ import { _RecordParticipationEvent } from "../../core/participation.js";
 import type { ParticipationEventInput } from "../../core/participation.types.js";
 
 /** Expected audience on the projected token tenant pods use to call this endpoint. */
-const _EXPECTED_AUDIENCE = "control-plane";
+const _EXPECTED_AUDIENCE = "opencrane-ui";
 
 /** Accepted participation event kinds. */
 const _KINDS = new Set(["agent_card", "skill_execution", "heartbeat"]);
@@ -30,7 +30,7 @@ function _ParseTenantNameFromSubject(subject: string): string | null
  * Internal endpoint for fleet participation events (P4B.5).
  *
  * Claws POST participation events (Agent Card advertisement, skill-execution
- * outcomes, heartbeats) from the `libs/awareness` SDK using the `control-plane`
+ * outcomes, heartbeats) from the `libs/awareness` SDK using the `opencrane-ui`
  * projected ServiceAccount token. Transport is at-least-once with an
  * idempotency key (no new bus); duplicates are deduped server-side.
  *
@@ -41,7 +41,7 @@ function _ParseTenantNameFromSubject(subject: string): string | null
  * **This router is NOT behind `___AuthMiddleware`.** Authentication is inline via
  * TokenReview; NetworkPolicy further limits which pods can reach it.
  *
- * @see apps/clustertenant-platform/templates/networkpolicy-planes.yaml — NetworkPolicy.
+ * @see apps/opencrane-infra/templates/networkpolicy-planes.yaml — NetworkPolicy.
  * @see apps/fleet-operator/src/tenants/deploy/3-deployment.ts — projected-token injection.
  *
  * @param prisma  - Prisma client.

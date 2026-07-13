@@ -17,7 +17,7 @@ describe("_FindL0Directives (P4C L0 sandbox guard)", function _suite()
 		expect(matched).toContain("obot-gateway");
 	});
 
-	it("flags skill-registry, effective-contract, env vars, workspace path and L0 files", function _mechanics()
+	it("flags feat-skill-registry, effective-contract, env vars, workspace path and L0 files", function _mechanics()
 	{
 		const matched = _FindL0Directives([
 			"Pull from the skill registry.",
@@ -26,7 +26,7 @@ describe("_FindL0Directives (P4C L0 sandbox guard)", function _suite()
 			"Write to /data/openclaw/workspace.",
 			"Edit AGENTS.md directly.",
 		].join("\n"));
-		expect(matched).toEqual(expect.arrayContaining(["skill-registry", "effective-contract", "opencrane-env", "workspace-path", "platform-l0-file"]));
+		expect(matched).toEqual(expect.arrayContaining(["feat-skill-registry", "effective-contract", "opencrane-env", "workspace-path", "platform-l0-file"]));
 	});
 
 	it("_AssertNoL0Directives throws listing the matches, passes when clean", function _assert()

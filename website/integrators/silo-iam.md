@@ -273,7 +273,7 @@ Personal  →  Project  →  Team  →  Department  →  Org
 ```
 
 Cognee has no native per-scope weighting and no exposed similarity score for the
-graph-completion search family. Scope precedence is therefore **control-plane
+graph-completion search family. Scope precedence is therefore **opencrane-ui
 orchestration over Cognee**, not a Cognee setting.
 
 ### Pattern A — cascade (start here)
@@ -316,7 +316,7 @@ Scope weights (indicative):
 
 ### Ingestion tagging
 
-The harvesting-agent `_PushDocumentToCognee` will also pass
+The feat-central-agents `_PushDocumentToCognee` will also pass
 `node_set=[scope, "<scope>:<subject>"]` so scope is a first-class, filterable graph
 tag. This makes scope a retrieval dimension in its own right, independent of dataset
 placement.

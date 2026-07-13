@@ -19,7 +19,7 @@ import { _ResolveActiveTenant } from "./active-tenant.util";
 @Injectable({ providedIn: "root" })
 export class ActiveTenantStore
 {
-	/** Session identity/tenant state, sourced from the control-plane. */
+	/** Session identity/tenant state, sourced from the opencrane-ui. */
 	private readonly _session = inject(SessionStore);
 
 	/** Active gateway mode; suppresses the demo-pod fallback in live mode. */

@@ -56,7 +56,7 @@ const AutoRoutingConfigSchema = {
   },
 };
 
-/** OpenAPI path fragments owned by the model-routing domain (composed into the control-plane spec). */
+/** OpenAPI path fragments owned by the model-routing domain (composed into the opencrane-ui spec). */
 export const _ModelRoutingOpenapiPaths = {
   "/model-routing/defaults": {
     get: {

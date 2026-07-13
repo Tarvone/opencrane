@@ -6,7 +6,7 @@ import { McpGateway } from "./mcp-gateway.types";
 import { McpAccessPolicyWire, McpInstalledWire, McpServerWire, _MapAccessPolicy, _MapDirectory, _MapInstalled, _MapServer } from "./mcp-mapper.util";
 
 /**
- * Live {@link McpGateway} backed by the OpenCrane control-plane MCP API.
+ * Live {@link McpGateway} backed by the OpenCrane opencrane-ui MCP API.
  *
  * Issues real requests to `/api/v1/mcp/...` through the shared
  * {@link ControlPlaneApiService} (same cookie session + 401→login as the typed
@@ -25,7 +25,7 @@ import { McpAccessPolicyWire, McpInstalledWire, McpServerWire, _MapAccessPolicy,
 @Injectable()
 export class OpenCraneMcpGateway implements McpGateway
 {
-	/** Shared control-plane client (base URL, cookie session, 401 handling). */
+	/** Shared opencrane-ui client (base URL, cookie session, 401 handling). */
 	private readonly _api = inject(ControlPlaneApiService);
 
 	/** @inheritdoc */

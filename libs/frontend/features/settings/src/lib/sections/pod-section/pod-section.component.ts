@@ -48,7 +48,7 @@ export class PodSectionComponent
 	});
 
 	/**
-	 * Storage stat cells. Static — the pinned control-plane contract exposes no
+	 * Storage stat cells. Static — the pinned opencrane-ui contract exposes no
 	 * per-pod storage figures yet (the bucket/quota live in the cluster, not the
 	 * Tenant API), so these remain illustrative until an endpoint surfaces them.
 	 */

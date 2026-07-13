@@ -13,7 +13,7 @@
  *      external-dns `DNSEndpoint` CR and reconciled into whatever DNS provider the platform
  *      runs (Cloud DNS, Route53, Cloudflare, RFC2136, …).
  *   2. TLS — the canonical host `<org>.<base>` is one label under the platform base, so it
- *      is already covered by the platform's own `*.<base>` / control-plane certificate; the
+ *      is already covered by the platform's own `*.<base>` / opencrane-ui certificate; the
  *      ONLY per-org certificate issued here is for an optional customer-VANITY host (a
  *      CNAME the customer points at the ingress), via cert-manager HTTP-01.
  *

@@ -2,7 +2,7 @@
 
 Mounted at: `/api/v1/metrics`, `/prom`.
 
-Owns control-plane metrics API + Prometheus exposition (fleet, awareness, projection drift). Routes live in `src/routes/`, services in `src/core/`, tests in
+Owns opencrane-ui metrics API + Prometheus exposition (fleet, awareness, projection drift). Routes live in `src/routes/`, services in `src/core/`, tests in
 `src/__tests__/`; the public surface is the barrel (`src/index.ts`).
 
 See [`libs/domain/README.md`](../../README.md) for the layout, boundary rules and

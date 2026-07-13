@@ -56,7 +56,7 @@ const AutoRoutingConfigSchema = {
   },
 };
 
-/** OpenAPI path fragments owned by the skills domain (composed into the control-plane spec). */
+/** OpenAPI path fragments owned by the skills domain (composed into the opencrane-ui spec). */
 export const _SkillsOpenapiPaths = {
   "/skills/catalog": {
     get: {

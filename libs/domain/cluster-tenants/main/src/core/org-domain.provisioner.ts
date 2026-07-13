@@ -32,7 +32,7 @@ function _VanityCertName(orgName: string): string
  *      provider. The org host gets an EXPLICIT record (not just wildcard coverage), so it
  *      is visible/manageable. There is NO per-user `*.<org>.<base>` wildcard record.
  *   2. **TLS** — the canonical host `<org>.<base>` is one label under the platform base,
- *      so it is already covered by the platform `*.<base>` / control-plane certificate; the
+ *      so it is already covered by the platform `*.<base>` / opencrane-ui certificate; the
  *      ONLY per-org certificate is for a customer-vanity host (via cert-manager HTTP-01,
  *      since the vanity CNAME resolves to the ingress). No vanity → no per-org cert.
  *
@@ -73,7 +73,7 @@ export class DefaultOrgDomainProvisioner implements OrgDomainProvisioner
     const dnsApplied = await this._ensureDnsEndpoint(req, orgDomain, namespace);
 
     // 2. TLS — only a customer-vanity host needs a per-org cert; the canonical host rides
-    //    the platform `*.<base>` / control-plane cert. No vanity → nothing to issue.
+    //    the platform `*.<base>` / opencrane-ui cert. No vanity → nothing to issue.
     const vanity = req.vanityDomain?.trim();
     let tlsSecretName: string | undefined;
     let certReadiness: CertificateReadiness | undefined;

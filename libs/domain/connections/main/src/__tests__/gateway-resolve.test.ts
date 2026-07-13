@@ -38,15 +38,15 @@ describe("_ResolveGatewayTarget (DOMAIN.T4 routing authority)", function _suite(
 		expect(outcome.resolved.podService).toEqual({ name: "openclaw-alice", namespace: "opencrane-acme" });
 	});
 
-	it("falls back to the control-plane namespace for a tenant with no org ref", async function ()
+	it("falls back to the opencrane-ui namespace for a tenant with no org ref", async function ()
 	{
 		const { prisma } = _buildPrisma([{ name: "alice", clusterTenantRef: null }]);
 
-		const outcome = await _ResolveGatewayTarget(prisma, "control-plane-ns", "alice@example.com", "sub-1");
+		const outcome = await _ResolveGatewayTarget(prisma, "opencrane-ui-ns", "alice@example.com", "sub-1");
 
 		expect(outcome.ok).toBe(true);
 		if (!outcome.ok) return;
-		expect(outcome.resolved.podService.namespace).toBe("control-plane-ns");
+		expect(outcome.resolved.podService.namespace).toBe("opencrane-ui-ns");
 	});
 
 	it("falls back to email as the logged subject when sub is empty", async function ()
@@ -131,7 +131,7 @@ describe("_ResolveGatewayTarget (DOMAIN.T4 routing authority)", function _suite(
 	{
 		const { prisma, findUnique } = _buildPrisma([{ name: "alice", clusterTenantRef: null }]);
 
-		const outcome = await _ResolveGatewayTarget(prisma, "control-plane-ns", "alice@example.com", "sub-1");
+		const outcome = await _ResolveGatewayTarget(prisma, "opencrane-ui-ns", "alice@example.com", "sub-1");
 
 		expect(outcome.ok).toBe(true);
 		// No org ref ⇒ the suspension check short-circuits without a membership query.

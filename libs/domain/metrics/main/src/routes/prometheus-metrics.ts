@@ -13,7 +13,7 @@ const _log = pino({ name: "prometheus-metrics" });
  *
  * Why Prometheus:
  * - Prometheus is the cluster-standard scrape system used by OpenCrane ops dashboards and alerts.
- * - This route emits numeric control-plane health signals that are inexpensive to scrape.
+ * - This route emits numeric opencrane-ui health signals that are inexpensive to scrape.
  *
  * What this route reports:
  * - tenant lifecycle distribution (`opencrane_tenants_total`)
@@ -75,7 +75,7 @@ export function prometheusMetricsRouter(prisma: PrismaClient, customApi: k8s.Cus
     ];
 
     // 4. Append awareness SLO metrics (P4B.6). Best-effort: a failure here must not
-    //    blank the core control-plane metrics a scraper depends on.
+    //    blank the core opencrane-ui metrics a scraper depends on.
     try
     {
       // Load the rollout once and reuse it for both the report and the gauges,

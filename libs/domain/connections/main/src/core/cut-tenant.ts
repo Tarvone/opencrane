@@ -17,10 +17,10 @@ const TENANT_POD_LABEL = "opencrane.io/tenant";
  * force-disconnect fails:
  *   1. **Gateway revoke (best-effort)** — ask the pod gateway to revoke device
  *      tokens + pairings so the cut connections cannot re-authenticate. The
- *      default admin is a no-op until a control-plane operator device is paired
+ *      default admin is a no-op until a opencrane-ui operator device is paired
  *      (CONN.4), so this half may report `ok: false` — that is expected.
  *   2. **Registry revoke** — mark the BrokeredDevice rows revoked so the
- *      control-plane's view of active connections is accurate.
+ *      opencrane-ui's view of active connections is accurate.
  *   3. **Kubernetes force-disconnect** — on a *full-tenant* cut, delete the pod
  *      so every established WebSocket is severed immediately. This is
  *      CNI-independent (unlike a deny NetworkPolicy, which only helps if the CNI
@@ -60,7 +60,7 @@ export async function _CutTenant(coreApi: k8s.CoreV1Api,
     ? await gatewayAdmin.revokeConnections({ gatewayUrl, tenant: params.tenant, subject: params.subject, deviceIds })
     : { ok: false, revokedCount: 0, message: "no active brokered connection to revoke" };
 
-  // 3. Registry revoke — mark the in-scope rows cut so the control-plane view of
+  // 3. Registry revoke — mark the in-scope rows cut so the opencrane-ui view of
   //    active connections stays accurate even when the gateway hop is a no-op.
   const revoked = await prisma.brokeredDevice.updateMany({
     where: {

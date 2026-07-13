@@ -3,7 +3,7 @@
  * connect, and activation feature.
  *
  * WeOwnAI is a pure network client: these are local projections of the
- * OpenCrane control-plane `/api/v1/mcp/...` contract shapes the catalogue UI
+ * OpenCrane opencrane-ui `/api/v1/mcp/...` contract shapes the catalogue UI
  * renders, never a re-export of OpenCrane source.
  */
 

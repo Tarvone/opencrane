@@ -64,7 +64,7 @@ export async function _ScanBundleContent(bundleId: string, content: string): Pro
   finally
   {
     // 3. Always remove the temp directory regardless of outcome to prevent
-    //    accumulation of scan artifacts on the control-plane filesystem.
+    //    accumulation of scan artifacts on the opencrane-ui filesystem.
     await rm(tempDir, { recursive: true, force: true });
   }
 }

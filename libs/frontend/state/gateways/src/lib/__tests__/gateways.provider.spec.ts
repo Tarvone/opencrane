@@ -53,7 +53,7 @@ function valueFor(providers: Provider[], token: InjectionToken<unknown>): unknow
 
 describe("provideControlPlaneGateways", () =>
 {
-	it("binds the live control-plane (org-admin) gateways and reports live mode", () =>
+	it("binds the live opencrane-ui (org-admin) gateways and reports live mode", () =>
 	{
 		const providers = provideControlPlaneGateways();
 

@@ -16,7 +16,7 @@ export class ChannelsSectionComponent
 {
 	/**
 	 * Harvest channel rows. Fixture-backed: harvest connectors are a Cognee
-	 * concern with no endpoint in the pinned OpenCrane control-plane contract, so
+	 * concern with no endpoint in the pinned OpenCrane opencrane-ui contract, so
 	 * unlike the other sections this one has no live gateway to read from yet.
 	 * Migrate to {@link SETTINGS_GATEWAY} once a connectors endpoint exists.
 	 */

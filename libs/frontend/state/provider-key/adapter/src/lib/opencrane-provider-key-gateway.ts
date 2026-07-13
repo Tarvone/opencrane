@@ -5,7 +5,7 @@ import { ControlPlaneApiService } from "@opencrane/core";
 import { ModelProvider, ProviderKeyGateway, ProviderKeyStatus } from "./provider-key-gateway.types";
 
 /**
- * Wire shape of a BYOK key status as returned by the OpenCrane control-plane API.
+ * Wire shape of a BYOK key status as returned by the OpenCrane opencrane-ui API.
  *
  * Mirrors the pinned contract's `ByokProviderKeyStatus` schema locally; the
  * `provider` field is a closed enum, narrowed onto {@link ModelProvider} on map.
@@ -26,7 +26,7 @@ interface ProviderKeyStatusWire
 }
 
 /**
- * Live ProviderKeyGateway backed by the OpenCrane control-plane API.
+ * Live ProviderKeyGateway backed by the OpenCrane opencrane-ui API.
  *
  * Issues typed GET/PUT/DELETE through the shared `ControlPlaneApiService` (the
  * openapi-fetch client generated from the pinned contract) against
@@ -34,13 +34,13 @@ interface ProviderKeyStatusWire
  * the {@link ProviderKeyStatus} read model. WeOwnAI never imports OpenCrane
  * source; this network contract is the only coupling.
  *
- * Bound as the default provider in the control-plane app via
+ * Bound as the default provider in the opencrane-ui app via
  * `provideControlPlaneGateways`.
  */
 @Injectable()
 export class OpenCraneProviderKeyGateway implements ProviderKeyGateway
 {
-	/** Typed OpenCrane control-plane client. */
+	/** Typed OpenCrane opencrane-ui client. */
 	private readonly _api = inject(ControlPlaneApiService);
 
 	/** @inheritdoc */

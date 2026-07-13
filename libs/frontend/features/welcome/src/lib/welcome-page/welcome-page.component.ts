@@ -23,7 +23,7 @@ import { _EMPTY_PERSONALIZATION, _IsFirstStep, _IsLastStep, _NextStep, _Previous
  * local, and on Finish marks onboarding complete via
  * {@link WelcomeOnboardingService} and navigates to the workspace (`"/"`).
  *
- * Distinct from `features/onboarding` (the control-plane signup funnel): this
+ * Distinct from `features/onboarding` (the opencrane-ui signup funnel): this
  * holds no HTTP, no URL beyond the final hand-off, and writes nothing to the
  * control plane.
  */

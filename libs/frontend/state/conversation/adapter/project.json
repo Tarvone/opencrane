@@ -1,0 +1,9 @@
+{
+	"name": "conversation-adapter",
+	"$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "libs/state/conversation/adapter/src",
+	"projectType": "library",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:state"],
+	"targets": {}
+}

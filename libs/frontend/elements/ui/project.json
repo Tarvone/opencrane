@@ -1,0 +1,8 @@
+{
+	"name": "elements-ui",
+	"projectType": "library",
+	"sourceRoot": "libs/elements/ui/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:ui"],
+	"targets": {}
+}

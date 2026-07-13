@@ -1,0 +1,9 @@
+{
+  "name": "utils-storage",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/state/utils/storage/src",
+  "projectType": "library",
+  "prefix": "wo",
+  "tags": ["scope:shared", "type:state"],
+  "targets": {}
+}

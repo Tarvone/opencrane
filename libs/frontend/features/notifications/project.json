@@ -1,0 +1,8 @@
+{
+	"name": "features-notifications",
+	"projectType": "library",
+	"sourceRoot": "libs/features/notifications/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:feature"],
+	"targets": {}
+}

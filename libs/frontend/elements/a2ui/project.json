@@ -1,0 +1,8 @@
+{
+	"name": "elements-a2ui",
+	"projectType": "library",
+	"sourceRoot": "libs/elements/a2ui/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:ui"],
+	"targets": {}
+}

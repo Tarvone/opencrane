@@ -1,0 +1,8 @@
+{
+	"name": "features-customer-admin",
+	"projectType": "library",
+	"sourceRoot": "libs/features/customer-admin/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:feature"],
+	"targets": {}
+}

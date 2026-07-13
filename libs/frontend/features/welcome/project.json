@@ -1,0 +1,8 @@
+{
+	"name": "features-welcome",
+	"projectType": "library",
+	"sourceRoot": "libs/features/welcome/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:feature"],
+	"targets": {}
+}

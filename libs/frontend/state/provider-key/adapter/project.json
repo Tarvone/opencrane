@@ -1,0 +1,9 @@
+{
+	"name": "provider-key-adapter",
+	"$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "libs/state/provider-key/adapter/src",
+	"projectType": "library",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:state"],
+	"targets": {}
+}

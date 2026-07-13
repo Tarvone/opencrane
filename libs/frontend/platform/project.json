@@ -1,0 +1,8 @@
+{
+	"name": "platform",
+	"projectType": "library",
+	"sourceRoot": "libs/platform/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:platform"],
+	"targets": {}
+}

@@ -1,0 +1,8 @@
+{
+	"name": "state-core",
+	"projectType": "library",
+	"sourceRoot": "libs/state/core/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:state"],
+	"targets": {}
+}

@@ -1,0 +1,8 @@
+{
+	"name": "features-tools",
+	"projectType": "library",
+	"sourceRoot": "libs/features/tools/src",
+	"prefix": "wo",
+	"tags": ["scope:shared", "type:feature"],
+	"targets": {}
+}

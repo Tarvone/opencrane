@@ -4,6 +4,7 @@
 export * from "./core/default-tenant.js";
 export * from "./core/resolve-own-cluster-tenant.js";
 export * from "./core/seed-own-default-tenant.js";
+export * from "./core/seed-own-cluster-tenant.js";
 export * from "./core/org-domain-provisioner.types.js";
 export * from "./core/org-domain.provisioner.js";
 export * from "./core/org-domain.provisioner.factory.js";

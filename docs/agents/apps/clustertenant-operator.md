@@ -67,7 +67,43 @@ PostgreSQL. ~30 models incl. `Tenant`, `ClusterTenant`, `AccessPolicy`, `Group`,
 
 ## Key Env
 
-`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE` (the TenantOperator's reconcile + workspace-seed scope), `MANAGE_TENANT_NAMESPACES` (default false — fleet-manager owns per-org namespace creation; true only for a standalone silo with the gated ns-manage ClusterRole), `FLEET_INTERNAL_URL` (fleet internal API base for the membership mirror + login write-through; unset = standalone membership ownership), `OPENCRANE_API_TOKEN`, OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`), `SKILL_OCI_REGISTRY_URL`/`SKILL_OCI_REPOSITORY`, `COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`, `OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`, `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, `OPENCRANE_FORCE_HTTPS`.
+`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE` (the TenantOperator's reconcile + workspace-seed scope), `DEPLOYMENT_MODE` (`standalone` | `fleet-managed` — see "Deployment modes" below), `MANAGE_TENANT_NAMESPACES` (default false — fleet-manager owns per-org namespace creation; true only for a standalone silo with the gated ns-manage ClusterRole), `MANAGE_OWN_DOMAIN` (defaults from `DEPLOYMENT_MODE`), `FLEET_INTERNAL_URL` (fleet internal API base for the membership mirror + login write-through; unset = standalone membership ownership), `CLUSTER_TENANT_SEED_NAME`/`_DISPLAY_NAME`/`_OWNER_EMAIL`/`_OWNER_SUBJECT`/`_TIER` (standalone-only ClusterTenant self-seed), `OPENCRANE_API_TOKEN`, OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`), `SKILL_OCI_REGISTRY_URL`/`SKILL_OCI_REPOSITORY`, `COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`, `OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`, `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, `OPENCRANE_FORCE_HTTPS`.
+
+## Deployment modes (#151 item 4)
+
+A silo runs in exactly one of two topologies, resolved to a single `DEPLOYMENT_MODE` value (`config.ts`'s `deploymentMode`) that every other standalone-vs-fleet-managed default in this app derives from:
+
+- **`fleet-managed`** — an external fleet-manager (the WeOwnAI control plane, italanta/opencrane#150) owns `ClusterTenant` lifecycle: it creates the CR, seeds `spec.owner`, creates/owns the org namespace, and this silo's `MembershipProjectionRepairer` mirrors membership from `FLEET_INTERNAL_URL`. The silo never creates or binds a `ClusterTenant` itself in this mode.
+- **`standalone`** — no fleet anywhere. This silo is the sole authority: it self-seeds its own cluster-scoped `ClusterTenant` CR on boot (`_SeedOwnClusterTenant`, gated on `deploymentMode === "standalone"` in `index.ts`), binds it to its own namespace, owns per-org namespace creation (`MANAGE_TENANT_NAMESPACES`) and domain provisioning (`MANAGE_OWN_DOMAIN`), and then seeds its own `<org>-default` workspace Tenant from that CR's owner (`_SeedOwnDefaultTenant`) — both boot seeds are best-effort/idempotent and run only in this mode (see the `if (config.deploymentMode === "standalone")` gate in `index.ts`, `~line 290`).
+
+`DEPLOYMENT_MODE` wins when set; otherwise the SAME fallback the chart itself uses applies: an empty `FLEET_INTERNAL_URL` derives `standalone`, a non-empty one derives `fleet-managed` — so a deployment that sets neither env var behaves exactly as it did before this switch existed.
+
+**Standalone quickstart** — via the chart (`apps/clustertenant-platform`), no fleet checkout needed:
+
+```bash
+helm dep build apps/clustertenant-platform
+helm install my-silo apps/clustertenant-platform \
+  -f apps/clustertenant-platform/values/standalone.yaml \
+  --set ingress.domain=example.com \
+  --set clustertenantManager.standaloneSeed.ownerEmail=owner@example.com \
+  --set clustertenantManager.database.existingSecret=my-db-secret
+```
+
+This sets `deploymentMode: standalone` (which fans out `manageTenantNamespaces`/`manageOwnDomain`/`DEPLOYMENT_MODE` coherently), leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults (#151 items 2/3), and self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are NOT installed by this chart — bring your own or run them via `libs/k8s-platform/k8s-deploy.sh` first. A `helm` `fail` guard (and a `values.schema.json` check, one step earlier) rejects a contradictory combination — `deploymentMode: fleet-managed` with an empty `fleetInternalUrl`, or `deploymentMode: standalone` with a non-empty one.
+
+To bootstrap a standalone ClusterTenant by hand instead of via `clustertenantManager.standaloneSeed`, apply a CR directly with `spec.owner.email` set — the seed is a convenience, not the only path:
+
+```yaml
+apiVersion: opencrane.io/v1alpha1
+kind: ClusterTenant
+metadata:
+  name: default
+spec:
+  displayName: "Default Organisation"
+  isolationTier: shared
+  owner:
+    email: owner@example.com
+```
 
 ## In-flight
 

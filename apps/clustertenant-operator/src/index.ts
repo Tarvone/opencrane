@@ -24,7 +24,7 @@ import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
 import { TenantProjectionRepairer } from "./infra/projection/tenant-projection-repairer.js";
 import { MembershipProjectionRepairer, _BuildHttpFleetMembershipReader, _BuildHttpFleetMembershipWriter } from "./infra/projection/membership-projection-repairer.js";
-import { _ResolveOwnClusterTenantName, _SeedOwnDefaultTenant } from "@opencrane/domain/cluster-tenants";
+import { _ResolveOwnClusterTenantName, _SeedOwnDefaultTenant, _SeedOwnClusterTenant } from "@opencrane/domain/cluster-tenants";
 import { CogneeLiteLlmKey } from "./reconcilers/tenants/internal/cognee-litellm-key.js";
 import { CogneeSiloTenant } from "./reconcilers/tenants/internal/cognee-silo-tenant.js";
 
@@ -280,11 +280,41 @@ async function _startInSiloControllers(): Promise<void>
     // the seed's ≥1-model onboarding gate and the silo comes up usable. Awaited for that ordering.
     await _BootstrapProviderKeyIfConfigured(config);
 
-    // Seed this silo's own `<org>-default` workspace Tenant from its ClusterTenant CR owner.
-    // Use config.watchNamespace (the namespace the operators below reconcile in) so the seed
-    // lands where the TenantOperator will pick it up — not the projection-repair namespace,
-    // which is derived independently and could diverge under manual env overrides.
-    void _SeedOwnDefaultTenant(customApi, prisma, config.watchNamespace, log);
+    // Standalone-only boot seeds (#151 item 4): a fleet-managed silo defers ClusterTenant
+    // lifecycle AND its own default-workspace seed entirely to the external fleet-manager +
+    // its provisioning flow (member adoption / first login) — this silo racing an unconditional
+    // create here could seed a workspace ahead of / independent from the fleet's authoritative
+    // membership state. A standalone silo has no such fleet, so it is both the one that must
+    // create + bind its own ClusterTenant CR (see `_SeedOwnClusterTenant`) and the one that
+    // seeds its own first workspace once that CR resolves.
+    if (config.deploymentMode === "standalone")
+    {
+      void (async function _standaloneBootSeeds()
+      {
+        if (config.standaloneSeedName.trim())
+        {
+          await _SeedOwnClusterTenant(customApi, config.watchNamespace, {
+            name: config.standaloneSeedName,
+            displayName: config.standaloneSeedDisplayName,
+            ownerEmail: config.standaloneSeedOwnerEmail,
+            ownerSubject: config.standaloneSeedOwnerSubject,
+            tier: config.standaloneSeedTier,
+          }, log);
+        }
+
+        // Seed this silo's own `<org>-default` workspace Tenant from its ClusterTenant CR
+        // owner. Use config.watchNamespace (the namespace the operators below reconcile in)
+        // so the seed lands where the TenantOperator will pick it up — not the
+        // projection-repair namespace, which is derived independently and could diverge
+        // under manual env overrides. Run AFTER the ClusterTenant self-seed above so a
+        // fresh standalone boot has something bound to seed a workspace from.
+        await _SeedOwnDefaultTenant(customApi, prisma, config.watchNamespace, log);
+      })();
+    }
+    else
+    {
+      log.info({ deploymentMode: config.deploymentMode }, "fleet-managed silo: skipping standalone boot seeds (ClusterTenant lifecycle + default-workspace seed are the external fleet's)");
+    }
 
     // Ensure this silo's Cognee has its own dedicated LiteLLM virtual key — a SEPARATE
     // identity/budget from tenant chat spend (Cognee's embedding + graph-extraction calls

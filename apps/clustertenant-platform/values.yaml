@@ -31,6 +31,24 @@ global:
 multiCt:
   enabled: false
 
+# -- Single explicit topology switch (#151 item 4): "" (default, UNSET) preserves every
+#    standalone-vs-fleet-managed default exactly as it behaved before this switch existed — each
+#    still derives, implicitly, from `clustertenantManager.fleetInternalUrl` emptiness. Set it
+#    explicitly to `standalone` or `fleet-managed` to (a) fail-fast validate the combination — a
+#    Helm `fail` guard rejects `fleet-managed` with an empty `fleetInternalUrl`, and rejects
+#    `standalone` with a non-empty one — and (b) make the topology self-documenting in this
+#    values file instead of an implication only visible by reading `fleetInternalUrl`.
+#
+#    Mirrors `apps/clustertenant-operator/src/app/config.ts`'s own `deploymentMode`: this chart
+#    always renders `DEPLOYMENT_MODE` from the RESOLVED value (this value if set, else the SAME
+#    fleetInternalUrl-emptiness derivation the operator falls back to on its own), so the chart
+#    and the operator's fallback can never disagree about which mode is active.
+#
+#    See `values/standalone.yaml` for a documented single-tenant standalone install preset, and
+#    docs/agents/apps/clustertenant-operator.md's "Deployment modes" section for the full
+#    walkthrough of both topologies.
+deploymentMode: ""
+
 # -- Chart self-sufficiency (#151 item 3): install the CRDs this silo needs to function on
 #    its own — ClusterTenant (cluster-scoped, read-only), Tenant + AccessPolicy (namespaced,
 #    full CRUD by the in-silo operators) — via templates/crds/ rather than assuming a fleet
@@ -255,15 +273,18 @@ clustertenantManager:
   #    fleet-manager creates + owns each org's namespace, and the silo SA is granted NO
   #    cluster-scoped `namespaces` RBAC, so the silo skips the create. Set true ONLY for an
   #    all-in-one / standalone silo — it renders the gated namespace-management ClusterRole
-  #    (clustertenant-manager-rbac.yaml) and injects MANAGE_TENANT_NAMESPACES=true.
+  #    (clustertenant-manager-rbac.yaml) and injects MANAGE_TENANT_NAMESPACES=true. The
+  #    `deploymentMode: standalone` preset (values/standalone.yaml) sets this explicitly; left
+  #    false here (rather than deriving from `deploymentMode`) so the bare default render is
+  #    byte-for-byte unchanged from before #151 item 4 introduced the switch.
   manageTenantNamespaces: false
 
   # -- Explicit override for whether THIS silo owns per-org domain provisioning (#151 item
   #    2: the DNSEndpoint + any vanity Certificate the operator's OrgDomainProvisioner
   #    applies). Left `null` (unset) by default so the operator derives it itself from
-  #    `fleetInternalUrl` emptiness (standalone ⇒ true, fleet-managed ⇒ false) — the SAME
+  #    `deploymentMode` (#151 item 4) — standalone ⇒ true, fleet-managed ⇒ false — the SAME
   #    single source of truth as `MANAGE_OWN_DOMAIN` in apps/clustertenant-operator/src/app/config.ts.
-  #    Set true/false only to force one mode regardless of `fleetInternalUrl`.
+  #    Set true/false only to force one mode regardless of `deploymentMode`/`fleetInternalUrl`.
   manageOwnDomain: null
 
   # -- Fleet internal API base for the fleet-managed topology, e.g.
@@ -271,13 +292,37 @@ clustertenantManager:
   #    the silo owns membership locally, and the fleet→silo membership mirror + first-login
   #    adoption write-through both idle. A fleet-managed silo MUST set this — without it
   #    member adoptions never reach the fleet's authoritative registry (the next mirror sweep
-  #    reaps them) and login-path seat caps are unenforced.
+  #    reaps them) and login-path seat caps are unenforced. Also the fallback signal
+  #    `deploymentMode` derives from when left unset (empty ⇒ standalone, set ⇒ fleet-managed) —
+  #    see the top-level `deploymentMode` value's doc comment. A Helm `fail` guard rejects the
+  #    combination `deploymentMode: fleet-managed` + this left empty, and the inverse
+  #    (`deploymentMode: standalone` + this set), so the two can never silently disagree.
   fleetInternalUrl: ""
   # -- Bearer presented to the fleet internal API (the fleet's OPENCRANE_API_TOKEN — one
   #    shared service credential). Prefer the existing-Secret form; inline is for dev only.
   fleetApiToken: ""
   fleetApiTokenExistingSecret: ""
   fleetApiTokenSecretKey: "token"
+
+  # -- Standalone ClusterTenant self-seed (#151 item 4). Only meaningful when this silo is
+  #    running standalone (`deploymentMode: standalone`, or its no-fleet fallback derivation):
+  #    the operator creates + binds its OWN cluster-scoped ClusterTenant CR on boot from these
+  #    fields — the one action a genuinely standalone silo has no external fleet to perform.
+  #    Leave `name` empty (default) to skip this and bootstrap the ClusterTenant CR by hand
+  #    instead (see docs/agents/apps/clustertenant-operator.md's "Deployment modes" section).
+  #    Silently ignored in fleet-managed mode: the fleet is the sole authority that may
+  #    create/bind a ClusterTenant CR there. Wired as `CLUSTER_TENANT_SEED_*`.
+  standaloneSeed:
+    # -- Stable org name (becomes the ClusterTenant CR name). Empty → no self-seed.
+    name: ""
+    # -- Human-readable org display name; defaults to `name` when empty.
+    displayName: ""
+    # -- Owner email recorded on `spec.owner.email` — the seeded default workspace's contact.
+    ownerEmail: ""
+    # -- Optional owner OIDC subject recorded on `spec.owner.subject`.
+    ownerSubject: ""
+    # -- Isolation tier for the self-seeded org: shared | dedicatedNodes | dedicatedCluster.
+    tier: shared
   image:
     repository: ghcr.io/italanta/opencrane-clustertenant-manager
     tag: latest

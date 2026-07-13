@@ -248,3 +248,79 @@ describe("_LoadOperatorConfig manageOwnDomain standalone-domain-ownership defaul
 		expect(config.manageOwnDomain).toBe(false);
 	});
 });
+
+describe("_LoadOperatorConfig deploymentMode single switch (#151 item 4)", function _deploymentModeSuite()
+{
+	let _saved: NodeJS.ProcessEnv;
+
+	beforeEach(function _save()
+	{
+		_saved = process.env;
+		process.env = { ..._BASE_ENV };
+	});
+
+	afterEach(function _restore()
+	{
+		process.env = _saved;
+	});
+
+	it("derives standalone when neither DEPLOYMENT_MODE nor FLEET_INTERNAL_URL is set", function _derivedStandalone()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		const config = _LoadOperatorConfig();
+		expect(config.deploymentMode).toBe("standalone");
+		expect(config.manageTenantNamespaces).toBe(true);
+		expect(config.manageOwnDomain).toBe(true);
+	});
+
+	it("derives fleet-managed when FLEET_INTERNAL_URL is set", function _derivedFleetManaged()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
+		const config = _LoadOperatorConfig();
+		expect(config.deploymentMode).toBe("fleet-managed");
+		expect(config.manageTenantNamespaces).toBe(false);
+		expect(config.manageOwnDomain).toBe(false);
+	});
+
+	it("an explicit DEPLOYMENT_MODE=fleet-managed wins even with no FLEET_INTERNAL_URL", function _explicitFleetManaged()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		process.env.DEPLOYMENT_MODE = "fleet-managed";
+		const config = _LoadOperatorConfig();
+		expect(config.deploymentMode).toBe("fleet-managed");
+		expect(config.manageTenantNamespaces).toBe(false);
+		expect(config.manageOwnDomain).toBe(false);
+	});
+
+	it("an explicit DEPLOYMENT_MODE=standalone wins even with FLEET_INTERNAL_URL set", function _explicitStandalone()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
+		process.env.DEPLOYMENT_MODE = "standalone";
+		const config = _LoadOperatorConfig();
+		expect(config.deploymentMode).toBe("standalone");
+	});
+
+	it("MANAGE_TENANT_NAMESPACES / MANAGE_OWN_DOMAIN still override the deploymentMode-derived default", function _individualOverridesStillWin()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		process.env.DEPLOYMENT_MODE = "standalone";
+		process.env.MANAGE_TENANT_NAMESPACES = "false";
+		process.env.MANAGE_OWN_DOMAIN = "false";
+		const config = _LoadOperatorConfig();
+		expect(config.manageTenantNamespaces).toBe(false);
+		expect(config.manageOwnDomain).toBe(false);
+	});
+
+	it("standalone self-seed config defaults to empty/shared and reads CLUSTER_TENANT_SEED_* overrides", function _standaloneSeedEnv()
+	{
+		process.env.WATCH_NAMESPACE = "oc-acme";
+		process.env.CLUSTER_TENANT_SEED_NAME = "acme";
+		process.env.CLUSTER_TENANT_SEED_OWNER_EMAIL = "owner@acme.test";
+		const config = _LoadOperatorConfig();
+		expect(config.standaloneSeedName).toBe("acme");
+		expect(config.standaloneSeedOwnerEmail).toBe("owner@acme.test");
+		expect(config.standaloneSeedTier).toBe("shared");
+	});
+});

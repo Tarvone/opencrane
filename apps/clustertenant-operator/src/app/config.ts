@@ -217,25 +217,66 @@ export interface OpenClawTenantOperatorConfig
   linkerdMeshEnabled: boolean;
 
   /**
-   * Whether this silo OWNS per-ClusterTenant namespace creation. Default false: in the
-   * fleet-managed topology the fleet-manager creates + owns each org's namespace
+   * Whether this silo OWNS per-ClusterTenant namespace creation. Default derives from
+   * {@link deploymentMode} (standalone ⇒ true, fleet-managed ⇒ false): in the fleet-managed
+   * topology the fleet-manager creates + owns each org's namespace
    * (`managed-by: opencrane-fleet-manager`) and the silo's ServiceAccount is granted NO
    * cluster-scoped `namespaces` verbs — so the silo must NOT attempt the create (it would only
    * ever be Forbidden). When true — an all-in-one / standalone deploy that grants the silo the
    * gated namespace-management ClusterRole — the silo creates the namespace itself. Either way
    * the namespaced applies that follow (baseline NetworkPolicy, quota) require the namespace to
-   * exist, so a genuinely-absent namespace still surfaces as NotFound there.
+   * exist, so a genuinely-absent namespace still surfaces as NotFound there. Set explicitly via
+   * `MANAGE_TENANT_NAMESPACES` to override the derived default.
    */
   manageTenantNamespaces: boolean;
 
   /**
+   * Single explicit topology switch (#151 item 4): `"standalone"` — no fleet anywhere,
+   * this silo owns ClusterTenant lifecycle/namespace/domain/membership itself — or
+   * `"fleet-managed"` — an external (or colocated) fleet-manager owns ClusterTenant
+   * lifecycle and this silo defers to it. This is the SINGLE source of truth every other
+   * standalone-vs-fleet-managed default in this config derives from (manageOwnDomain,
+   * manageTenantNamespaces, the `_SeedOwnDefaultTenant` / `_SeedOwnClusterTenant` boot
+   * calls in index.ts).
+   *
+   * Set explicitly via `DEPLOYMENT_MODE`; when unset, derives from the SAME signal the
+   * standalone defaults already used before this switch existed — an empty
+   * `FLEET_INTERNAL_URL` (no external fleet configured) — so a deployment that never sets
+   * either env var behaves EXACTLY as it did before this switch was introduced.
+   */
+  deploymentMode: "standalone" | "fleet-managed";
+
+  /**
+   * Standalone ClusterTenant self-seed (#151 item 4): when set (`CLUSTER_TENANT_SEED_NAME`)
+   * AND `deploymentMode === "standalone"`, the operator creates ITS OWN cluster-scoped
+   * ClusterTenant CR on boot (with this `owner`) and immediately binds it
+   * (`status.boundNamespace = watchNamespace`) — the one action a standalone silo has no
+   * external fleet to perform. No-op (empty string) leaves standalone bootstrap to a
+   * manually-applied CR (see docs/agents/apps/clustertenant-operator.md's standalone
+   * quickstart). Ignored entirely in fleet-managed mode: the fleet is the sole authority
+   * that may create/bind a ClusterTenant CR there.
+   */
+  standaloneSeedName: string;
+
+  /** Human-readable display name for {@link standaloneSeedName}; defaults to the name itself when empty. */
+  standaloneSeedDisplayName: string;
+
+  /** Owner email recorded on the self-seeded ClusterTenant's `spec.owner.email`. */
+  standaloneSeedOwnerEmail: string;
+
+  /** Optional owner OIDC subject recorded on the self-seeded ClusterTenant's `spec.owner.subject`. */
+  standaloneSeedOwnerSubject: string;
+
+  /** Isolation tier recorded on the self-seeded ClusterTenant's `spec.isolationTier`. */
+  standaloneSeedTier: string;
+
+  /**
    * Whether THIS silo owns per-org domain provisioning (#151 item 2): applying the
    * per-org DNSEndpoint + any vanity Certificate via the {@link OrgDomainProvisioner}.
-   * Default derives from the SAME standalone signal `index.ts` already reads directly
-   * for the membership projection (`FLEET_INTERNAL_URL` empty ⇒ standalone, no external
-   * fleet to own the domain) — set explicitly via `MANAGE_OWN_DOMAIN` to override. In
-   * fleet-managed mode (`FLEET_INTERNAL_URL` set) this defaults false and the reconcile
-   * step is a no-op: the external fleet owns domain provisioning for the org.
+   * Default derives from {@link deploymentMode} (standalone ⇒ true, no external fleet to
+   * own the domain) — set explicitly via `MANAGE_OWN_DOMAIN` to override. In fleet-managed
+   * mode this defaults false and the reconcile step is a no-op: the external fleet owns
+   * domain provisioning for the org.
    */
   manageOwnDomain: boolean;
 }
@@ -266,12 +307,19 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     _readEnvValue<string>("GATEWAY_TRUSTED_PROXIES", "string", false, ""),
   ));
 
-  // 2c. Standalone-domain-ownership default (#151 item 2): the SAME standalone signal
-  //     `index.ts` already reads directly for the membership projection — empty
-  //     FLEET_INTERNAL_URL means there is no external fleet to own the org's domain, so
-  //     this silo must. Read directly (not via this config object) to mirror that existing
-  //     convention; MANAGE_OWN_DOMAIN lets an operator override the derived default.
-  const standaloneDomainDefault = !(process.env["FLEET_INTERNAL_URL"]?.trim());
+  // 2c. Single deployment-mode switch (#151 item 4). DEPLOYMENT_MODE wins when it is one of
+  //     the two valid values; otherwise derive from the SAME signal every standalone default
+  //     already used before this switch existed — an empty FLEET_INTERNAL_URL (no external
+  //     fleet configured) — so a deployment that sets neither env var is unaffected by this
+  //     switch's introduction. Every other standalone-vs-fleet-managed default below
+  //     (manageOwnDomain, manageTenantNamespaces, the standalone boot-seed gate in index.ts)
+  //     derives from THIS one value, not from FLEET_INTERNAL_URL directly, so an explicit
+  //     DEPLOYMENT_MODE override cascades coherently everywhere.
+  const deploymentModeRaw = _readEnvValue<string>("DEPLOYMENT_MODE", "string", false, "");
+  const deploymentMode: "standalone" | "fleet-managed" = deploymentModeRaw === "standalone" || deploymentModeRaw === "fleet-managed"
+    ? deploymentModeRaw
+    : (process.env["FLEET_INTERNAL_URL"]?.trim() ? "fleet-managed" : "standalone");
+  const isStandalone = deploymentMode === "standalone";
 
   // 3. Build the typed config from env, applying namespace-derived fallbacks for the
   //    runtime-plane URLs so no value silently points at another instance.
@@ -325,8 +373,17 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     controlPlaneInternalServiceUrl: _readEnvValue<string>("CLUSTERTENANT_MANAGER_INTERNAL_SERVICE_URL", "string", false, `http://opencrane-clustertenant-manager.${ownNamespace}.svc:8081`),
     projectedTokenTtlSeconds: _readEnvValue<number>("PROJECTED_TOKEN_TTL_SECONDS", "number", false, 600),
     linkerdMeshEnabled: _readEnvValue<boolean>("LINKERD_MESH_ENABLED", "boolean", false, false),
-    manageTenantNamespaces: _readEnvValue<boolean>("MANAGE_TENANT_NAMESPACES", "boolean", false, false),
-    manageOwnDomain: _readEnvValue<boolean>("MANAGE_OWN_DOMAIN", "boolean", false, standaloneDomainDefault),
+    deploymentMode,
+    standaloneSeedName: _readEnvValue<string>("CLUSTER_TENANT_SEED_NAME", "string", false, ""),
+    standaloneSeedDisplayName: _readEnvValue<string>("CLUSTER_TENANT_SEED_DISPLAY_NAME", "string", false, ""),
+    standaloneSeedOwnerEmail: _readEnvValue<string>("CLUSTER_TENANT_SEED_OWNER_EMAIL", "string", false, ""),
+    standaloneSeedOwnerSubject: _readEnvValue<string>("CLUSTER_TENANT_SEED_OWNER_SUBJECT", "string", false, ""),
+    standaloneSeedTier: _readEnvValue<string>("CLUSTER_TENANT_SEED_TIER", "string", false, "shared"),
+    // Both derive from `deploymentMode` (not FLEET_INTERNAL_URL directly) so an explicit
+    // DEPLOYMENT_MODE override cascades to them coherently; MANAGE_TENANT_NAMESPACES /
+    // MANAGE_OWN_DOMAIN still let an operator force one independently of the mode.
+    manageTenantNamespaces: _readEnvValue<boolean>("MANAGE_TENANT_NAMESPACES", "boolean", false, isStandalone),
+    manageOwnDomain: _readEnvValue<boolean>("MANAGE_OWN_DOMAIN", "boolean", false, isStandalone),
   };
 
   // 4. Fail closed in multi-instance mode: refuse to watch the whole cluster when

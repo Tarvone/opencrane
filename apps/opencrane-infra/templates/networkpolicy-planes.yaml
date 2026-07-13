@@ -20,15 +20,15 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ingress
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ingress
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server
 spec:
   podSelector:
     matchLabels:
       {{- include "opencrane.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: clustertenant-manager
+      app.kubernetes.io/component: opencrane-server
   policyTypes:
     - Ingress
   ingress:
@@ -102,7 +102,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
@@ -135,7 +135,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
@@ -166,7 +166,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
       ports:
         - protocol: TCP
           port: {{ .Values.skillRegistry.ociStore.service.port }}

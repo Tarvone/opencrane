@@ -13,7 +13,7 @@ code and the pinned plugin ACTUALLY do, not what a doc claims.
 ### 1. OpenClaw's workspace-memory model
 The tenant pod runs OpenClaw with a persistent workspace at `/data/openclaw/workspace`,
 seeded by `apps/feat-openclaw-tenant/deploy/entrypoint.sh` from the operator ConfigMap
-(`apps/opencrane-api/src/tenants/deploy/2-config-map.ts`):
+(`apps/opencrane/src/tenants/deploy/2-config-map.ts`):
 - **L0 files** (no `.seed` suffix — `AGENTS.md`, `TOOLS.md`) are platform-managed and
   re-stamped on every boot. Their source is `.../deploy/workspace/*` plus, for `TOOLS.md`,
   the contract-regenerated org-memory section (`core/contract/tools-markdown.ts`).

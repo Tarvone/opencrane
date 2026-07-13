@@ -252,7 +252,7 @@ export interface OpenClawTenantOperatorConfig
    * ClusterTenant CR on boot (with this `owner`) and immediately binds it
    * (`status.boundNamespace = watchNamespace`) — the one action a standalone silo has no
    * external fleet to perform. No-op (empty string) leaves standalone bootstrap to a
-   * manually-applied CR (see docs/agents/apps/opencrane-api.md's standalone
+   * manually-applied CR (see docs/agents/apps/opencrane.md's standalone
    * quickstart). Ignored entirely in fleet-managed mode: the fleet is the sole authority
    * that may create/bind a ClusterTenant CR there.
    */
@@ -370,7 +370,7 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     cogneeEndpoint: _readEnvValue<string>("COGNEE_ENDPOINT", "string", false, ""),
     internalPort: _readEnvValue<number>("INTERNAL_PORT", "number", false, 8081),
     controlPlaneInternalUrl: _readEnvValue<string>("CLUSTERTENANT_MANAGER_INTERNAL_URL", "string", false, "http://localhost:8081"),
-    controlPlaneInternalServiceUrl: _readEnvValue<string>("CLUSTERTENANT_MANAGER_INTERNAL_SERVICE_URL", "string", false, `http://opencrane-clustertenant-manager.${ownNamespace}.svc:8081`),
+    controlPlaneInternalServiceUrl: _readEnvValue<string>("CLUSTERTENANT_MANAGER_INTERNAL_SERVICE_URL", "string", false, `http://opencrane-opencrane-server.${ownNamespace}.svc:8081`),
     projectedTokenTtlSeconds: _readEnvValue<number>("PROJECTED_TOKEN_TTL_SECONDS", "number", false, 600),
     linkerdMeshEnabled: _readEnvValue<boolean>("LINKERD_MESH_ENABLED", "boolean", false, false),
     deploymentMode,

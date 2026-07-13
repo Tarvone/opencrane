@@ -318,7 +318,7 @@ resource "kubernetes_job" "db_migrate"
           image   = "${var.registry_url}/opencrane-ui:${var.image_tag}"
           command = ["npx", "prisma", "migrate", "deploy"]
 
-          working_dir = "/app/apps/opencrane-api"
+          working_dir = "/app/apps/opencrane"
 
           env
           {

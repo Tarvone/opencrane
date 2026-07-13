@@ -2,7 +2,7 @@ apiVersion: v2
 name: opencrane-silo
 description: >-
   OpenCrane SILO install — one per ClusterTenant, into the org's own namespace: the
-  clustertenant-manager (per-silo control plane + in-silo controllers) plus its dedicated
+  opencrane-server (per-silo control plane + in-silo controllers) plus its dedicated
   runtime planes (Cognee, LiteLLM, Obot/MCP gateway, feat-skill-registry, Langfuse), per-silo
   NetworkPolicies, and the identity-routing gateway. Installed with apps/opencrane-infra/deploy.sh,
   either after the fleet (fleet-managed: set crds.install=false to avoid contending with the

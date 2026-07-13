@@ -82,7 +82,7 @@ spec:
             # In-cluster opencrane-ui URL for internal entitlement + content calls
             # (/api/internal/bundles) — targets the INTERNAL listener port, not the public one.
             - name: CONTROL_PLANE_URL
-              value: "http://{{ include "opencrane.fullname" . }}-clustertenant-manager.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.clustertenantManager.service.internalPort }}"
+              value: "http://{{ include "opencrane.fullname" . }}-opencrane-server.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.clustertenantManager.service.internalPort }}"
           livenessProbe:
             httpGet:
               path: /healthz

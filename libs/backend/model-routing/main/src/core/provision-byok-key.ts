@@ -157,7 +157,7 @@ async function _applyProviderKeySecret(coreApi: k8s.CoreV1Api, namespace: string
       name,
       namespace,
       labels: {
-        "app.kubernetes.io/managed-by": "opencrane-api",
+        "app.kubernetes.io/managed-by": "opencrane-server",
         "opencrane.io/byok-provider": provider,
       },
     },

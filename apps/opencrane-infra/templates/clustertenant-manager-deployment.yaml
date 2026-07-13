@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" . }}-opencrane-server
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server
 spec:
   replicas: {{ .Values.clustertenantManager.replicas }}
   selector:
     matchLabels:
       {{- include "opencrane.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: clustertenant-manager
+      app.kubernetes.io/component: opencrane-server
   template:
     metadata:
       labels:
         {{- include "opencrane.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: clustertenant-manager
+        app.kubernetes.io/component: opencrane-server
     spec:
-      serviceAccountName: {{ include "opencrane.fullname" . }}-clustertenant-manager
+      serviceAccountName: {{ include "opencrane.fullname" . }}-opencrane-server
       initContainers:
         # Apply pending Prisma migrations before the server starts (prisma migrate
         # deploy). Runs the same image so the schema/migrations match the binary;
@@ -30,7 +30,7 @@ spec:
         - name: db-migrate
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
           imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
-          command: ["node", "apps/opencrane-api/dist/scripts/migrate.js"]
+          command: ["node", "apps/opencrane/dist/scripts/migrate.js"]
           env:
             {{- include "opencrane.clustertenantManagerDatabaseEnv" . | nindent 12 }}
       containers:
@@ -59,7 +59,7 @@ spec:
             # Second (internal-only) listener for /api/internal/*.
             - name: INTERNAL_PORT
               value: {{ .Values.clustertenantManager.service.internalPort | quote }}
-            {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "clustertenant-manager") | nindent 12 }}
+            {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "opencrane-server") | nindent 12 }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}
             # -- Platform base domain used to derive each org's Zitadel redirect URI
@@ -234,7 +234,7 @@ spec:
                   key: LANGFUSE_INIT_PROJECT_SECRET_KEY
             {{- end }}
             # ============================================================================
-            # In-silo controllers (Stage 5). The clustertenant-manager runs every in-silo
+            # In-silo controllers (Stage 5). The opencrane-server runs every in-silo
             # reconcile loop over its OWN namespace — TenantOperator, PolicyOperator,
             # idle-suspend, runtime-plane drift repair, rollout canary, Obot health, and the
             # in-process gateway proxy — so a silo stands on its own. The fleet-manager
@@ -415,7 +415,7 @@ spec:
             #    /api/internal/* from a DIFFERENT pod — a pod's localhost is itself, so it uses
             #    the Service DNS on the internal port.
             - name: CLUSTERTENANT_MANAGER_INTERNAL_SERVICE_URL
-              value: {{ printf "http://%s-clustertenant-manager.%s.svc:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.clustertenantManager.service.internalPort | quote }}
+              value: {{ printf "http://%s-opencrane-server.%s.svc:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.clustertenantManager.service.internalPort | quote }}
             - name: LITELLM_ENABLED
               value: {{ .Values.litellm.enabled | quote }}
             - name: LITELLM_DEFAULT_MONTHLY_BUDGET_USD

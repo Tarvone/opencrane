@@ -39,13 +39,13 @@ multiCt:
 #    `standalone` with a non-empty one — and (b) make the topology self-documenting in this
 #    values file instead of an implication only visible by reading `fleetInternalUrl`.
 #
-#    Mirrors `apps/opencrane-api/src/app/config.ts`'s own `deploymentMode`: this chart
+#    Mirrors `apps/opencrane/src/app/config.ts`'s own `deploymentMode`: this chart
 #    always renders `DEPLOYMENT_MODE` from the RESOLVED value (this value if set, else the SAME
 #    fleetInternalUrl-emptiness derivation the operator falls back to on its own), so the chart
 #    and the operator's fallback can never disagree about which mode is active.
 #
 #    See `values/standalone.yaml` for a documented single-tenant standalone install preset, and
-#    docs/agents/apps/opencrane-api.md's "Deployment modes" section for the full
+#    docs/agents/apps/opencrane.md's "Deployment modes" section for the full
 #    walkthrough of both topologies.
 deploymentMode: ""
 
@@ -283,7 +283,7 @@ clustertenantManager:
   #    2: the DNSEndpoint + any vanity Certificate the operator's OrgDomainProvisioner
   #    applies). Left `null` (unset) by default so the operator derives it itself from
   #    `deploymentMode` (#151 item 4) — standalone ⇒ true, fleet-managed ⇒ false — the SAME
-  #    single source of truth as `MANAGE_OWN_DOMAIN` in apps/opencrane-api/src/app/config.ts.
+  #    single source of truth as `MANAGE_OWN_DOMAIN` in apps/opencrane/src/app/config.ts.
   #    Set true/false only to force one mode regardless of `deploymentMode`/`fleetInternalUrl`.
   manageOwnDomain: null
 
@@ -309,7 +309,7 @@ clustertenantManager:
   #    the operator creates + binds its OWN cluster-scoped ClusterTenant CR on boot from these
   #    fields — the one action a genuinely standalone silo has no external fleet to perform.
   #    Leave `name` empty (default) to skip this and bootstrap the ClusterTenant CR by hand
-  #    instead (see docs/agents/apps/opencrane-api.md's "Deployment modes" section).
+  #    instead (see docs/agents/apps/opencrane.md's "Deployment modes" section).
   #    Silently ignored in fleet-managed mode: the fleet is the sole authority that may
   #    create/bind a ClusterTenant CR there. Wired as `CLUSTER_TENANT_SEED_*`.
   standaloneSeed:
@@ -324,7 +324,7 @@ clustertenantManager:
     # -- Isolation tier for the self-seeded org: shared | dedicatedNodes | dedicatedCluster.
     tier: shared
   image:
-    repository: ghcr.io/italanta/opencrane-clustertenant-manager
+    repository: ghcr.io/italanta/opencrane-server
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -642,7 +642,7 @@ litellm:
 # -- Default tenant pod settings (can be overridden per Tenant CR)
 tenant:
   defaultImage:
-    repository: ghcr.io/italanta/opencrane-tenant
+    repository: ghcr.io/italanta/opencrane-openclaw-tenant
     tag: latest
     pullPolicy: IfNotPresent
   defaultResources:
@@ -793,10 +793,10 @@ ingress:
 controlPlaneSpa:
   enabled: false
   image:
-    # Built by .github/workflows/docker.yml (OPENCRANE_UI_SPA_IMAGE) from
+    # Built by .github/workflows/docker.yml (OPENCRANE_UI_IMAGE) from
     # apps/opencrane-ui/deploy/Dockerfile — a static `nx build opencrane-ui` bundle
     # served by nginxinc/nginx-unprivileged.
-    repository: ghcr.io/italanta/opencrane-ui-spa
+    repository: ghcr.io/italanta/opencrane-ui
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -1036,7 +1036,7 @@ skillRegistry:
   image:
     # Built and published by .github/workflows/docker.yml (SKILL_REGISTRY_IMAGE), matching
     # the opencrane-<service> naming of the other first-party images.
-    repository: ghcr.io/italanta/opencrane-feat-skill-registry
+    repository: ghcr.io/italanta/opencrane-skills-registry
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1

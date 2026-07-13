@@ -11,7 +11,7 @@ opencrane-api host (the platform host / apex), runs against its **own registry D
 
 It does **not** watch anything inside a silo — every per-org/in-silo controller (tenant runtime,
 policies, plane drift-repair, rollout canary, Obot health, gateway proxy) runs in the per-silo
-[`opencrane-api`](./opencrane-api.md). The fleet's only reconcile loop is the
+[`opencrane`](./opencrane.md). The fleet's only reconcile loop is the
 **ClusterTenantOperator** below.
 
 **Roles** (terminology per

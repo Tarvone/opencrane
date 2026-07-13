@@ -1,11 +1,11 @@
 {{- if and .Values.ingress.enabled .Values.ingress.tls.enabled .Values.certManager.enabled }}
 {{- /*
-Per-silo TLS certificate for the clustertenant-manager host.
+Per-silo TLS certificate for the opencrane-server host.
 
 The silo serves its control plane at the ORG host (`ingress.controlPlaneHost` =
 `<cluster-tenant>.<base>`, set by the silo deploy profile). A Kubernetes Ingress can only
 reference a TLS secret in its OWN namespace — so each silo must issue its own cert here, into
-the secret the clustertenant-manager Ingress references. The Issuer it references
+the secret the opencrane-server Ingress references. The Issuer it references
 (`certManager.issuerName`) is either created by THIS chart (cluster-issuer.yaml, #151 item 2 —
 the standalone default, `certManager.selfManagedIssuer=true`) or by an external fleet chart in
 a fleet-managed topology (`certManager.selfManagedIssuer=false`) — either way the kind
@@ -21,7 +21,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server
 spec:
   secretName: {{ required "ingress.tls.secretName is required when ingress.tls.enabled" .Values.ingress.tls.secretName }}
   issuerRef:

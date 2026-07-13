@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" . }}-opencrane-server
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server
 spec:
   type: ClusterIP
   ports:
@@ -20,4 +20,4 @@ spec:
       name: internal
   selector:
     {{- include "opencrane.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server

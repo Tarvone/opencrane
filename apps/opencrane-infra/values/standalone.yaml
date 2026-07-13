@@ -3,7 +3,7 @@
 # apps/opencrane-infra ALONE, no external fleet-manager anywhere: this silo owns
 # ClusterTenant lifecycle, per-org namespace creation, per-org domain provisioning
 # (OrgDomainProvisioner), and OIDC login (its own clustertenantManager.oidc.*, not a
-# fleet-provisioned per-org client) — see docs/agents/apps/opencrane-api.md's
+# fleet-provisioned per-org client) — see docs/agents/apps/opencrane.md's
 # "Deployment modes" section for the full walkthrough and prerequisites (ingress-nginx,
 # cert-manager, and a Postgres this release can reach must already exist in the cluster;
 # this chart does not install them).

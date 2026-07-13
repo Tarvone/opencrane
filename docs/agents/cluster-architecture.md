@@ -122,7 +122,7 @@ CRDs are shipped separately under `apps/fleet-platform/crds/` (see below), not i
 All planes are **ClusterIP-only** (no external LB) — external traffic arrives through Ingress. Internal DNS is `<release>-<plane>.<namespace>.svc`. Each plane is independently release-local (`instance`) or `shared` via `values.yaml` (`sharedPlatform.*`).
 
 - **operator** → Kubernetes API only. Watches Tenant/AccessPolicy/ClusterTenant CRs; injects the other planes' URLs into tenant pods. Deep-dive: [`apps/fleet-operator.md`](./apps/fleet-operator.md).
-- **opencrane-api** (`:8080`) → Postgres + K8s API + Cognee + LiteLLM. The hub everything else talks to. Deep-dive: [`apps/opencrane-api.md`](./apps/opencrane-api.md).
+- **opencrane-api** (`:8080`) → Postgres + K8s API + Cognee + LiteLLM. The hub everything else talks to. Deep-dive: [`apps/opencrane.md`](./apps/opencrane.md).
 - **mcp-gateway / Obot** (`:8080`) → polls opencrane-api `GET /api/internal/obot-registry`; tenant pods reach MCP servers through it (projected token `aud=obot-gateway`).
 - **feat-skill-registry** (`:5000`) → validates tenant projected token (`aud=feat-skill-registry`) via TokenReview, proxies to opencrane-api internal bundle endpoint. Deep-dive: [`apps/feat-skill-registry.md`](./apps/feat-skill-registry.md).
 - **litellm** (`:4000`) → the only LLM egress path for tenant pods; operator mints a per-tenant virtual key Secret; enforces budget.

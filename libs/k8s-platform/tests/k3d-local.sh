@@ -120,7 +120,7 @@ echo "[local] Building tenant image"
 docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:local "$ROOT_DIR"
 
 echo "[local] Building opencrane-ui image"
-docker build -f "$ROOT_DIR/apps/opencrane-api/deploy/Dockerfile" -t opencrane/clustertenant-manager:local "$ROOT_DIR"
+docker build -f "$ROOT_DIR/apps/opencrane/deploy/Dockerfile" -t opencrane/opencrane-server:local "$ROOT_DIR"
 
 # 3. Create a fresh cluster for a deterministic full-stack install.
 echo "[local] Recreating k3d cluster '$CLUSTER_NAME'"
@@ -135,7 +135,7 @@ docker pull ghcr.io/cloudnative-pg/postgresql:16
 echo "[local] Importing images into k3d"
 k3d image import opencrane/operator:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:local --cluster "$CLUSTER_NAME"
-k3d image import opencrane/clustertenant-manager:local --cluster "$CLUSTER_NAME"
+k3d image import opencrane/opencrane-server:local --cluster "$CLUSTER_NAME"
 k3d image import ghcr.io/cloudnative-pg/postgresql:16 --cluster "$CLUSTER_NAME"
 
 echo "[local] Using profile '$LOCAL_PROFILE' with values '$VALUES_FILE'"
@@ -275,7 +275,7 @@ fi
 
 helm "${helm_args[@]}"
 
-# 6b. Install the SILO chart (clustertenant-manager + the in-silo TenantOperator + planes) into the
+# 6b. Install the SILO chart (opencrane-server + the in-silo TenantOperator + planes) into the
 #     SAME namespace for this single-machine full stack. The two charts' resource sets are disjoint,
 #     so co-installing them in one namespace is safe; each self-migrates its own DB via its db-migrate
 #     initContainer (fleet → registry DB, silo → the separate `silo` DB) — no manual migration Job.
@@ -303,7 +303,7 @@ helm "${silo_args[@]}"
 
 # 7. Wait for the platform workloads that depend on the database.
 _wait_for_rollout "deployment/opencrane-fleet-manager"
-_wait_for_rollout "deployment/opencrane-silo-clustertenant-manager"
+_wait_for_rollout "deployment/opencrane-silo-opencrane-server"
 
 if kubectl get deployment/opencrane-silo-litellm -n "$NAMESPACE" >/dev/null 2>&1; then
   _wait_for_rollout "deployment/opencrane-silo-litellm"

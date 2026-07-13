@@ -285,7 +285,7 @@ export class CogneeSiloTenant
         labels: {
           "app.kubernetes.io/part-of": "opencrane",
           "app.kubernetes.io/component": "cognee",
-          "app.kubernetes.io/managed-by": "opencrane-clustertenant-manager",
+          "app.kubernetes.io/managed-by": "opencrane-server",
         },
       },
       type: "Opaque",

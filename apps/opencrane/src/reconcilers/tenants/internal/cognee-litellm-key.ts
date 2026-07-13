@@ -99,7 +99,7 @@ export class CogneeLiteLlmKey
         labels: {
           "app.kubernetes.io/part-of": "opencrane",
           "app.kubernetes.io/component": "cognee",
-          "app.kubernetes.io/managed-by": "opencrane-clustertenant-manager",
+          "app.kubernetes.io/managed-by": "opencrane-server",
         },
         annotations: {
           "opencrane.io/litellm-key-alias": keyAlias,

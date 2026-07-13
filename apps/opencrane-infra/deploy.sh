@@ -78,7 +78,7 @@ fi
 # silo and from the central release. Default `opencrane-<cluster-tenant>`; --namespace overrides.
 [[ -n "$NAMESPACE" ]] || NAMESPACE="opencrane-${CLUSTER_TENANT}"
 
-# Per-org OIDC (org-admin login). The clustertenant-manager resolves the per-org CLIENT from the
+# Per-org OIDC (org-admin login). opencrane-server resolves the per-org CLIENT from the
 # ClusterTenant CR at runtime, but its BASE OIDC config must be present or login 503s ("OIDC is not
 # configured for this opencrane-ui instance"). The shared loader requires ALL of issuer+client+
 # redirect+session once ANY is set, else the pod crashloops ("OIDC is partially configured"). So when
@@ -114,9 +114,9 @@ PROFILE_SET=(
   # OWN namespace, so each silo provisions its cert here rather than borrowing the fleet's wildcard
   # secret. No per-silo Issuer is created — only the Certificate, pointed at certManager.issuerName.
   --set "certManager.enabled=true"
-  # The silo's opencrane-ui (clustertenant-manager) serves at the ORG host
+  # The silo's opencrane-server serves at the ORG host
   # `<cluster-tenant>.<base>` — NOT the chart default `platform.<base>`, which is the FLEET's
-  # super-admin host (the fleet install). Without this, the silo's clustertenant-manager Ingress
+  # super-admin host (the fleet install). Without this, the silo's opencrane-server Ingress
   # collides with the fleet's at platform.<base>. A caller --set later overrides this default.
   --set "ingress.controlPlaneHost=${CLUSTER_TENANT}.${BASE_DOMAIN}"
 )

@@ -2,7 +2,7 @@
   Chart self-sufficiency (#151 item 3): the ClusterTenant CRD.
 
   Cluster-scoped, read-only from the silo's perspective (per-org-client.ts resolves the
-  per-org Zitadel client off this CR; RBAC grant: clustertenant-manager-ct-read). In the
+  per-org Zitadel client off this CR; RBAC grant: opencrane-server-ct-read). In the
   fleet-managed topology the fleet installs this CRD once, cluster-wide, and every silo
   should set `crds.install=false` to avoid a second release fighting the fleet's release
   for ownership of the same cluster-scoped object. In STANDALONE mode (no fleet,

@@ -1,11 +1,11 @@
 /**
  * Emit the OpenAPI 3.1 spec to openapi.json in the package root.
  *
- * Run via:  pnpm --filter @opencrane/api emit-openapi
+ * Run via:  pnpm --filter @opencrane/server emit-openapi
  *
  * CI drift gate:
- *   pnpm --filter @opencrane/api emit-openapi
- *   git diff --exit-code apps/opencrane-api/openapi.json
+ *   pnpm --filter @opencrane/server emit-openapi
+ *   git diff --exit-code apps/opencrane/openapi.json
  *
  * If the diff is non-empty, the committed openapi.json is stale.
  * Update the spec in src/openapi/spec.ts and re-run this script,

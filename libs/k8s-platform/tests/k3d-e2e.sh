@@ -145,8 +145,8 @@ fi
 echo "[e2e] Building fleet-operator image"
 _retry 3 docker build -f "$FLEET_OPERATOR_DIR/deploy/Dockerfile" -t opencrane/operator:e2e "$ROOT_DIR"
 
-echo "[e2e] Building opencrane-api (silo) image"
-_retry 3 docker build -f "$ROOT_DIR/apps/opencrane-api/deploy/Dockerfile" -t opencrane/clustertenant-manager:e2e "$ROOT_DIR"
+echo "[e2e] Building opencrane-server (silo) image"
+_retry 3 docker build -f "$ROOT_DIR/apps/opencrane/deploy/Dockerfile" -t opencrane/opencrane-server:e2e "$ROOT_DIR"
 
 echo "[e2e] Building tenant image"
 _retry 3 docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:e2e "$ROOT_DIR"
@@ -163,7 +163,7 @@ _retry 3 docker pull ghcr.io/cloudnative-pg/postgresql:16
 # 4b. Import images into the k3d cluster runtime.
 echo "[e2e] Importing images into k3d"
 k3d image import opencrane/operator:e2e --cluster "$CLUSTER_NAME"
-k3d image import opencrane/clustertenant-manager:e2e --cluster "$CLUSTER_NAME"
+k3d image import opencrane/opencrane-server:e2e --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:e2e --cluster "$CLUSTER_NAME"
 k3d image import ghcr.io/cloudnative-pg/postgresql:16 --cluster "$CLUSTER_NAME"
 
@@ -273,7 +273,7 @@ helm upgrade --install "$RELEASE_NAME" "$FLEET_CHART_DIR" \
 # mounts them, creating a chicken-and-egg with Helm's readiness checks).
 kubectl rollout status deployment/opencrane-fleet-manager -n "$NAMESPACE" --timeout=120s
 
-# 6b. Install the SILO chart (clustertenant-manager + the in-silo TenantOperator + planes) into the
+# 6b. Install the SILO chart (opencrane-server + the in-silo TenantOperator + planes) into the
 #     SAME namespace for this single-namespace smoke test. The Tenant CR below is reconciled by the
 #     silo's TenantOperator — the fleet chart has none (it stops at ClusterTenant lifecycle). The
 #     two charts' resource sets are disjoint, so co-installing them in one namespace is safe.
@@ -287,7 +287,7 @@ helm upgrade --install opencrane-silo "$ROOT_DIR/apps/opencrane-infra" \
 # Silo resources are prefixed by the silo RELEASE name (opencrane-silo) because nameOverride
 # (opencrane) is a prefix of it, so Helm's fullname == the release name → opencrane-silo-<component>
 # (the fleet release is plain "opencrane", hence opencrane-fleet-manager above).
-kubectl rollout status deployment/opencrane-silo-clustertenant-manager -n "$NAMESPACE" --timeout=180s
+kubectl rollout status deployment/opencrane-silo-opencrane-server -n "$NAMESPACE" --timeout=180s
 
 # Wait for LiteLLM (a silo plane) when cost routing is enabled by chart values.
 if kubectl get deployment/opencrane-silo-litellm -n "$NAMESPACE" >/dev/null 2>&1; then

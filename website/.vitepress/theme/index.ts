@@ -7,7 +7,7 @@ import spec from '../../public/openapi.json' with { type: 'json' }
 
 // Register the OpenCrane opencrane-ui spec globally so the <OASpec /> component
 // on the API reference page renders without a per-page :spec prop. The spec is
-// copied in from apps/opencrane-api by scripts/sync-openapi.mjs (predev/prebuild).
+// copied in from apps/opencrane by scripts/sync-openapi.mjs (predev/prebuild).
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {

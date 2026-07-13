@@ -2,7 +2,7 @@
 
 Every opencrane-ui HTTP surface lives here as an NX package that owns its **routes, core
 services, API types, and tests** in one place (#153). The operator app
-(`apps/opencrane-api`) is composition + reconciler wiring only: it mounts the routers
+(`apps/opencrane`) is composition + reconciler wiring only: it mounts the routers
 in `src/routes.ts` and injects `PrismaClient` / Kubernetes clients.
 
 ## Layout convention
@@ -39,7 +39,7 @@ can join it later without restructuring (e.g. `libs/backend/mcp/main` next to
    - Create `tsconfig.json` that extends `../../tsconfig.base.json` and sets `compilerOptions.baseUrl` to the package root.
    - Create `vitest.config.ts` for test configuration (copy from an existing domain package).
 2. Add path alias to `tsconfig.base.json`: `"@opencrane/backend-<d>": ["libs/backend/<d>/main/src"]`.
-3. Mount the router in `apps/opencrane-api/src/routes.ts` and add the
+3. Mount the router in `apps/opencrane/src/routes.ts` and add the
    path alias import in the operator's `src/routes.ts`.
 4. Add `prisma/schema/<d>.prisma` if the domain owns models.
 5. `npm ci && npm run build && npm run test && npm run lint:boundaries`.

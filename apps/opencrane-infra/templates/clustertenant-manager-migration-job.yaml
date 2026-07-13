@@ -11,10 +11,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-migrate
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-migrate
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager-migrate
+    app.kubernetes.io/component: opencrane-server-migrate
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
@@ -25,7 +25,7 @@ spec:
     metadata:
       labels:
         {{- include "opencrane.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: clustertenant-manager-migrate
+        app.kubernetes.io/component: opencrane-server-migrate
     spec:
       # No serviceAccountName: this is a pre-install/pre-upgrade hook, so it runs BEFORE the
       # chart's own ServiceAccount exists — referencing it would wedge the Job (the pod is
@@ -37,7 +37,7 @@ spec:
         - name: db-migrate
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
           imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
-          command: ["node", "apps/opencrane-api/dist/scripts/migrate.js"]
+          command: ["node", "apps/opencrane/dist/scripts/migrate.js"]
           env:
             {{- include "opencrane.clustertenantManagerDatabaseEnv" . | nindent 12 }}
 {{- end }}

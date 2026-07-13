@@ -50,7 +50,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
@@ -109,7 +109,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}

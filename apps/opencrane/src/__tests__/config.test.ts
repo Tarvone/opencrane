@@ -70,7 +70,7 @@ describe("_LoadOperatorConfig multi-instance fail-closed guard (MI.1 / brief B2)
 		expect(config.mcpGatewayUrl).toBe("http://opencrane-mcp-gateway.oc-acme.svc:8080");
 		expect(config.skillRegistryUrl).toBe("http://opencrane-feat-skill-registry.oc-acme.svc:5000");
 		// The pod-facing internal URL is namespace-derived (Service DNS on the internal port).
-		expect(config.controlPlaneInternalServiceUrl).toBe("http://opencrane-clustertenant-manager.oc-acme.svc:8081");
+		expect(config.controlPlaneInternalServiceUrl).toBe("http://opencrane-opencrane-server.oc-acme.svc:8081");
 		// The operator's OWN internal call is a localhost self-call — not namespace-derived.
 		expect(config.controlPlaneInternalUrl).toBe("http://localhost:8081");
 	});

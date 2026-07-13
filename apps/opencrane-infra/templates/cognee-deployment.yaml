@@ -207,7 +207,7 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: clustertenant-manager
+              app.kubernetes.io/component: opencrane-server
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: tenant

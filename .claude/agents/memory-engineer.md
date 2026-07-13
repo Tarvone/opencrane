@@ -25,7 +25,7 @@ code and the pinned plugin ACTUALLY do, not what a doc claims.
 ### 1. OpenClaw's workspace-memory model
 The tenant pod runs OpenClaw with a persistent workspace at `/data/openclaw/workspace`,
 seeded by `apps/feat-openclaw-tenant/deploy/entrypoint.sh` from the operator ConfigMap
-(`apps/opencrane-api/src/tenants/deploy/2-config-map.ts`):
+(`apps/opencrane/src/tenants/deploy/2-config-map.ts`):
 - **L0 files** (no `.seed` suffix — `AGENTS.md`, `TOOLS.md`) are platform-managed and
   re-stamped on every boot. Their source is `.../deploy/workspace/*` plus, for `TOOLS.md`,
   the contract-regenerated org-memory section (`core/contract/tools-markdown.ts`).
@@ -97,7 +97,7 @@ Default: **audit** — trace the memory chain across chart/operator/plugin/docs,
 ordered by impact (a broken write path outranks a doc nit), each with file:line evidence and
 whether it's `chart` / `codebase` / `config` / `plugin-upstream`. Apply the conventions
 (edit code/chart/docs) only when the caller asks; then build + test what you touched
-(`pnpm --filter @opencrane/api test`) and, for a chart change, confirm the
+(`pnpm --filter @opencrane/server test`) and, for a chart change, confirm the
 render (`helm template`). Never document a memory capability the pinned plugin does not
 implement, and never leave AGENTS.md / TOOLS.md / the generated contract disagreeing about
 the MEMORY.md-vs-Cognee policy.

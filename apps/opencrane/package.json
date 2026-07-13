@@ -1,5 +1,5 @@
 {
-  "name": "@opencrane/api",
+  "name": "@opencrane/server",
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
@@ -48,7 +48,7 @@
     "vitest": "^4.0.8"
   },
   "nx": {
-    "name": "opencrane-api",
+    "name": "opencrane",
     "tags": [
       "scope:app"
     ]

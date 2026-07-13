@@ -1,6 +1,6 @@
-# App: opencrane-api (`@opencrane/api`)
+# App: opencrane (`@opencrane/server`)
 
-> Deep-dive for `apps/opencrane-api`. Index: [`../app-specific.md`](../app-specific.md). Identity model:
+> Deep-dive for `apps/opencrane`. Index: [`../app-specific.md`](../app-specific.md). Identity model:
 > [`../architecture.md`](../architecture.md). Verified June 2026 (post fleet/silo split, v0.6.0).
 
 The **per-silo control plane** — one instance per **ClusterTenant**, running in that org's own
@@ -107,4 +107,4 @@ spec:
 
 ## In-flight
 
-OCI/Zot skill delivery is mid-cutover (dual-write DB + registry; resolve OCI-first, DB fallback). Awareness rollout `shadowMode` and the doc-reconciliation merge agent are partly scaffolded. AI-budget enforcement lives in LiteLLM; the opencrane-api only reads spend.
+OCI/Zot skill delivery is mid-cutover (dual-write DB + registry; resolve OCI-first, DB fallback). Awareness rollout `shadowMode` and the doc-reconciliation merge agent are partly scaffolded. AI-budget enforcement lives in LiteLLM; opencrane-server only reads spend.

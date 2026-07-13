@@ -263,7 +263,7 @@ lifecycle/namespace/domain/membership itself, no external fleet anywhere) or `"f
 (an external fleet-manager owns ClusterTenant lifecycle and this silo defers to it).
 
 Returns the explicit `deploymentMode` value when it is one of the two valid strings; otherwise
-derives it from the SAME fallback signal `apps/opencrane-api/src/app/config.ts` itself
+derives it from the SAME fallback signal `apps/opencrane/src/app/config.ts` itself
 falls back to when `DEPLOYMENT_MODE` is unset — an empty `clustertenantManager.fleetInternalUrl`
 means standalone (no external fleet configured), a non-empty one means fleet-managed. Keeping
 this identical to the operator's own fallback means the chart's resolved value and what the

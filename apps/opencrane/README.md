@@ -1,4 +1,4 @@
-# @opencrane/api
+# @opencrane/server
 
 Express REST API that serves as the management layer for the OpenCrane platform. It provides endpoints for tenant lifecycle management, access policy administration, shared skills discovery, and audit log querying.
 
@@ -80,9 +80,9 @@ Skill           — discovered skills registry (name, scope, team, contentHash)
 Run migrations:
 
 ```bash
-npm run db:migrate -w @opencrane/api   # prisma migrate deploy (production)
-npm run db:generate -w @opencrane/api  # regenerate Prisma client after schema changes
-npm run db:push -w @opencrane/api      # push schema without migrations (dev only)
+npm run db:migrate -w @opencrane/server   # prisma migrate deploy (production)
+npm run db:generate -w @opencrane/server  # regenerate Prisma client after schema changes
+npm run db:push -w @opencrane/server      # push schema without migrations (dev only)
 ```
 
 ## Development
@@ -90,9 +90,9 @@ npm run db:push -w @opencrane/api      # push schema without migrations (dev onl
 ```bash
 # From repo root
 npm run build                                    # compile TypeScript + generate Prisma client
-npm run build -w @opencrane/api  # build only this package
+npm run build -w @opencrane/server  # build only this package
 npm run test                                    # run vitest integration tests
-npx nx run opencrane-api:test          # alternative NX command
+npx nx run opencrane:test          # alternative NX command
 ```
 
 ## Docker
@@ -100,5 +100,5 @@ npx nx run opencrane-api:test          # alternative NX command
 Built from `deploy/Dockerfile` using the repo root as build context:
 
 ```bash
-docker build -f apps/opencrane-api/deploy/Dockerfile -t ghcr.io/opencrane/opencrane-ui:latest .
+docker build -f apps/opencrane/deploy/Dockerfile -t ghcr.io/opencrane/opencrane-server:latest .
 ```

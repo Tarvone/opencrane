@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" . }}-opencrane-server
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 {{- if eq (include "opencrane.namespacedRbac" .) "true" }}
@@ -16,7 +16,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "opencrane.fullname" $ }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" $ }}-opencrane-server
   namespace: {{ $ns }}
   labels:
     {{- include "opencrane.labels" $ | nindent 4 }}
@@ -26,17 +26,17 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "opencrane.fullname" $ }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" $ }}-opencrane-server
   namespace: {{ $ns }}
   labels:
     {{- include "opencrane.labels" $ | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "opencrane.fullname" $ }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" $ }}-opencrane-server
 subjects:
   - kind: ServiceAccount
-    name: {{ include "opencrane.fullname" $ }}-clustertenant-manager
+    name: {{ include "opencrane.fullname" $ }}-opencrane-server
     namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- else }}
@@ -50,7 +50,7 @@ kind: ClusterRole
 metadata:
   # Cluster-scoped → name MUST be unique per silo, or a second silo's release can't import a
   # ClusterRole the first already owns. Suffix with the release namespace (one silo per ns).
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 rules:
@@ -59,16 +59,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-{{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+    name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
 {{- end }}
 ---
@@ -83,8 +83,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  # Cluster-scoped → suffix per silo (see the clustertenant-manager ClusterRole above).
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ct-read-{{ .Release.Namespace }}
+  # Cluster-scoped → suffix per silo (see the opencrane-server ClusterRole above).
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ct-read-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 rules:
@@ -95,16 +95,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ct-read-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ct-read-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ct-read-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ct-read-{{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+    name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
 {{- if .Values.clustertenantManager.manageTenantNamespaces }}
 ---
@@ -119,7 +119,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ns-manage-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ns-manage-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 rules:
@@ -130,15 +130,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ns-manage-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ns-manage-{{ .Release.Namespace }}
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager-ns-manage-{{ .Release.Namespace }}
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-ns-manage-{{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+    name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -11,7 +11,7 @@ COPY apps/feat-skill-registry/package.json apps/feat-skill-registry/tsconfig.jso
 RUN npm ci
 
 COPY apps/feat-skill-registry/src apps/feat-skill-registry/src
-RUN npm run build -w @opencrane/feat-skill-registry
+RUN npm run build -w @opencrane/skills-registry
 
 # Runtime stage
 FROM node:22-bookworm-slim

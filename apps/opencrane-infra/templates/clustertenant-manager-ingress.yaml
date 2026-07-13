@@ -19,10 +19,10 @@ wildcard `*.<ingress.domain>`. See docs/agents/cluster-architecture.md → "Tena
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+  name: {{ include "opencrane.fullname" . }}-opencrane-server
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
-    app.kubernetes.io/component: clustertenant-manager
+    app.kubernetes.io/component: opencrane-server
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -51,7 +51,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+                name: {{ include "opencrane.fullname" . }}-opencrane-server
                 port:
                   number: {{ .Values.clustertenantManager.service.port }}
           {{- if .Values.gatewayProxy.enabled }}
@@ -76,7 +76,7 @@ spec:
                 port:
                   number: {{ $spaPort }}
                 {{- else }}
-                name: {{ include "opencrane.fullname" . }}-clustertenant-manager
+                name: {{ include "opencrane.fullname" . }}-opencrane-server
                 port:
                   number: {{ .Values.clustertenantManager.service.port }}
                 {{- end }}

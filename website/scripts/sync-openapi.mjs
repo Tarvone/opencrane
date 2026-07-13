@@ -3,7 +3,7 @@
  * directory so VitePress can serve it and `vitepress-openapi` can render the
  * interactive API reference from it.
  *
- * The spec is the single source of truth (`apps/opencrane-api/openapi.json`,
+ * The spec is the single source of truth (`apps/opencrane/openapi.json`,
  * emitted at build time and guarded by a CI drift gate), so this is a pure copy
  * — the website never hand-edits the API surface.
  */
@@ -12,7 +12,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const source = resolve(here, '../../apps/opencrane-api/openapi.json')
+const source = resolve(here, '../../apps/opencrane/openapi.json')
 const dest = resolve(here, '../public/openapi.json')
 
 if (!existsSync(source)) {

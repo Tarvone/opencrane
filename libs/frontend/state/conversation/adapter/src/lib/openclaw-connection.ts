@@ -1,3 +1,4 @@
+import { _RandomId } from "@opencrane/core";
 import { TypeCompiler } from "@sinclair/typebox/compiler";
 import { Value } from "@sinclair/typebox/value";
 
@@ -49,12 +50,11 @@ const _CLIENT_DEVICE_FAMILY = "browser";
  * A fresh, non-persisted per-connection instance id for the `connect` metadata
  * (`client.instanceId`). Trusted-proxy auth binds identity to the proxy-injected header,
  * not to a stable device id, so this is ephemeral per connection — nothing is stored in
- * the browser. Falls back to a random string where `crypto.randomUUID` is unavailable.
+ * the browser.
  */
 function _NewInstanceId(): string
 {
-	const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-	return c?.randomUUID ? c.randomUUID() : `weownai-${Math.random().toString(36).slice(2)}`;
+	return `weownai-${_RandomId()}`;
 }
 
 /**

@@ -14,3 +14,4 @@ export * from "./lib/api/control-plane-api.service";
 export * from "./lib/api/fleet-manager-api.service";
 export * from "./lib/theme/weownai-preset";
 export * from "./lib/utils/collection.utils";
+export * from "./lib/utils/id.utils";

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, output, signal } from "@angular/core";
 
-import { ActiveSkill, LedgerEntry, SCOPE_COLORS, ScopeCitation, ScopeContextEntry, ScopeLevel } from "@weownai/core";
-import { CollapsibleSectionComponent, LedgerCardComponent } from "@weownai/elements/ui";
+import { ActiveSkill, LedgerEntry, SCOPE_COLORS, ScopeCitation, ScopeContextEntry, ScopeLevel } from "@opencrane/core";
+import { CollapsibleSectionComponent, LedgerCardComponent } from "@opencrane/elements/ui";
 import { CanvasDocComponent } from "../components/canvas-doc/canvas-doc.component";
 
 /** Right panel: awareness contract, retrieved context, skills, ledger, canvas. */

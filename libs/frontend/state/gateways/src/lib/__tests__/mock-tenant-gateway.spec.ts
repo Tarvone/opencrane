@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UserTenantPhase } from "@weownai/state/tenant/adapter";
+import { UserTenantPhase } from "@opencrane/state/tenant/adapter";
 import { MockUserTenantGateway } from "../__test__/mock-tenant-gateway";
 
 describe("MockUserTenantGateway", () =>

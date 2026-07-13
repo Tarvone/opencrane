@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from "@angular/core";
 
-import { MessageCard } from "@weownai/core";
+import { MessageCard } from "@opencrane/core";
 
 import { ToolEntryComponent } from "../tool-entry/tool-entry.component";
 

@@ -3,8 +3,8 @@ import { Router } from "@angular/router";
 import { Button } from "primeng/button";
 import { Card } from "primeng/card";
 
-import { ControlPlaneApiService } from "@weownai/core";
-import { SessionStore } from "@weownai/state/core";
+import { ControlPlaneApiService } from "@opencrane/core";
+import { SessionStore } from "@opencrane/state/core";
 
 /**
  * Public sign-in landing for the operator app.

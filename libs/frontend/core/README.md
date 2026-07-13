@@ -1,4 +1,4 @@
-# @weownai/core
+# @opencrane/core
 
 Domain foundation for WeOwnAI: models, demo data, the typed OpenCrane API
 client, the PrimeNG theme preset, and pure utilities.
@@ -6,7 +6,7 @@ client, the PrimeNG theme preset, and pure utilities.
 ## Import
 
 ```ts
-import { ScopeLevel, ControlPlaneApiService, WeOwnAiPreset, _ToggleId } from "@weownai/core";
+import { ScopeLevel, ControlPlaneApiService, WeOwnAiPreset, _ToggleId } from "@opencrane/core";
 ```
 
 ## Contents
@@ -24,7 +24,7 @@ import { ScopeLevel, ControlPlaneApiService, WeOwnAiPreset, _ToggleId } from "@w
 
 ## Dependencies
 
-Depends on **no other `@weownai` lib** (it is the base). All HTTP must go through
+Depends on **no other `@opencrane` lib** (it is the base). All HTTP must go through
 `api/` services — never call `fetch` from features or components.
 
 ## Boundary

@@ -1,4 +1,4 @@
-# @weownai/features/workspace
+# @opencrane/features/workspace
 
 The application shell — the route-level container that composes every other
 feature into the three-pane console.
@@ -6,7 +6,7 @@ feature into the three-pane console.
 ## Import
 
 ```ts
-import { WorkspacePageComponent } from "@weownai/features/workspace";
+import { WorkspacePageComponent } from "@opencrane/features/workspace";
 ```
 
 ## Contents

@@ -1,6 +1,6 @@
 import { InjectionToken } from "@angular/core";
 
-import { SessionSummary, ThreadMessage } from "@weownai/core";
+import { SessionSummary, ThreadMessage } from "@opencrane/core";
 
 /** A locally-persisted snapshot of one thread's transcript. */
 export interface CachedThread

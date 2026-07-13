@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 
-import { ModelProvider, ProviderKeyGateway, ProviderKeyStatus, SUPPORTED_MODEL_PROVIDERS } from "@weownai/state/provider-key/adapter";
+import { ModelProvider, ProviderKeyGateway, ProviderKeyStatus, SUPPORTED_MODEL_PROVIDERS } from "@opencrane/state/provider-key/adapter";
 
 /** In-memory ProviderKeyGateway for tests — never imported by production code. */
 @Injectable()

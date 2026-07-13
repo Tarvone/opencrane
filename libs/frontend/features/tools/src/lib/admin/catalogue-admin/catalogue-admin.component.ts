@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
 import { Router } from "@angular/router";
 
-import { MCP_APPROVAL_STYLES, MCP_TYPE_STYLES, McpApprovalStatus, McpServer } from "@weownai/core";
-import { MCP_GATEWAY } from "@weownai/state/mcp/adapter";
-import { SessionStore } from "@weownai/state/core";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { MCP_APPROVAL_STYLES, MCP_TYPE_STYLES, McpApprovalStatus, McpServer } from "@opencrane/core";
+import { MCP_GATEWAY } from "@opencrane/state/mcp/adapter";
+import { SessionStore } from "@opencrane/state/core";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 
 /**
  * Catalogue — admin governance view.

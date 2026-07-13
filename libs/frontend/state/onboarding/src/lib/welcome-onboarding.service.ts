@@ -1,6 +1,6 @@
 import { Injectable, Signal, inject, signal } from "@angular/core";
 
-import { LOCAL_STORAGE_GATEWAY } from "@weownai/state/utils/storage";
+import { LOCAL_STORAGE_GATEWAY } from "@opencrane/state/utils/storage";
 
 import { _HasCompletedWelcome, _WELCOME_COMPLETED_KEY, _WelcomeCompletedValue } from "./welcome-onboarding.util";
 

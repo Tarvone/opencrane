@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
-import { MCP_TYPE_STYLES, McpInstalledServer, McpServer, McpServerType } from "@weownai/core";
-import { MCP_GATEWAY } from "@weownai/state/mcp/adapter";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { MCP_TYPE_STYLES, McpInstalledServer, McpServer, McpServerType } from "@opencrane/core";
+import { MCP_GATEWAY } from "@opencrane/state/mcp/adapter";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 
 /**
  * Catalogue — user browse view.

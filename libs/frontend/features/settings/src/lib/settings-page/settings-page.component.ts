@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
 
-import { SETTINGS_NAV, SettingsNavItem, SettingsSection } from "@weownai/core";
+import { SETTINGS_NAV, SettingsNavItem, SettingsSection } from "@opencrane/core";
 import { PodSectionComponent } from "../sections/pod-section/pod-section.component";
 import { ModelBudgetSectionComponent } from "../sections/model-budget-section/model-budget-section.component";
 import { AwarenessSectionComponent } from "../sections/awareness-section/awareness-section.component";

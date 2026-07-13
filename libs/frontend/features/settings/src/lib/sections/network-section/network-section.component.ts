@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
 
-import { EgressDomain } from "@weownai/core";
-import { SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { SectionHeadingComponent, SettingsRowComponent } from "@weownai/elements/ui";
+import { EgressDomain } from "@opencrane/core";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
 import { _settledValue } from "../../resource.util";
 
 /** Network & Egress settings section. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UserTenant, UserTenantPhase } from "@weownai/state/tenant/adapter";
+import { UserTenant, UserTenantPhase } from "@opencrane/state/tenant/adapter";
 import { _ToUserTenantRows, _UserTenantPhaseLabel, _UserTenantPhaseSeverity } from "../customer-admin.util";
 
 /** Minimal UserTenant fixture for the row mapper. */

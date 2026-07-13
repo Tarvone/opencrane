@@ -1,4 +1,4 @@
-import { UserTenantPhase } from "@weownai/state/tenant/adapter";
+import { UserTenantPhase } from "@opencrane/state/tenant/adapter";
 
 /**
  * PrimeNG `Tag` severity tokens.

@@ -7,8 +7,8 @@ import { InputTextModule } from "primeng/inputtext";
 import { MessageModule } from "primeng/message";
 import { StepperModule } from "primeng/stepper";
 
-import { SessionStore } from "@weownai/state/core";
-import { WelcomeOnboardingService } from "@weownai/state/onboarding";
+import { SessionStore } from "@opencrane/state/core";
+import { WelcomeOnboardingService } from "@opencrane/state/onboarding";
 
 import { WelcomePersonalization, WelcomeStep, WelcomeTourCard } from "../welcome.types";
 import { _EMPTY_PERSONALIZATION, _IsFirstStep, _IsLastStep, _NextStep, _PreviousStep, _WELCOME_TOUR_CARDS } from "../welcome.util";

@@ -95,76 +95,79 @@
       "@opencrane/observability/telemetry": [
         "libs/observability/src/telemetry.ts"
       ],
-      "@weownai/core": [
+      "@opencrane/core": [
         "libs/frontend/core/src/index.ts"
       ],
-      "@weownai/platform": [
+      "@opencrane/core/testing": [
+        "libs/frontend/core/src/testing.ts"
+      ],
+      "@opencrane/platform": [
         "libs/frontend/platform/src/index.ts"
       ],
-      "@weownai/elements/ui": [
+      "@opencrane/elements/ui": [
         "libs/frontend/elements/ui/src/index.ts"
       ],
-      "@weownai/elements/a2ui": [
+      "@opencrane/elements/a2ui": [
         "libs/frontend/elements/a2ui/src/index.ts"
       ],
-      "@weownai/features/welcome": [
+      "@opencrane/features/welcome": [
         "libs/frontend/features/welcome/src/index.ts"
       ],
-      "@weownai/features/customer-admin": [
+      "@opencrane/features/customer-admin": [
         "libs/frontend/features/customer-admin/src/index.ts"
       ],
-      "@weownai/features/tools": [
+      "@opencrane/features/tools": [
         "libs/frontend/features/tools/src/index.ts"
       ],
-      "@weownai/features/workspace": [
+      "@opencrane/features/workspace": [
         "libs/frontend/features/workspace/src/index.ts"
       ],
-      "@weownai/features/settings": [
+      "@opencrane/features/settings": [
         "libs/frontend/features/settings/src/index.ts"
       ],
-      "@weownai/features/conversation": [
+      "@opencrane/features/conversation": [
         "libs/frontend/features/conversation/src/index.ts"
       ],
-      "@weownai/features/context": [
+      "@opencrane/features/context": [
         "libs/frontend/features/context/src/index.ts"
       ],
-      "@weownai/features/notifications": [
+      "@opencrane/features/notifications": [
         "libs/frontend/features/notifications/src/index.ts"
       ],
-      "@weownai/features/metrics": [
+      "@opencrane/features/metrics": [
         "libs/frontend/features/metrics/src/index.ts"
       ],
-      "@weownai/state/core": [
+      "@opencrane/state/core": [
         "libs/frontend/state/core/src/index.ts"
       ],
-      "@weownai/state/gateways": [
+      "@opencrane/state/gateways": [
         "libs/frontend/state/gateways/src/index.ts"
       ],
-      "@weownai/state/conversation/adapter": [
+      "@opencrane/state/conversation/adapter": [
         "libs/frontend/state/conversation/adapter/src/index.ts"
       ],
-      "@weownai/state/conversation/cache": [
+      "@opencrane/state/conversation/cache": [
         "libs/frontend/state/conversation/cache/src/index.ts"
       ],
-      "@weownai/state/conversation/render": [
+      "@opencrane/state/conversation/render": [
         "libs/frontend/state/conversation/render/src/index.ts"
       ],
-      "@weownai/state/settings/adapter": [
+      "@opencrane/state/settings/adapter": [
         "libs/frontend/state/settings/adapter/src/index.ts"
       ],
-      "@weownai/state/mcp/adapter": [
+      "@opencrane/state/mcp/adapter": [
         "libs/frontend/state/mcp/adapter/src/index.ts"
       ],
-      "@weownai/state/provider-key/adapter": [
+      "@opencrane/state/provider-key/adapter": [
         "libs/frontend/state/provider-key/adapter/src/index.ts"
       ],
-      "@weownai/state/tenant/adapter": [
+      "@opencrane/state/tenant/adapter": [
         "libs/frontend/state/tenant/adapter/src/index.ts"
       ],
-      "@weownai/state/onboarding": [
+      "@opencrane/state/onboarding": [
         "libs/frontend/state/onboarding/src/index.ts"
       ],
-      "@weownai/state/utils/storage": [
+      "@opencrane/state/utils/storage": [
         "libs/frontend/state/utils/storage/src/index.ts"
       ]
     }

@@ -1,4 +1,4 @@
-import { GatewayMode } from "@weownai/state/gateways";
+import { GatewayMode } from "@opencrane/state/gateways";
 
 /**
  * Developer-machine environment pointed at a **live** OpenCrane cluster.

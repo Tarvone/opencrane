@@ -1,16 +1,16 @@
-# @weownai/features/welcome
+# @opencrane/features/welcome
 
 First-run onboarding for the **operator** app — a guided welcome shown the first
 time an authenticated end user / customer admin lands in the workspace.
 
-Distinct from `@weownai/features/onboarding`, which is the control-plane's
-self-serve customer **signup** funnel. This flow writes nothing to the control
-plane.
+Distinct from `@weownai/features/onboarding`, the fleet app's self-serve
+customer **signup** funnel (fleet-only, stays in the WeOwnAI repo — not
+ported here). This flow writes nothing to the control plane.
 
 ## Import
 
 ```ts
-import { WELCOME_ROUTES, WelcomePageComponent, WelcomeOnboardingService } from "@weownai/features/welcome";
+import { WELCOME_ROUTES, WelcomePageComponent, WelcomeOnboardingService } from "@opencrane/features/welcome";
 ```
 
 ## Contents
@@ -36,7 +36,7 @@ The lib does not self-mount. The host app:
 
 ## Dependencies
 
-`@weownai/state/core` (read-only `SessionStore` signals: `displayName`,
+`@opencrane/state/core` (read-only `SessionStore` signals: `displayName`,
 `currentTenant`) and PrimeNG. Must not import other feature libs.
 
 ## Note

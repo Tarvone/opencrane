@@ -1,4 +1,4 @@
-# @weownai/platform
+# @opencrane/platform
 
 The **web/desktop seam**. Defines an abstract `PlatformBridge` for capabilities
 that differ by runtime, so features stay platform-agnostic.
@@ -6,7 +6,7 @@ that differ by runtime, so features stay platform-agnostic.
 ## Import
 
 ```ts
-import { PLATFORM_BRIDGE, PlatformBridge, provideWebPlatform } from "@weownai/platform";
+import { PLATFORM_BRIDGE, PlatformBridge, provideWebPlatform } from "@opencrane/platform";
 ```
 
 ## Contents
@@ -31,5 +31,5 @@ Electron/Tauri-backed implementation — **no feature code changes.**
 
 ## Dependencies
 
-`@angular/core` only. Depends on no other `@weownai` lib. This is the **only**
+`@angular/core` only. Depends on no other `@opencrane` lib. This is the **only**
 place native/runtime APIs (Electron, Tauri, Node `fs`, `window`) may appear.

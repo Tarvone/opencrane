@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
-import { MCP_CONNECTION_STYLES, MCP_TYPE_STYLES, McpConnectionStatus, McpInstalledServer, McpServer, McpServerType } from "@weownai/core";
-import { MCP_GATEWAY } from "@weownai/state/mcp/adapter";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { MCP_CONNECTION_STYLES, MCP_TYPE_STYLES, McpConnectionStatus, McpInstalledServer, McpServer, McpServerType } from "@opencrane/core";
+import { MCP_GATEWAY } from "@opencrane/state/mcp/adapter";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 import { ConnectDrawerComponent } from "../connect-drawer/connect-drawer.component";
 
 /** One installed-server row: the catalogue server joined to its install record. */

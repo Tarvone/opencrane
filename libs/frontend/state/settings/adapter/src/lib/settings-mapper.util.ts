@@ -1,4 +1,4 @@
-import { DatasetAccess, EgressDomain, ScopeLevel, SkillRow } from "@weownai/core";
+import { DatasetAccess, EgressDomain, ScopeLevel, SkillRow } from "@opencrane/core";
 
 import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity } from "./settings-gateway.types";
 

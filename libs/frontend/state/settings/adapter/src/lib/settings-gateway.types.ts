@@ -1,6 +1,6 @@
 import { InjectionToken } from "@angular/core";
 
-import { DatasetAccess, EgressDomain, SkillRow } from "@weownai/core";
+import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
 
 /**
  * Read model for the Account settings section.

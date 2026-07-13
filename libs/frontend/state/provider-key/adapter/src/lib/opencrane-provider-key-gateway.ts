@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 
-import { ControlPlaneApiService } from "@weownai/core";
+import { ControlPlaneApiService } from "@opencrane/core";
 
 import { ModelProvider, ProviderKeyGateway, ProviderKeyStatus } from "./provider-key-gateway.types";
 

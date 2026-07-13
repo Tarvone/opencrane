@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
 
-import { SCOPE_COLORS, ScopeLevel, SkillRow } from "@weownai/core";
-import { SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { SCOPE_COLORS, ScopeLevel, SkillRow } from "@opencrane/core";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 import { _settledValue } from "../../resource.util";
 
 /** Skills management settings section. */

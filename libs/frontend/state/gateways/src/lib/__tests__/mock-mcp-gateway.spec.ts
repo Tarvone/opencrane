@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { McpApprovalStatus, McpConnectionStatus, McpServerType } from "@weownai/core";
+import { McpApprovalStatus, McpConnectionStatus, McpServerType } from "@opencrane/core";
 
 import { MockMcpGateway } from "../__test__/mock-mcp-gateway";
 

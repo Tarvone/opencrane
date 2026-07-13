@@ -1,4 +1,4 @@
-# @weownai/elements/ui
+# @opencrane/elements/ui
 
 Reusable, presentational PrimeNG-based components shared across features. Pure
 display + orchestration — no data fetching, no domain logic.
@@ -6,7 +6,7 @@ display + orchestration — no data fetching, no domain logic.
 ## Import
 
 ```ts
-import { ScopeChipComponent, LedgerCardComponent, CollapsibleSectionComponent } from "@weownai/elements/ui";
+import { ScopeChipComponent, LedgerCardComponent, CollapsibleSectionComponent } from "@opencrane/elements/ui";
 ```
 
 ## Contents
@@ -19,7 +19,7 @@ in sibling files.
 
 ## Dependencies
 
-May depend on `@weownai/core` (types, colour tokens) only. **Must not** import
+May depend on `@opencrane/core` (types, colour tokens) only. **Must not** import
 any `features/*` lib. New shared element packages live as siblings under
 `libs/elements/` (e.g. a future `libs/elements/table`).
 

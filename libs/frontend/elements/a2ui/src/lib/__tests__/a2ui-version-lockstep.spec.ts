@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+
+/**
+ * Repo-root `package.json` — resolved from this file's own location (not
+ * `process.cwd()`), since Nx runs this lib's `test` target with the lib
+ * directory as cwd, not the workspace root.
+ */
+const _ROOT_PACKAGE_JSON = fileURLToPath(new URL("../../../../../../../package.json", import.meta.url));
 
 /**
  * §5 version discipline (fast, offline CI guard): our A2UI packages must move in lockstep with
@@ -22,7 +29,7 @@ function _minor(range: string): string
 
 describe("A2UI version lockstep (#41 §5)", () =>
 {
-	const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as { dependencies?: Record<string, string> };
+	const pkg = JSON.parse(readFileSync(_ROOT_PACKAGE_JSON, "utf8")) as { dependencies?: Record<string, string> };
 	const deps = pkg.dependencies ?? {};
 
 	it("declares both @a2ui packages", () =>

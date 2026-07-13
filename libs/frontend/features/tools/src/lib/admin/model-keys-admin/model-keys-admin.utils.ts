@@ -1,4 +1,4 @@
-import { ModelProvider, ProviderKeyStatus, SUPPORTED_MODEL_PROVIDERS } from "@weownai/state/provider-key/adapter";
+import { ModelProvider, ProviderKeyStatus, SUPPORTED_MODEL_PROVIDERS } from "@opencrane/state/provider-key/adapter";
 
 import { LiteLlmBadge, MODEL_PROVIDER_LABELS, ModelKeyRow } from "./model-keys-admin.types";
 

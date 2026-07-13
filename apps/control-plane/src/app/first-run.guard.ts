@@ -1,6 +1,6 @@
 import { inject } from "@angular/core";
 import { CanActivateFn, Router, UrlTree } from "@angular/router";
-import { WelcomeOnboardingService } from "@weownai/state/onboarding";
+import { WelcomeOnboardingService } from "@opencrane/state/onboarding";
 
 /**
  * Set once the first-run redirect has fired this session. Guarantees the guard

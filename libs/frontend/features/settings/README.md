@@ -1,11 +1,11 @@
-# @weownai/features/settings
+# @opencrane/features/settings
 
 The settings view: a section nav plus eight settings sections.
 
 ## Import
 
 ```ts
-import { SettingsPageComponent } from "@weownai/features/settings";
+import { SettingsPageComponent } from "@opencrane/features/settings";
 ```
 
 ## Contents

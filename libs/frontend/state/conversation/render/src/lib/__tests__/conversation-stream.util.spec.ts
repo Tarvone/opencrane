@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageCard, MessageCardKind, ThreadMessage } from "@weownai/core";
+import { MessageCard, MessageCardKind, ThreadMessage } from "@opencrane/core";
 
 import { _BuildStreamBlocks } from "../conversation-stream.util";
 

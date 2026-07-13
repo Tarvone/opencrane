@@ -1,4 +1,4 @@
-import { GatewayMode } from "@weownai/state/gateways";
+import { GatewayMode } from "@opencrane/state/gateways";
 
 /**
  * Default (development) environment for the control-plane (org-admin) app.

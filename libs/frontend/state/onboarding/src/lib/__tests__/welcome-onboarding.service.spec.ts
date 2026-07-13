@@ -1,7 +1,7 @@
 import { Injector, runInInjectionContext } from "@angular/core";
 import { describe, expect, it } from "vitest";
 
-import { LOCAL_STORAGE_GATEWAY, StorageGateway } from "@weownai/state/utils/storage";
+import { LOCAL_STORAGE_GATEWAY, StorageGateway } from "@opencrane/state/utils/storage";
 
 import { WelcomeOnboardingService } from "../welcome-onboarding.service";
 import { _WELCOME_COMPLETED_KEY, _WelcomeCompletedValue } from "../welcome-onboarding.util";

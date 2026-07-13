@@ -4,13 +4,13 @@ import { provideAnimationsAsync } from "@angular/platform-browser/animations/asy
 import { provideHttpClient, withFetch } from "@angular/common/http";
 import { providePrimeNG } from "primeng/config";
 
-import { WeOwnAiPreset } from "@weownai/core";
-import { CONVERSATION_CACHE, PLATFORM_SURFACE } from "@weownai/state/core";
-import { IndexedDbConversationCache } from "@weownai/state/conversation/cache";
-import { UserTenantStore } from "@weownai/state/tenant/adapter";
-import { LOCAL_STORAGE_GATEWAY, SESSION_STORAGE_GATEWAY, WebLocalStorageAdapter, WebSessionStorageAdapter } from "@weownai/state/utils/storage";
-import { provideControlPlaneGateways } from "@weownai/state/gateways";
-import { provideWebPlatform } from "@weownai/platform";
+import { WeOwnAiPreset } from "@opencrane/core";
+import { CONVERSATION_CACHE, PLATFORM_SURFACE } from "@opencrane/state/core";
+import { IndexedDbConversationCache } from "@opencrane/state/conversation/cache";
+import { UserTenantStore } from "@opencrane/state/tenant/adapter";
+import { LOCAL_STORAGE_GATEWAY, SESSION_STORAGE_GATEWAY, WebLocalStorageAdapter, WebSessionStorageAdapter } from "@opencrane/state/utils/storage";
+import { provideControlPlaneGateways } from "@opencrane/state/gateways";
+import { provideWebPlatform } from "@opencrane/platform";
 
 import { environment } from "../environments/environment";
 import { APP_ROUTES } from "./app.routes";

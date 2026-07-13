@@ -1,4 +1,4 @@
-import { GatewayMode } from "@weownai/state/gateways";
+import { GatewayMode } from "@opencrane/state/gateways";
 
 /**
  * Production environment for the operator app.

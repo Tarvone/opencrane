@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from "@angular/core";
 
-import { MessageCard, MessageCardKind, MessageDelivery, ThreadMessage } from "@weownai/core";
-import { A2uiCanvasComponent } from "@weownai/elements/a2ui";
-import { LedgerCardComponent } from "@weownai/elements/ui";
+import { MessageCard, MessageCardKind, MessageDelivery, ThreadMessage } from "@opencrane/core";
+import { A2uiCanvasComponent } from "@opencrane/elements/a2ui";
+import { LedgerCardComponent } from "@opencrane/elements/ui";
 
 import { CopyCodeDirective } from "../../directives/copy-code.directive";
 import { MarkdownPipe } from "../../pipes/markdown.pipe";

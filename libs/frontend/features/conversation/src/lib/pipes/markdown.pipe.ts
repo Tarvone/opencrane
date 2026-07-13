@@ -1,7 +1,7 @@
 import { Pipe, PipeTransform, inject } from "@angular/core";
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 
-import { toSanitizedMarkdownHtml } from "@weownai/state/conversation/render";
+import { toSanitizedMarkdownHtml } from "@opencrane/state/conversation/render";
 
 /**
  * Renders assistant markdown to safe HTML via the vendored OpenClaw pipeline

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from "@angular/core";
 import { TagModule } from "primeng/tag";
 
-import { UserTenantPhase } from "@weownai/state/tenant/adapter";
+import { UserTenantPhase } from "@opencrane/state/tenant/adapter";
 import { UserTenantTagSeverity } from "../customer-admin.types";
 import { _UserTenantPhaseLabel, _UserTenantPhaseSeverity } from "../customer-admin.util";
 

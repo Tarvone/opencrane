@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 
-import { UserTenant, UserTenantGateway, UserTenantPhase } from "@weownai/state/tenant/adapter";
-import { _FilterByClusterTenant } from "@weownai/state/tenant/adapter";
+import { UserTenant, UserTenantGateway, UserTenantPhase } from "@opencrane/state/tenant/adapter";
+import { _FilterByClusterTenant } from "@opencrane/state/tenant/adapter";
 
 const _BASE_DOMAINS: Readonly<Record<string, string>> = { acme: "ai.acme.example", globex: "ai.globex.example" };
 

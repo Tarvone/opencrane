@@ -36,7 +36,7 @@ export const APP_ROUTES: Routes =
 		canActivate: [___OperatorAccessGuard],
 		loadChildren: function loadWelcomeRoutes()
 		{
-			return import("@weownai/features/welcome").then(function pickWelcomeRoutes(m)
+			return import("@opencrane/features/welcome").then(function pickWelcomeRoutes(m)
 			{
 				return m.WELCOME_ROUTES;
 			});
@@ -48,7 +48,7 @@ export const APP_ROUTES: Routes =
 		canActivate: [___OperatorAccessGuard],
 		loadChildren: function loadCustomerAdminRoutes()
 		{
-			return import("@weownai/features/customer-admin").then(function pickCustomerAdminRoutes(m)
+			return import("@opencrane/features/customer-admin").then(function pickCustomerAdminRoutes(m)
 			{
 				return m.CUSTOMER_ADMIN_ROUTES;
 			});
@@ -61,7 +61,7 @@ export const APP_ROUTES: Routes =
 		canActivate: [___OperatorAccessGuard],
 		loadChildren: function loadMcpAdminRoutes()
 		{
-			return import("@weownai/features/tools").then(function pickMcpAdminRoutes(m)
+			return import("@opencrane/features/tools").then(function pickMcpAdminRoutes(m)
 			{
 				return m.MCP_ADMIN_ROUTES;
 			});
@@ -75,7 +75,7 @@ export const APP_ROUTES: Routes =
 		canActivate: [___OperatorAccessGuard, ___FirstRunGuard],
 		loadChildren: function loadWorkspaceRoutes()
 		{
-			return import("@weownai/features/workspace").then(function pickWorkspaceRoutes(m)
+			return import("@opencrane/features/workspace").then(function pickWorkspaceRoutes(m)
 			{
 				return m.WORKSPACE_ROUTES;
 			});

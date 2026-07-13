@@ -3,10 +3,10 @@ import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { ToggleSwitchModule } from "primeng/toggleswitch";
 
-import { MCP_TYPE_STYLES, McpAccessPolicy, McpApprovalStatus, McpDirectory, McpEntitledUser, McpServer } from "@weownai/core";
-import { MCP_GATEWAY } from "@weownai/state/mcp/adapter";
-import { SessionStore } from "@weownai/state/core";
-import { AvatarCircleComponent, ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { MCP_TYPE_STYLES, McpAccessPolicy, McpApprovalStatus, McpDirectory, McpEntitledUser, McpServer } from "@opencrane/core";
+import { MCP_GATEWAY } from "@opencrane/state/mcp/adapter";
+import { SessionStore } from "@opencrane/state/core";
+import { AvatarCircleComponent, ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 
 /**
  * Access-policy management — maps servers → users / groups.

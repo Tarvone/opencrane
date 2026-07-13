@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 
-import { ControlPlaneApiService, McpAccessPolicy, McpDirectory, McpInstalledServer, McpServer } from "@weownai/core";
+import { ControlPlaneApiService, McpAccessPolicy, McpDirectory, McpInstalledServer, McpServer } from "@opencrane/core";
 
 import { McpGateway } from "./mcp-gateway.types";
 import { McpAccessPolicyWire, McpInstalledWire, McpServerWire, _MapAccessPolicy, _MapDirectory, _MapInstalled, _MapServer } from "./mcp-mapper.util";

@@ -1,8 +1,27 @@
 {
-	"name": "features-notifications",
+	"name": "frontend-features-notifications",
+	"$schema": "../../../../node_modules/nx/schemas/project-schema.json",
 	"projectType": "library",
-	"sourceRoot": "libs/features/notifications/src",
+	"sourceRoot": "libs/frontend/features/notifications/src",
 	"prefix": "wo",
-	"tags": ["scope:shared", "type:feature"],
-	"targets": {}
+	"tags": [
+		"scope:web",
+		"type:feature"
+	],
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "tsc -p tsconfig.json --noEmit",
+				"cwd": "libs/frontend/features/notifications"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --passWithNoTests",
+				"cwd": "libs/frontend/features/notifications"
+			}
+		}
+	}
 }

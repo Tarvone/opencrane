@@ -1,8 +1,8 @@
 import { Injectable, Signal, computed, inject, signal } from "@angular/core";
 
-import { AgentOption, MessageCardKind, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@weownai/core";
-import { EMPTY_THREAD, SESSIONS, THREADS } from "@weownai/core/testing";
-import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway } from "@weownai/state/core";
+import { AgentOption, MessageCardKind, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
+import { EMPTY_THREAD, SESSIONS, THREADS } from "@opencrane/core/testing";
+import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway } from "@opencrane/state/core";
 
 const _BACKLOG_SIZE = 48;
 const _MOCK_PAGE = 12;

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
 
-import { AgentOption, ModelOption } from "@weownai/core";
-import { CONVERSATION_GATEWAY } from "@weownai/state/core";
+import { AgentOption, ModelOption } from "@opencrane/core";
+import { CONVERSATION_GATEWAY } from "@opencrane/state/core";
 
 /**
  * Header pill + dropdown for choosing the agent a session sends to, with the

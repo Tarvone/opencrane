@@ -1,4 +1,4 @@
-import { SessionSummary } from "@weownai/core";
+import { SessionSummary } from "@opencrane/core";
 
 /** Default accent colour applied when a row carries no colour. */
 const _DEFAULT_COLOR = "#7A6AA0";

@@ -5,7 +5,7 @@
 	"sourceRoot": "apps/control-plane/src",
 	"prefix": "wo",
 	"tags": [
-		"scope:web",
+		"scope:app",
 		"type:app"
 	],
 	"targets": {

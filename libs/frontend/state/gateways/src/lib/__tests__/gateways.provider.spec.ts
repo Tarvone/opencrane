@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ClassProvider, InjectionToken, Provider, ValueProvider } from "@angular/core";
 
-import { CONVERSATION_GATEWAY } from "@weownai/state/core";
-import { OpenClawConversationGateway } from "@weownai/state/conversation/adapter";
-import { OpenCraneSettingsGateway, SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { OpenCraneUserTenantGateway, USER_TENANT_GATEWAY } from "@weownai/state/tenant/adapter";
-import { CLUSTER_TENANT_GATEWAY, OpenCraneClusterTenantGateway } from "@weownai/state/cluster-tenant/adapter";
-import { MCP_GATEWAY, OpenCraneMcpGateway } from "@weownai/state/mcp/adapter";
-import { MockPaymentGateway, PAYMENT_GATEWAY } from "@weownai/state/billing/adapter";
+import { CONVERSATION_GATEWAY } from "@opencrane/state/core";
+import { OpenClawConversationGateway } from "@opencrane/state/conversation/adapter";
+import { OpenCraneSettingsGateway, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { OpenCraneUserTenantGateway, USER_TENANT_GATEWAY } from "@opencrane/state/tenant/adapter";
+import { MCP_GATEWAY, OpenCraneMcpGateway } from "@opencrane/state/mcp/adapter";
 
 import { GATEWAY_MODE } from "../gateway-mode.types";
 import { provideControlPlaneGateways } from "../control-plane-gateways.provider";
-import { provideFleetGateways } from "../fleet-gateways.provider";
 import {
-	MockClusterTenantGateway,
 	MockConversationGateway,
 	MockMcpGateway,
 	MockSettingsGateway,
@@ -69,20 +65,6 @@ describe("provideControlPlaneGateways", () =>
 	});
 });
 
-describe("provideFleetGateways", () =>
-{
-	it("binds the live fleet gateways, keeps payment on the mock, and reports live mode", () =>
-	{
-		const providers = provideFleetGateways();
-
-		expect(classFor(providers, CLUSTER_TENANT_GATEWAY)).toBe(OpenCraneClusterTenantGateway);
-		expect(classFor(providers, USER_TENANT_GATEWAY)).toBe(OpenCraneUserTenantGateway);
-		// Payment stays mock even in live mode (no live PSP — LIVE.5).
-		expect(classFor(providers, PAYMENT_GATEWAY)).toBe(MockPaymentGateway);
-		expect(valueFor(providers, GATEWAY_MODE)).toBe("live");
-	});
-});
-
 describe("provideTestGateways", () =>
 {
 	it("binds every swappable gateway to its in-memory fixture and reports mock mode", () =>
@@ -93,7 +75,6 @@ describe("provideTestGateways", () =>
 		expect(classFor(providers, SETTINGS_GATEWAY)).toBe(MockSettingsGateway);
 		expect(classFor(providers, USER_TENANT_GATEWAY)).toBe(MockUserTenantGateway);
 		expect(classFor(providers, MCP_GATEWAY)).toBe(MockMcpGateway);
-		expect(classFor(providers, CLUSTER_TENANT_GATEWAY)).toBe(MockClusterTenantGateway);
 		expect(valueFor(providers, GATEWAY_MODE)).toBe("mock");
 	});
 });

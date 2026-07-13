@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
 
-import { DatasetAccess, SCOPE_COLORS, ScopeLevel } from "@weownai/core";
-import { ActiveTenantStore } from "@weownai/state/gateways";
-import { SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { DatasetAccess, SCOPE_COLORS, ScopeLevel } from "@opencrane/core";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 import { _settledValue } from "../../resource.util";
 
 /** Access & Datasets settings section. */

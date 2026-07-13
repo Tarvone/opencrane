@@ -1,4 +1,4 @@
-import { MessageCardKind, ThreadMessage } from "@weownai/core";
+import { MessageCardKind, ThreadMessage } from "@opencrane/core";
 
 import { StreamBlock } from "./conversation-stream.types";
 

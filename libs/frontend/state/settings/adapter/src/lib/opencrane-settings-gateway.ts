@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 
-import { ControlPlaneApiService, DatasetAccess, EgressDomain, SkillRow } from "@weownai/core";
+import { ControlPlaneApiService, DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
 
 import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "./settings-gateway.types";
 import {

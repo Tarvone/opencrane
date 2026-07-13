@@ -1,7 +1,7 @@
 import { EnvironmentProviders, Provider } from "@angular/core";
 import { DEFAULT_CATALOG, provideA2UI, provideMarkdownRenderer } from "@a2ui/angular/v0_8";
 
-import { toSanitizedMarkdownHtml } from "@weownai/state/conversation/render";
+import { toSanitizedMarkdownHtml } from "@opencrane/state/conversation/render";
 
 import { _WoA2uiTheme } from "./a2ui.theme";
 

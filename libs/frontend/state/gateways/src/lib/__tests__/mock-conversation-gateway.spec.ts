@@ -1,10 +1,10 @@
 import { Injector, runInInjectionContext } from "@angular/core";
 import { describe, expect, it } from "vitest";
 
-import type { SessionSummary, ThreadMessage } from "@weownai/core";
-import { SESSIONS } from "@weownai/core/testing";
-import { CONVERSATION_CACHE, ConnectionStatus } from "@weownai/state/core";
-import type { CachedThread, ConversationCache } from "@weownai/state/core";
+import type { SessionSummary, ThreadMessage } from "@opencrane/core";
+import { SESSIONS } from "@opencrane/core/testing";
+import { CONVERSATION_CACHE, ConnectionStatus } from "@opencrane/state/core";
+import type { CachedThread, ConversationCache } from "@opencrane/state/core";
 
 import { MockConversationGateway } from "../__test__/mock-conversation-gateway";
 

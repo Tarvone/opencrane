@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
-import { ConversationViewComponent, FilePanelComponent, FilePreviewService } from "@weownai/features/conversation";
-import { ContextPanelComponent } from "@weownai/features/context";
+import { ConversationViewComponent, FilePanelComponent, FilePreviewService } from "@opencrane/features/conversation";
+import { ContextPanelComponent } from "@opencrane/features/context";
 import { NewSessionRelay } from "./new-session-relay";
 import { _NewSessionId } from "./session-page.utils";
 

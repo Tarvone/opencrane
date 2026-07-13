@@ -1,4 +1,4 @@
-import { UserTenant, UserTenantPhase } from "@weownai/state/tenant/adapter";
+import { UserTenant, UserTenantPhase } from "@opencrane/state/tenant/adapter";
 
 import { UserTenantRow, UserTenantTagSeverity } from "./customer-admin.types";
 

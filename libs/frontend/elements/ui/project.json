@@ -1,8 +1,27 @@
 {
-	"name": "elements-ui",
+	"name": "frontend-elements-ui",
+	"$schema": "../../../../node_modules/nx/schemas/project-schema.json",
 	"projectType": "library",
-	"sourceRoot": "libs/elements/ui/src",
+	"sourceRoot": "libs/frontend/elements/ui/src",
 	"prefix": "wo",
-	"tags": ["scope:shared", "type:ui"],
-	"targets": {}
+	"tags": [
+		"scope:web",
+		"type:ui"
+	],
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "tsc -p tsconfig.json --noEmit",
+				"cwd": "libs/frontend/elements/ui"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --passWithNoTests",
+				"cwd": "libs/frontend/elements/ui"
+			}
+		}
+	}
 }

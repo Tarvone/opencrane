@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, input, linkedSignal, output } from "@angular/core";
 import { DrawerModule } from "primeng/drawer";
 
-import { MCP_TYPE_STYLES, McpConnectionStatus, McpCredentialField, McpInstalledServer, McpServer, McpServerType } from "@weownai/core";
-import { AvatarCircleComponent } from "@weownai/elements/ui";
+import { MCP_TYPE_STYLES, McpConnectionStatus, McpCredentialField, McpInstalledServer, McpServer, McpServerType } from "@opencrane/core";
+import { AvatarCircleComponent } from "@opencrane/elements/ui";
 
 /**
  * Connect / Set-credential drawer — the single secure entry point for binding a

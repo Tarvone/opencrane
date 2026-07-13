@@ -3,7 +3,7 @@ import { ButtonModule } from "primeng/button";
 import { TableModule } from "primeng/table";
 import { MessageModule } from "primeng/message";
 
-import { ControlPlaneApiService } from "@weownai/core";
+import { ControlPlaneApiService } from "@opencrane/core";
 
 import { MetricsDailyRow, MetricsRange, MetricsSummary } from "../metrics.types";
 import { _BuildQuery, _ParseRows, _Summarise } from "../metrics.util";

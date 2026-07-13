@@ -1,8 +1,8 @@
 import { Injectable } from "@angular/core";
 
-import { McpAccessPolicy, McpApprovalStatus, McpConnectionStatus, McpDirectory, McpInstalledServer, McpServer, McpServerType } from "@weownai/core";
-import { MCP_ACCESS_POLICIES, MCP_CATALOGUE, MCP_DIRECTORY, MCP_INSTALLED } from "@weownai/core/testing";
-import { McpGateway } from "@weownai/state/mcp/adapter";
+import { McpAccessPolicy, McpApprovalStatus, McpConnectionStatus, McpDirectory, McpInstalledServer, McpServer, McpServerType } from "@opencrane/core";
+import { MCP_ACCESS_POLICIES, MCP_CATALOGUE, MCP_DIRECTORY, MCP_INSTALLED } from "@opencrane/core/testing";
+import { McpGateway } from "@opencrane/state/mcp/adapter";
 
 /** In-memory McpGateway for tests — never imported by production code. */
 @Injectable()

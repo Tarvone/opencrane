@@ -1,11 +1,11 @@
-# @weownai/features/notifications
+# @opencrane/features/notifications
 
 The notification popover anchored to the sidebar bell.
 
 ## Import
 
 ```ts
-import { NotificationPanelComponent } from "@weownai/features/notifications";
+import { NotificationPanelComponent } from "@opencrane/features/notifications";
 ```
 
 ## Contents

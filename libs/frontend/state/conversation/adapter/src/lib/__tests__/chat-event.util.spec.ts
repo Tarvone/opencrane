@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageDelivery } from "@weownai/core";
+import { MessageDelivery } from "@opencrane/core";
 
 import { _DecodeChatEvent } from "../openclaw-connection";
 import { _ChatEventDelivery, _ChatEventDone, _ChatEventId, _ChatEventIsSnapshot, _ChatEventRole, _ChatEventStopReason, _ChatEventText, _ChatEventThinking, _ChatEventTools, _HistoryRowContent } from "../chat-event.util";

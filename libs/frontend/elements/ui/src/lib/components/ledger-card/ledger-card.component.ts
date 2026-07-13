@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from "@angular/core";
 
-import { LEDGER_KIND_STYLES, LedgerKindStyle, SCOPE_COLORS, ScopeLevel } from "@weownai/core";
+import { LEDGER_KIND_STYLES, LedgerKindStyle, SCOPE_COLORS, ScopeLevel } from "@opencrane/core";
 import { ScopeChipComponent } from "../scope-chip/scope-chip.component";
 
 /** Observation / policy / action ledger card (used in chat and ledger tab). */

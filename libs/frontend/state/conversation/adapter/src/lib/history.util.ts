@@ -1,4 +1,4 @@
-import { ThreadMessage } from "@weownai/core";
+import { ThreadMessage } from "@opencrane/core";
 
 /**
  * Pure helpers for the history-window logic, factored out of the gateway so the

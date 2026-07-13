@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageCard, MessageCardKind } from "@weownai/core";
+import { MessageCard, MessageCardKind } from "@opencrane/core";
 
 import { _ChatEventAttachments, _ChatEventText, _ChatEventToolResults, _ChatEventTools } from "../chat-event.util";
 import { _BuildAssistantCards, _MergeToolResults } from "../assistant-cards.util";

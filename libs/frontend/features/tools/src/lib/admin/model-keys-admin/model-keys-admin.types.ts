@@ -1,4 +1,4 @@
-import { ModelProvider } from "@weownai/state/provider-key/adapter";
+import { ModelProvider } from "@opencrane/state/provider-key/adapter";
 
 /**
  * Per-provider row view model for the Model Keys table.

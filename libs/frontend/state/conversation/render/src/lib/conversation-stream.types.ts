@@ -1,4 +1,4 @@
-import { MessageCard, ThreadMessage } from "@weownai/core";
+import { MessageCard, ThreadMessage } from "@opencrane/core";
 
 /**
  * A row in the rendered conversation stream: either a whole message, or a run of

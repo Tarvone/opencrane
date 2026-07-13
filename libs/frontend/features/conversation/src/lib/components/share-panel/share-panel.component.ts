@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from "@angular/core";
 
-import { ShareTarget, Teammate, _ToggleId } from "@weownai/core";
-import { AvatarCircleComponent } from "@weownai/elements/ui";
+import { ShareTarget, Teammate, _ToggleId } from "@opencrane/core";
+import { AvatarCircleComponent } from "@opencrane/elements/ui";
 
 /** Share popover: invite teammates or share the canvas to another session. */
 @Component({

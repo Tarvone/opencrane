@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, output } from "@angular/core";
 
-import { AppNotification, NOTIFICATION_KIND_STYLES, NotificationKindStyle } from "@weownai/core";
+import { AppNotification, NOTIFICATION_KIND_STYLES, NotificationKindStyle } from "@opencrane/core";
 
 /** Notification popover anchored to the sidebar bell. */
 @Component({

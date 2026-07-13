@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, signal, untracked, viewChild } from "@angular/core";
 
-import { SCOPE_COLORS, ScopeLevel } from "@weownai/core";
-import { CONVERSATION_GATEWAY, ConnectionStatus } from "@weownai/state/core";
-import { StreamBlock, _BuildStreamBlocks } from "@weownai/state/conversation/render";
+import { SCOPE_COLORS, ScopeLevel } from "@opencrane/core";
+import { CONVERSATION_GATEWAY, ConnectionStatus } from "@opencrane/state/core";
+import { StreamBlock, _BuildStreamBlocks } from "@opencrane/state/conversation/render";
 import { ConversationViewState, _ToConversationViewState } from "../conversation-view.util";
 import { ConversationPickerComponent } from "../components/conversation-picker/conversation-picker.component";
 import { MessageItemComponent } from "../components/message-item/message-item.component";

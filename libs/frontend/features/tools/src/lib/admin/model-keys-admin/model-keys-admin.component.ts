@@ -3,9 +3,9 @@ import { FormsModule } from "@angular/forms";
 import { ConfirmationService } from "primeng/api";
 import { ConfirmDialogModule } from "primeng/confirmdialog";
 
-import { ModelProvider, PROVIDER_KEY_GATEWAY, ProviderKeyStatus } from "@weownai/state/provider-key/adapter";
-import { SessionStore } from "@weownai/state/core";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { ModelProvider, PROVIDER_KEY_GATEWAY, ProviderKeyStatus } from "@opencrane/state/provider-key/adapter";
+import { SessionStore } from "@opencrane/state/core";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 
 import { LITELLM_BADGE_STYLES, ModelKeyRow } from "./model-keys-admin.types";
 import { _BadgeFor, _ToModelKeyRows } from "./model-keys-admin.utils";

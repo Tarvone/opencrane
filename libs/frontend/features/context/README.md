@@ -1,11 +1,11 @@
-# @weownai/features/context
+# @opencrane/features/context
 
 The right pane: Context / Ledger / Canvas tabs.
 
 ## Import
 
 ```ts
-import { ContextPanelComponent } from "@weownai/features/context";
+import { ContextPanelComponent } from "@opencrane/features/context";
 ```
 
 ## Contents

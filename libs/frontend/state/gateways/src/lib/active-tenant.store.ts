@@ -1,6 +1,6 @@
 import { Injectable, Signal, computed, inject } from "@angular/core";
 
-import { SessionStore } from "@weownai/state/core";
+import { SessionStore } from "@opencrane/state/core";
 import { GATEWAY_MODE } from "./gateway-mode.types";
 import { _ResolveActiveTenant } from "./active-tenant.util";
 

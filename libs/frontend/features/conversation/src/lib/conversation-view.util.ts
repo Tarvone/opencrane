@@ -1,4 +1,4 @@
-import { ConnectionStatus } from "@weownai/state/core";
+import { ConnectionStatus } from "@opencrane/state/core";
 
 /**
  * Enum-first UI state for the conversation centre pane, derived from the live

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
 
-import { CanvasInitiative, CanvasMetric, CanvasRisk } from "@weownai/core";
+import { CanvasInitiative, CanvasMetric, CanvasRisk } from "@opencrane/core";
 
 /** Status display metadata for canvas initiative rows. */
 interface InitiativeStatusStyle { color: string; label: string; }

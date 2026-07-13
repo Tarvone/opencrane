@@ -1,4 +1,4 @@
-import { PlanIdentity } from "@weownai/core";
+import { PlanIdentity } from "@opencrane/core";
 
 /**
  * Ordered steps of the self-serve signup funnel.

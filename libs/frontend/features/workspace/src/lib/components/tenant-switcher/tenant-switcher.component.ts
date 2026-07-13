@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, Signal, computed, inject } from "@a
 import { FormsModule } from "@angular/forms";
 import { SelectModule } from "primeng/select";
 
-import { SessionStore } from "@weownai/state/core";
+import { SessionStore } from "@opencrane/state/core";
 
 /**
  * Active-tenant switcher for the workspace shell (OPS.3).

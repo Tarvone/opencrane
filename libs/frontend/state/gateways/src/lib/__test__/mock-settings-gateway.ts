@@ -1,8 +1,8 @@
 import { Injectable } from "@angular/core";
 
-import { DatasetAccess, EgressDomain, SkillRow } from "@weownai/core";
-import { DATASET_ACCESS, EGRESS_DOMAINS, SKILLS } from "@weownai/core/testing";
-import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "@weownai/state/settings/adapter";
+import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
+import { DATASET_ACCESS, EGRESS_DOMAINS, SKILLS } from "@opencrane/core/testing";
+import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "@opencrane/state/settings/adapter";
 
 const _FIXTURE: AccountProfile = { name: "alex.oc", fullName: "Alex Kim", email: "alex.kim@acme-corp.com", department: "Product" };
 

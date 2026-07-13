@@ -1,4 +1,4 @@
-// Public API of @weownai/elements/a2ui — in-process A2UI (Google A2UI protocol, Apache-2.0)
+// Public API of @opencrane/elements/a2ui — in-process A2UI (Google A2UI protocol, Apache-2.0)
 // rendering for agent-authored canvas surfaces, on the v0.8 dialect OpenClaw ships at the pin.
 //
 // This is the SINK half of the canvas feature (renderer + return path). The PRODUCER — the

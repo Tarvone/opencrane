@@ -1,9 +1,27 @@
 {
-	"name": "gateways",
-	"$schema": "../../../node_modules/nx/schemas/project-schema.json",
-	"sourceRoot": "libs/state/gateways/src",
+	"name": "frontend-gateways",
+	"$schema": "../../../../node_modules/nx/schemas/project-schema.json",
 	"projectType": "library",
+	"sourceRoot": "libs/frontend/state/gateways/src",
 	"prefix": "wo",
-	"tags": ["scope:shared", "type:state"],
-	"targets": {}
+	"tags": [
+		"scope:web",
+		"type:state"
+	],
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "tsc -p tsconfig.json --noEmit",
+				"cwd": "libs/frontend/state/gateways"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --passWithNoTests",
+				"cwd": "libs/frontend/state/gateways"
+			}
+		}
+	}
 }

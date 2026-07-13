@@ -1,11 +1,11 @@
-# @weownai/features/conversation
+# @opencrane/features/conversation
 
 The centre pane: thread header, message stream, and composer.
 
 ## Import
 
 ```ts
-import { ConversationViewComponent } from "@weownai/features/conversation";
+import { ConversationViewComponent } from "@opencrane/features/conversation";
 ```
 
 ## Contents

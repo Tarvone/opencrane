@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 
-import { ControlPlaneApiService } from "@weownai/core";
+import { ControlPlaneApiService } from "@opencrane/core";
 
 import { UserTenant, UserTenantGateway, UserTenantPhase } from "./tenant-gateway.types";
 import { _FilterByClusterTenant } from "./tenant-store.util";

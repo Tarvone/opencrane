@@ -1,6 +1,6 @@
 import { Injectable, Signal, computed, inject, resource, signal } from "@angular/core";
 
-import { ControlPlaneApiService, FleetManagerApiService } from "@weownai/core";
+import { ControlPlaneApiService, FleetManagerApiService } from "@opencrane/core";
 import { Capabilities, SessionTenant, SessionUser } from "./session-store.types";
 import { _DeriveCapabilities, _ResolveCurrentTenant } from "./session-store.util";
 import { PLATFORM_SURFACE } from "./platform-surface";

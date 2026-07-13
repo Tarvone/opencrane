@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageCard, MessageCardKind } from "@weownai/core";
+import { MessageCard, MessageCardKind } from "@opencrane/core";
 
 import { _BuildAssistantCards, _HasRenderableCards, _MergeToolCard } from "../assistant-cards.util";
 

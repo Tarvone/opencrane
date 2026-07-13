@@ -1,6 +1,6 @@
 import { Injectable, Signal, signal } from "@angular/core";
 
-import { FileArtifact } from "@weownai/state/conversation/render";
+import { FileArtifact } from "@opencrane/state/conversation/render";
 
 /**
  * Holds the file a tool row has "portaled to the side". A file-bearing tool (a `read`, or a

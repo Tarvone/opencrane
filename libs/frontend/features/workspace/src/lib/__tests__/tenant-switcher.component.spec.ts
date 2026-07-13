@@ -1,7 +1,7 @@
 import { Injector, runInInjectionContext, signal } from "@angular/core";
 import { describe, expect, it } from "vitest";
 
-import { SessionStore } from "@weownai/state/core";
+import { SessionStore } from "@opencrane/state/core";
 import { TenantSwitcherComponent } from "../components/tenant-switcher/tenant-switcher.component";
 
 /** A tenant shape as the switcher reads it (name only is exercised here). */

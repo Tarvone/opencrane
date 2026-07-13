@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from "@angular/core";
 
-import { HarvestChannel, SCOPE_COLORS, ScopeLevel } from "@weownai/core";
-import { ScopeChipComponent, SectionHeadingComponent } from "@weownai/elements/ui";
+import { HarvestChannel, SCOPE_COLORS, ScopeLevel } from "@opencrane/core";
+import { ScopeChipComponent, SectionHeadingComponent } from "@opencrane/elements/ui";
 
 /** Harvest Channels settings section. */
 @Component({

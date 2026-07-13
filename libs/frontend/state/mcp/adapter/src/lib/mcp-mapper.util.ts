@@ -1,4 +1,4 @@
-import { McpAccessPolicy, McpApprovalStatus, McpConnectionStatus, McpCredentialField, McpDirectory, McpEntitledUser, McpInstalledServer, McpServer, McpServerType } from "@weownai/core";
+import { McpAccessPolicy, McpApprovalStatus, McpConnectionStatus, McpCredentialField, McpDirectory, McpEntitledUser, McpInstalledServer, McpServer, McpServerType } from "@opencrane/core";
 
 /**
  * Wire shapes + mappers for the live OpenCrane MCP gateway.

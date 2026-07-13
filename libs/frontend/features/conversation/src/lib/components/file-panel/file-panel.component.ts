@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 
-import { FileArtifact } from "@weownai/state/conversation/render";
+import { FileArtifact } from "@opencrane/state/conversation/render";
 
 import { CopyCodeDirective } from "../../directives/copy-code.directive";
 import { MarkdownPipe } from "../../pipes/markdown.pipe";

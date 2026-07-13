@@ -1,6 +1,6 @@
-// Public API of @weownai/state/conversation/render — the vendored OpenClaw headless
+// Public API of @opencrane/state/conversation/render — the vendored OpenClaw headless
 // render slice (MIT; see THIRD_PARTY_NOTICES.md). View-model types + pure builders; the
-// Angular rendering surface is re-implemented in @weownai/features/conversation.
+// Angular rendering surface is re-implemented in @opencrane/features/conversation.
 export * from "./lib/chat-types";
 export * from "./lib/tool-content";
 export * from "./lib/canvas-render";

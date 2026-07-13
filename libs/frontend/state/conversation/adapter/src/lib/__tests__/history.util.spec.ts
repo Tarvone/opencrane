@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ThreadMessage } from "@weownai/core";
+import type { ThreadMessage } from "@opencrane/core";
 
 import { _IsHistoryExhausted, _MergeLiveTail } from "../history.util";
 

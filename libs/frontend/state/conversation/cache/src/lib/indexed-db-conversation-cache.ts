@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 
-import { SessionSummary, ThreadMessage } from "@weownai/core";
-import { CachedSessions, CachedThread, ConversationCache } from "@weownai/state/core";
+import { SessionSummary, ThreadMessage } from "@opencrane/core";
+import { CachedSessions, CachedThread, ConversationCache } from "@opencrane/state/core";
 
 /** IndexedDB database name for WeOwnAI local state. */
 const _DB_NAME = "weownai";

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
 import { Button } from "primeng/button";
 import { Card } from "primeng/card";
 
-import { SessionStore } from "@weownai/state/core";
+import { SessionStore } from "@opencrane/state/core";
 
 /**
  * Terminal screen for an authenticated user who has no UserTenant in this

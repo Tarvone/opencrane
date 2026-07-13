@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ScopeLevel } from "@weownai/core";
+import { ScopeLevel } from "@opencrane/core";
 
 import {
 	_MapAccountProfile,

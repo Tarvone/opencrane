@@ -1,5 +1,5 @@
-import { MessageDelivery } from "@weownai/core";
-import { inferAttachmentKind, isToolCallContentType, isToolErrorOutput, mediaKindFromMime, resolveToolBlockArgs } from "@weownai/state/conversation/render";
+import { MessageDelivery } from "@opencrane/core";
+import { inferAttachmentKind, isToolCallContentType, isToolErrorOutput, mediaKindFromMime, resolveToolBlockArgs } from "@opencrane/state/conversation/render";
 
 import { ChatEvent } from "./gateway-protocol.types";
 

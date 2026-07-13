@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageCardKind, ThreadMessage } from "@weownai/core";
+import { MessageCardKind, ThreadMessage } from "@opencrane/core";
 
 import { _FoldHistoryToolResults, _LocateToolResultTarget, HistoryBuilt } from "../assistant-cards.util";
 

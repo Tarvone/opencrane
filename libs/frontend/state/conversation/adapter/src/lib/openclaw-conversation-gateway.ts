@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, inject, signal } from "@angular/core";
 
-import { AgentOption, ControlPlaneApiService, MessageCardKind, MessageDelivery, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@weownai/core";
-import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway, SessionStore } from "@weownai/state/core";
+import { AgentOption, ControlPlaneApiService, MessageCardKind, MessageDelivery, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
+import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway, SessionStore } from "@opencrane/state/core";
 
 import { OpenClawConnection, _DecodeAgentList, _DecodeChatEvent, _DecodeHealth, _DecodeHistory, _DecodeModelList, _DecodeSessionOperation, _DecodeSessionTool, _IsSecureGatewayUrl } from "./openclaw-connection";
 import { _ChatEventAttachments, _ChatEventDelivery, _ChatEventDone, _ChatEventId, _ChatEventIsSnapshot, _ChatEventRole, _ChatEventText, _ChatEventThinking, _ChatEventToolResults, _ChatEventTools, _HistoryRowContent } from "./chat-event.util";

@@ -1,11 +1,11 @@
 import { Provider } from "@angular/core";
 
-import { CONVERSATION_GATEWAY } from "@weownai/state/core";
-import { OpenClawConversationGateway } from "@weownai/state/conversation/adapter";
-import { OpenCraneSettingsGateway, SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { OpenCraneUserTenantGateway, USER_TENANT_GATEWAY } from "@weownai/state/tenant/adapter";
-import { MCP_GATEWAY, OpenCraneMcpGateway } from "@weownai/state/mcp/adapter";
-import { OpenCraneProviderKeyGateway, PROVIDER_KEY_GATEWAY } from "@weownai/state/provider-key/adapter";
+import { CONVERSATION_GATEWAY } from "@opencrane/state/core";
+import { OpenClawConversationGateway } from "@opencrane/state/conversation/adapter";
+import { OpenCraneSettingsGateway, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { OpenCraneUserTenantGateway, USER_TENANT_GATEWAY } from "@opencrane/state/tenant/adapter";
+import { MCP_GATEWAY, OpenCraneMcpGateway } from "@opencrane/state/mcp/adapter";
+import { OpenCraneProviderKeyGateway, PROVIDER_KEY_GATEWAY } from "@opencrane/state/provider-key/adapter";
 
 import { GATEWAY_MODE } from "./gateway-mode.types";
 

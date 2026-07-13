@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource, signal } from "@angular/core";
 
-import { MODELS, MODEL_CLASSES, ModelClass, ModelInfo, SpendSlice, _ToggleId } from "@weownai/core";
-import { ActiveTenantStore } from "@weownai/state/gateways";
-import { BudgetSpend, SETTINGS_GATEWAY } from "@weownai/state/settings/adapter";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@weownai/elements/ui";
+import { MODELS, MODEL_CLASSES, ModelClass, ModelInfo, SpendSlice, _ToggleId } from "@opencrane/core";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { BudgetSpend, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
 import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
 import { ModelChipComponent } from "../../components/model-chip/model-chip.component";
 import { _settledValue } from "../../resource.util";

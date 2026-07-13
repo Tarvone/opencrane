@@ -1,6 +1,6 @@
 import { InjectionToken } from "@angular/core";
 
-import { McpAccessPolicy, McpDirectory, McpInstalledServer, McpServer } from "@weownai/core";
+import { McpAccessPolicy, McpDirectory, McpInstalledServer, McpServer } from "@opencrane/core";
 
 /**
  * Abstraction over the OpenCrane MCP catalogue / credential / activation reads

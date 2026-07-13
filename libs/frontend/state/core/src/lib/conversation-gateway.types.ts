@@ -1,6 +1,6 @@
 import { InjectionToken, Signal } from "@angular/core";
 
-import { AgentOption, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@weownai/core";
+import { AgentOption, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
 
 /** Live connection state for a conversation stream. */
 export enum ConnectionStatus

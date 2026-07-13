@@ -17,6 +17,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `@opencrane/cli` | [apps/cli.md](./apps/cli.md) | The `oc` CLI — a **thin typed wrapper** over the contracts client, no business logic. OIDC device-flow login; `--output table|json`. |
 | `@opencrane/skill-registry` | [apps/skill-registry.md](./apps/skill-registry.md) | Entitlement-gated skill delivery (`:5000`). TokenReview (`aud=skill-registry`) → proxy to control-plane; non-entitled **and** non-existent → `404` (existence-hiding). |
 | `@opencrane/harvesting-agent` | [apps/harvesting-agent.md](./apps/harvesting-agent.md) | Background ingestion worker (not API-first). Slack → normalise → Cognee; cursor in Postgres. `/healthz`, `/metrics`. |
+| _(apps/control-plane)_ | — | Org-admin Angular SPA, ported in from WeOwnAI (#152). PrimeNG, zoneless/signals, standalone components — see [`angular.md`](./angular.md). Just another client of the control-plane API (API-First / CLI-First Rule below). `npx nx build\|serve control-plane`. |
 | _(apps/tenant)_ | — | Tenant-side assets / templates (not a workspace package). |
 
 ## Libs (`libs/`)
@@ -38,6 +39,19 @@ Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, boundary rules (`scope:domain`), and the
 add-a-domain checklist live in [`libs/domain/README.md`](../../libs/domain/README.md);
 schema/migration ownership in [`prisma.md`](./prisma.md).
+
+## Frontend libs (`libs/frontend/*`)
+
+Angular libraries feeding `apps/control-plane`, ported in from WeOwnAI (#152): `core`, `platform`
+(FORK — also live in the WeOwnAI repo, kept in sync deliberately), `elements/{ui,a2ui}`,
+`features/{welcome,customer-admin,tools,workspace,settings,conversation,context,notifications,metrics}`,
+and `state/{core,gateways,conversation/*,settings/adapter,mcp/adapter,provider-key/adapter,tenant/adapter,onboarding,utils/storage}`.
+Project names are `frontend-<lib>` (`scope:web` tag, may only depend on `scope:web`/`scope:shared`);
+aliases are `@opencrane/*` in `tsconfig.base.json`, resolved via `tsconfig.frontend.json` (Angular's
+module/decorator settings layered over the shared `tsconfig.base.json` — never edit the base config's
+`module`/`moduleResolution` for Angular's sake). `state/gateways` is control-plane-only here — the
+fleet-only `provideFleetGateways` wiring (cluster-tenant/billing/onboarding gateways) stays in WeOwnAI,
+not ported. See [`angular.md`](./angular.md) for layering/style rules.
 
 ## API-First / CLI-First Rule
 

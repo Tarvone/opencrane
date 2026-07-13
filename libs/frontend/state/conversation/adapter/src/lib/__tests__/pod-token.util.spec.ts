@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ConnectionStatus } from "@weownai/state/core";
+import { ConnectionStatus } from "@opencrane/state/core";
 import { _PodTokenFailureStatus } from "../pod-token.util";
 
 describe("_PodTokenFailureStatus", () =>

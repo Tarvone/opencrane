@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 
-import { MODELS, ModelInfo, PROVIDER_COLORS } from "@weownai/core";
+import { MODELS, ModelInfo, PROVIDER_COLORS } from "@opencrane/core";
 
 /** Inline model chip with provider initial, label, pricing, optional remove. */
 @Component({

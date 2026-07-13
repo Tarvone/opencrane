@@ -2,7 +2,7 @@ import { Injector, runInInjectionContext } from "@angular/core";
 import { describe, expect, it } from "vitest";
 
 import { OnboardingSelection, OnboardingStep } from "../onboarding.types";
-import { SESSION_STORAGE_GATEWAY, StorageGateway } from "@weownai/state/utils/storage";
+import { SESSION_STORAGE_GATEWAY, StorageGateway } from "@opencrane/state/utils/storage";
 
 import { OnboardingCacheService } from "../onboarding-cache.service";
 

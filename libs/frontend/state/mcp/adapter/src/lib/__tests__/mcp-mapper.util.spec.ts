@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { McpApprovalStatus, McpConnectionStatus, McpServerType } from "@weownai/core";
+import { McpApprovalStatus, McpConnectionStatus, McpServerType } from "@opencrane/core";
 
 import { _MapAccessPolicy, _MapDirectory, _MapInstalled, _MapServer } from "../mcp-mapper.util";
 

@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from "@angular/core";
 import { RouterLink, RouterLinkActive } from "@angular/router";
 
-import { AutomationRun, DEPARTMENTS, DepartmentInfo, SessionSummary } from "@weownai/core";
-import { CONVERSATION_GATEWAY, SessionStore } from "@weownai/state/core";
-import { AvatarCircleComponent, CollapsibleSectionComponent } from "@weownai/elements/ui";
+import { AutomationRun, DEPARTMENTS, DepartmentInfo, SessionSummary } from "@opencrane/core";
+import { CONVERSATION_GATEWAY, SessionStore } from "@opencrane/state/core";
+import { AvatarCircleComponent, CollapsibleSectionComponent } from "@opencrane/elements/ui";
 import { SessionRowComponent } from "../session-row/session-row.component";
 import { TenantSwitcherComponent } from "../tenant-switcher/tenant-switcher.component";
 

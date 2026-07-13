@@ -4,7 +4,7 @@ import { toSignal } from "@angular/core/rxjs-interop";
 import { filter } from "rxjs";
 
 import { SidebarComponent } from "./components/sidebar/sidebar.component";
-import { NotificationPanelComponent } from "@weownai/features/notifications";
+import { NotificationPanelComponent } from "@opencrane/features/notifications";
 
 /** Root workspace shell: sidebar + routed session/settings outlet + popovers. */
 @Component({

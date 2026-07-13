@@ -1,4 +1,4 @@
-import { MessageCard, MessageCardKind, ThreadMessage } from "@weownai/core";
+import { MessageCard, MessageCardKind, ThreadMessage } from "@opencrane/core";
 
 import { ChatEventAttachment, ChatEventTool, ChatEventToolResult } from "./chat-event.util";
 

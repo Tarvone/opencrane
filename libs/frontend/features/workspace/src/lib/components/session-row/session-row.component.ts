@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { RouterLink, RouterLinkActive } from "@angular/router";
 
-import { DEPARTMENTS, DepartmentInfo, SessionSummary } from "@weownai/core";
+import { DEPARTMENTS, DepartmentInfo, SessionSummary } from "@opencrane/core";
 
 /** A single session row in the sidebar rail lists; links to its session route. */
 @Component({

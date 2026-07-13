@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject } from "@a
 import { ButtonModule } from "primeng/button";
 import { TableModule } from "primeng/table";
 
-import { SessionStore } from "@weownai/state/core";
-import { UserTenant, UserTenantStore } from "@weownai/state/tenant/adapter";
+import { SessionStore } from "@opencrane/state/core";
+import { UserTenant, UserTenantStore } from "@opencrane/state/tenant/adapter";
 import { UserTenantPhaseBadgeComponent } from "../user-tenant-phase-badge/user-tenant-phase-badge.component";
 import { UserTenantRow } from "../customer-admin.types";
 import { _ToUserTenantRows } from "../customer-admin.util";

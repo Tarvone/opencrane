@@ -1,4 +1,4 @@
-import { ConnectionStatus } from "@weownai/state/core";
+import { ConnectionStatus } from "@opencrane/state/core";
 
 /**
  * Pure helper for classifying a failed `POST /auth/pod-token` response, factored

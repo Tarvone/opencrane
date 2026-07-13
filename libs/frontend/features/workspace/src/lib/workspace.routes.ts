@@ -1,6 +1,6 @@
 import { Routes } from "@angular/router";
 
-import { provideWoA2ui } from "@weownai/elements/a2ui";
+import { provideWoA2ui } from "@opencrane/elements/a2ui";
 
 import { WorkspacePageComponent } from "./workspace-page.component";
 
@@ -51,7 +51,7 @@ export const WORKSPACE_ROUTES: Routes =
 				path: "settings",
 				loadComponent: function loadSettingsPage()
 				{
-					return import("@weownai/features/settings").then(function pickComponent(m)
+					return import("@opencrane/features/settings").then(function pickComponent(m)
 					{
 						return m.SettingsPageComponent;
 					});
@@ -61,7 +61,7 @@ export const WORKSPACE_ROUTES: Routes =
 				path: "tools",
 				loadChildren: function loadToolsRoutes()
 				{
-					return import("@weownai/features/tools").then(function pickToolsRoutes(m)
+					return import("@opencrane/features/tools").then(function pickToolsRoutes(m)
 					{
 						return m.TOOLS_ROUTES;
 					});

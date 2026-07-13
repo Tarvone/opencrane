@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from "@angular/core";
 
-import { MessageCard } from "@weownai/core";
-import { FileArtifact, extractFileArtifact, formatCollapsedToolPreviewText } from "@weownai/state/conversation/render";
+import { MessageCard } from "@opencrane/core";
+import { FileArtifact, extractFileArtifact, formatCollapsedToolPreviewText } from "@opencrane/state/conversation/render";
 
 import { CopyCodeDirective } from "../../directives/copy-code.directive";
 import { MarkdownPipe } from "../../pipes/markdown.pipe";

@@ -1,4 +1,4 @@
-// Styles for HTML emitted by the vendored markdown pipeline (@weownai/state/conversation/render).
+// Styles for HTML emitted by the vendored markdown pipeline (@opencrane/state/conversation/render).
 // The pipeline output is injected via [innerHTML], so these must be applied through ::ng-deep from
 // the host component (Angular's emulated encapsulation does not tag innerHTML children). Include the
 // mixin inside a scoped `::ng-deep` block, e.g. `.wo-msg__prose { ::ng-deep { @include wo-markdown-content; } }`.

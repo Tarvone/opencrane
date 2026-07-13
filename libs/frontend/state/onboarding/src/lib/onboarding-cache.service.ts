@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@angular/core";
 
 import { OnboardingSelection, OnboardingStep } from "./onboarding.types";
 
-import { SESSION_STORAGE_GATEWAY, StorageGateway } from "@weownai/state/utils/storage";
+import { SESSION_STORAGE_GATEWAY, StorageGateway } from "@opencrane/state/utils/storage";
 
 /**
  * Headless state service for persisting the self-serve onboarding flow.

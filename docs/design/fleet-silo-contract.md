@@ -325,6 +325,22 @@ hand-off list; none of it is done by this design doc.
 4. **Confirm the artifact emit for the split.** `openapi.json` is emitted + drift-gated today; add the CRD
    YAML and (if not already) a released `@opencrane/contracts` build to the tagged-release asset set so
    weownai can pin all three from one tag.
-5. **Prove standalone-silo login (#151).** Verify the fail-closed masters-client path is the intended
-   single-tenant behaviour when no fleet manager stamps `spec.zitadel`, and document it as the standalone
-   contract (no-op delegation is a first-class mode, not a degraded one).
+5. **Prove standalone-silo login (#151).** ✅ **Done.** The fail-closed masters-client path is the intended
+   single-tenant behaviour when no fleet manager stamps `spec.zitadel`, and it is a first-class mode, not a
+   degraded one:
+   - `_ResolvePerOrgClient` (`per-org-client.ts`) never calls a fleet Zitadel *management* API — it only reads
+     the public `spec.zitadel` ids off the cluster-scoped CR (or the cluster API itself is absent, e.g.
+     `customApi: null` in tests) and returns `null` when the block is missing/incomplete, which
+     `OidcAuthService.resolveLoginClient` (`oidc.service.ts`) falls through to the masters client for.
+   - The masters client itself has zero fleet dependency: it is configured entirely from `OIDC_ISSUER_URL` /
+     `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_REDIRECT_URI` / `OIDC_SESSION_SECRET` env vars (read in
+     `libs/infra/auth/src/oidc-config.ts`), which the chart already exposes as
+     `clustertenantManager.oidc.{issuerUrl,clientId,redirectUri,existingSecret,clientSecret,sessionSecret}`
+     in `apps/clustertenant-platform/values.yaml` — a standalone operator sets these to their own,
+     independently-provisioned OIDC client (Option A in `#151`'s bootstrap note) with no fleet involved.
+   - First-login adoption follows the same rule: `fleetWriter` is `null` when `FLEET_INTERNAL_URL` is unset,
+     and `_AdoptMemberOnLogin` (`adopt-member.ts`) then upserts `OrgMembership` locally instead of writing
+     through to a fleet endpoint.
+   - Test coverage: `oidc-perorg-login.test.ts` (`falls through to the masters client for an unprovisioned org
+     host (fail-closed)`) and `adopt-member.test.ts` (all `fleetWriter: null` cases) already exercise this
+     path together — one CR-absent + fallthrough-to-masters login, one local-only adoption.

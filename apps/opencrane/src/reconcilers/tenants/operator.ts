@@ -104,6 +104,9 @@ export class TenantOperator
    */
   private readonly configChecksum: string;
 
+  /** Delay between failed startup snapshot attempts. */
+  private readonly initialReplayRetryDelayMs: number;
+
   /**
    * Create a new TenantOperator with pre-wired dependencies.
    * Prefer {@link _CreateTenantOperator} in production entry-points.
@@ -121,7 +124,8 @@ export class TenantOperator
               encryptionKeys: TenantEncryptionKeys,
               liteLlmKeys: TenantLiteLlmKeys,
               cogneeTenantIdentity: CogneeTenantIdentity,
-              domainProvisioner: OrgDomainProvisioner)
+              domainProvisioner: OrgDomainProvisioner,
+              initialReplayRetryDelayMs = 5000)
   {
     this.watch = watch;
     this.customApi = customApi;
@@ -138,6 +142,7 @@ export class TenantOperator
     this.cogneeTenantIdentity = cogneeTenantIdentity;
     this.domainProvisioner = domainProvisioner;
     this.configChecksum = _OperatorConfigChecksum(config);
+    this.initialReplayRetryDelayMs = initialReplayRetryDelayMs;
   }
 
   /**
@@ -162,6 +167,66 @@ export class TenantOperator
         await this.handleEvent(type, tenant);
       },
     });
+    await this.reconcileExistingTenantsUntilListed();
+  }
+
+  /**
+   * Retry the startup snapshot until the current Tenant set has been listed.
+   *
+   * The watch remains active while this waits; the retry only closes transient
+   * list failures that would otherwise leave pre-existing Tenant CRs invisible.
+   */
+  private async reconcileExistingTenantsUntilListed(): Promise<void>
+  {
+    while (true)
+    {
+      const listed = await this.reconcileExistingTenants();
+      if (listed) return;
+
+      const retryDelayMs = this.initialReplayRetryDelayMs;
+      await new Promise<void>(function _sleep(resolve)
+      {
+        setTimeout(resolve, retryDelayMs);
+      });
+    }
+  }
+
+  /**
+   * Reconcile Tenant CRs that already existed before the watch stream connected.
+   *
+   * Kubernetes watches observe changes after the stream starts; they are not an
+   * initial snapshot. Boot seeds and operator restarts can therefore leave a
+   * Tenant present but unreconciled unless startup also lists the current set.
+   */
+  private async reconcileExistingTenants(): Promise<boolean>
+  {
+    try
+    {
+      const ns = this.config.watchNamespace;
+      const response = ns
+        ? await this.customApi.listNamespacedCustomObject({ group: OPENCRANE_API_GROUP, version: OPENCRANE_API_VERSION, namespace: ns, plural: TENANT_CRD_PLURAL })
+        : await this.customApi.listClusterCustomObject({ group: OPENCRANE_API_GROUP, version: OPENCRANE_API_VERSION, plural: TENANT_CRD_PLURAL });
+      const tenants = (response as { items?: Tenant[] }).items ?? [];
+      this.log.info({ count: tenants.length }, "replaying existing tenants before watch settles");
+
+      for (const tenant of tenants)
+      {
+        try
+        {
+          await this.handleEvent(K8sWatchEventType.Added, tenant);
+        }
+        catch (err)
+        {
+          this.log.error({ err, name: tenant.metadata?.name }, "initial tenant reconcile failed");
+        }
+      }
+    }
+    catch (err)
+    {
+      this.log.error({ err }, "initial tenant replay failed; retrying while watch remains active");
+      return false;
+    }
+    return true;
   }
 
   /**

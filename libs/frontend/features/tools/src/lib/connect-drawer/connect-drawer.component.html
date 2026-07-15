@@ -83,7 +83,7 @@
 					<p class="wo-connect__label">Connected account</p>
 					<div class="wo-connect__set">
 						<span class="wo-connect__account">
-							<wo-avatar-circle [initials]="accountInitials()" color="#4A6B8A" [size]="22" />
+							<wo-avatar-circle [initials]="accountInitials()" accessibleName="Connected account" size="medium" />
 							<span class="wo-mono">{{ connectedAccount() }}</span>
 						</span>
 						<button type="button" class="wo-tools__act wo-tools__act--muted" (click)="disconnect()">Disconnect</button>

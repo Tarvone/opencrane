@@ -30,7 +30,7 @@
 					@for (id of selected(); track id) {
 						@if (teammate(id); as person) {
 							<span class="wo-share__chip">
-								<wo-avatar-circle [initials]="person.initials" [color]="person.color" [size]="20" />
+								<wo-avatar-circle [initials]="person.initials" [accessibleName]="person.name" size="small" />
 								{{ person.name.split(" ")[0] }}
 								<button type="button" (click)="toggleTeammate(id)"><i class="pi pi-times"></i></button>
 							</span>
@@ -42,7 +42,7 @@
 			<div class="wo-share__people">
 				@for (person of filteredTeammates(); track person.id) {
 					<button type="button" class="wo-share__person" (click)="toggleTeammate(person.id)">
-						<wo-avatar-circle [initials]="person.initials" [color]="person.color" [size]="28" />
+						<wo-avatar-circle [initials]="person.initials" [accessibleName]="person.name" size="large" />
 						<span class="wo-share__person-info">
 							<span class="wo-share__person-name">{{ person.name }}</span>
 							<span class="wo-share__person-dept">{{ person.dept }}</span>

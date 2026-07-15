@@ -2,9 +2,8 @@ import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource 
 
 import { ActiveTenantStore } from "@opencrane/state/gateways";
 import { PodIdentity, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
-import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
-import { _settledValue } from "../../resource.util";
+import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { _settledValue } from "../../resource.util.js";
 
 /** Pod & Session settings section. */
 @Component({

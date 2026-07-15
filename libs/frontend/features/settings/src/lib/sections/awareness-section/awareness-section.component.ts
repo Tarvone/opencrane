@@ -3,9 +3,8 @@ import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource,
 import { CogneeDataset, SCOPE_COLORS, SEARCH_MODES, ScopeLevel, _ToggleId } from "@opencrane/core";
 import { ActiveTenantStore } from "@opencrane/state/gateways";
 import { AwarenessContractInfo, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
-import { SaveButtonComponent, ScopeChipComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
-import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
-import { _settledValue } from "../../resource.util";
+import { SaveButtonComponent, ScopeChipComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { _settledValue } from "../../resource.util.js";
 
 /** Awareness Contract settings section: Cognee scope datasets + retrieval. */
 @Component({

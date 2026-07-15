@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
 
 import { ActiveTenantStore } from "@opencrane/state/gateways";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
+import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
 import { AccountProfile, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
-import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
-import { _settledValue } from "../../resource.util";
+import { _settledValue } from "../../resource.util.js";
 
 /** Account settings section. */
 @Component({

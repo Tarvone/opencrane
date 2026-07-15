@@ -16,24 +16,11 @@
 		font-weight: 500;
 	}
 
-	&__spend-amount {
-		color: var(--wo-warn);
-		font-weight: 400;
-	}
-
-	&__bar {
-		width: 100%;
-		height: 5px;
-		border-radius: 999px;
-		overflow: hidden;
-		background: var(--secondary);
-	}
-
-	&__bar-fill {
-		height: 100%;
-		width: 82%;
-		border-radius: 999px;
-		background: var(--wo-warn);
+	&__spend-placeholder {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--muted-foreground);
 	}
 
 	&__slices {

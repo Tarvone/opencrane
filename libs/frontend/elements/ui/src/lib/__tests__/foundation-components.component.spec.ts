@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -256,6 +258,13 @@ describe("ToggleFieldComponent", function toggleFieldSuite(): void
 		expect(toggle.passThrough().input["aria-describedby"]).toBe(toggle.descriptionId);
 		expect(styles).toContain("width: 44px");
 		expect(styles).toContain("height: 24px");
+		expect(styles).toContain("flex-shrink: 0");
+		expect(styles).toContain("gap: 10px");
+		expect(styles).toContain("width: 20px");
+		expect(styles).toContain("height: 20px");
+		expect(styles).toContain("inset-inline-start: 2px");
+		expect(styles).toContain("inset-inline-start: 22px");
+		expect(styles).toContain("box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18)");
 		toggle.onValueChange(true);
 		expect(toggle.value()).toBe(true);
 	});
@@ -269,11 +278,35 @@ describe("ToggleFieldComponent", function toggleFieldSuite(): void
 		_detect(reference);
 
 		const control = reference.location.nativeElement.querySelector("input") as HTMLInputElement;
+		const field = reference.location.nativeElement.querySelector(".wo-toggle__control") as HTMLElement;
+		const toggleSwitch = reference.location.nativeElement.querySelector(".p-toggleswitch") as HTMLElement;
+		const slider = reference.location.nativeElement.querySelector(".p-toggleswitch-slider") as HTMLElement;
+		const handle = reference.location.nativeElement.querySelector(".p-toggleswitch-handle") as HTMLElement;
+		const label = reference.location.nativeElement.querySelector(".wo-toggle__label") as HTMLElement;
 		expect(control.disabled).toBe(true);
 		expect(control.getAttribute("aria-labelledby")).toBe(reference.instance.labelId);
 		expect(control.getAttribute("aria-describedby")).toContain(reference.instance.descriptionId);
+		expect(getComputedStyle(field).gap).toBe("10px");
+		expect(getComputedStyle(toggleSwitch).width).toBe("44px");
+		expect(getComputedStyle(toggleSwitch).height).toBe("24px");
+		expect(getComputedStyle(toggleSwitch).flexShrink).toBe("0");
+		expect(getComputedStyle(slider).borderRadius).toBe("12px");
+		expect(getComputedStyle(handle).width).toBe("20px");
+		expect(getComputedStyle(handle).height).toBe("20px");
+		expect(getComputedStyle(handle).insetInlineStart).toBe("2px");
+		expect(getComputedStyle(handle).backgroundColor).toBe("rgb(255, 255, 255)");
+		expect(getComputedStyle(handle).boxShadow).toBe("0 1px 3px rgba(0, 0, 0, 0.18)");
+		expect(getComputedStyle(label).fontSize).toBe("13.5px");
+		expect(getComputedStyle(label).color).toBe("var(--oc-text-secondary, #6a6660)");
 		control.click();
 		expect(reference.instance.value()).toBe(false);
+		toggleSwitch.classList.add("p-toggleswitch-checked");
+		expect(getComputedStyle(handle).insetInlineStart).toBe("22px");
+		reference.location.nativeElement.dir = "rtl";
+		toggleSwitch.classList.remove("p-toggleswitch-checked");
+		expect(getComputedStyle(handle).insetInlineStart).toBe("2px");
+		toggleSwitch.classList.add("p-toggleswitch-checked");
+		expect(getComputedStyle(handle).insetInlineStart).toBe("22px");
 		reference.destroy();
 	});
 

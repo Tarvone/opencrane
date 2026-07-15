@@ -9,7 +9,7 @@
 	&__control {
 		display: flex;
 		align-items: center;
-		gap: 9px;
+		gap: 10px;
 	}
 
 	&__label {
@@ -56,6 +56,7 @@
 :host ::ng-deep .p-toggleswitch {
 	width: 44px;
 	height: 24px;
+	flex-shrink: 0;
 }
 
 :host ::ng-deep .p-toggleswitch-slider {
@@ -63,6 +64,25 @@
 }
 
 :host ::ng-deep .p-toggleswitch-handle {
-	width: 18px;
-	height: 18px;
+	width: 20px;
+	height: 20px;
+	inset-inline-start: 2px;
+	margin-block-start: -10px;
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+:host ::ng-deep .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-handle {
+	inset-inline-start: 22px;
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+:host ::ng-deep .p-toggleswitch.p-disabled .p-toggleswitch-handle,
+:host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover) .p-toggleswitch-handle,
+:host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:focus-visible) .p-toggleswitch-handle,
+:host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover).p-toggleswitch-checked .p-toggleswitch-handle,
+:host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:focus-visible).p-toggleswitch-checked .p-toggleswitch-handle {
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }

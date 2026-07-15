@@ -1,0 +1,42 @@
+.wo-progress {
+	display: grid;
+	gap: 7px;
+	color: var(--oc-green, #4a9e6b);
+
+	&__summary {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		font-family: var(--font-mono);
+		font-size: var(--type-small-label-size, 12px);
+		color: var(--oc-text-secondary, #6a6660);
+	}
+
+	&__status {
+		font-family: var(--font-sans);
+		font-weight: var(--font-weight-semibold, 600);
+		color: var(--oc-text-secondary, #6a6660);
+	}
+
+	&__track {
+		height: 4px;
+		overflow: hidden;
+		border-radius: 2px;
+		background: var(--oc-border, #dedad2);
+	}
+
+	&__fill {
+		height: 100%;
+		border-radius: inherit;
+		background: currentColor;
+		transition: width 160ms ease;
+	}
+
+	&--danger {
+		color: var(--oc-red, #c1392b);
+
+		.wo-progress__status {
+			color: var(--oc-red, #c1392b);
+		}
+	}
+}

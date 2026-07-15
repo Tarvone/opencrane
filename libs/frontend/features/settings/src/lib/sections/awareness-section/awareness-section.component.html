@@ -38,7 +38,7 @@
 					</div>
 				</div>
 				<div class="wo-aware__head-actions" (click)="$event.stopPropagation()">
-					<wo-toggle-field [defaultOn]="dataset.enabled" />
+					<wo-toggle-field [value]="dataset.enabled" [label]="dataset.name + ' enabled'" [hideLabel]="true" />
 					<i class="pi pi-chevron-down" [class.wo-aware__chevron--open]="isExpanded(dataset.id)"></i>
 				</div>
 			</div>
@@ -97,20 +97,20 @@
 	}
 </div>
 
-<wo-settings-row label="Fallback behaviour" hint="When Cognee is unreachable mid-loop.">
-	<select class="wo-select">
+<wo-settings-row label="Fallback behaviour" description="When Cognee is unreachable mid-loop.">
+	<select woSettingsControl class="wo-select">
 		@for (option of fallbackOptions; track option) {
 			<option [selected]="option === 'Proceed without context'">{{ option }}</option>
 		}
 	</select>
 </wo-settings-row>
 
-<wo-settings-row label="Citation mode" hint="Require Cognee citations on every grounded response.">
-	<wo-toggle-field [defaultOn]="true" label="Enabled" />
+<wo-settings-row label="Citation mode" description="Require Cognee citations on every grounded response.">
+	<wo-toggle-field woSettingsControl [value]="true" label="Enabled" />
 </wo-settings-row>
 
-<wo-settings-row label="Scope query order" hint="Datasets are queried in this order. Personal is always fastest.">
-	<p class="wo-aware__order wo-mono">personal → project → dept → org</p>
+<wo-settings-row label="Scope query order" description="Datasets are queried in this order. Personal is always fastest.">
+	<p woSettingsControl class="wo-aware__order wo-mono">personal → project → dept → org</p>
 </wo-settings-row>
 
 <wo-save-button />

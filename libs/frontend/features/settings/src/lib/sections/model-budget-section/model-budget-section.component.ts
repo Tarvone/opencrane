@@ -3,16 +3,15 @@ import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource,
 import { MODELS, MODEL_CLASSES, ModelClass, ModelInfo, SpendSlice, _ToggleId } from "@opencrane/core";
 import { ActiveTenantStore } from "@opencrane/state/gateways";
 import { BudgetSpend, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
-import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
-import { ModelChipComponent } from "../../components/model-chip/model-chip.component";
-import { _settledValue } from "../../resource.util";
+import { ProgressMeterComponent, SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { ModelChipComponent } from "../../components/model-chip/model-chip.component.js";
+import { _settledValue } from "../../resource.util.js";
 
 /** Model & Budget settings section: spend, routing strategy, model classes. */
 @Component({
 	selector: "wo-model-budget-section",
 	standalone: true,
-	imports: [SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent, ModelChipComponent],
+	imports: [SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent, ProgressMeterComponent, ModelChipComponent],
 	templateUrl: "./model-budget-section.component.html",
 	styleUrl: "./model-budget-section.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush
@@ -31,27 +30,14 @@ export class ModelBudgetSectionComponent
 		loader: ({ params }): Promise<BudgetSpend> => this._gateway.getBudgetSpend(params)
 	});
 
-	/** "$current / $limit" label for the monthly spend card. */
-	public readonly spendLabel: Signal<string> = computed((): string =>
-	{
-		const spend = _settledValue(this._spend);
-		if (!spend)
-		{
-			return "—";
-		}
-		return `$${spend.currentSpendUsd.toFixed(2)} / $${spend.monthlyLimitUsd.toFixed(2)}`;
-	});
+	/** Whether the gateway has returned settled spend data suitable for display. */
+	public readonly hasSpend: Signal<boolean> = computed((): boolean => _settledValue(this._spend) !== undefined);
 
-	/** Percentage of the monthly limit used (0–100), for the spend bar width. */
-	public readonly spendPercent: Signal<number> = computed((): number =>
-	{
-		const spend = _settledValue(this._spend);
-		if (!spend || spend.monthlyLimitUsd <= 0)
-		{
-			return 0;
-		}
-		return Math.min(100, Math.round((spend.currentSpendUsd / spend.monthlyLimitUsd) * 100));
-	});
+	/** Current monthly spend used by the shared progress meter. */
+	public readonly spendUsed: Signal<number> = computed((): number => _settledValue(this._spend)?.currentSpendUsd ?? 0);
+
+	/** Monthly spend limit used by the shared progress meter. */
+	public readonly spendLimit: Signal<number> = computed((): number => _settledValue(this._spend)?.monthlyLimitUsd ?? 0);
 
 	/** Budget alert band (`ok` | `warning` | `exceeded`). */
 	public readonly alertState: Signal<string> = computed((): string =>

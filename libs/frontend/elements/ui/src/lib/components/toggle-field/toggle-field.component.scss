@@ -1,0 +1,68 @@
+:host {
+	display: inline-block;
+}
+
+.wo-toggle {
+	display: grid;
+	gap: 4px;
+
+	&__control {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+	}
+
+	&__label {
+		display: block;
+		font-size: 13.5px;
+		color: var(--oc-text-secondary, #6a6660);
+		cursor: pointer;
+
+		&--hidden {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			white-space: nowrap;
+			border: 0;
+		}
+	}
+
+	&__description,
+	&__pending,
+	&__error {
+		margin: 2px 0 0;
+		font-size: 12px;
+		line-height: 1.4;
+	}
+
+	&__description,
+	&__pending {
+		color: var(--muted-foreground);
+	}
+
+	&__error {
+		color: var(--oc-red, #c1392b);
+	}
+
+	&--pending {
+		cursor: progress;
+	}
+}
+
+:host ::ng-deep .p-toggleswitch {
+	width: 44px;
+	height: 24px;
+}
+
+:host ::ng-deep .p-toggleswitch-slider {
+	border-radius: 12px;
+}
+
+:host ::ng-deep .p-toggleswitch-handle {
+	width: 18px;
+	height: 18px;
+}

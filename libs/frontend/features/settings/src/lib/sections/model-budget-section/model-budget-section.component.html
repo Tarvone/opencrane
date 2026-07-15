@@ -6,11 +6,12 @@
 <div class="wo-budget__card">
 	<div class="wo-budget__spend-head">
 		<span>Monthly spend</span>
-		<span class="wo-mono wo-budget__spend-amount">{{ spendLabel() }}</span>
 	</div>
-	<div class="wo-budget__bar">
-		<div class="wo-budget__bar-fill" [style.width.%]="spendPercent()"></div>
-	</div>
+	@if (hasSpend()) {
+		<wo-progress-meter label="Monthly budget usage" [used]="spendUsed()" [limit]="spendLimit()" prefix="$" />
+	} @else {
+		<p class="wo-budget__spend-placeholder" role="status" aria-live="polite">—</p>
+	}
 	<div class="wo-budget__slices">
 		@for (slice of slices; track slice.label) {
 			<div class="wo-budget__slice">
@@ -65,7 +66,7 @@
 					<p class="wo-budget__class-desc">{{ cls.description }}</p>
 				</div>
 				<div class="wo-budget__class-actions" (click)="$event.stopPropagation()">
-					<wo-toggle-field [defaultOn]="cls.enabled" />
+					<wo-toggle-field [value]="cls.enabled" [label]="cls.label + ' enabled'" [hideLabel]="true" />
 					<i class="pi pi-chevron-down" [class.wo-budget__chevron--open]="isExpanded(cls.id)"></i>
 				</div>
 			</div>
@@ -105,15 +106,15 @@
 	}
 </div>
 
-<wo-settings-row label="Budget alert" hint="Notify when monthly spend reaches this threshold.">
-	<div class="wo-budget__alert">
+<wo-settings-row label="Budget alert" description="Notify when monthly spend reaches this threshold.">
+	<div woSettingsControl class="wo-budget__alert">
 		<input type="text" class="wo-text-input wo-mono" value="80" />
 		<span>% of limit</span>
 	</div>
 </wo-settings-row>
 
-<wo-settings-row label="Cost tracking" hint="Dual-write spend data to audit log.">
-	<wo-toggle-field [defaultOn]="true" label="Enabled" />
+<wo-settings-row label="Cost tracking" description="Dual-write spend data to audit log.">
+	<wo-toggle-field woSettingsControl [value]="true" label="Enabled" />
 </wo-settings-row>
 
 <wo-save-button />

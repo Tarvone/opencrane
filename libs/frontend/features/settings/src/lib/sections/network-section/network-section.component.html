@@ -3,8 +3,8 @@
 	subtitle="Outbound domain allowlist enforced via Kubernetes NetworkPolicy. Your pod cannot reach domains not on this list."
 />
 
-<wo-settings-row label="Egress policy" hint="Enforced at the network layer — not bypassable from within the pod.">
-	<div class="wo-network__policy">
+<wo-settings-row label="Egress policy" description="Enforced at the network layer — not bypassable from within the pod.">
+	<div woSettingsControl class="wo-network__policy">
 		<span class="wo-network__dot"></span>
 		<span class="wo-mono">strict allowlist</span>
 	</div>

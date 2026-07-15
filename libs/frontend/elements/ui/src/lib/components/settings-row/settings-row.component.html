@@ -1,11 +1,24 @@
-<div class="wo-row">
+<section
+	class="wo-row"
+	[class.wo-row--invalid]="invalid()"
+	role="group"
+	[attr.aria-labelledby]="labelId"
+	[attr.aria-describedby]="describedBy()"
+	[attr.aria-invalid]="invalid()"
+>
 	<div class="wo-row__left">
-		<p class="wo-row__label">{{ label() }}</p>
-		@if (hint(); as hintValue) {
-			<p class="wo-row__hint">{{ hintValue }}</p>
+		@if (controlId(); as targetId) {
+			<label class="wo-row__label" [id]="labelId" [for]="targetId">{{ label() }}</label>
+		} @else {
+			<p class="wo-row__label" [id]="labelId">{{ label() }}</p>
+		}
+		@if (description(); as descriptionValue) {
+			<p class="wo-row__description" [id]="descriptionId">{{ descriptionValue }}</p>
 		}
 	</div>
 	<div class="wo-row__control">
-		<ng-content />
+		<ng-content select="[woSettingsControl]" />
+		<div class="wo-row__help" [id]="helpId"><ng-content select="[woSettingsHelp]" /></div>
+		<div class="wo-row__error" [id]="errorId" role="alert"><ng-content select="[woSettingsError]" /></div>
 	</div>
-</div>
+</section>

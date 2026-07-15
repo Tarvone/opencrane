@@ -33,6 +33,21 @@
     },
     {
       "path": "../../libs/frontend/core"
+    },
+    {
+      "path": "../../libs/frontend/state/conversation/cache/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/frontend/state/tenant/adapter/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/frontend/state/utils/storage/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/frontend/state/gateways/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/frontend/state/onboarding/tsconfig.lib.json"
     }
   ]
 }

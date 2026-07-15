@@ -11,9 +11,12 @@ import { UserTenantStore } from "@opencrane/state/tenant/adapter";
 import { LOCAL_STORAGE_GATEWAY, SESSION_STORAGE_GATEWAY, WebLocalStorageAdapter, WebSessionStorageAdapter } from "@opencrane/state/utils/storage";
 import { provideControlPlaneGateways } from "@opencrane/state/gateways";
 import { provideWebPlatform } from "@opencrane/platform";
+import { SessionStore } from "@opencrane/state/core";
+import { provideTestGateways } from "@opencrane/state/gateways/testing";
 
 import { environment } from "../environments/environment";
 import { APP_ROUTES } from "./app.routes";
+import { MockSessionStore } from "./mock-session.store";
 
 /**
  * Root application configuration for the WeOwnAI frontend.
@@ -40,10 +43,12 @@ export const appConfig: ApplicationConfig =
 		{ provide: PLATFORM_SURFACE, useValue: "org" },
 		// Swappable data gateways are selected from one environment flag
 		// (mock in dev, live in prod) — see provideControlPlaneGateways.
-		...provideControlPlaneGateways(),
+		...(environment.gatewayMode === "mock" ? provideTestGateways() : provideControlPlaneGateways()),
 		// Web local-transcript cache; a desktop build binds this token to a
 		// filesystem/SQLite store instead (see ConversationCache).
 		{ provide: CONVERSATION_CACHE, useClass: IndexedDbConversationCache },
+		// Use the mock identity store for the UI handoff.
+		{ provide: SessionStore, useClass: MockSessionStore },
 		// UserTenant store for the customer-admin console (not a gateway).
 		UserTenantStore
 	]

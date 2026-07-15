@@ -142,6 +142,9 @@
       "@opencrane/state/gateways": [
         "./libs/frontend/state/gateways/src/index.ts"
       ],
+      "@opencrane/state/gateways/testing": [
+        "./libs/frontend/state/gateways/src/lib/__test__/test-gateways.provider.ts"
+      ],
       "@opencrane/state/conversation/adapter": [
         "./libs/frontend/state/conversation/adapter/src/index.ts"
       ],

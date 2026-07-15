@@ -30,21 +30,35 @@
 	}
 
 	<div class="wo-rail__lists wo-scrollable">
-		<wo-collapsible-section title="My Sessions" variant="rail">
-			@for (session of mySessions(); track session.id) {
-				<wo-session-row [session]="session" />
-			}
-			<a [routerLink]="['/']" class="wo-rail__new-session">
-				<i class="pi pi-plus"></i>
-				New session
-			</a>
-		</wo-collapsible-section>
+		@if (sessionsError()) {
+			<div class="wo-rail__message">Failed to load sessions.</div>
+		} @else if (sessionsLoading()) {
+			<div class="wo-rail__message">Loading sessions...</div>
+		} @else {
+			<wo-collapsible-section title="MY SESSIONS" variant="rail">
+				@for (session of mySessions(); track session.id) {
+					<wo-session-row [session]="session" />
+				}
+				@if (mySessions().length === 0) {
+					<div class="wo-rail__empty">No personal sessions</div>
+				}
+				<a [routerLink]="['/']" class="wo-rail__new-session">
+					<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<path d="M6 1V11M1 6H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+					</svg>
+					New session
+				</a>
+			</wo-collapsible-section>
 
-		<wo-collapsible-section title="Shared Sessions" variant="rail">
-			@for (session of sharedSessions(); track session.id) {
-				<wo-session-row [session]="session" />
-			}
-		</wo-collapsible-section>
+			<wo-collapsible-section title="SHARED" variant="rail">
+				@for (session of sharedSessions(); track session.id) {
+					<wo-session-row [session]="session" />
+				}
+				@if (sharedSessions().length === 0) {
+					<div class="wo-rail__empty">No shared sessions</div>
+				}
+			</wo-collapsible-section>
+		}
 
 		<wo-collapsible-section title="Automation Runs" variant="rail" [defaultOpen]="false">
 			@for (run of automationRuns; track run.id) {

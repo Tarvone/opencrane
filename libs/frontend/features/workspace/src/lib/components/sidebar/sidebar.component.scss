@@ -3,10 +3,10 @@
 	flex-direction: column;
 	height: 100%;
 	flex-shrink: 0;
-	width: 232px;
-	min-width: 232px;
-	background: var(--wo-sidebar-bg);
-	border-right: 1px solid var(--wo-sidebar-border);
+	width: 192px;
+	min-width: 192px;
+	background: #1a1918;
+	border-right: 1px solid rgba(255, 255, 255, 0.06);
 
 	&__top {
 		display: flex;
@@ -23,9 +23,9 @@
 	}
 
 	&__logo {
-		font-size: 14px;
-		color: var(--wo-sidebar-fg);
-		font-weight: 400;
+		font-size: 14.5px;
+		color: #ffffff;
+		font-weight: 600;
 	}
 
 	&__tenant {
@@ -58,9 +58,12 @@
 			font-size: 13px;
 		}
 
-		&:hover,
+		&:hover {
+			color: #ffffff;
+		}
+
 		&--active {
-			color: var(--wo-sidebar-fg);
+			color: #0db5cc; /* Teal active state */
 		}
 	}
 
@@ -102,9 +105,14 @@
 		align-items: center;
 		gap: 8px;
 		padding: 6px 12px;
-		width: 100%;
-		color: rgba(232, 228, 220, 0.3);
-		font-size: 12px;
+		margin: 4px 12px;
+		width: calc(100% - 24px);
+		color: #fff;
+		background: #f47920;
+		border-radius: 5px;
+		font-size: 13px;
+		font-weight: 500;
+		text-decoration: none;
 		transition: opacity 120ms ease;
 
 		i {
@@ -112,7 +120,7 @@
 		}
 
 		&:hover {
-			opacity: 0.8;
+			opacity: 0.9;
 		}
 	}
 
@@ -182,13 +190,14 @@
 
 	&__user-name {
 		font-size: 12px;
-		color: rgba(232, 228, 220, 0.7);
+		font-weight: 500;
+		color: #cccccc;
 		margin: 0;
 	}
 
 	&__user-pod {
-		font-size: 10px;
-		color: rgba(232, 228, 220, 0.3);
+		font-size: 10.5px;
+		color: #4a4845;
 		margin: 0;
 	}
 

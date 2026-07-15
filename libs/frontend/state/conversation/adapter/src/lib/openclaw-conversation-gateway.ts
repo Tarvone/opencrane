@@ -74,6 +74,8 @@ export class OpenClawConversationGateway implements ConversationGateway
 	private readonly _operation = signal<string | null>(null);
 	private readonly _selectedAgentId = signal<string | null>(null);
 	private readonly _sessions = signal<SessionSummary[]>([]);
+	private readonly _sessionsLoading = signal<boolean>(false);
+	private readonly _sessionsError = signal<string | null>(null);
 
 	/** True between `open()` and a deliberate teardown — gates auto-reconnect. */
 	private _wantOpen = false;
@@ -150,6 +152,12 @@ export class OpenClawConversationGateway implements ConversationGateway
 
 	/** @inheritdoc */
 	public readonly sessions: Signal<SessionSummary[]> = this._sessions.asReadonly();
+
+	/** @inheritdoc */
+	public readonly sessionsLoading: Signal<boolean> = this._sessionsLoading.asReadonly();
+
+	/** @inheritdoc */
+	public readonly sessionsError: Signal<string | null> = this._sessionsError.asReadonly();
 
 	/** @inheritdoc */
 	public readonly loadingHistory: Signal<boolean> = this._loadingHistory.asReadonly();

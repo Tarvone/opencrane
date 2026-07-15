@@ -82,6 +82,12 @@ export interface ConversationGateway
 	 */
 	readonly sessions: Signal<SessionSummary[]>;
 
+	/** Whether the sessions list is currently loading. */
+	readonly sessionsLoading: Signal<boolean>;
+
+	/** Any error that occurred while fetching sessions. */
+	readonly sessionsError: Signal<string | null>;
+
 	/**
 	 * Whether older history can still be loaded for the open thread.
 	 *

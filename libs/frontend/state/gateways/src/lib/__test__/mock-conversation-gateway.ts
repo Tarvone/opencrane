@@ -36,6 +36,10 @@ export class MockConversationGateway implements ConversationGateway
 	public readonly selectedAgentId: Signal<string | null> = this._selectedAgentId.asReadonly();
 	private readonly _sessions = signal<SessionSummary[]>(SESSIONS.map(function copy(s: SessionSummary): SessionSummary { return { ...s }; }));
 	public readonly sessions: Signal<SessionSummary[]> = this._sessions.asReadonly();
+	private readonly _sessionsLoading = signal<boolean>(false);
+	public readonly sessionsLoading: Signal<boolean> = this._sessionsLoading.asReadonly();
+	private readonly _sessionsError = signal<string | null>(null);
+	public readonly sessionsError: Signal<string | null> = this._sessionsError.asReadonly();
 
 	public listSessions(): Promise<SessionSummary[]>
 	{

@@ -37,6 +37,12 @@ export class SidebarComponent
 	 */
 	private readonly _sessions = this._gateway.sessions;
 
+	/** Whether the session list is currently loading. */
+	public readonly sessionsLoading = this._gateway.sessionsLoading;
+
+	/** Whether the session list failed to load. */
+	public readonly sessionsError = this._gateway.sessionsError;
+
 	/** Sessions owned by the current user. */
 	public readonly mySessions = computed<SessionSummary[]>(() => this._sessions().filter(function isMine(s: SessionSummary): boolean { return s.mine; }));
 

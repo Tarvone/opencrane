@@ -4,7 +4,9 @@
   "projectType": "library",
   "sourceRoot": "libs/infra/auth/src",
   "tags": [
-    "scope:shared"
+    "type:lib",
+    "layer:infra",
+    "scope:auth"
   ],
   "targets": {
     "lint": {

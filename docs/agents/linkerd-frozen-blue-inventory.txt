@@ -5,17 +5,18 @@
 # references are included because they explain the superseded decision. Runtime/config paths are
 # frozen blue and are deleted only after the enforcing Cilium replacement passes R9/R10.
 
-apps/opencrane-infra/templates/clustertenant-manager-deployment.yaml
+apps/opencrane/helm/templates/_deployment.tpl
 apps/opencrane-infra/values.yaml
-apps/opencrane/src/__tests__/fixtures.ts
-apps/opencrane/src/__tests__/tenants/linkerd-identity.client.test.ts
-apps/opencrane/src/__tests__/tenants/tenant-resource-builder.test.ts
 apps/opencrane/src/app/config.ts
-apps/opencrane/src/reconcilers/tenants/deploy/index.ts
-apps/opencrane/src/reconcilers/tenants/deploy/silo-linkerd-identity.ts
-apps/opencrane/src/reconcilers/tenants/deploy/silo-linkerd-identity.types.ts
-apps/opencrane/src/reconcilers/tenants/internal/linkerd-identity.client.ts
-apps/opencrane/src/reconcilers/tenants/operator.ts
+libs/backend/feat-openclaw-tenant/main/src/__tests__/fixtures.ts
+libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/linkerd-identity.client.test.ts
+libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/tenant-resource-builder.test.ts
+libs/backend/feat-openclaw-tenant/main/src/operator-config.types.ts
+libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/index.ts
+libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/silo-linkerd-identity.ts
+libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/silo-linkerd-identity.types.ts
+libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/internal/linkerd-identity.client.ts
+libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/operator.ts
 CHANGELOG.md
 docs/adr/0001-cluster-tenant-virtual-network-isolation.md
 docs/adr/0002-per-clustertenant-silo-architecture.md

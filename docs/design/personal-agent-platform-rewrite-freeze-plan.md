@@ -395,7 +395,7 @@ Important repo-grounded hazards:
 Evidence: [current dual-write/source model](../agents/architecture.md),
 [session scope schema](../../apps/opencrane/prisma/schema/sessions.prisma),
 [company/workspace documents](../../apps/opencrane/prisma/schema/company-docs.prisma), and
-[user state PVC](../../apps/opencrane/src/reconcilers/tenants/deploy/3-state-pvc.ts).
+[user state PVC](../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/3-state-pvc.ts).
 
 ## R4 — complete the personal-agent runtime and data planes
 

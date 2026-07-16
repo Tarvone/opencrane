@@ -39,3 +39,6 @@ export {
   _RequireOrgManager,
 } from "./cluster-tenant-org-admin.js";
 export type { BillingAccountReader, OrgManagerReader } from "./cluster-tenant-org-admin.js";
+export * from "./per-org-client.js";
+export type * from "./per-org-client.types.js";
+export * from "./request-silo.js";

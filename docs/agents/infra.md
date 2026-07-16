@@ -43,7 +43,9 @@ Infrastructure-as-code lives under `apps/*-platform/` (the Helm deploy charts) a
 |------|------|
 | `libs/k8s-platform/terraform/` | Cloud identities, trust bindings, IAM role attachments |
 | `apps/fleet-platform/` (chart `opencrane-fleet`) | Central-plane K8s service accounts, RBAC bindings, workload identity annotations, NetworkPolicy, CRDs |
-| `apps/opencrane-infra/` (chart `opencrane-silo`) | Per-silo plane workloads + NetworkPolicies (litellm, obot gateway, feat-skill-registry, OCI store) |
+| `apps/opencrane-infra/` (chart `opencrane-silo`) | Umbrella composition, deployment profiles, CRDs, issuers, external-secret wiring, and frozen-blue skill-registry/Zot exceptions |
+| `apps/{opencrane,opencrane-ui,cognee,litellm,obot,opencrane-migrate}/helm/` | App-owned Helm library units for every current per-silo workload and its component policy/identity contract |
+| `apps/langfuse/` | Pinned upstream wrapper and explicit six-class workload inventory; the umbrella retains the direct dependency for render parity |
 | `libs/k8s-platform/` (Helm library chart + shared deploy engine) | Shared named-templates (`templates/_helpers.tpl`), `k8s-deploy.sh` / `configure-oidc.sh` / `provision.sh` / `deploy-single-tenant.sh` |
 | `apps/fleet-platform/deploy.sh`, `apps/opencrane-infra/deploy.sh` | Fleet / silo deploy flows |
 | `libs/k8s-platform/deploy-single-tenant.sh`, `provision.sh` | Single-org orchestrator + shared cluster provisioning (`--provision local/gke/vps`) |

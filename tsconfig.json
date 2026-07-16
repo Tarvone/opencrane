@@ -13,6 +13,9 @@
       "@opencrane/backend/access-tokens": [
         "./libs/backend/access-tokens/main/src/index.ts"
       ],
+      "@opencrane/backend/api-spec": [
+        "./libs/backend/api-spec/main/src/index.ts"
+      ],
       "@opencrane/backend/audit": [
         "./libs/backend/audit/main/src/index.ts"
       ],
@@ -34,11 +37,17 @@
       "@opencrane/backend/grants": [
         "./libs/backend/grants/main/src/index.ts"
       ],
+      "@opencrane/backend/feat-openclaw-tenant": [
+        "./libs/backend/feat-openclaw-tenant/main/src/index.ts"
+      ],
       "@opencrane/backend/groups": [
         "./libs/backend/groups/main/src/index.ts"
       ],
       "@opencrane/backend/mcp": [
         "./libs/backend/mcp/main/src/index.ts"
+      ],
+      "@opencrane/backend/identity": [
+        "./libs/backend/identity/main/src/index.ts"
       ],
       "@opencrane/backend/metrics": [
         "./libs/backend/metrics/main/src/index.ts"
@@ -82,8 +91,14 @@
       "@opencrane/infra/auth": [
         "./libs/infra/auth/src/index.ts"
       ],
+      "@opencrane/infra/channel-proxy": [
+        "./libs/infra/channel-proxy/src/index.ts"
+      ],
       "@opencrane/infra/http": [
         "./libs/infra/http/src/index.ts"
+      ],
+      "@opencrane/infra/tenant-hosting": [
+        "./libs/infra/tenant-hosting/src/index.ts"
       ],
       "@opencrane/observability/telemetry": [
         "./libs/observability/src/telemetry.ts"

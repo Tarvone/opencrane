@@ -273,8 +273,8 @@ clustertenantManager:
   # -- Whether this silo OWNS per-ClusterTenant namespace creation. Default false: the
   #    fleet-manager creates + owns each org's namespace, and the silo SA is granted NO
   #    cluster-scoped `namespaces` RBAC, so the silo skips the create. Set true ONLY for an
-  #    all-in-one / standalone silo — it renders the gated namespace-management ClusterRole
-  #    (clustertenant-manager-rbac.yaml) and injects MANAGE_TENANT_NAMESPACES=true. The
+  #    all-in-one / standalone silo — the app-owned OpenCrane Helm unit renders its gated
+  #    namespace-management ClusterRole and injects MANAGE_TENANT_NAMESPACES=true. The
   #    `deploymentMode: standalone` preset (values/standalone.yaml) sets this explicitly; left
   #    false here (rather than deriving from `deploymentMode`) so the bare default render is
   #    byte-for-byte unchanged from before #151 item 4 introduced the switch.
@@ -784,8 +784,8 @@ ingress:
 # ingress.sameOrigin.spaService="weownai-opencrane-ui" (the external Service) — flipping
 # this on is an explicit per-install cutover, not a silent default change. When true, this
 # chart's own Deployment + Service render AND the ingress `/` route targets them
-# automatically, overriding ingress.sameOrigin.spaService/spaPort (see
-# clustertenant-manager-ingress.yaml).
+# automatically, overriding ingress.sameOrigin.spaService/spaPort (see the app-owned
+# `apps/opencrane/helm/templates/_ingress.tpl`).
 controlPlaneSpa:
   enabled: false
   image:
@@ -894,7 +894,7 @@ certManager:
   #    pre-create `certManager.issuerName`, so it must own the Issuer itself. Default true =
   #    self-contained (mirrors crds.install's standalone-first default). Set false in a
   #    fleet-managed topology where an external fleet chart already creates the Issuer this
-  #    silo's Certificates (clustertenant-manager-certificate.yaml + the operator's runtime
+  #    silo's Certificates (the app-owned OpenCrane certificate template + the operator's runtime
   #    per-org vanity Certificate) reference — so this release's install/upgrade does not
   #    contend with the fleet's release for ownership of the same object (Helm annotates
   #    managed resources with the owning release+namespace and refuses to adopt one owned
@@ -1141,7 +1141,7 @@ networkPolicy:
   #      2. Set enabled=true in a staging/dev cluster and run your full smoke test
   #         (API calls, model routing, agent skill delivery, Obot MCP connections).
   #      3. If any path breaks, check whether the missing allow-list entry is in this
-  #         template or in networkpolicy-planes.yaml / cognee-deployment.yaml.
+  #         template, networkpolicy-planes.yaml, or the app-owned Cognee Helm unit.
   #      4. Once all planes pass, promote to production.
   #
   #    RELATION TO S2: the per-silo operator policies restrict what TENANT pods can

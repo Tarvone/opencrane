@@ -61,7 +61,7 @@ CRUD + lifecycle live at `/api/v1/skills/catalog`
 1. The operator injects a projected token with **audience `feat-skill-registry`** at
    `/var/run/opencrane/tokens/feat-skill-registry.token`, plus
    `OPENCRANE_SKILL_REGISTRY_URL`
-   ([3-deployment.ts](https://github.com/italanta/opencrane/blob/main/apps/opencrane/src/reconcilers/tenants/deploy/3-deployment.ts)).
+   ([3-deployment.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/3-deployment.ts)).
    No shared storage volume is mounted for skill delivery; the live mechanism is the
    per-entitlement HTTP pull below.
 2. The pod calls **`GET /bundles/:digest`** on the Skill Registry service with that

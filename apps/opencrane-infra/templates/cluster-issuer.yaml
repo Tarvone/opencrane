@@ -2,7 +2,7 @@
 #151 item 2 — silo-owned cert-manager Issuer/ClusterIssuer.
 
 certManagerIssuerName references an Issuer that a fleet chart used to be assumed to have
-already created (see clustertenant-manager-certificate.yaml's original comment). A STANDALONE
+already created (see the app-owned OpenCrane certificate template). A STANDALONE
 silo has no fleet to do that, so this chart provisions its own — the cert-manager analogue of
 `crds.install` (self-sufficiency, #151 item 3). Gated by `certManager.selfManagedIssuer`
 (default true = self-contained); set false in a fleet-managed topology where an external
@@ -11,7 +11,7 @@ with the fleet's release for ownership of the same object.
 
 Every Certificate that will reference this Issuer in THIS chart is a SINGLE, non-wildcard
 hostname (see docs/agents/cluster-architecture.md → "Tenancy Model"): the opencrane-ui's own
-host (clustertenant-manager-certificate.yaml) and the operator's optional per-org vanity
+host (rendered by the app-owned OpenCrane Helm unit) and the operator's optional per-org vanity
 Certificate (libs/backend/cluster-tenants/main/src/core/org-domain.provisioner.ts). Neither
 needs a wildcard SAN, so — unlike the old fleet-wide platform-wildcard Issuer this was ported
 from — HTTP-01 through the ingress is sufficient on its own and is the default solver; DNS-01
@@ -21,8 +21,8 @@ is set, for installs that prefer it or need to solve challenges before the ingre
 - mode=selfSigned : dev/local — issues instantly, no ACME challenge, not browser-trusted.
 - mode=acme       : production — public CA (Let's Encrypt by default).
 
-Issuer scope mirrors `opencrane.namespacedCertIssuer` (brief B4, MI.4) — the SAME helper
-clustertenant-manager-deployment.yaml already uses to derive CERT_MANAGER_ISSUER_KIND, so
+Issuer scope mirrors `opencrane.namespacedCertIssuer` (brief B4, MI.4) — the SAME helper the
+app-owned OpenCrane deployment template uses to derive CERT_MANAGER_ISSUER_KIND, so
 this template and that env var can never disagree on ClusterIssuer vs. namespaced Issuer:
 - default (`multiInstance.certIssuer=cluster` or multiInstance disabled): one cluster-singleton
   ClusterIssuer.

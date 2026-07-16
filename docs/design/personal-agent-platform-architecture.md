@@ -837,7 +837,7 @@ Repository evidence:
 - [cluster topology](../agents/cluster-architecture.md)
 - [MCP and skills platform brief](../briefs/mcp-skills-platform-brief.md)
 - [OpenClaw runtime entrypoint](../../apps/feat-openclaw-tenant/deploy/entrypoint.sh)
-- [OpenClaw config renderer](../../apps/opencrane/src/reconcilers/tenants/deploy/2-config-map.ts)
+- [OpenClaw config renderer](../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/2-config-map.ts)
 - [OpenClaw frontend adapter](../../libs/frontend/state/conversation/adapter/src/lib/openclaw-conversation-gateway.ts)
 
 Upstream evidence:

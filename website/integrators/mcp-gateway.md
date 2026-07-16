@@ -77,9 +77,9 @@ halves of one change.
 
 ## Deployment and network posture
 
-- The silo chart renders the Obot Deployment and Service from
-  `apps/opencrane-infra/templates/obot-mcp-gateway-deployment.yaml` and
-  `mcp-gateway-service.yaml`.
+- The Obot app owns its Deployment and Service templates under
+  `apps/obot/helm/templates/`; the silo chart composes that app-owned unit from
+  `apps/opencrane-infra/templates/app-rollups.yaml`.
 - `OBOT_SERVER_MCPRUNTIME_BACKEND=kubernetes` makes Obot start MCP servers as pods in
   the silo namespace.
 - There is no external Obot ingress. NetworkPolicy admits the gateway only from the

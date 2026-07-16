@@ -14,7 +14,7 @@
   pods, but nothing stopped an arbitrary pod in this namespace from reaching another on an
   unlisted port, or reaching out to an arbitrary destination.
 
-  RELATION TO OTHER POLICIES: networkpolicy-planes.yaml + clustertenant-manager-ingress.yaml
+  RELATION TO OTHER POLICIES: networkpolicy-planes.yaml + the app-owned OpenCrane ingress template
   remain the precise, per-port allow-lists; this template is the coarse belt-and-suspenders
   floor underneath them. networkpolicy-multi-instance.yaml is the CROSS-instance/cross-silo
   floor (a different namespace boundary); this one is INTRA-namespace.
@@ -77,7 +77,7 @@ spec:
               app.kubernetes.io/component: opencrane-ui-spa
     # 2. Tenant pods (a different namespace's watch target, but may share this namespace in
     #    single-namespace installs) -> opencrane-ui, INTERNAL port only. Identity is enforced
-    #    by TokenReview inside the handler (see clustertenant-manager-ingress.yaml); this rule
+    #    by TokenReview inside the handler (see apps/opencrane/helm/templates/_ingress.tpl); this rule
     #    is the coarse backstop so that path survives the default-deny.
     - from:
         - podSelector:

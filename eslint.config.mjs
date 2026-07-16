@@ -3,14 +3,19 @@
  *
  * Mechanical TypeScript style stays in `scripts/agent-style-check.sh` and per-package
  * `tsc --noEmit`; this config exists solely so the NX project graph can enforce the
- * scope tags declared in each package.json (`nx.tags`):
+ * legacy scope tags and the dimensional tags declared in each package.json
+ * (`nx.tags`):
  *
  *   - `scope:shared`  (libs/* infra + contracts) may only depend on other shared libs.
  *   - `scope:backend` (libs/backend/*)           may depend on backend + shared libs.
  *   - `scope:web`     (libs/frontend/*)          may depend on web + shared libs.
  *   - `scope:app`     (apps/*)                   may depend on anything.
  *
- * Run via `pnpm lint:boundaries`.
+ * Phase B starts the dimensional migration on every new or touched project. Untagged legacy
+ * targets remain reachable until R2 migrates the complete graph, but newly tagged projects are
+ * prevented from introducing app-to-app, lib-to-app, or upward layer dependencies now.
+ *
+ * Run via `npm run lint:boundaries`.
  */
 import nx from "@nx/eslint-plugin";
 import tsEslint from "@typescript-eslint/eslint-plugin";
@@ -41,10 +46,80 @@ export default [
           enforceBuildableLibDependency: false,
           allow: [],
           depConstraints: [
-            { sourceTag: "scope:shared", onlyDependOnLibsWithTags: ["scope:shared"] },
-            { sourceTag: "scope:backend", onlyDependOnLibsWithTags: ["scope:backend", "scope:shared"] },
+            {
+              sourceTag: "scope:shared",
+              onlyDependOnLibsWithTags: [
+                "scope:shared",
+                "scope:auth",
+                "scope:channel-proxy",
+                "scope:http",
+                "scope:tenant-hosting",
+              ],
+            },
+            {
+              sourceTag: "scope:backend",
+              onlyDependOnLibsWithTags: [
+                "scope:backend",
+                "scope:shared",
+                "scope:api-spec",
+                "scope:auth",
+                "scope:channel-proxy",
+                "scope:connections",
+                "scope:contract",
+                "scope:feat-openclaw-tenant",
+                "scope:http",
+                "scope:identity",
+                "scope:policies",
+                "scope:projection",
+                "scope:tenant-hosting",
+                "scope:tenants",
+              ],
+            },
             { sourceTag: "scope:web", onlyDependOnLibsWithTags: ["scope:web", "scope:shared"] },
             { sourceTag: "scope:app", onlyDependOnLibsWithTags: ["*"] },
+            { sourceTag: "type:app", notDependOnLibsWithTags: ["type:app"] },
+            { sourceTag: "type:lib", notDependOnLibsWithTags: ["type:app"] },
+            {
+              sourceTag: "layer:backend",
+              notDependOnLibsWithTags: ["layer:entrypoint", "layer:frontend"],
+            },
+            {
+              sourceTag: "layer:infra",
+              notDependOnLibsWithTags: ["layer:entrypoint", "layer:backend", "layer:frontend"],
+            },
+            {
+              sourceTag: "layer:frontend",
+              notDependOnLibsWithTags: ["layer:entrypoint", "layer:backend", "layer:infra"],
+            },
+            {
+              sourceTag: "layer:contract",
+              notDependOnLibsWithTags: [
+                "layer:entrypoint",
+                "layer:backend",
+                "layer:frontend",
+                "layer:infra",
+              ],
+            },
+            {
+              sourceTag: "layer:model",
+              notDependOnLibsWithTags: [
+                "layer:entrypoint",
+                "layer:backend",
+                "layer:contract",
+                "layer:frontend",
+                "layer:infra",
+              ],
+            },
+            {
+              sourceTag: "layer:util",
+              notDependOnLibsWithTags: [
+                "layer:entrypoint",
+                "layer:backend",
+                "layer:contract",
+                "layer:frontend",
+                "layer:infra",
+              ],
+            },
           ],
         },
       ],

@@ -9,3 +9,6 @@ export * from "./error-handler.js";
 export * from "./healthz.js";
 export * from "./openapi-route.js";
 export * from "./rate-limit.js";
+export * from "./transport-security.middleware.js";
+export * from "./trusted-proxies.js";
+export type * from "./trusted-proxies.types.js";

@@ -65,6 +65,17 @@ follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 
 ### Changed
 
+- **Operators can now identify and release every deployed workload from its owning app package.**
+  OpenCrane server, UI, migration, Cognee, LiteLLM, Obot, and Langfuse deployment definitions now
+  live with their app rollups; `opencrane-infra` composes those app-owned charts as the platform
+  umbrella while preserving the frozen blue render.
+
+- **Platform developers can reuse functional server capabilities without importing an app root.**
+  Tenant reconciliation, identity, projection, connection auth, policy reconciliation, channel
+  proxying, tenant hosting, transport security, and OpenAPI ownership now live in focused backend
+  and infrastructure libraries. CI rejects new app-owned implementation logic, unregistered
+  workload constructors, duplicate workload ownership, and dependency-direction drift.
+
 - **Tenant runtime upgrades and rollbacks are now image operations, not startup-time mutations.**
   OpenClaw and its Cognee memory plugin are pinned in the tenant image, and an empty state volume
   can start either the current or previous image without downloading executable code. Operators

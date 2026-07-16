@@ -11,30 +11,24 @@ import { pinoHttp } from "pino-http";
 import express, { type Express } from "express";
 import type { PrismaClient } from "@prisma/client";
 
-import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry, ___DoWithTrace } from "@opencrane/observability";
+import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry } from "@opencrane/observability";
 import { ___AuthMiddleware } from "@opencrane/infra/auth";
-import { _ErrorHandler, _RateLimit } from "@opencrane/infra/http";
+import { _ErrorHandler, _RateLimit, _TransportSecurity } from "@opencrane/infra/http";
 
-import { ___AuthRouter } from "./infra/auth/auth.router.js";
-import { ___CreateOidcAuthService } from "./infra/auth/oidc.service.js";
+import { ___AuthRouter, ___CreateOidcAuthService } from "@opencrane/backend/identity";
 import { ___CreatePrismaClient } from "./infra/db/db.js";
-import { _TransportSecurity } from "./infra/middleware/transport-security.middleware.js";
 import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
-import { TenantProjectionRepairer } from "./infra/projection/tenant-projection-repairer.js";
-import { MembershipProjectionRepairer, _BuildHttpFleetMembershipReader, _BuildHttpFleetMembershipWriter } from "./infra/projection/membership-projection-repairer.js";
-import { _ResolveOwnClusterTenantName, _SeedOwnDefaultTenant, _SeedOwnClusterTenant } from "@opencrane/backend/cluster-tenants";
-import { CogneeLiteLlmKey } from "./reconcilers/tenants/internal/cognee-litellm-key.js";
-import { CogneeSiloTenant } from "./reconcilers/tenants/internal/cognee-silo-tenant.js";
+import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/projection";
+import { OpenClawTenantLifecycle } from "@opencrane/backend/feat-openclaw-tenant";
+import { _CutTenant } from "@opencrane/backend/connections";
+import { _SetTenantSuspended } from "@opencrane/backend/tenants";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped
 // ClusterTenant CR and nothing inside a silo.
-import { _LoadOperatorConfig, type OpenClawTenantOperatorConfig } from "./app/config.js";
-import { _ProvisionByokKey } from "@opencrane/backend/model-routing";
-import { _CreateTenantOperator, IdleChecker } from "./reconcilers/tenants/index.js";
-import { PolicyOperator } from "./reconcilers/policies/operator.js";
-import { GatewayProxyServer } from "./gateways/gateway-proxy/server.js";
+import { _LoadOperatorConfig } from "./app/config.js";
+import { _BuildHostingAdapter } from "./hosting/index.js";
 
 // Route any stray console.* call (first-party or third-party) through the
 // structured logger so nothing reaches stdout unstructured / uncorrelated.
@@ -167,282 +161,51 @@ const internalServer = internalApp.listen(internalPort, function _onInternalList
   log.info({ internalPort }, "control plane internal API listening");
 });
 
-// NOTE: the single-tenant ClusterTenant boot-seed moved to the fleet-manager (Stage 4) — the
-// fleet owns the ClusterTenant registry. The silo receives its ClusterTenant read-model via CR
-// projection, not a local boot-seed.
+/** Namespace and cadence for the app-composed projection lifecycle. */
+const projectionNamespace = process.env.NAMESPACE ?? "default";
+const projectionIntervalMs = Number(process.env.OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS ?? "60") * 1000;
 
-// Periodic Tenant-projection repair (Stage 4). The fleet-manager creates each org's
-// `<org>-default` Tenant CRD on ready; the silo has no operator watch, so this loop reconciles
-// its Postgres projection to the namespace's Tenant CRDs (creating missing rows) so fleet-seeded
-// workspaces appear in the silo's management API. Idempotent + fail-soft; interval from
-// OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS (default 60; 0 disables).
-const _projectionRepairNamespace = process.env.NAMESPACE ?? "default";
-const _projectionRepairIntervalMs = Number(process.env.OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS ?? "60") * 1000;
-const tenantProjectionRepairer = new TenantProjectionRepairer(customApi, prisma, _projectionRepairNamespace, log, _projectionRepairIntervalMs);
-tenantProjectionRepairer.start();
-
-// Periodic fleet → silo OrgMembership projection repair (#126 S2). The fleet registry owns the
-// authoritative membership; the silo keeps a local read-model the org-admin gate + POST /tenants
-// membership validation (S1) depend on. This loop pulls the org's membership from the fleet
-// internal endpoint and reconciles the silo rows. Standalone-safe (#151): when FLEET_INTERNAL_URL
-// is unset or the fleet is unreachable, the reader returns null and the sweep no-ops, leaving
-// locally-managed rows intact. Interval shares OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS.
-/** Reference to the membership repairer, populated once the silo's org name resolves. */
-let _membershipRepairerRef: MembershipProjectionRepairer | null = null;
-void (async function _startMembershipRepairer()
+/** Adapt the connection-domain cut operation to the projection enforcement port. */
+async function _cutMembershipTenant(tenant: string, namespace: string, reason: string): Promise<void>
 {
-  const clusterTenant = await _ResolveOwnClusterTenantName(customApi, _projectionRepairNamespace, log);
-  if (!clusterTenant)
-  {
-    log.info({ namespace: _projectionRepairNamespace }, "no ClusterTenant bound to this namespace yet; membership projection repairer idle");
-    return;
-  }
-  const fleetInternalUrl = process.env.FLEET_INTERNAL_URL?.trim() ?? "";
-  const fleetInternalToken = process.env.OPENCRANE_API_TOKEN?.trim() ?? "";
-  const reader = _BuildHttpFleetMembershipReader(fleetInternalUrl, fleetInternalToken, log);
-  // Suspension ENFORCEMENT (#126): the sweep cuts a Suspended member's runtime pod and
-  // suspends the workspace. Thread the Kubernetes clients + this silo's namespace so
-  // the repairer can drive `_CutTenant` and the Tenant `spec.suspended` patch.
-  const enforcement = { customApi, coreApi, namespace: _projectionRepairNamespace };
-  const repairer = new MembershipProjectionRepairer(prisma, reader, clusterTenant, log, _projectionRepairIntervalMs, enforcement);
-  repairer.start();
-  _membershipRepairerRef = repairer;
-})();
-
-/** Idle-checker handle, set during controller bootstrap for shutdown access. */
-let _idleCheckerRef: IdleChecker | null = null;
-
-/** Periodic Cognee silo-tenant heal timer, cleared on shutdown. */
-let _cogneeSiloHealTimerRef: ReturnType<typeof setInterval> | null = null;
-
-/** In-process gateway proxy server handle, for graceful shutdown. */
-let _gatewayProxyRef: GatewayProxyServer | null = null;
-
-/**
- * Start every in-silo reconcile loop over this silo's OWN namespace (Stage 5).
- *
- * The fleet-manager stops at ClusterTenant lifecycle; the silo owns the tenant runtime:
- * the TenantOperator (openclaw pods/ConfigMaps/Services + LiteLLM keys), the PolicyOperator
- * (AccessPolicy → NetworkPolicy), the idle-suspend checker, the runtime-plane drift repairer,
- * and the identity-routing gateway proxy — all scoped to `config.watchNamespace` (this silo's
- * namespace). Because the operator
- * is DB-less, its internal-API calls hit the silo's OWN API (its own Service), so a silo is
- * self-contained.
- *
- * Fail-soft: a controller bootstrap error is logged but never crashes the pod — the silo's
- * management API + health endpoint stay up so the misconfiguration is diagnosable rather than
- * crash-looping.
- */
-/**
- * Optional boot-time bootstrap of this silo's OpenAI BYOK key, gated on the
- * `OPENCRANE_BOOTSTRAP_OPENAI_KEY` env var (injected from a deploy Secret — never hardcoded). When
- * set, provisions it as the silo's Global OpenAI key via the same path as the BYOK route: writes the
- * encrypted Secret, registers the LiteLLM credential, and seeds a default model. Idempotent (upsert)
- * so re-running on every boot is safe, and best-effort so a hiccup never blocks controller startup.
- *
- * Intended for short-lived testing: populate the deploy Secret to light a silo up, then delete it to
- * stop re-applying (the live key is removed via the BYOK delete endpoint / Model Keys UI, not by
- * clearing the env). The raw key is never logged.
- *
- * @param config - Operator config; supplies the operator's own namespace for the Secret write.
- */
-async function _BootstrapProviderKeyIfConfigured(config: OpenClawTenantOperatorConfig): Promise<void>
-{
-  const apiKey = process.env.OPENCRANE_BOOTSTRAP_OPENAI_KEY?.trim();
-  if (!apiKey)
-  {
-    return;
-  }
-
-  try
-  {
-    const result = await _ProvisionByokKey({ prisma, coreApi, operatorNamespace: config.operatorNamespace, provider: "openai", apiKey, log });
-    log.info({ provider: "openai", litellmRegistered: result.litellmRegistered }, "bootstrap provider key provisioned for silo");
-  }
-  catch (err)
-  {
-    log.warn({ err }, "bootstrap provider key provisioning failed; continuing boot");
-  }
+  await _CutTenant(coreApi, { tenant, namespace, reason });
 }
 
-async function _startInSiloControllers(): Promise<void>
+/** Adapt the tenant-domain suspension operation to the projection enforcement port. */
+async function _setMembershipTenantSuspended(tenant: string, suspended: boolean): Promise<void>
 {
-  try
-  {
-    const config = _LoadOperatorConfig();
-    log.info({ watchNamespace: config.watchNamespace }, "starting in-silo controllers");
-
-    // Optional test bootstrap — provision this silo's OpenAI BYOK key from an injected env var
-    // (sourced from a deploy Secret), BEFORE the default-tenant seed so the model it seeds satisfies
-    // the seed's ≥1-model onboarding gate and the silo comes up usable. Awaited for that ordering.
-    await _BootstrapProviderKeyIfConfigured(config);
-
-    const tenantOperator = _CreateTenantOperator(kc, config, log);
-
-    // Standalone-only boot seeds (#151 item 4): a fleet-managed silo defers ClusterTenant
-    // lifecycle AND its own default-workspace seed entirely to the external fleet-manager +
-    // its provisioning flow (member adoption / first login) — this silo racing an unconditional
-    // create here could seed a workspace ahead of / independent from the fleet's authoritative
-    // membership state. A standalone silo has no such fleet, so it is both the one that must
-    // create + bind its own ClusterTenant CR (see `_SeedOwnClusterTenant`) and the one that
-    // seeds its own first workspace once that CR resolves.
-    if (config.deploymentMode === "standalone")
-    {
-      void (async function _standaloneBootSeeds()
-      {
-        if (config.standaloneSeedName.trim())
-        {
-          await _SeedOwnClusterTenant(customApi, config.watchNamespace, {
-            name: config.standaloneSeedName,
-            displayName: config.standaloneSeedDisplayName,
-            ownerEmail: config.standaloneSeedOwnerEmail,
-            ownerSubject: config.standaloneSeedOwnerSubject,
-            tier: config.standaloneSeedTier,
-          }, log);
-        }
-
-        // Seed this silo's own `<org>-default` workspace Tenant from its ClusterTenant CR
-        // owner. Use config.watchNamespace (the namespace the operators below reconcile in)
-        // so the seed lands where the TenantOperator will pick it up — not the
-        // projection-repair namespace, which is derived independently and could diverge
-        // under manual env overrides. Run AFTER the ClusterTenant self-seed above so a
-        // fresh standalone boot has something bound to seed a workspace from.
-        const seedResult = await _SeedOwnDefaultTenant(customApi, prisma, config.watchNamespace, log);
-        if (seedResult?.created)
-        {
-          try
-          {
-            await tenantOperator.reconcileExistingTenantByName(seedResult.tenantName, config.watchNamespace);
-            log.info({ tenantName: seedResult.tenantName }, "queued standalone default tenant for immediate reconciliation");
-          }
-          catch (err)
-          {
-            log.warn({ err, tenantName: seedResult.tenantName }, "standalone default tenant immediate reconcile failed; watch replay remains the backstop");
-          }
-        }
-      })();
-    }
-    else
-    {
-      log.info({ deploymentMode: config.deploymentMode }, "fleet-managed silo: skipping standalone boot seeds (ClusterTenant lifecycle + default-workspace seed are the external fleet's)");
-    }
-
-    // Ensure this silo's Cognee has its own dedicated LiteLLM virtual key — a SEPARATE
-    // identity/budget from tenant chat spend (Cognee's embedding + graph-extraction calls
-    // must be trackable on their own, not folded into a tenant's cap). One-shot at boot:
-    // there is exactly one Cognee per silo and its params rarely change, unlike per-tenant
-    // keys which reconcile every tenant-CR poll. Best-effort — a LiteLLM outage at boot
-    // must not block the tenant/policy operators from starting.
-    void (async function _ensureCogneeLiteLlmKey()
-    {
-      const clusterTenantName = await _ResolveOwnClusterTenantName(customApi, config.watchNamespace, log);
-      if (!clusterTenantName)
-      {
-        log.info({ namespace: config.watchNamespace }, "no ClusterTenant bound to this namespace yet; cognee litellm key provisioning idle");
-        return;
-      }
-      const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
-      const cogneeAppsApi = kc.makeApiClient(k8s.AppsV1Api);
-      try
-      {
-        await new CogneeLiteLlmKey(config, coreApi, objectApi, cogneeAppsApi, log).ensureCogneeLiteLlmKeySecret(clusterTenantName, config.watchNamespace);
-      }
-      catch (err)
-      {
-        log.warn({ err, clusterTenantName }, "cognee litellm key provisioning failed; cognee will run without embedding/LLM credentials until this is retried");
-      }
-
-      // Ensure this silo has ONE Cognee owner account + Cognee Tenant — the grouping every
-      // per-openclaw-tenant Cognee login (CogneeTenantIdentity) joins so the plugin's
-      // companyDataset scope is actually shared silo-wide instead of a private dataset per
-      // tenant (see CogneeSiloTenant's doc comment). Independent try/catch: this has no
-      // dependency on the LiteLLM key above other than running after it in this same IIFE;
-      // a failure here must not affect that key already having been provisioned.
-      try
-      {
-        await new CogneeSiloTenant(config, coreApi, objectApi, log).ensureSiloTenant(clusterTenantName, config.watchNamespace);
-      }
-      catch (err)
-      {
-        log.warn({ err, clusterTenantName }, "cognee silo tenant provisioning failed; per-tenant logins will join it once this is retried");
-      }
-    })();
-
-    // Periodic Cognee silo-tenant heal. The boot attempt above is one-shot, but the silo owner +
-    // Cognee Tenant live in Cognee's OWN database (unlike the LiteLLM key, a durable k8s Secret) —
-    // a Cognee restart onto a fresh/empty store (notably the FIRST mount of its new persistent
-    // volume) wipes them, and the single boot attempt misses that window whenever Cognee isn't
-    // ready at exactly that moment (it usually restarts alongside this pod on a deploy). Without a
-    // live owner, EVERY per-tenant `ensureTenantJoinedToSiloTenant` fails at owner-login and the
-    // tenant stays 401 forever. Re-running on a slow cadence closes that gap: `ensureSiloTenant`
-    // is idempotent + liveness-checked (a cheap no-op once the owner authenticates) and
-    // re-provisions when it was wiped. Slow interval — this is a silo singleton that changes rarely.
-    if (config.cogneeEndpoint)
-    {
-      const cogneeSiloHealer = new CogneeSiloTenant(config, coreApi, k8s.KubernetesObjectApi.makeApiClient(kc), log);
-      _cogneeSiloHealTimerRef = setInterval(function _healCogneeSiloTenant()
-      {
-        void (async function _run()
-        {
-          try
-          {
-            const ctName = await _ResolveOwnClusterTenantName(customApi, config.watchNamespace, log);
-            if (!ctName)
-            {
-              return;
-            }
-            await cogneeSiloHealer.ensureSiloTenant(ctName, config.watchNamespace);
-          }
-          catch (err)
-          {
-            log.warn({ err }, "cognee silo-tenant heal tick failed; will retry next interval");
-          }
-        })();
-      }, 60_000);
-    }
-
-    const policyOperator = new PolicyOperator(kc, config, log);
-
-    const idleChecker = new IdleChecker(kc, config, log);
-    _idleCheckerRef = idleChecker;
-    idleChecker.start();
-
-    // In-process identity-routing gateway proxy (DOMAIN.T4): serves the gateway WebSocket,
-    // delegates auth to the silo control plane, injects X-Forwarded-User, reverse-proxies to
-    // the user's pod. Holds no Kubernetes client and no secrets.
-    if (config.gatewayProxyEnabled)
-    {
-      const gatewayProxy = new GatewayProxyServer({
-        port: config.gatewayProxyPort,
-        // The proxy calls GET /api/v1/auth/gateway-resolve — a PUBLIC route on the public
-        // listener (same pod), so it targets localhost:<public port>, NOT the internal listener.
-        controlPlaneUrl: `http://localhost:${port}`,
-        gatewayPort: config.gatewayPort,
-        clusterDomain: config.clusterDomain,
-        userHeader: config.gatewayTrustedProxyUserHeader,
-        allowedOrigins: config.gatewayProxyAllowedOrigins,
-        allowedOriginBaseDomains: config.gatewayProxyAllowedOriginBaseDomains,
-        rateLimitPerMinute: config.gatewayProxyRateLimitPerMinute,
-      }, log);
-      gatewayProxy.start();
-      _gatewayProxyRef = gatewayProxy;
-    }
-    else
-    {
-      log.info("in-silo gateway proxy disabled (GATEWAY_PROXY_ENABLED not true)");
-    }
-
-    // Start the watch loops concurrently — these reconcile Tenant + AccessPolicy CRs in the
-    // silo's own namespace.
-    await Promise.all([tenantOperator.start(), policyOperator.start()]);
-  }
-  catch (err)
-  {
-    log.error({ err }, "in-silo controller bootstrap failed; the silo API stays up but the tenant runtime is NOT reconciling");
-  }
+  await _SetTenantSuspended(customApi, projectionNamespace, tenant, suspended);
 }
 
-void _startInSiloControllers();
+/** Projection loops composed from app-owned clients and explicit tenant mutation ports. */
+const projectionLifecycle = new ProjectionLifecycle({
+  customApi,
+  prisma,
+  namespace: projectionNamespace,
+  intervalMs: projectionIntervalMs,
+  fleetInternalUrl: process.env.FLEET_INTERNAL_URL?.trim() ?? "",
+  fleetInternalToken: process.env.OPENCRANE_API_TOKEN?.trim() ?? "",
+  log,
+  enforcement: {
+    namespace: projectionNamespace,
+    cutTenant: _cutMembershipTenant,
+    setTenantSuspended: _setMembershipTenantSuspended,
+  },
+});
+projectionLifecycle.start();
+
+/** Frozen-blue OpenClaw tenant runtime composed behind its library lifecycle contract. */
+const openClawTenantLifecycle = new OpenClawTenantLifecycle({
+  kubeConfig: kc,
+  customApi,
+  coreApi,
+  prisma,
+  publicPort: port,
+  loadConfig: _LoadOperatorConfig,
+  buildHostingAdapter: _BuildHostingAdapter,
+  log,
+});
+void openClawTenantLifecycle.start();
 
 /**
  * Gracefully drain the server, disconnect Prisma, flush telemetry, and restore
@@ -459,14 +222,8 @@ async function _shutdown(signal: string): Promise<void>
   hardExit.unref();
 
   // Stop the projection-repair loops + in-silo controllers so no sweep races the disconnect below.
-  tenantProjectionRepairer.stop();
-  _membershipRepairerRef?.stop();
-  if (_cogneeSiloHealTimerRef)
-  {
-    clearInterval(_cogneeSiloHealTimerRef);
-  }
-  _idleCheckerRef?.stop();
-  await _gatewayProxyRef?.stop();
+  projectionLifecycle.stop();
+  await openClawTenantLifecycle.stop();
 
   try
   {

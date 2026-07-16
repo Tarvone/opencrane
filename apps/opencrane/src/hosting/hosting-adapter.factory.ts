@@ -1,8 +1,5 @@
-import type { OpenClawTenantOperatorConfig } from "../app/config.js";
-import { HostingProvider, type HostingAdapter } from "./hosting-adapter.types.js";
-import { OnPremHostingAdapter } from "./adapters/onprem/onprem-hosting.adapter.js";
-import { GcpHostingAdapter } from "./adapters/gcp/gcp-hosting.adapter.js";
-import { GcpBucketClient } from "./adapters/gcp/gcp-bucket.client.js";
+import type { OpenClawTenantOperatorConfig } from "@opencrane/backend/feat-openclaw-tenant";
+import { GcpBucketClient, GcpHostingAdapter, HostingProvider, OnPremHostingAdapter, type HostingAdapter } from "@opencrane/infra/tenant-hosting";
 
 /**
  * Construct the hosting adapter for the configured provider.

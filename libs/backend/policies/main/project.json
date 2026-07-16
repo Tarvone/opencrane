@@ -4,7 +4,9 @@
   "projectType": "library",
   "sourceRoot": "libs/backend/policies/main/src",
   "tags": [
-    "scope:backend"
+    "type:lib",
+    "layer:backend",
+    "scope:policies"
   ],
   "targets": {
     "lint": {

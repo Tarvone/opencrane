@@ -68,7 +68,7 @@ For the OpenCrane web UI, the concrete path is:
 
 1. [`OpenClawConversationGateway.send()`](../../libs/frontend/state/conversation/adapter/src/lib/openclaw-conversation-gateway.ts)
    sends Gateway v4 `chat.send` with a session key and idempotency key.
-2. The trusted [gateway proxy](../../apps/opencrane/src/gateways/gateway-proxy/proxy.ts) validates the
+2. The trusted [gateway proxy](../../libs/infra/channel-proxy/src/gateway-proxy/proxy.ts) validates the
    browser origin, delegates identity and tenant resolution to the control plane, strips a forged
    identity header, injects the verified user, and forwards the WebSocket to the user's pod.
 3. OpenClaw's

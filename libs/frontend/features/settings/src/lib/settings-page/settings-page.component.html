@@ -10,24 +10,26 @@
 			</svg>
 		</div>
 
-		<nav class="wo-settings__scope" aria-label="Settings scope">
-			<a
+		<div class="wo-settings__scope" role="group" aria-label="Settings scope">
+			<button
+				type="button"
 				class="wo-settings__scope-link"
 				[class.wo-settings__scope-link--active]="activeScope() === scopes.Workspace"
-				[attr.aria-current]="activeScope() === scopes.Workspace ? 'page' : null"
-				[routerLink]="['/settings/workspace/pod']"
+				[attr.aria-pressed]="activeScope() === scopes.Workspace"
+				(click)="selectScope(scopes.Workspace)"
 			>
 				Workspace
-			</a>
-			<a
+			</button>
+			<button
+				type="button"
 				class="wo-settings__scope-link"
 				[class.wo-settings__scope-link--active]="activeScope() === scopes.Personal"
-				[attr.aria-current]="activeScope() === scopes.Personal ? 'page' : null"
-				[routerLink]="['/settings/personal/account']"
+				[attr.aria-pressed]="activeScope() === scopes.Personal"
+				(click)="selectScope(scopes.Personal)"
 			>
 				Personal
-			</a>
-		</nav>
+			</button>
+		</div>
 
 		<div class="wo-settings__nav-list">
 		@for (item of navigation(); track item.id) {

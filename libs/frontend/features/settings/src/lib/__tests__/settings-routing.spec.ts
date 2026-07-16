@@ -3,12 +3,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { LocationStrategy } from "@angular/common";
+import { MockLocationStrategy } from "@angular/common/testing";
 import { ɵresolveComponentResources } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { Route, Router, Routes, provideRouter } from "@angular/router";
+import { NavigationEnd, Route, Router, Routes, provideRouter } from "@angular/router";
 import { RouterTestingHarness } from "@angular/router/testing";
+import { filter, firstValueFrom, take } from "rxjs";
 import { compileString } from "sass";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -48,6 +51,29 @@ function _testableRoutes(routes: Routes): Routes
 	});
 }
 
+/** Await the next completed router navigation. */
+function _nextNavigation(router: Router): Promise<NavigationEnd>
+{
+	return firstValueFrom(router.events.pipe(filter(function navigationEnded(event): event is NavigationEnd
+	{
+		return event instanceof NavigationEnd;
+	}), take(1)));
+}
+
+/** Emulate the native browser activation jsdom omits for focused buttons. */
+function _activateNativeButton(button: HTMLButtonElement, key: "Enter" | " "): void
+{
+	// 1. Focus — reproduce keyboard traversal placing the native control in the tab order.
+	button.focus();
+
+	// 2. Key lifecycle — expose the same events assistive and application listeners observe.
+	button.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+	button.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+
+	// 3. Default action — jsdom omits the browser's keyboard-generated button click.
+	button.click();
+}
+
 beforeAll(async function prepareAngularRouter(): Promise<void>
 {
 	TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting(), { teardown: { destroyAfterEach: true } });
@@ -61,7 +87,7 @@ beforeAll(async function prepareAngularRouter(): Promise<void>
 beforeEach(function configureRouter(): void
 {
 	TestBed.configureTestingModule({
-		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }])]
+		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }]), { provide: LocationStrategy, useClass: MockLocationStrategy }]
 	});
 });
 
@@ -174,16 +200,14 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		const router = TestBed.inject(Router);
 		const firstPlaceholder = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
 		const firstActiveLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
-		const scopeLinks = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLAnchorElement[];
+		const scopeButtons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLButtonElement[];
 
 		expect(firstPlaceholder.title).toBe("Members");
 		expect(firstActiveLink?.getAttribute("href")).toBe("/settings/workspace/members");
-		expect(scopeLinks.map(function label(link): string { return link.textContent?.trim() ?? ""; })).toEqual(["Workspace", "Personal"]);
-		expect(scopeLinks.map(function route(link): string | null { return link.getAttribute("href"); })).toEqual([
-			"/settings/workspace/pod", "/settings/personal/account"
-		]);
-		expect(scopeLinks[0]?.getAttribute("aria-current")).toBe("page");
-		expect(scopeLinks[1]?.hasAttribute("aria-current")).toBe(false);
+		expect(scopeButtons.map(function label(button): string { return button.textContent?.trim() ?? ""; })).toEqual(["Workspace", "Personal"]);
+		expect(scopeButtons.every(function nativeButton(button): boolean { return button instanceof HTMLButtonElement; })).toBe(true);
+		expect(scopeButtons[0]?.getAttribute("aria-pressed")).toBe("true");
+		expect(scopeButtons[1]?.getAttribute("aria-pressed")).toBe("false");
 
 		await harness.navigateByUrl("/settings/personal/budget");
 		harness.detectChanges();
@@ -195,8 +219,75 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(secondPlaceholder.title).toBe("My Budget");
 		expect(secondPlaceholder).not.toBe(firstPlaceholder);
 		expect(secondActiveLink?.getAttribute("href")).toBe("/settings/personal/budget");
-		expect(scopeLinks[0]?.hasAttribute("aria-current")).toBe(false);
-		expect(scopeLinks[1]?.getAttribute("aria-current")).toBe("page");
+		expect(scopeButtons[0]?.getAttribute("aria-pressed")).toBe("false");
+		expect(scopeButtons[1]?.getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("preserves active scopes and focuses content after cross-scope selection", async function scopeSelection(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/members");
+		const router = TestBed.inject(Router);
+		const scopeButtons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLButtonElement[];
+		const workspaceButton = scopeButtons[0];
+		const personalButton = scopeButtons[1];
+		const workspaceLeaf = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+
+		workspaceButton?.click();
+		await harness.fixture.whenStable();
+		expect(router.url).toBe("/settings/workspace/members");
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance).toBe(workspaceLeaf);
+
+		const personalNavigation = _nextNavigation(router);
+		personalButton?.click();
+		await personalNavigation;
+		await harness.fixture.whenStable();
+		harness.detectChanges();
+
+		const personalLeaf = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+		expect(router.url).toBe("/settings/personal/account");
+		expect(personalLeaf).not.toBe(workspaceLeaf);
+		expect(document.activeElement).toBe(harness.fixture.nativeElement.querySelector("main"));
+
+		if (!personalButton || !workspaceButton) throw new Error("Settings scope controls were not rendered");
+		_activateNativeButton(personalButton, "Enter");
+		await harness.fixture.whenStable();
+		expect(router.url).toBe("/settings/personal/account");
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance).toBe(personalLeaf);
+
+		const workspaceNavigation = _nextNavigation(router);
+		_activateNativeButton(workspaceButton, " ");
+		await workspaceNavigation;
+		await harness.fixture.whenStable();
+		harness.detectChanges();
+		expect(router.url).toBe("/settings/workspace/pod");
+		expect(workspaceButton.getAttribute("aria-pressed")).toBe("true");
+		expect(document.activeElement).toBe(harness.fixture.nativeElement.querySelector("main"));
+	});
+
+	it("restores scope selection through browser history", async function scopeHistory(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/members");
+		const router = TestBed.inject(Router);
+		const locationStrategy = TestBed.inject(LocationStrategy) as MockLocationStrategy;
+		router.setUpLocationChangeListener();
+
+		await harness.navigateByUrl("/settings/personal/budget");
+		harness.detectChanges();
+		expect(router.url).toBe("/settings/personal/budget");
+
+		const backNavigation = _nextNavigation(router);
+		locationStrategy.simulatePopState("/settings/workspace/members");
+		await backNavigation;
+		harness.detectChanges();
+		expect(router.url).toBe("/settings/workspace/members");
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__scope-link[aria-pressed='true']") as HTMLButtonElement | null)?.textContent?.trim()).toBe("Workspace");
+
+		const forwardNavigation = _nextNavigation(router);
+		locationStrategy.simulatePopState("/settings/personal/budget");
+		await forwardNavigation;
+		harness.detectChanges();
+		expect(router.url).toBe("/settings/personal/budget");
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__scope-link[aria-pressed='true']") as HTMLButtonElement | null)?.textContent?.trim()).toBe("Personal");
 	});
 
 });

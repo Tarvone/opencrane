@@ -291,115 +291,201 @@
 	}
 
 	&__composer {
+		max-width: 700px;
+		margin: 0 auto;
+		background: #fff;
+		border: 1px solid #d8d4cd;
+		border-radius: 12px;
+		padding: 10px 12px;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 		display: flex;
-		align-items: flex-end;
-		gap: 8px;
-		border-bottom: 2px solid var(--border);
+		flex-direction: column;
+		gap: 10px;
 
 		textarea {
 			flex: 1;
-			background: transparent;
 			border: none;
 			outline: none;
-			resize: none;
-			padding: 8px 0;
-			font-size: 14px;
-			line-height: 1.6;
+			font-size: 14.5px;
+			color: #1a1918;
+			background: transparent;
+			line-height: 1.55;
 			max-height: 140px;
+			overflow-y: auto;
+			padding: 1px 0;
+			resize: none;
+			font-family: inherit;
 
 			&::placeholder {
-				color: var(--muted-foreground);
+				color: #b0ada8;
 			}
 		}
 	}
 
-	&__attach {
-		padding: 6px;
-		margin-bottom: 6px;
-		color: var(--muted-foreground);
+	&__composer-inner {
+		display: flex;
+		align-items: flex-end;
+		gap: 10px;
+	}
+
+	&__attachments {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding-bottom: 4px;
+	}
+
+	&__attachment-chip {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: #f5f2ec;
+		border: 1px solid #dedad2;
+		border-radius: 6px;
+		padding: 6px 10px;
+		font-size: 12px;
+		color: #1a1918;
+
+		&--error {
+			border-color: #f9c7b4;
+			background: #fdf2ef;
+		}
+	}
+
+	&__attachment-info {
+		display: flex;
+		flex-direction: column;
+	}
+
+	&__attachment-name {
+		font-weight: 500;
+	}
+
+	&__attachment-size {
+		font-size: 10.5px;
+		color: #9a9690;
+	}
+
+	&__attachment-progress {
+		width: 40px;
+		height: 4px;
+		background: #dedad2;
+		border-radius: 2px;
+		overflow: hidden;
+	}
+
+	&__attachment-progress-bar {
+		height: 100%;
+		background: #0db5cc;
+	}
+
+	&__attachment-error {
+		font-size: 11px;
+		color: #c1392b;
+	}
+
+	&__attachment-remove {
+		background: transparent;
+		border: none;
+		color: #9a9690;
+		cursor: pointer;
+		padding: 2px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 
 		&:hover {
-			color: var(--foreground);
+			color: #1a1918;
+			background: #dedad2;
 		}
-
-		i {
-			font-size: 13px;
-		}
-	}
-
-	&__connecting {
-		gap: 4px;
-
-		&-icon {
-			font-size: 22px;
-			color: var(--muted-foreground);
-			margin-bottom: 10px;
-		}
-	}
-
-	&__composer-actions {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-bottom: 6px;
-
-		span {
-			font-size: 11px;
-			color: var(--muted-foreground);
-		}
-	}
-
-	&__composer-status {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		font-size: 11px;
-		color: var(--muted-foreground);
 
 		i {
 			font-size: 10px;
 		}
 	}
 
-	&__composer-retry {
+	&__attach {
+		background: transparent;
+		border: none;
+		padding: 2px 3px;
+		cursor: pointer;
+		color: #b0ada8;
+		flex-shrink: 0;
+		margin-bottom: 1px;
+
 		&:hover {
-			color: var(--foreground);
-			text-decoration: underline;
+			color: #1a1918;
 		}
 	}
 
+	&__composer-actions {
+		display: flex;
+		align-items: center;
+		flex-shrink: 0;
+		margin-bottom: 1px;
+	}
+
 	&__send {
-		padding: 6px;
-		border-radius: var(--radius);
-		color: var(--muted-foreground);
+		background: #0db5cc;
+		border: none;
+		border-radius: 7px;
+		padding: 6px 9px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25);
+		transition: all 0.13s ease;
 
 		&:disabled {
-			opacity: 0.3;
+			opacity: 0.4;
 			cursor: default;
+			pointer-events: none;
 		}
 
-		&--ready {
-			background: var(--primary);
-			color: var(--primary-foreground);
+		&:not(:disabled):hover {
+			background: linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%);
+			transform: translateY(-1px);
+			box-shadow: 0 2px 0 #0a94a7, 0 3px 6px rgba(13, 181, 204, 0.3);
 		}
 
-		i {
-			font-size: 12px;
+		&:not(:disabled):active {
+			transform: translateY(0);
+			box-shadow: 0 1px 0 #0a94a7;
 		}
 	}
 
 	&__stop {
+		background: #f5f2ec;
+		border: 1px solid #dedad2;
+		border-radius: 7px;
 		padding: 6px;
-		border-radius: var(--radius);
-		color: var(--foreground);
-		background: var(--secondary);
+		color: #1a1918;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 
 		&:hover {
-			background: var(--muted);
+			background: #e8e5de;
 		}
 
 		i {
 			font-size: 14px;
 		}
+	}
+
+	&__contract-summary {
+		text-align: center;
+		margin-top: 7px;
+		font-size: 11.5px;
+		color: #b0ada8;
+		font-family: inherit;
+	}
+
+	&__contract-active {
+		color: #f47920;
+		font-weight: 600;
 	}
 }

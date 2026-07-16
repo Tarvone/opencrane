@@ -1,5 +1,13 @@
-import { MessageCardKind, ThreadData } from "../../models/thread.types";
-import { ScopeLevel } from "../../models/scope.types";
+import { ComposerAttachment, MessageCardKind, ThreadData } from "../../models/thread.types.js";
+import { ScopeLevel } from "../../models/scope.types.js";
+
+/** Demo staged attachments for the composer UI handoff. */
+export const MOCK_COMPOSER_ATTACHMENTS: ComposerAttachment[] = [
+	{ id: '1', name: 'sales_data.csv', sizeBytes: 1048576, progress: 100, status: 'done' },
+	{ id: '2', name: 'strategy.pdf', sizeBytes: 2500000, progress: 45, status: 'uploading' },
+	{ id: '3', name: 'virus.exe', sizeBytes: 500, progress: 0, status: 'unsupported', errorText: 'Unsupported format' },
+	{ id: '4', name: 'large.zip', sizeBytes: 99999999, progress: 80, status: 'error', errorText: 'Upload failed' }
+];
 
 /** Empty-thread fallback when a session has no fixture. */
 export const EMPTY_THREAD: ThreadData =

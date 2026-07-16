@@ -121,13 +121,19 @@ Green app topology (owner naming, 2026-07-17): the runtime app is **`apps/feat-p
 (supersedes `apps/feat-openclaw-tenant` at its silo's R9 cutover; the design docs' provisional
 `apps/agent-runtime` name is overridden). There is **no separate skill-registry app in green**:
 the skill catalog is an OpenCrane API module and skill bytes live in the artifact service —
-`apps/feat-skill-registry` freezes with blue and dies at R10. Managed agents (owner, 2026-07-17): **each first-party managed agent is its own lightweight
-monorepo app** (`apps/agents/<name>` — a rollup composing shared runtime libs with that agent's
-persona/skills/schedule/budget manifest and, only when needed, bespoke baked tools), each running
-in its own workload (dedicated Deployment or per-run Job). `apps/feat-central-agents` is replaced
-by these per-agent apps at R5. The boundary: repo-defined agents are apps; **tenant/user-created
-managed agents are AgentService records** on the shared managed-runtime image — they are created
-at runtime and cannot be monorepo apps.
+`apps/feat-skill-registry` freezes with blue and dies at R10. **Pod↔app rule (owner, 2026-07-17): everything that becomes a pod is registered as an app.**
+Every pod class in the cluster traces to exactly one `/apps` unit that owns its image and deploy
+templates; instances (per user, per agent, per run) are workloads of that app. The green pod-class
+map:
+
+| Pod class | Owning app |
+|---|---|
+| Control-plane API / UI / channel proxy / agent controller / artifact service | `apps/opencrane`, `apps/opencrane-ui`, `apps/channel-proxy`, `apps/agent-controller`, `apps/artifact-service` |
+| Cognee / LiteLLM / Obot | `apps/cognee`, `apps/litellm`, `apps/obot` (#249 promotes these) |
+| Personal agent pods (one per user) | `apps/feat-personal-agent` |
+| First-party managed agents (one workload each) | `apps/agents/<name>` — per-agent lightweight rollups (persona/skills/schedule/budget manifest over shared runtime libs); replace `apps/feat-central-agents` at R5 |
+| Tenant/user-created managed agent pods | `apps/feat-managed-agent` — the shared managed-runtime rollup; the agents themselves are AgentService records (created at runtime), their pods are this app's workloads |
+| Isolated authoring/tool Jobs, migration-factory Jobs, and every other Job class | Each gets a named owning app; enumerated exhaustively in R2's app→KSA→network identity matrix — an unowned pod class fails the R2 gate |
 
 **R2:** target app packages (into the Phase B structure), green Postgres schema
 (AgentService/Run/Thread/Message/RunEvent/Approval/Persona/Artifact/Skill), authorization facade +

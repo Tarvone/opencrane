@@ -13,6 +13,9 @@ export class CollapsibleSectionComponent
 	/** Uppercase section title. */
 	public readonly title = input.required<string>();
 
+	/** Optional numeric badge to display (usually when closed). */
+	public readonly badgeCount = input<number>();
+
 	/** Whether the section starts open. */
 	public readonly defaultOpen = input<boolean>(true);
 

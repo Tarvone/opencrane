@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from "@angular/core";
 import { RouterLink, RouterLinkActive } from "@angular/router";
 
-import { AutomationRun, DEPARTMENTS, DepartmentInfo, SessionSummary } from "@opencrane/core";
+import { SessionSummary } from "@opencrane/core";
 import { CONVERSATION_GATEWAY, SessionStore } from "@opencrane/state/core";
 import { AvatarCircleComponent, CollapsibleSectionComponent } from "@opencrane/elements/ui";
 import { SessionRowComponent } from "../session-row/session-row.component";
@@ -49,9 +49,6 @@ export class SidebarComponent
 	/** Sessions shared with the current user. */
 	public readonly sharedSessions = computed<SessionSummary[]>(() => this._sessions().filter(function isShared(s: SessionSummary): boolean { return !s.mine; }));
 
-	/** Automation runs — empty until a live gateway endpoint exists. */
-	public readonly automationRuns: AutomationRun[] = [];
-
 	/** App-wide identity state. */
 	private readonly _session = inject(SessionStore);
 
@@ -61,11 +58,14 @@ export class SidebarComponent
 	/** Display name of the signed-in user. */
 	public readonly userName = computed<string>(() => this._session.displayName() ?? "");
 
-	/** "pod · department" footer line. */
-	public readonly userPod = computed<string>(() =>
+	/** "handle · department" footer line. */
+	public readonly userSubtitle = computed<string>(() =>
 	{
 		const tenant = this._session.currentTenant();
-		return tenant ? `${tenant.name} · ${tenant.email}` : "";
+		// Handle comes from tenant.name (e.g. 'alex.oc'). 
+		// Department is mocked until it's added to the identity facade.
+		const mockDepartment = "Tech"; 
+		return tenant ? `${tenant.name} · ${mockDepartment}` : "";
 	});
 
 	/** Two-letter avatar initials derived from the user name. */
@@ -83,12 +83,6 @@ export class SidebarComponent
 	public constructor()
 	{
 		this._gateway.ensureConnected();
-	}
-
-	/** Resolves department metadata for a key, if known. */
-	public department(key: string): DepartmentInfo | undefined
-	{
-		return DEPARTMENTS[key];
 	}
 
 	/** Sign the current user out of the opencrane-ui session. */

@@ -1,14 +1,15 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, signal, untracked, viewChild } from "@angular/core";
+import { DecimalPipe } from "@angular/common";
 
 import { SCOPE_COLORS, ScopeLevel } from "@opencrane/core";
 import { CONVERSATION_GATEWAY, ConnectionStatus } from "@opencrane/state/core";
 import { StreamBlock, _BuildStreamBlocks } from "@opencrane/state/conversation/render";
-import { ConversationViewState, _ToConversationViewState } from "../conversation-view.util";
-import { ConversationPickerComponent } from "../components/conversation-picker/conversation-picker.component";
-import { MessageItemComponent } from "../components/message-item/message-item.component";
-import { ToolGroupComponent } from "../components/tool-group/tool-group.component";
-import { SharePanelComponent } from "../components/share-panel/share-panel.component";
-import { FilePreviewService } from "../services/file-preview.service";
+import { ConversationViewState, _ToConversationViewState } from "../conversation-view.util.js";
+import { ConversationPickerComponent } from "../components/conversation-picker/conversation-picker.component.js";
+import { MessageItemComponent } from "../components/message-item/message-item.component.js";
+import { ToolGroupComponent } from "../components/tool-group/tool-group.component.js";
+import { SharePanelComponent } from "../components/share-panel/share-panel.component.js";
+import { FilePreviewService } from "../services/file-preview.service.js";
 
 /** Distance (px) from the top of the stream that triggers an older-history load. */
 const _LOAD_OLDER_THRESHOLD = 80;
@@ -26,7 +27,7 @@ interface HeaderScope
 @Component({
 	selector: "wo-conversation-view",
 	standalone: true,
-	imports: [ConversationPickerComponent, MessageItemComponent, ToolGroupComponent, SharePanelComponent],
+	imports: [DecimalPipe, ConversationPickerComponent, MessageItemComponent, ToolGroupComponent, SharePanelComponent],
 	templateUrl: "./conversation-view.component.html",
 	styleUrl: "./conversation-view.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush
@@ -139,6 +140,9 @@ export class ConversationViewComponent
 	/** The scrollable message stream element. */
 	private readonly _stream = viewChild<ElementRef<HTMLElement>>("stream");
 
+	/** The composer textarea element. */
+	private readonly _composerTextarea = viewChild<ElementRef<HTMLTextAreaElement>>("composerTextarea");
+
 	/** Injector used to schedule post-render scroll adjustments. */
 	private readonly _injector = inject(Injector);
 
@@ -150,6 +154,9 @@ export class ConversationViewComponent
 
 	/** Composer draft text. */
 	public readonly draft = signal<string>("");
+
+	/** Attachments staged in the composer. */
+	public readonly attachments = this._gateway.draftAttachments;
 
 	/** Share popover open state; resets to closed on thread switch. */
 	public readonly shareOpen = signal<boolean>(false);
@@ -297,10 +304,22 @@ export class ConversationViewComponent
 		{
 			this.startSession.emit(text);
 			this.draft.set("");
+			this._resetTextareaHeight();
 			return;
 		}
 		this._gateway.send(text);
 		this.draft.set("");
+		this._resetTextareaHeight();
+	}
+
+	/** Resets the textarea height back to 1 row after sending. */
+	private _resetTextareaHeight(): void
+	{
+		const el = this._composerTextarea()?.nativeElement;
+		if (el)
+		{
+			el.style.height = "auto";
+		}
 	}
 
 	/** Interrupts the in-flight run (`chat.abort`). */
@@ -313,6 +332,15 @@ export class ConversationViewComponent
 	public onCanvasAction(action: unknown): void
 	{
 		this._gateway.sendCanvasAction(action);
+	}
+
+	/** Auto-grow textarea up to 140px on input */
+	public onComposerInput(event: Event): void
+	{
+		const target = event.target as HTMLTextAreaElement;
+		this.draft.set(target.value);
+		target.style.height = "auto";
+		target.style.height = `${Math.min(target.scrollHeight, 140)}px`;
 	}
 
 	/** Sends on Enter (without Shift); Escape stops an in-flight run. */

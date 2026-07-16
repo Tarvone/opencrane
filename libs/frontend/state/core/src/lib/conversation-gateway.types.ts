@@ -1,6 +1,6 @@
 import { InjectionToken, Signal } from "@angular/core";
 
-import { AgentOption, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
+import { AgentOption, ComposerAttachment, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
 
 /** Live connection state for a conversation stream. */
 export enum ConnectionStatus
@@ -58,6 +58,9 @@ export interface ConversationGateway
 
 	/** Messages in the open thread, appended as the stream arrives. */
 	readonly messages: Signal<ThreadMessage[]>;
+
+	/** Attachments staged in the composer for the next send. */
+	readonly draftAttachments: Signal<ComposerAttachment[]>;
 
 	/** Whether the assistant is currently composing a reply. */
 	readonly typing: Signal<boolean>;

@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, inject, signal } from "@angular/core";
 
 import { AgentOption, MessageCardKind, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
-import { EMPTY_THREAD, SESSIONS, THREADS } from "@opencrane/core/testing";
+import { EMPTY_THREAD, MOCK_COMPOSER_ATTACHMENTS, SESSIONS, THREADS } from "@opencrane/core/testing";
 import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway } from "@opencrane/state/core";
 
 const _BACKLOG_SIZE = 48;
@@ -15,12 +15,16 @@ export class MockConversationGateway implements ConversationGateway
 	private readonly _status = signal<ConnectionStatus>(ConnectionStatus.Idle);
 	private readonly _thread = signal<ThreadData>(EMPTY_THREAD);
 	private readonly _messages = signal<ThreadMessage[]>([]);
+	private readonly _draftAttachments = signal(MOCK_COMPOSER_ATTACHMENTS);
 	private readonly _typing = signal<boolean>(false);
 	private readonly _loadingHistory = signal<boolean>(false);
 	private readonly _all = signal<ThreadMessage[]>([]);
 	private readonly _window = signal<number>(_MOCK_PAGE);
 	private readonly _operation = signal<string | null>(null);
 	private readonly _selectedAgentId = signal<string | null>(null);
+	private readonly _sessions = signal<SessionSummary[]>(SESSIONS.map(function copy(s: SessionSummary): SessionSummary { return { ...s }; }));
+	private readonly _sessionsLoading = signal<boolean>(false);
+	private readonly _sessionsError = signal<string | null>(null);
 	private readonly _cache = inject(CONVERSATION_CACHE, { optional: true });
 	private _threadId = "";
 	private _seq = 0;
@@ -29,16 +33,14 @@ export class MockConversationGateway implements ConversationGateway
 	public readonly status: Signal<ConnectionStatus> = this._status.asReadonly();
 	public readonly thread: Signal<ThreadData> = this._thread.asReadonly();
 	public readonly messages: Signal<ThreadMessage[]> = this._messages.asReadonly();
+	public readonly draftAttachments = this._draftAttachments.asReadonly();
 	public readonly typing: Signal<boolean> = this._typing.asReadonly();
 	public readonly loadingHistory: Signal<boolean> = this._loadingHistory.asReadonly();
 	public readonly hasMoreHistory: Signal<boolean> = computed((): boolean => this._window() < this._all().length);
 	public readonly operation: Signal<string | null> = this._operation.asReadonly();
 	public readonly selectedAgentId: Signal<string | null> = this._selectedAgentId.asReadonly();
-	private readonly _sessions = signal<SessionSummary[]>(SESSIONS.map(function copy(s: SessionSummary): SessionSummary { return { ...s }; }));
 	public readonly sessions: Signal<SessionSummary[]> = this._sessions.asReadonly();
-	private readonly _sessionsLoading = signal<boolean>(false);
 	public readonly sessionsLoading: Signal<boolean> = this._sessionsLoading.asReadonly();
-	private readonly _sessionsError = signal<string | null>(null);
 	public readonly sessionsError: Signal<string | null> = this._sessionsError.asReadonly();
 
 	public listSessions(): Promise<SessionSummary[]>

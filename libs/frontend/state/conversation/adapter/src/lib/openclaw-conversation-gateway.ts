@@ -1,18 +1,18 @@
 import { Injectable, Signal, computed, inject, signal } from "@angular/core";
 
-import { AgentOption, ControlPlaneApiService, MessageCardKind, MessageDelivery, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
+import { AgentOption, ComposerAttachment, ControlPlaneApiService, MessageCardKind, MessageDelivery, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
 import { CONVERSATION_CACHE, ConnectionStatus, ConversationGateway, SessionStore } from "@opencrane/state/core";
 
-import { OpenClawConnection, _DecodeAgentList, _DecodeChatEvent, _DecodeHealth, _DecodeHistory, _DecodeModelList, _DecodeSessionOperation, _DecodeSessionTool, _IsSecureGatewayUrl } from "./openclaw-connection";
-import { _ChatEventAttachments, _ChatEventDelivery, _ChatEventDone, _ChatEventId, _ChatEventIsSnapshot, _ChatEventRole, _ChatEventText, _ChatEventThinking, _ChatEventToolResults, _ChatEventTools, _HistoryRowContent } from "./chat-event.util";
-import { _BuildAssistantCards, _FoldHistoryToolResults, _HasRenderableCards, _LocateToolResultTarget, _MergeToolCard, _MergeToolResults, HistoryBuilt } from "./assistant-cards.util";
-import { _IsHistoryExhausted, _MergeLiveTail } from "./history.util";
-import { _OperationLabel, _OperationIsTerminal } from "./operation.util";
-import { _PodTokenFailureStatus } from "./pod-token.util";
-import { _ReconnectDelayMs } from "./reconnect.util";
-import { _MapSessionSummaries } from "./session-list.util";
-import { GATEWAY_HEALTH_EVENT, GATEWAY_HEARTBEAT_EVENT, GATEWAY_OPERATION_EVENT, GATEWAY_SHUTDOWN_EVENT } from "./gateway-protocol.schema";
-import { ChatEvent, ChatHistoryParams, EventFrame, HistoryMessage, SessionToolEvent } from "./gateway-protocol.types";
+import { OpenClawConnection, _DecodeAgentList, _DecodeChatEvent, _DecodeHealth, _DecodeHistory, _DecodeModelList, _DecodeSessionOperation, _DecodeSessionTool, _IsSecureGatewayUrl } from "./openclaw-connection.js";
+import { _ChatEventAttachments, _ChatEventDelivery, _ChatEventDone, _ChatEventId, _ChatEventIsSnapshot, _ChatEventRole, _ChatEventText, _ChatEventThinking, _ChatEventToolResults, _ChatEventTools, _HistoryRowContent } from "./chat-event.util.js";
+import { _BuildAssistantCards, _FoldHistoryToolResults, _HasRenderableCards, _LocateToolResultTarget, _MergeToolCard, _MergeToolResults, HistoryBuilt } from "./assistant-cards.util.js";
+import { _IsHistoryExhausted, _MergeLiveTail } from "./history.util.js";
+import { _OperationLabel, _OperationIsTerminal } from "./operation.util.js";
+import { _PodTokenFailureStatus } from "./pod-token.util.js";
+import { _ReconnectDelayMs } from "./reconnect.util.js";
+import { _MapSessionSummaries } from "./session-list.util.js";
+import { GATEWAY_HEALTH_EVENT, GATEWAY_HEARTBEAT_EVENT, GATEWAY_OPERATION_EVENT, GATEWAY_SHUTDOWN_EVENT } from "./gateway-protocol.schema.js";
+import { ChatEvent, ChatHistoryParams, EventFrame, HistoryMessage, SessionToolEvent } from "./gateway-protocol.types.js";
 
 /**
  * Connection coordinates returned by OpenCrane's broker (`POST /auth/pod-token`).
@@ -69,6 +69,7 @@ export class OpenClawConversationGateway implements ConversationGateway
 	private readonly _thread = signal<ThreadData>(this._buildThread(""));
 	private readonly _messages = signal<ThreadMessage[]>([]);
 	private readonly _typing = signal<boolean>(false);
+	private readonly _draftAttachments = signal<ComposerAttachment[]>([]);
 	private readonly _loadingHistory = signal<boolean>(false);
 	private readonly _historyExhausted = signal<boolean>(false);
 	private readonly _operation = signal<string | null>(null);
@@ -143,6 +144,9 @@ export class OpenClawConversationGateway implements ConversationGateway
 
 	/** @inheritdoc */
 	public readonly typing: Signal<boolean> = this._typing.asReadonly();
+
+	/** @inheritdoc */
+	public readonly draftAttachments: Signal<ComposerAttachment[]> = this._draftAttachments.asReadonly();
 
 	/** @inheritdoc */
 	public readonly operation: Signal<string | null> = this._operation.asReadonly();
@@ -762,7 +766,7 @@ export class OpenClawConversationGateway implements ConversationGateway
 	/** Log validation failures without crashing the stream. */
 	private _onInvalid(raw: unknown, reason: string): void
 	{
-		console.warn(`[openclaw] dropped invalid frame: ${reason}`, raw);
+		// Dropped invalid frame
 	}
 
 	/**

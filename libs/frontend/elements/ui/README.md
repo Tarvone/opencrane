@@ -16,7 +16,9 @@ import { AvatarCircleComponent, ProgressMeterComponent, SettingsRowComponent, To
 `save-button`.
 
 Avatar sizes are named to keep call sites consistent: `xs` (18px), `small`
-(20px), `medium` (24px), `large` (28px), and `xl` (32px). Settings-row
+(20px), `medium` (24px), `large` (28px), and `xl` (32px). Avatars use the
+deterministic Paper palette by default and accept `color` when a design context
+requires a fixed background. Settings-row
 projection slots are marked with `woSettingsControl`, `woSettingsHelp`, and
 `woSettingsError`.
 

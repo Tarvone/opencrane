@@ -121,10 +121,10 @@ Green app topology (owner naming, 2026-07-17): the runtime app is **`apps/feat-p
 (supersedes `apps/feat-openclaw-tenant` at its silo's R9 cutover; the design docs' provisional
 `apps/agent-runtime` name is overridden). There is **no separate skill-registry app in green**:
 the skill catalog is an OpenCrane API module and skill bytes live in the artifact service —
-`apps/feat-skill-registry` freezes with blue and dies at R10. **Pod↔app rule (owner, 2026-07-17): everything that becomes a pod is registered as an app.**
-Every pod class in the cluster traces to exactly one `/apps` unit that owns its image and deploy
-templates; instances (per user, per agent, per run) are workloads of that app. The green pod-class
-map:
+`apps/feat-skill-registry` freezes with blue and dies at R10. **Pod↔app rule (owner, 2026-07-17): everything that becomes a pod is registered as an app.
+Apps are templates — instantiated multiple times where necessary.** Every pod class in the
+cluster traces to exactly one `/apps` unit that owns its image and deploy templates; instances
+(per user, per agent, per run) are workloads of that app. The green pod-class map:
 
 | Pod class | Owning app |
 |---|---|

@@ -1,0 +1,151 @@
+.wo-skills {
+	&__header {
+		margin-bottom: 28px;
+	}
+
+	&__title {
+		color: #1a1918;
+		font-size: 26px;
+		font-weight: 600;
+		letter-spacing: -0.5px;
+		margin: 0;
+	}
+
+	&__subtitle {
+		color: #8a8682;
+		font-size: 14px;
+		margin: 4px 0 0;
+	}
+
+	&__group {
+		margin-bottom: 26px;
+	}
+
+	&__scope {
+		color: #9a9690;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.09em;
+		margin: 0 0 8px;
+		text-transform: uppercase;
+	}
+
+	&__card {
+		background: #fff;
+		border: 1px solid #dedad2;
+		border-radius: 10px;
+		overflow: hidden;
+	}
+
+	&__capability {
+		align-items: center;
+		display: flex;
+		gap: 14px;
+		padding: 13px 18px;
+
+		&:not(:last-child) {
+			border-bottom: 1px solid #f0ede8;
+		}
+	}
+
+	&__icon {
+		align-items: center;
+		background: #f0f9fa;
+		border-radius: 8px;
+		display: flex;
+		flex: 0 0 32px;
+		height: 32px;
+		justify-content: center;
+	}
+
+	&__copy {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	&__name {
+		color: #1a1918;
+		font-size: 14px;
+		font-weight: 500;
+		margin: 0;
+	}
+
+	&__description {
+		color: #9a9690;
+		font-size: 12.5px;
+		margin: 2px 0 0;
+	}
+
+	&__tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		justify-content: flex-end;
+	}
+
+	&__tag {
+		border-radius: 4px;
+		font-size: 11px;
+		padding: 2px 8px;
+		white-space: nowrap;
+
+		&--mcp {
+			background: #efe8f8;
+			color: #6b3fa0;
+		}
+
+		&--tool {
+			background: #e8e6e3;
+			color: #1a1918;
+		}
+
+		&--department {
+			background: #f0ede8;
+			color: #6a6660;
+		}
+	}
+
+	&__menu {
+		align-items: center;
+		background: transparent;
+		border: 0;
+		border-radius: 5px;
+		color: #b0ada8;
+		display: flex;
+		flex: 0 0 24px;
+		height: 24px;
+		justify-content: center;
+		margin-left: 2px;
+		padding: 0;
+
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 1;
+		}
+	}
+
+	&__empty {
+		color: #9a9690;
+		font-size: 12.5px;
+		margin: 0;
+		padding: 18px;
+	}
+}
+
+@media (max-width: 760px) {
+	.wo-skills {
+		&__capability {
+			align-items: flex-start;
+			flex-wrap: wrap;
+		}
+
+		&__copy {
+			flex-basis: calc(100% - 72px);
+		}
+
+		&__tags {
+			justify-content: flex-start;
+			margin-left: 46px;
+		}
+	}
+}

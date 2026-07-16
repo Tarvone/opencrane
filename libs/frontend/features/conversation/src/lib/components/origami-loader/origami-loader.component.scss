@@ -1,0 +1,46 @@
+@keyframes ocFold {
+	0%, 12% { transform: rotateX(0); filter: brightness(1); }
+	42%, 55% { transform: rotateX(-178deg); filter: brightness(.72); }
+	88%, 100% { transform: rotateX(0); filter: brightness(1); }
+}
+
+:host {
+	display: block;
+}
+
+.wo-origami {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 32px;
+
+	&__facets {
+		display: flex;
+		align-items: flex-end;
+		perspective: 200px;
+	}
+
+	&__facet {
+		width: 11px;
+		height: 9px;
+		flex-shrink: 0;
+		opacity: 0.45;
+		animation: ocFold 1.6s ease-in-out infinite;
+
+		&--even {
+			clip-path: polygon(50% 0, 100% 100%, 0 100%);
+			transform-origin: 50% 100%;
+		}
+
+		&--odd {
+			clip-path: polygon(0 0, 100% 0, 50% 100%);
+			transform-origin: 50% 0%;
+		}
+	}
+
+	&__text {
+		font-size: 12.5px;
+		color: #b0ada8;
+		font-style: italic;
+	}
+}

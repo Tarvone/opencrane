@@ -27,13 +27,14 @@
 	}
 
 	&__bubble {
-		background: var(--secondary);
-		border-radius: 18px 18px 4px 18px;
-		padding: 10px 15px;
-		font-size: 14px;
-		line-height: 1.65;
-		color: var(--foreground);
+		background: #1a1918;
+		border-radius: 14px 14px 3px 14px;
+		padding: 11px 16px;
+		font-size: 14.5px;
+		line-height: 1.6;
+		color: #fff;
 		white-space: pre-wrap;
+		margin-bottom: 28px;
 	}
 
 	&__meta {
@@ -56,9 +57,18 @@
 
 	// Assistant prose — rendered HTML from the vendored markdown pipeline (via [innerHTML]).
 	&__prose {
-		font-size: 14px;
+		font-size: 15px;
 		line-height: 1.7;
-		color: var(--foreground);
+		color: #1a1918;
+		margin-bottom: 32px;
+	}
+
+	&__carousel {
+		display: flex;
+		gap: 8px;
+		overflow-x: auto;
+		padding-bottom: 14px;
+		margin-bottom: 10px;
 	}
 
 	&__thinking {

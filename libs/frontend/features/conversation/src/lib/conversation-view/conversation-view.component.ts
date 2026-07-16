@@ -9,6 +9,7 @@ import { ConversationPickerComponent } from "../components/conversation-picker/c
 import { MessageItemComponent } from "../components/message-item/message-item.component.js";
 import { ToolGroupComponent } from "../components/tool-group/tool-group.component.js";
 import { SharePanelComponent } from "../components/share-panel/share-panel.component.js";
+import { OrigamiLoaderComponent } from "../components/origami-loader/origami-loader.component.js";
 import { FilePreviewService } from "../services/file-preview.service.js";
 
 /** Distance (px) from the top of the stream that triggers an older-history load. */
@@ -27,7 +28,7 @@ interface HeaderScope
 @Component({
 	selector: "wo-conversation-view",
 	standalone: true,
-	imports: [DecimalPipe, ConversationPickerComponent, MessageItemComponent, ToolGroupComponent, SharePanelComponent],
+	imports: [DecimalPipe, ConversationPickerComponent, MessageItemComponent, ToolGroupComponent, SharePanelComponent, OrigamiLoaderComponent],
 	templateUrl: "./conversation-view.component.html",
 	styleUrl: "./conversation-view.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush

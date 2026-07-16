@@ -1,0 +1,45 @@
+@if (open()) {
+	<div
+		class="wo-destructive"
+		role="alertdialog"
+		aria-modal="true"
+		[attr.aria-labelledby]="titleId"
+		[attr.aria-describedby]="descriptionId"
+		(keydown.escape)="onEscape($event)"
+		(keydown.tab)="onTab($event)"
+		(keydown.shift.tab)="onTab($event)"
+	>
+		<div class="wo-destructive__panel">
+			<h2 [id]="titleId">{{ actionName() }} {{ entityName() }}?</h2>
+			<p [id]="descriptionId">{{ impact() }}</p>
+
+			@if (state().message) {
+				<p
+					class="wo-destructive__status"
+					[attr.role]="state().phase === DestructiveActionPhase.Error ? 'alert' : 'status'"
+					aria-live="polite"
+				>
+					{{ state().message }}
+				</p>
+			}
+			@if (pending()) {
+				<p class="wo-destructive__pending" role="status" tabindex="0" data-dialog-focus>
+					{{ actionName() }} in progress. Please wait.
+				</p>
+			}
+
+			<div class="wo-destructive__actions">
+				<button type="button" class="wo-destructive__cancel" data-dialog-focus [disabled]="pending()" (click)="cancel()" autofocus>
+					Cancel
+				</button>
+				<button type="button" class="wo-destructive__confirm" [disabled]="pending()" (click)="confirm()">
+					@if (pending()) {
+						Working…
+					} @else {
+						{{ confirmationLabel() }}
+					}
+				</button>
+			</div>
+		</div>
+	</div>
+}

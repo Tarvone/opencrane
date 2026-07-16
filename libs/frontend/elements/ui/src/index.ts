@@ -8,3 +8,4 @@ export * from "./lib/components/settings-row/settings-row.component.js";
 export * from "./lib/components/progress-meter/progress-meter.component.js";
 export * from "./lib/components/toggle-field/toggle-field.component.js";
 export * from "./lib/components/save-button/save-button.component.js";
+export * from "./lib/components/destructive-confirmation/destructive-confirmation.component.js";

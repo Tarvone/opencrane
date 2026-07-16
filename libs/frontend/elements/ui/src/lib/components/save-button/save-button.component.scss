@@ -1,25 +1,83 @@
 .wo-save {
-	display: flex;
-	justify-content: flex-end;
+	display: grid;
+	gap: 12px;
 	margin-top: 32px;
 
-	&__button {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 8px 16px;
-		border-radius: var(--radius);
-		background: var(--primary);
-		color: var(--primary-foreground);
+	&__feedback {
+		margin: 0;
+		color: var(--oc-text-secondary, #6a6660);
 		font-size: 13px;
-		transition: background 120ms ease;
+		text-align: right;
 
-		&--saved {
-			background: var(--wo-ok);
+		&--error {
+			color: var(--oc-danger, #c1392b);
+		}
+	}
+
+	&__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+	}
+
+	&__button,
+	&__secondary {
+		padding: 8px 16px;
+		border: 1px solid var(--oc-border, #dedad2);
+		border-radius: var(--radius, 8px);
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+		transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+
+		&:focus-visible {
+			outline: 3px solid color-mix(in srgb, var(--oc-teal, #0db5cc) 35%, transparent);
+			outline-offset: 2px;
 		}
 
-		i {
-			font-size: 13px;
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 0.55;
+			transform: none;
+			box-shadow: none;
+		}
+	}
+
+	&__button {
+		padding: 10px 20px;
+		border: none;
+		border-radius: 7px;
+		background: #0db5cc;
+		box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25);
+		color: #fff;
+		font-size: 14px;
+		font-weight: 500;
+
+		&:not(:disabled):hover {
+			background: linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%);
+			box-shadow: 0 2px 0 #0a94a7, 0 3px 6px rgba(13, 181, 204, 0.3);
+			transform: translateY(-1px);
+		}
+
+		&:not(:disabled):active {
+			box-shadow: 0 1px 0 #0a94a7;
+			transform: none;
+		}
+	}
+
+	&__secondary {
+		background: #fff;
+		box-shadow: 0 1px 0 #c7c2b8, 0 2px 3px rgba(0, 0, 0, 0.08);
+		color: var(--oc-text-primary, #1a1918);
+
+		&:not(:disabled):hover {
+			background: linear-gradient(135deg, #fff 0%, #fff 50%, #f5f2ec 50%);
+			transform: translateY(-1px);
+		}
+
+		&:not(:disabled):active {
+			box-shadow: 0 1px 0 #c7c2b8;
+			transform: none;
 		}
 	}
 }

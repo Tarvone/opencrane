@@ -1,0 +1,114 @@
+<section class="wo-connectors" aria-labelledby="workspace-connectors-title">
+	@if (marketplaceOpen()) {
+		<button type="button" class="wo-connectors__back" [disabled]="activeMutation() !== null" (click)="closeMarketplace()">
+			<span aria-hidden="true">←</span> Connectors
+		</button>
+
+		<header class="wo-connectors__marketplace-header">
+			<h2 id="workspace-connectors-title" class="wo-connectors__marketplace-title">Connector Marketplace</h2>
+			<p class="wo-connectors__subtitle">Discover and install connectors for your workspace.</p>
+		</header>
+
+		<div class="wo-connectors__filters" role="group" aria-label="Marketplace categories">
+			@for (category of categories; track category) {
+				<button
+					type="button"
+					class="wo-connectors__filter"
+					[class.wo-connectors__filter--active]="selectedCategory() === category"
+					[attr.aria-pressed]="selectedCategory() === category"
+					(click)="selectCategory(category)"
+				>
+					{{ category }}
+				</button>
+			}
+		</div>
+
+		<div class="wo-connectors__card wo-connectors__card--marketplace">
+			@for (connector of marketplaceConnectors(); track connector.id) {
+				<article class="wo-connectors__marketplace-row">
+					<div class="wo-connectors__copy">
+						<h3>{{ connector.name }}</h3>
+						<p>{{ connector.description }}</p>
+					</div>
+					<span class="wo-connectors__badge">{{ connector.category }}</span>
+					<span class="wo-connectors__version wo-mono">{{ connector.version }}</span>
+					<div class="wo-connectors__action">
+						<button
+							type="button"
+							class="wo-connectors__row-button"
+							[class.wo-connectors__row-button--danger]="connector.installed"
+							[disabled]="activeMutation() !== null"
+							(click)="marketplaceAction(connector, $event)"
+						>
+							{{ connector.installed ? "Uninstall" : isPending(connector, ConnectorMutationKind.Install) ? "Installing…" : "Install" }}
+						</button>
+					</div>
+				</article>
+			} @empty {
+				<p class="wo-connectors__empty">No connectors in this category.</p>
+			}
+		</div>
+	} @else {
+		<header class="wo-connectors__header">
+			<div>
+				<h2 id="workspace-connectors-title" class="wo-connectors__title">Connectors</h2>
+				<p class="wo-connectors__subtitle">External tools and data sources your agents can call.</p>
+			</div>
+			<button type="button" class="wo-connectors__primary" [disabled]="activeMutation() !== null" (click)="openMarketplace()">
+				Browse marketplace
+			</button>
+		</header>
+
+		<div class="wo-connectors__card">
+			@for (connector of installedConnectors(); track connector.id) {
+				<article class="wo-connectors__installed-row">
+					<div class="wo-connectors__copy">
+						<h3>{{ connector.name }}</h3>
+						<p>{{ connector.category }} · v{{ connector.version }}</p>
+					</div>
+					<span class="wo-connectors__badge">{{ connector.category }}</span>
+					<span class="wo-connectors__version wo-mono">{{ connector.version }}</span>
+					<button
+						type="button"
+						class="wo-connectors__toggle"
+						role="switch"
+						[class.wo-connectors__toggle--enabled]="connector.enabled"
+						[attr.aria-checked]="connector.enabled"
+						[attr.aria-label]="(connector.enabled ? 'Disable ' : 'Enable ') + connector.name"
+						[disabled]="activeMutation() !== null"
+						(click)="toggle(connector)"
+					>
+						<span aria-hidden="true"></span>
+					</button>
+				</article>
+			}
+		</div>
+	}
+
+	@if (pendingMessage(); as pending) {
+		<p class="wo-connectors__feedback" role="status" aria-live="polite">{{ pending }}</p>
+	}
+
+	@if (feedback(); as actionFeedback) {
+		<p
+			class="wo-connectors__feedback"
+			[class.wo-connectors__feedback--error]="actionFeedback.kind === ConnectorFeedbackKind.Error"
+			[attr.role]="actionFeedback.kind === ConnectorFeedbackKind.Error ? 'alert' : 'status'"
+			aria-live="polite"
+		>
+			{{ actionFeedback.message }}
+		</p>
+	}
+
+	<wo-destructive-confirmation
+		[open]="uninstallTarget() !== null"
+		[entityName]="uninstallTarget()?.name ?? 'connector'"
+		actionName="Uninstall"
+		impact="Agents will immediately lose access to this connector until it is installed again."
+		confirmationLabel="Uninstall connector"
+		[state]="destructiveState()"
+		[focusTarget]="uninstallFocusTarget()"
+		(cancelIntent)="cancelUninstall()"
+		(confirmIntent)="confirmUninstall()"
+	/>
+</section>

@@ -35,7 +35,16 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("connectors", "Connectors", "Installed external tools and marketplace access will be delivered in milestone 4."),
+	{
+		path: "connectors",
+		loadComponent: function loadConnectorsSection()
+		{
+			return import("./sections/connectors-section/connectors-section.component.js").then(function pickConnectorsSection(module)
+			{
+				return module.ConnectorsSectionComponent;
+			});
+		}
+	},
 	_placeholderRoute("channels", "Channels", "Agent and messaging-surface configuration will be delivered in milestone 4."),
 	_placeholderRoute("data-network", "Data & Network", "Data-sovereignty and egress controls will be delivered in milestone 4."),
 	_placeholderRoute("provider-keys", "API Keys", "Workspace AI provider keys will be delivered in milestone 4."),

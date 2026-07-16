@@ -44,9 +44,15 @@ export class AvatarCircleComponent
 	/** Named diameter variant. */
 	public readonly size = input<AvatarCircleSize>("medium");
 
+	/** Optional fixed background for branded or context-specific avatars. */
+	public readonly color = input<string | undefined>(undefined);
+
 	/** Diameter resolved from the named size variant. */
 	public readonly sizePixels: Signal<number> = computed((): number => AVATAR_SIZE_PIXELS[this.size()]);
 
-	/** Stable palette colour resolved from the initials. */
-	public readonly backgroundColor: Signal<string> = computed((): string => AVATAR_PALETTE[_paletteIndex(this.initials())]);
+	/** Explicit background or stable palette colour resolved from the initials. */
+	public readonly backgroundColor: Signal<string> = computed((): string =>
+	{
+		return this.color() ?? AVATAR_PALETTE[_paletteIndex(this.initials())];
+	});
 }

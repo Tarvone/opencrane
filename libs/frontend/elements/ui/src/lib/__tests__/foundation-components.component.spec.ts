@@ -119,6 +119,8 @@ describe("AvatarCircleComponent", function avatarCircleSuite(): void
 		expect(first.accessibleName()).toBe("Alex Kim");
 		expect(first.sizePixels()).toBe(28);
 		expect(first.backgroundColor()).toBe(second.backgroundColor());
+		_setInput(first.color, "#0db5cc");
+		expect(first.backgroundColor()).toBe("#0db5cc");
 		expect(_resource("avatar-circle/avatar-circle.component.html")).toContain("role=\"img\"");
 	});
 
@@ -128,11 +130,13 @@ describe("AvatarCircleComponent", function avatarCircleSuite(): void
 		_setInput(reference.instance.initials, "AK");
 		_setInput(reference.instance.accessibleName, "Alex Kim");
 		_setInput(reference.instance.size, "large");
+		_setInput(reference.instance.color, "#0db5cc");
 		_detect(reference);
 
 		const avatar = reference.location.nativeElement.querySelector("[role='img']") as HTMLElement;
 		expect(avatar.getAttribute("aria-label")).toBe("Alex Kim");
 		expect(avatar.style.width).toBe("28px");
+		expect(avatar.style.background).toBe("rgb(13, 181, 204)");
 		reference.destroy();
 	});
 });

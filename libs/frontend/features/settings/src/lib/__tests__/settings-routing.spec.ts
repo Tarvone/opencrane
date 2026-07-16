@@ -9,7 +9,7 @@ import { ɵresolveComponentResources } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { NavigationEnd, Route, Router, Routes, provideRouter } from "@angular/router";
+import { NavigationEnd, Route, Router, Routes, provideRouter, withComponentInputBinding } from "@angular/router";
 import { RouterTestingHarness } from "@angular/router/testing";
 import { filter, firstValueFrom, take } from "rxjs";
 import { compileString } from "sass";
@@ -19,12 +19,13 @@ import { PERSONAL_SETTINGS_NAVIGATION, WORKSPACE_SETTINGS_NAVIGATION, _SettingsN
 import { SettingsScope, SettingsSectionId } from "../settings-navigation.types.js";
 import { SettingsPlaceholderComponent } from "../settings-placeholder/settings-placeholder.component.js";
 import { SETTINGS_ROUTES } from "../settings.routes.js";
+import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component.js";
 
 /** Resolve an external settings component template or stylesheet. */
 function _componentResource(resourceUrl: string): string
 {
 	const file = resourceUrl.replace(/^\.\//, "");
-	const folder = file.startsWith("settings-page") ? "settings-page" : "settings-placeholder";
+	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : "settings-placeholder";
 	return readFileSync(resolve(process.cwd(), "src/lib", folder, file), "utf8");
 }
 
@@ -45,9 +46,10 @@ function _testableRoutes(routes: Routes): Routes
 {
 	return routes.map(function testableRoute(route): Route
 	{
-		if (route.children) return { ...route, children: _testableRoutes(route.children) };
-		if (route.redirectTo !== undefined || route.component) return route;
-		return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent };
+	if (route.children) return { ...route, children: _testableRoutes(route.children) };
+	if (route.redirectTo !== undefined || route.component) return route;
+	if (route.path === "skills") return route;
+	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent };
 	});
 }
 
@@ -87,7 +89,7 @@ beforeAll(async function prepareAngularRouter(): Promise<void>
 beforeEach(function configureRouter(): void
 {
 	TestBed.configureTestingModule({
-		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }]), { provide: LocationStrategy, useClass: MockLocationStrategy }]
+		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }], withComponentInputBinding()), { provide: LocationStrategy, useClass: MockLocationStrategy }]
 	});
 });
 
@@ -192,6 +194,17 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(router.url).toBe("/settings/personal/account");
 		await harness.navigateByUrl("/settings/not-a-scope");
 		expect(router.url).toBe("/settings/workspace/pod");
+	});
+
+	it("activates the Skills implementation at its stable route", async function skillsRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/skills");
+		const skills = harness.fixture.debugElement.query(By.directive(SkillsSectionComponent)).componentInstance as SkillsSectionComponent;
+
+		expect(harness.fixture.debugElement.query(By.directive(SkillsSectionComponent))).not.toBeNull();
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/skills");
+		expect(skills.groups()).toHaveLength(4);
 	});
 
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>

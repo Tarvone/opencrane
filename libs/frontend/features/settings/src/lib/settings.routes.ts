@@ -25,7 +25,16 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 	},
 	_placeholderRoute("members", "Members", "Workspace access, people, teams, and projects will be delivered in milestone 4."),
 	_placeholderRoute("budgets", "Budgets", "Workspace allocations and member spend controls will be delivered in milestone 4."),
-	_placeholderRoute("skills", "Skills", "Scope-aware agent capabilities will be delivered by issue #23."),
+	{
+		path: "skills",
+		loadComponent: function loadSkillsSection()
+		{
+			return import("./sections/skills-section/skills-section.component.js").then(function pickSkillsSection(module)
+			{
+				return module.SkillsSectionComponent;
+			});
+		}
+	},
 	_placeholderRoute("connectors", "Connectors", "Installed external tools and marketplace access will be delivered in milestone 4."),
 	_placeholderRoute("channels", "Channels", "Agent and messaging-surface configuration will be delivered in milestone 4."),
 	_placeholderRoute("data-network", "Data & Network", "Data-sovereignty and egress controls will be delivered in milestone 4."),

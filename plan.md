@@ -20,11 +20,13 @@ The [personal-agent platform architecture](docs/design/personal-agent-platform-a
 2. **Delivery:** the [deletion-gated strangler](docs/design/personal-agent-platform-simplification-plan.md)
    over the [rewrite-freeze/blue-green alternative](docs/design/personal-agent-platform-rewrite-freeze-plan.md).
    Lean OpenClaw is a bridge with named expiries, never a peer runtime.
-3. **Sequencing:** deletion debt is paid first (Phase A), then the runtime program is the spine
-   (Phases B–E); platform authorities that don't gate the personal-agent cutover (artifact CAS,
-   AgentService registry) follow as Phase F rather than blocking the runtime. This deliberately
-   diverges from the simplification plan's W4/W5-before-W7 ordering: personal agents cut over on
-   the **current** skill/memory authorities; managed agents wait for Phase F.
+3. **Sequencing:** deletion debt is paid first (Phase A, including deleting the `oc` CLI —
+   supersedes #216), then the monorepo is normalized (Phase B: every deployed unit under `/apps`
+   as a lightweight rollup, logic in `/libs`) so the runtime program (Phases C–E) lands new code
+   into the right structure; platform authorities that don't gate the personal-agent cutover
+   (artifact CAS, AgentService registry) follow as Phase F rather than blocking the runtime. This
+   deliberately diverges from the simplification plan's W4/W5-before-W7 ordering: personal agents
+   cut over on the **current** skill/memory authorities; managed agents wait for Phase F.
 4. Authority/identity gates 2–9 of the architecture doc (Postgres authority, artifact-on-PVC,
    per-silo authorization + signed run capabilities, Cilium-not-RBAC, CRD retirement, isolated
    Python, controller/proxy extraction, no permanent dual runtime) are accepted with it.
@@ -66,11 +68,22 @@ issue rewrites follow the
 | Issue | Scope | Exit |
 |-------|-------|------|
 | [#245](https://github.com/italanta/opencrane/issues/245) — **W1 residue + docs drift + decision ADRs** | Dead shared-skills · CSV mcpPolicy/channels · configOverrides · canary/self-update · **immutable pinned bridge image** (= first Gate L0 deliverable) · pairing/BrokeredDevice · SessionScope · Obot-poll residue · Linkerd freeze+inventory · six-CRDs docs fix · ADR 0005/0006 + ADR 0003 correction | Forbidden-reference CI test; immutable-image cold-start/rollback green; no fallback without named expiry. |
+| [#248](https://github.com/italanta/opencrane/issues/248) — **Delete the `oc` CLI** | `apps/cli` (~2.9k lines) + docs/website/scripts references; API/UI are the only clients (supersedes #216, closed) | No `oc` invocation documented anywhere; runbooks carry API/UI equivalents. |
 
 Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked (external half);
 [#227](https://github.com/italanta/opencrane/issues/227) fires after Phase A + rollback windows.
 
-### Phases B/C — runtime foundation: canonical run plane → toolkit selection
+### Phase B — monorepo topology: apps are lightweight rollups
+
+| Issue | Scope | Exit |
+|-------|-------|------|
+| [#249](https://github.com/italanta/opencrane/issues/249) — **Every deployed unit under `/apps`; logic in `/libs`** | Promote cognee/litellm/obot from embedded opencrane-infra templates to app-owned deploy units (render-parity gated) · extract `apps/opencrane`'s ~20.5k lines (reconcilers, gateways, infra, openapi) into libs · opencrane-infra narrows to umbrella composition · Nx module-boundary guardrail. Apps scheduled to die (feat-openclaw-tenant, feat-central-agents, feat-skill-registry) are **not** churned. | Every deployed pod traces to an `apps/*` rollup; `apps/opencrane` is composition+bootstrap; CI blocks logic under `apps/*`. |
+
+Executes the app-ownership half of W2; trust-boundary *extraction* (channel-proxy,
+agent-controller processes) stays Phase F but lands into this structure. Runtime code from
+Phase C onward is written into this shape, not migrated later.
+
+### Phase C — runtime foundation: canonical run plane → toolkit selection
 
 One epic drives Gates L0–L4 (→ [#246](https://github.com/italanta/opencrane/issues/246)):
 baseline fixtures + trajectory recorder (L0) · canonical Thread/Message/Run/RunEvent plane with
@@ -118,8 +131,8 @@ Opens once the personal runtime is past L4 (overlap with D/E where safe):
   authoring path — prerequisite) then [#243](https://github.com/italanta/opencrane/issues/243)
   (governed skill learning: nuances + promotion).
 - **Consoles + managed-agent cutover** (W9): [#226](https://github.com/italanta/opencrane/issues/226)
-  membership UI, [#224](https://github.com/italanta/opencrane/issues/224) cost/model console,
-  [#216](https://github.com/italanta/opencrane/issues/216) CLI-retirement decision.
+  membership UI, [#224](https://github.com/italanta/opencrane/issues/224) cost/model console.
+  (#216 closed — CLI deleted in Phase A, #248.)
 
 ### Phase G — final topology & residue (W11–W12)
 

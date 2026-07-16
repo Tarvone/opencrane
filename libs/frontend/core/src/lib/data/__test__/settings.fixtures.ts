@@ -33,9 +33,7 @@ export const DATASET_ACCESS: DatasetAccess[] =
 /** Egress allowlist rows. */
 export const EGRESS_DOMAINS: EgressDomain[] =
 [
-	{ domain: "api.anthropic.com", purpose: "LLM inference", status: "active" },
-	{ domain: "cognee.acme-corp.internal", purpose: "Knowledge retrieval", status: "active" },
-	{ domain: "jira.acme-corp.com", purpose: "Jira MCP tool", status: "active" },
-	{ domain: "github.com", purpose: "GitHub MCP tool", status: "active" },
-	{ domain: "confluence.acme-corp.com", purpose: "Confluence connector", status: "active" }
+	{ domain: "*.anthropic.com", purpose: "AI provider", status: "active" },
+	{ domain: "*.googleapis.com", purpose: "AI provider", status: "active" },
+	{ domain: "api.github.com", purpose: "Skill: GitHub", status: "active" }
 ];

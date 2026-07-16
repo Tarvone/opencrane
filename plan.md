@@ -1,93 +1,135 @@
 # OpenCrane — Active Plan
 
-> **Rebased 2026-07-05; resequenced 2026-07-07; re-lettered 2026-07-16.** Implementation
-> detail lives in **GitHub issues** (context + todo checklists); this file is the sequencing
-> index the work is driven from. When an item here is executed, work off the linked issue —
-> not this file. History of everything landed before the rebase: `plan-done.md` + the git
-> history of this file (the pre-rebase plan is at commit `700473b` and earlier).
->
-> Phase letters were reset on 2026-07-16 to match where the work actually stands: the launch
-> stabilisation phase, member onboarding, and the bulk of the Phase 3 repo cutover are done
-> (see Current state), so the active sequence now restarts at **Phase A**.
+> **Rebased 2026-07-16 (evening): personal-agent program adopted.** Implementation detail lives
+> in **GitHub issues** (context + todo checklists); this file is the sequencing index the work is
+> driven from. When an item here is executed, work off the linked issue — not this file. History
+> of everything landed before the rebase: `plan-done.md` + the git history of this file (the
+> morning re-lettered plan is at commit `e2b0228`; the pre-rebase plan at `700473b` and earlier).
+
+## Decision record (2026-07-16)
+
+The [personal-agent platform architecture](docs/design/personal-agent-platform-architecture.md) is
+**adopted** as the target, with the runtime refinement from the
+[OpenClaw loop investigation](docs/design/openclaw-agent-loop-replacement-plan.md):
+
+1. **End state:** an OpenCrane-owned agent runtime. OpenCrane owns Thread/Message/Run/RunEvent,
+   approvals, transcript, compaction, retry, budgets, identity, memory, and tool policy; a
+   conformance-selected **TypeScript** toolkit (`@openai/agents` primary spike, `ai`/`ToolLoopAgent`
+   control) drives only the bounded model/tool loop. Python stays for isolated tool Jobs only.
+   Supersedes the 2026-06-19 keep-OpenClaw decision (trigger: personal-agent product pivot).
+2. **Delivery:** the [deletion-gated strangler](docs/design/personal-agent-platform-simplification-plan.md)
+   over the [rewrite-freeze/blue-green alternative](docs/design/personal-agent-platform-rewrite-freeze-plan.md).
+   Lean OpenClaw is a bridge with named expiries, never a peer runtime.
+3. **Sequencing:** deletion debt is paid first (Phase A), then the runtime program is the spine
+   (Phases B–E); platform authorities that don't gate the personal-agent cutover (artifact CAS,
+   AgentService registry) follow as Phase F rather than blocking the runtime. This deliberately
+   diverges from the simplification plan's W4/W5-before-W7 ordering: personal agents cut over on
+   the **current** skill/memory authorities; managed agents wait for Phase F.
+4. Authority/identity gates 2–9 of the architecture doc (Postgres authority, artifact-on-PVC,
+   per-silo authorization + signed run capabilities, Cilium-not-RBAC, CRD retirement, isolated
+   Python, controller/proxy extraction, no permanent dual runtime) are accepted with it.
+   ADRs recording all of this are a Phase A deliverable (→ [#245](https://github.com/italanta/opencrane/issues/245)).
+
+Toolkit choice is **not** pre-decided — Gate L4's conformance run decides it (→ [#246](https://github.com/italanta/opencrane/issues/246)).
 
 ## Current state (2026-07-16)
 
 The silo program (S1–S6) is merged: fleet/silo split, Zitadel as PDP system-of-record with
-per-org OIDC login, member API (`oc cluster-tenant members`), S4 inheritance + scope
-vocabularies + dataset-membership sync, BYOK provider keys, same-origin org ingress + gateway
-proxy (built, gated), org-memory (Cognee) wired into tenant pods.
+per-org OIDC login, member API, S4 inheritance + scope vocabularies + dataset-membership sync,
+BYOK provider keys, same-origin org ingress + gateway proxy (built, gated), org-memory (Cognee)
+wired into tenant pods. Launch stabilisation (#144, #134), member onboarding (#126), and the bulk
+of the Phase 3 repo cutover (#151, #152, #153 — on `phase3-cutover`, **pending merge**) are done.
 
-Since the rebase, three tranches have completed and dropped out of the active sequence:
+Retired from the morning plan: #130 (scope-aware retrieval), #138 (teardown), #141 (devops-agents
+spike), #131 (CLI polish) — closed; their residue pointers live in the issues themselves.
 
-- **Launch stabilisation** — fail-safe tenant reconcile ([#144](https://github.com/italanta/opencrane/issues/144)) and operator/deploy ops hygiene ([#134](https://github.com/italanta/opencrane/issues/134)). The live cluster no longer clobbers a known-good config or silently reverts deploys.
-- **Member onboarding & user lifecycle** ([#126](https://github.com/italanta/opencrane/issues/126)) — signup → invite → membership → seeded workspace → offboard.
-- **Phase 3 repo cutover (bulk)** — standalone-capable silo ([#151](https://github.com/italanta/opencrane/issues/151)), frontend + org-libs receive/relicense ([#152](https://github.com/italanta/opencrane/issues/152)), NX adoption ([#153](https://github.com/italanta/opencrane/issues/153)). Landed on the `phase3-cutover` branch — **pending merge to `main`** (merge gated on the e2e-k3d design call + the k8s-platform subchart vendor-vs-publish decision).
+## Track 0 — live obligations (parallel; not program-gated)
 
-## Architecture review gate — personal-agent platform
+Production and launch work that continues alongside the program. Nothing below waits for a phase.
 
-The proposed [personal-agent platform architecture](docs/design/personal-agent-platform-architecture.md)
-defines one lean OpenCrane-owned, OpenClaw-free end state. Two delivery strategies are under
-review: the
-[deletion-gated strangler](docs/design/personal-agent-platform-simplification-plan.md) and the
-[rewrite freeze with whole-silo blue/green replacement](docs/design/personal-agent-platform-rewrite-freeze-plan.md).
-Both keep Postgres/OpenCrane as the authority for silo-owned business state and fleet
-membership/lifecycle as explicit upstream contracts; they differ in when legacy changes stop, when
-users see value, how state is migrated, and where cutover/rollback risk sits.
-The focused [OpenClaw loop investigation](docs/design/openclaw-agent-loop-replacement-plan.md)
-traces the pinned runtime and defines the toolkit bake-off and parity gates shared by either route.
+| Item | Scope | Status |
+|------|-------|--------|
+| [#127](https://github.com/italanta/opencrane/issues/127) — **Isolation & domaining production defaults** | Mandatory default-deny (multi-CT) · per-CT hosts · encrypted tenant storage · GCP smoke + ACME e2e | Last launch-critical backend item — still the launch front. |
+| [#174](https://github.com/italanta/opencrane/issues/174) — **LiteLLM Team provisioning bug** | team_id 404s on /key/update, unthrottled reconcile | Production bug; also a prerequisite for scoped runtime model access (Gate L3). |
+| [#162](https://github.com/italanta/opencrane/issues/162) — **Chart-native OpenCrane UI rollout** | Enablement, migration, status, live verification | Needed before the UI carries cutover consoles. |
+| `phase3-cutover` merge + [#150](https://github.com/italanta/opencrane/issues/150) close-out | Merge gated on e2e-k3d design call + subchart vendor-vs-publish decision | Bookkeeping; opencrane side done. |
+| Frontend launch cutover (weownai) | weownai [#28](https://github.com/italanta/WeOwnAI/issues/28) + #30 | Cross-repo; see weownai's plan. |
 
-These documents are **under review and do not yet resequence the phases below**. Their Gate 0 or R0
-first records the accepted decisions and then rebases the live GitHub issue inventory; this avoids
-rewriting implementation issues around an architecture that has not been accepted.
+## Program — personal-agent platform
 
-## Execution order
+Phases are the execution spine. Issues for a phase are cut when the phase opens; later-phase
+issue rewrites follow the
+[live-issue disposition table](docs/design/personal-agent-platform-simplification-plan.md#live-github-issue-disposition).
 
-The roadmap is sequenced into cross-repo phases (shared with [weownai's plan](https://github.com/italanta/WeOwnAI/blob/main/plan.md)).
-Governing rule: **finish the launch push (Phases A–C) before treating the Phase 3 tail
-(Phase D) as anything but bookkeeping + research.** The heavy Phase 3 code moves are already
-done; what remains there has no launch dependency.
+### Phase A — deletion debt (current front)
 
-### Phase A — Isolation & domaining production defaults (current front)
+| Issue | Scope | Exit |
+|-------|-------|------|
+| [#245](https://github.com/italanta/opencrane/issues/245) — **W1 residue + docs drift + decision ADRs** | Dead shared-skills · CSV mcpPolicy/channels · configOverrides · canary/self-update · **immutable pinned bridge image** (= first Gate L0 deliverable) · pairing/BrokeredDevice · SessionScope · Obot-poll residue · Linkerd freeze+inventory · six-CRDs docs fix · ADR 0005/0006 + ADR 0003 correction | Forbidden-reference CI test; immutable-image cold-start/rollback green; no fallback without named expiry. |
 
-| Issue | Scope | Why first |
-|-------|-------|-----------|
-| [#127](https://github.com/italanta/opencrane/issues/127) — **Isolation & domaining production defaults** | Default-deny mandatory for multi-CT (ex-#105) · per-ClusterTenant hosts default-ON + purge per-usertenant domains · encrypted tenant storage (CMEK + preflight) · GCP smoke + live ACME e2e | Shipped defaults must match the documented security model before any multi-org production install. Last launch-critical backend item. |
+Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked (external half);
+[#227](https://github.com/italanta/opencrane/issues/227) fires after Phase A + rollback windows.
 
-### Phase B — Frontend launch cutover (weownai)
+### Phases B/C — runtime foundation: canonical run plane → toolkit selection
 
-No opencrane issues. Cross-repo gate: weownai [#28](https://github.com/italanta/WeOwnAI/issues/28)
-(live workspace) needs the stabilised cluster; weownai #30 pairs with the completed #126. See weownai's plan.
+One epic drives Gates L0–L4 (→ [#246](https://github.com/italanta/opencrane/issues/246)):
+baseline fixtures + trajectory recorder (L0) · canonical Thread/Message/Run/RunEvent plane with
+thread leases, idempotency, cursor replay, SSE (L1) · OpenClaw bridged **into** that plane so the
+frontend consumes the canonical API while OpenClaw still executes (L2) · versioned
+`RunInputSnapshot` + prompt compiler + LiteLLM/Obot/Cognee/skill adapters (L3) · conformance
+bake-off and exact-pinned toolkit selection (L4).
 
-### Phase C — Capability completion (overlaps Phase B's tail)
+Feeds from existing issues (rewritten as consumed): [#225](https://github.com/italanta/opencrane/issues/225)
+(generic workspace/rendering stays; OpenClaw gateway/A2UI scope becomes bridge scope with expiry),
+[#221](https://github.com/italanta/opencrane/issues/221) (full-KSA identity → run capabilities),
+[#220](https://github.com/italanta/opencrane/issues/220) (least-privilege baseline on the bridge),
+[#128](https://github.com/italanta/opencrane/issues/128) (Obot lifecycle, runtime-neutral MCP
+assignment — L3's Obot adapter builds on it).
 
-| Issue | Scope | Dependency |
-|-------|-------|------------|
-| [#128](https://github.com/italanta/opencrane/issues/128) — **Obot live integration** | Verify mgmt-API/enc-at-rest knob against the live Obot · OBO push path · per-user RFC-8693 round-trip · pod-can't-reach-token-store assertion | None — unblocked by the live Obot. |
-| [#129](https://github.com/italanta/opencrane/issues/129) — **Central harvesting harness over Obot MCP** | Declarative harvest jobs · executor as privileged Obot client · Slack connector re-expressed as an MCP-backed job · Teams/email/tickets = config, not code | Credentialed sources need #128; harness can start against credential-free MCP servers. |
-| [#130](https://github.com/italanta/opencrane/issues/130) — **Scope-aware retrieval + per-scope memory partitioning** (S4e + P4B.7.2/.3) | Session scope projected into the official Cognee plugin · cascade retrieval · `node_set` ingestion tagging · written-memory partitioning | Plugin can land against manual groups; full value after #126's S4b. |
-| [#138](https://github.com/italanta/opencrane/issues/138) — **ClusterTenant teardown** | Finalizer-driven silo deprovision · CR-delete + DB-row in one transaction · data-retention policy | Pairs with #126's lifecycle; align teardown semantics with #150's contract. |
+### Phase D — reliability envelope + personal runtime (Gate L5)
 
-### Phase D — Phase 3 cutover close-out & plugin seam (no launch dependency)
+State machine, transactional event append + outbox, tool idempotency, budgets + no-progress
+breaker, error taxonomy + retry matrix, provider-neutral compaction, one durable terminal event.
+Go/no-go rule: session correctness, cancellation/recovery, and authorization must meet or beat the
+OpenClaw baseline. Issue cut at phase open.
 
-The heavy Phase 3 code moves — standalone silo (#151), frontend receive (#152), NX adoption
-(#153) — are **done** on `phase3-cutover` (see Current state). What remains is the contract
-close-out and the plugin research spike.
+### Phase E — shadow, canary, cutover, delete (Gates L6–L7)
 
-| Issue | Scope | Dependency |
-|-------|-------|------------|
-| [#150](https://github.com/italanta/opencrane/issues/150) — **Fleet↔silo contract + licensing split** | ClusterTenant CR schema + lifecycle API (incl. teardown, see #138) · OIDC delegation payload · relicense `fleet-operator`/`fleet-platform` to private ahead of the move | **DONE (opencrane side, phase3-cutover):** `apps/fleet-operator` + `apps/fleet-platform` removed from this repo (fleet-facing CLI commands and the generated `fleet-api.ts` client removed with them); the fleet backend now lives in WeOwnAI (counterpart: weownai#39, "done"). Deploy scripts/terraform that drove the fleet chart now require an external `FLEET_CHART_DIR`/`fleet_chart_path` pointing at a checked-out WeOwnAI copy. Issue still open — close out once `phase3-cutover` merges to `main`. |
-| [#154](https://github.com/italanta/opencrane/issues/154) — **Plugin system research spike** | Plugin shape (backend module + frontend element + chart + manifest), install procedure, customisation line, hooks inventory, prove-the-seam plugins (skills, MCP, #129 harvesting, #130 awareness, billing, metrics) | Research anytime; design after the cutover merges. #129/#130 become prove-the-seam candidates. |
+Fixture replay → side-effect-free shadow → dogfood silo → whole-tenant canaries → cutover →
+**delete the entire OpenClaw compatibility surface** (installer, config renderer/schema, Gateway
+v4 client + folds, workspace/persona compat, Cognee plugin lifecycle, losing toolkit adapter).
+Rollback frontier: first canonical new-runtime write. Issues cut at phase open.
 
-### Phase E — End-state substrate & deferred (no launch dependency)
+### Phase F — platform authorities & managed agents (W2–W5, W8–W9)
+
+Opens once the personal runtime is past L4 (overlap with D/E where safe):
+
+- **Trust-boundary apps + authorization** (W2/W3): channel-proxy and agent-controller extraction;
+  `libs/authorization` contracts/engine; signed run capabilities; membership freshness.
+  [#117](https://github.com/italanta/opencrane/issues/117) executes here (Cilium baseline, then
+  Linkerd removal). [#221](https://github.com/italanta/opencrane/issues/221) generalizes here.
+- **Artifact CAS + Cognee pipeline** (W4): artifact service, outbox indexer, memory gateway.
+  Decides [#133](https://github.com/italanta/opencrane/issues/133) (skills → CAS; Zot demoted to
+  optional export — do not run the Zot-only cutover first).
+- **AgentService registry + scheduler + run ledger** (W5):
+  [#129](https://github.com/italanta/opencrane/issues/129) promotes to the core epic; Slack worker
+  re-lands as a scheduled AgentService.
+- **Skills product** (W8): [#222](https://github.com/italanta/opencrane/issues/222) (safe
+  authoring path — prerequisite) then [#243](https://github.com/italanta/opencrane/issues/243)
+  (governed skill learning: nuances + promotion).
+- **Consoles + managed-agent cutover** (W9): [#226](https://github.com/italanta/opencrane/issues/226)
+  membership UI, [#224](https://github.com/italanta/opencrane/issues/224) cost/model console,
+  [#216](https://github.com/italanta/opencrane/issues/216) CLI-retirement decision.
+
+### Phase G — final topology & residue (W11–W12)
+
+Tenant/AccessPolicy CRD retirement (after observation windows), duplicate-model collapse,
+[#231](https://github.com/italanta/opencrane/issues/231) naming pass, docs/website/runbook sync,
+CI checks against retired concepts. Issues cut at phase open.
+
+## Deferred / research
 
 | Issue | Scope | Status |
 |-------|-------|--------|
-| [#117](https://github.com/italanta/opencrane/issues/117) — **Cilium + SPIFFE identity substrate — remove Linkerd** | Cilium CNI · SPIRE/SVID issuance · per-silo `CiliumNetworkPolicy` · super-admin identity rotation/audit · Linkerd removal | After #127's floor is enforced; rollout stays additive. |
-| [#133](https://github.com/italanta/opencrane/issues/133) — **Skill-bundle registry-only cutover (S9)** | Live Zot backfill run → drop `SkillBundle.content` | Needs live infra; tooling ready (`oc skills backfill`). |
-| [#135](https://github.com/italanta/opencrane/issues/135) — **Provider-secret cutover (S10)** | Remove `org-shared-secrets` broadcast · retire `ProviderApiKey` | **BLOCKED external** (OpenClaw translator image + WeOwnAI). |
-| [#136](https://github.com/italanta/opencrane/issues/136) — **Deferred capabilities (S7 · S12 · D4/D5)** | Dedicated-compute tiers & cost model · guardrail stream · plane pooling + scale-to-zero | Future. S7 relies on the same provisioner-webhook seam #150 formalises. |
-| [#141](https://github.com/italanta/opencrane/issues/141) — **Cluster-based devops agents (research spike)** | Always-on in-cluster counterpart to the `/deploy-loop` fleet: drift/error detection, pre-upgrade config review — read-only, remediation via PRs/issues | Future; scope + guardrails in the issue. |
-| [#131](https://github.com/italanta/opencrane/issues/131) — **CLI & docs polish** (low prio) | `oc providers byok` · README component-table fix · budget-enforcement seam wording | Anytime. |
-
-Folded elsewhere: CONN.4/5 device-seam kill-or-keep → **#117** · live Cognee `/v1/search`
-verification → **#130**.
+| [#136](https://github.com/italanta/opencrane/issues/136) — Dedicated-compute tiers · guardrail stream · pooling/scale-to-zero | Re-lands as AgentService deployment profiles (Phase F+) | Future. |
+| [#154](https://github.com/italanta/opencrane/issues/154) — Plugin system spike | Replaced per disposition: derive a small app/module contract from Cognee/Obot/artifact/runtime needs — no generic plugin framework first | Re-scope when Phase F opens. |

@@ -17,14 +17,6 @@
 			<a [routerLink]="['/tools']" routerLinkActive="wo-rail__action--active" class="wo-rail__action" title="Tools">
 				<i class="pi pi-th-large"></i>
 			</a>
-			<a
-				[routerLink]="['/settings']"
-				routerLinkActive="wo-rail__action--active"
-				class="wo-rail__action wo-rail__action--settings"
-				aria-label="Settings"
-			>
-				<i class="pi pi-cog"></i>
-			</a>
 		</div>
 	</div>
 
@@ -79,10 +71,10 @@
 	</div>
 
 	<div class="wo-rail__footer">
-		<div class="wo-rail__sovereign">
-			<i class="pi pi-shield"></i>
-			<span class="wo-mono">self-hosted · data sovereign</span>
-		</div>
+		<a [routerLink]="['/settings']" routerLinkActive="wo-rail__settings--active" class="wo-rail__settings">
+			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+			<span>Settings</span>
+		</a>
 		<div class="wo-rail__user">
 			<wo-avatar-circle [initials]="userInitials()" [accessibleName]="userName() || 'Current user'" color="#0db5cc" size="large" />
 			<div class="wo-rail__user-info">

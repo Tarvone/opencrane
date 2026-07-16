@@ -17,16 +17,23 @@ The [personal-agent platform architecture](docs/design/personal-agent-platform-a
    conformance-selected **TypeScript** toolkit (`@openai/agents` primary spike, `ai`/`ToolLoopAgent`
    control) drives only the bounded model/tool loop. Python stays for isolated tool Jobs only.
    Supersedes the 2026-06-19 keep-OpenClaw decision (trigger: personal-agent product pivot).
-2. **Delivery:** the [deletion-gated strangler](docs/design/personal-agent-platform-simplification-plan.md)
-   over the [rewrite-freeze/blue-green alternative](docs/design/personal-agent-platform-rewrite-freeze-plan.md).
-   Lean OpenClaw is a bridge with named expiries, never a peer runtime.
+2. **Delivery:** the [rewrite freeze with whole-silo blue/green replacement](docs/design/personal-agent-platform-rewrite-freeze-plan.md)
+   (owner, 2026-07-17: hard rewiring of the openclaw tenant in one go, as far as possible — we
+   need that control). The [strangler](docs/design/personal-agent-platform-simplification-plan.md)
+   is rejected; there is **no OpenClaw bridge, transcript mirror, or compatibility adapter in
+   green**. Per the plan's own limits this is one whole ClusterTenant at a time (never a
+   fleet-wide big bang), and **R0 must still run its decision test**: classify every CT
+   reset-eligible vs full-fidelity, and if post-write rollback turns out to be mandatory the
+   route reverts to strangler — that check is a gate, not a formality. Branch mechanics: `main`
+   stays the protected blue maintenance line; green integrates on protected
+   `feat/agent-platform-v2` through normal small PRs.
 3. **Sequencing:** deletion debt is paid first (Phase A, including deleting the `oc` CLI —
-   supersedes #216), then the monorepo is normalized (Phase B: every deployed unit under `/apps`
-   as a lightweight rollup, logic in `/libs`) so the runtime program (Phases C–E) lands new code
-   into the right structure; platform authorities that don't gate the personal-agent cutover
-   (artifact CAS, AgentService registry) follow as Phase F rather than blocking the runtime. This
-   deliberately diverges from the simplification plan's W4/W5-before-W7 ordering: personal agents
-   cut over on the **current** skill/memory authorities; managed agents wait for Phase F.
+   supersedes #216) and the monorepo is normalized second (Phase B) — both are **pre-freeze**
+   work that shrinks the frozen surface and carves the reusable foundations green is allowed to
+   import. The program then follows the R-gates: R0 estate audit → R1 stabilize+freeze blue
+   (absorbs the launch blockers) → R2/R3 green foundations + migration factory → R4/R5 runtime +
+   AgentService → R6 surfaces → R7 rehearsal → R8 dogfood silo → R9 atomic per-CT cutovers →
+   R10 legacy deletion.
 4. Authority/identity gates 2–9 of the architecture doc (Postgres authority, artifact-on-PVC,
    per-silo authorization + signed run capabilities, Cilium-not-RBAC, CRD retirement, isolated
    Python, controller/proxy extraction, no permanent dual runtime) are accepted with it.
@@ -45,23 +52,26 @@ of the Phase 3 repo cutover (#151, #152, #153 — on `phase3-cutover`, **pending
 Retired from the morning plan: #130 (scope-aware retrieval), #138 (teardown), #141 (devops-agents
 spike), #131 (CLI polish) — closed; their residue pointers live in the issues themselves.
 
-## Track 0 — live obligations (parallel; not program-gated)
+## Track 0 — live obligations (now mostly freeze-gating)
 
-Production and launch work that continues alongside the program. Nothing below waits for a phase.
+Under the rewrite-freeze contract these are no longer merely parallel: the freeze **cannot be
+declared** until the pre-freeze runway blockers are done. They execute inside R1's runway.
 
 | Item | Scope | Status |
 |------|-------|--------|
-| [#127](https://github.com/italanta/opencrane/issues/127) — **Isolation & domaining production defaults** | Mandatory default-deny (multi-CT) · per-CT hosts · encrypted tenant storage · GCP smoke + ACME e2e | Last launch-critical backend item — still the launch front. |
-| [#174](https://github.com/italanta/opencrane/issues/174) — **LiteLLM Team provisioning bug** | team_id 404s on /key/update, unthrottled reconcile | Production bug; also a prerequisite for scoped runtime model access (Gate L3). |
-| [#162](https://github.com/italanta/opencrane/issues/162) — **Chart-native OpenCrane UI rollout** | Enablement, migration, status, live verification | Needed before the UI carries cutover consoles. |
-| `phase3-cutover` merge + [#150](https://github.com/italanta/opencrane/issues/150) close-out | Merge gated on e2e-k3d design call + subchart vendor-vs-publish decision | Bookkeeping; opencrane side done. |
-| Frontend launch cutover (weownai) | weownai [#28](https://github.com/italanta/WeOwnAI/issues/28) + #30 | Cross-repo; see weownai's plan. |
+| [#127](https://github.com/italanta/opencrane/issues/127) — **Isolation & domaining production defaults** | Mandatory default-deny (multi-CT) · per-CT hosts · encrypted tenant storage · GCP smoke + ACME e2e | **Freeze-gating** (pre-freeze runway condition). |
+| [#174](https://github.com/italanta/opencrane/issues/174) — **LiteLLM Team provisioning bug** | team_id 404s on /key/update, unthrottled reconcile | **Freeze-gating** (reconcile storms must be fixed pre-freeze). |
+| [#162](https://github.com/italanta/opencrane/issues/162) — **Chart-native OpenCrane UI rollout** | Enablement, migration, status, live verification | **Freeze-gating** (one supportable UI version required). |
+| `phase3-cutover` merge + [#150](https://github.com/italanta/opencrane/issues/150) close-out | Merge gated on e2e-k3d design call + subchart vendor-vs-publish decision | **Freeze-gating** (one supportable fleet/silo contract version). |
+| Frontend launch cutover (weownai) | weownai [#28](https://github.com/italanta/WeOwnAI/issues/28) + #30 | Cross-repo; see weownai's plan — resequence against the freeze at R0. |
 
 ## Program — personal-agent platform
 
-Phases are the execution spine. Issues for a phase are cut when the phase opens; later-phase
-issue rewrites follow the
-[live-issue disposition table](docs/design/personal-agent-platform-simplification-plan.md#live-github-issue-disposition).
+Phases A/B are pre-freeze repo work; R0–R10 are the
+[rewrite-freeze plan](docs/design/personal-agent-platform-rewrite-freeze-plan.md)'s gates. Issues
+for a gate are cut when it opens; issue dispositions from the
+[strangler table](docs/design/personal-agent-platform-simplification-plan.md#live-github-issue-disposition)
+still apply where noted, re-read through the freeze route.
 
 ### Phase A — deletion debt (current front)
 
@@ -79,70 +89,94 @@ Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked
 |-------|-------|------|
 | [#249](https://github.com/italanta/opencrane/issues/249) — **Every deployed unit under `/apps`; logic in `/libs`** | Promote cognee/litellm/obot from embedded opencrane-infra templates to app-owned deploy units (render-parity gated) · extract `apps/opencrane`'s ~20.5k lines (reconcilers, gateways, infra, openapi) into libs · opencrane-infra narrows to umbrella composition · Nx module-boundary guardrail. Apps scheduled to die (feat-openclaw-tenant, feat-central-agents, feat-skill-registry) are **not** churned. | Every deployed pod traces to an `apps/*` rollup; `apps/opencrane` is composition+bootstrap; CI blocks logic under `apps/*`. |
 
-Executes the app-ownership half of W2; trust-boundary *extraction* (channel-proxy,
-agent-controller processes) stays Phase F but lands into this structure. Runtime code from
-Phase C onward is written into this shape, not migrated later.
+Under the freeze route this phase has a second purpose: it **carves the reuse seam**. Green may
+only import clean libs (never legacy domain packages), so extracting the sound foundations —
+workload builders, observability, generic k8s utilities, frontend state — into libs before the
+freeze is what lets green reuse them instead of rewriting them. Trust-boundary *extraction*
+(channel-proxy, agent-controller as processes) is built fresh in green at R2, into this structure.
 
-### Phase C — runtime foundation: canonical run plane → toolkit selection
+### R0 — estate audit and irreversible decisions (opens with Phase A)
 
-One epic drives Gates L0–L4 (→ [#246](https://github.com/italanta/opencrane/issues/246)):
-baseline fixtures + trajectory recorder (L0) · canonical Thread/Message/Run/RunEvent plane with
-thread leases, idempotency, cursor replay, SSE (L1) · OpenClaw bridged **into** that plane so the
-frontend consumes the canonical API while OpenClaw still executes (L2) · versioned
-`RunInputSnapshot` + prompt compiler + LiteLLM/Obot/Cognee/skill adapters (L3) · conformance
-bake-off and exact-pinned toolkit selection (L4).
+Classify every ClusterTenant **reset-eligible vs full-fidelity** (dev/staging estate is expected
+to be largely reset-eligible — verify, don't assume); frozen capability catalog; grant
+deny/priority + project-scope handling; persona precedence (DB docs vs mutable files); credential
+adopt-vs-reconnect; **post-write rollback decision** (if mandatory → route reverts to strangler);
+cohort order; maintenance windows; sign-off authority. Records the ADRs (with #245). Issue cut at
+open.
 
-Feeds from existing issues (rewritten as consumed): [#225](https://github.com/italanta/opencrane/issues/225)
-(generic workspace/rendering stays; OpenClaw gateway/A2UI scope becomes bridge scope with expiry),
-[#221](https://github.com/italanta/opencrane/issues/221) (full-KSA identity → run capabilities),
-[#220](https://github.com/italanta/opencrane/issues/220) (least-privilege baseline on the bridge),
-[#128](https://github.com/italanta/opencrane/issues/128) (Obot lifecycle, runtime-neutral MCP
-assignment — L3's Obot adapter builds on it).
+### R1 — stabilize, snapshot, freeze blue
 
-### Phase D — reliability envelope + personal runtime (Gate L5)
+The pre-freeze runway = Track 0 blockers (#127, #174, #162, fleet/silo contract) + Phase A/B +
+the slot-neutral cutover supervisor. Then: execute **Gate L0** (immutable pinned image — #245's
+deliverable — golden fixtures, trajectory recorder) against the frozen artifact; tag/sign the
+frozen source/image/chart/config manifest (`openclaw-freeze-YYYYMMDD`); blue maintenance matrix
+(0.5–1 engineer reserved, security-class fixes only). [#225](https://github.com/italanta/opencrane/issues/225):
+only its stabilization-critical parts land pre-freeze; the rest of its OpenClaw gateway/A2UI
+scope dies with blue. [#220](https://github.com/italanta/opencrane/issues/220): least-privilege
+profile becomes a freeze condition.
 
-State machine, transactional event append + outbox, tool idempotency, budgets + no-progress
-breaker, error taxonomy + retry matrix, provider-neutral compaction, one durable terminal event.
-Go/no-go rule: session correctness, cancellation/recovery, and authorization must meet or beat the
-OpenClaw baseline. Issue cut at phase open.
+### R2/R3 — green foundations + migration factory (parallel; on `feat/agent-platform-v2`)
 
-### Phase E — shadow, canary, cutover, delete (Gates L6–L7)
+**R2:** target app packages (into the Phase B structure), green Postgres schema
+(AgentService/Run/Thread/Message/RunEvent/Approval/Persona/Artifact/Skill), authorization facade +
+proof-bound capabilities, channel-proxy + agent-controller as apps, artifact CAS, app-owned
+Cognee/Obot, Cilium/default-deny as cutover-blocking ([#117](https://github.com/italanta/opencrane/issues/117)
+executes here), identity matrix ([#221](https://github.com/italanta/opencrane/issues/221)
+generalizes here), active-slot/quarantine controls. CI forbids legacy/OpenClaw imports from the
+first green PR.
+**R3:** exporters/importers per the legacy-state table (or the reduced reset/archive/reconnect
+factory if R0 classifies the estate reset-eligible); signed per-silo reconciliation manifests.
+[#128](https://github.com/italanta/opencrane/issues/128) reframes to the green Obot adapter +
+credential adoption/reconnect list.
 
-Fixture replay → side-effect-free shadow → dogfood silo → whole-tenant canaries → cutover →
-**delete the entire OpenClaw compatibility surface** (installer, config renderer/schema, Gateway
-v4 client + folds, workspace/persona compat, Cognee plugin lifecycle, losing toolkit adapter).
-Rollback frontier: first canonical new-runtime write. Issues cut at phase open.
+### R4/R5 — personal runtime + AgentService plane (parallel)
 
-### Phase F — platform authorities & managed agents (W2–W5, W8–W9)
+**R4** (→ [#246](https://github.com/italanta/opencrane/issues/246), rescoped): Gates **L3–L5** —
+`RunInputSnapshot` + prompt compiler, toolkit conformance bake-off (`@openai/agents` vs
+`ai`/`ToolLoopAgent`) against frozen trajectories + live LiteLLM, one exact-pinned driver, the
+reliability envelope, persona/PreferenceFact learning, multimodal + document authoring, governed
+Python skill Jobs ([#222](https://github.com/italanta/opencrane/issues/222) executes green-side;
+[#243](https://github.com/italanta/opencrane/issues/243) rides it). **No OpenClaw compatibility
+anywhere in green.**
+**R5:** AgentService/Revision/Run + schedules + one-attempt Jobs + one-way personal→managed
+boundary ([#129](https://github.com/italanta/opencrane/issues/129) promotes to this epic; Slack
+worker re-lands as schedule+MCP+skill).
 
-Opens once the personal runtime is past L4 (overlap with D/E where safe):
+### R6 — product and operator surfaces
 
-- **Trust-boundary apps + authorization** (W2/W3): channel-proxy and agent-controller extraction;
-  `libs/authorization` contracts/engine; signed run capabilities; membership freshness.
-  [#117](https://github.com/italanta/opencrane/issues/117) executes here (Cilium baseline, then
-  Linkerd removal). [#221](https://github.com/italanta/opencrane/issues/221) generalizes here.
-- **Artifact CAS + Cognee pipeline** (W4): artifact service, outbox indexer, memory gateway.
-  Decides [#133](https://github.com/italanta/opencrane/issues/133) (skills → CAS; Zot demoted to
-  optional export — do not run the Zot-only cutover first).
-- **AgentService registry + scheduler + run ledger** (W5):
-  [#129](https://github.com/italanta/opencrane/issues/129) promotes to the core epic; Slack worker
-  re-lands as a scheduled AgentService.
-- **Skills product** (W8): [#222](https://github.com/italanta/opencrane/issues/222) (safe
-  authoring path — prerequisite) then [#243](https://github.com/italanta/opencrane/issues/243)
-  (governed skill learning: nuances + promotion).
-- **Consoles + managed-agent cutover** (W9): [#226](https://github.com/italanta/opencrane/issues/226)
-  membership UI, [#224](https://github.com/italanta/opencrane/issues/224) cost/model console.
-  (#216 closed — CLI deleted in Phase A, #248.)
+One UI/API path: conversation/persona/memory, agent catalog + revision publish/rollback,
+schedules/runs, approval inbox, assets, skills, membership + effective-access explorer
+([#226](https://github.com/italanta/opencrane/issues/226),
+[#224](https://github.com/italanta/opencrane/issues/224) execute green-side). Upstream consoles
+are diagnostics only.
 
-### Phase G — final topology & residue (W11–W12)
+### R7/R8 — rehearsal, qualification, dogfood
 
-Tenant/AccessPolicy CRD retirement (after observation windows), duplicate-model collapse,
-[#231](https://github.com/italanta/opencrane/issues/231) naming pass, docs/website/runbook sync,
-CI checks against retired concepts. Issues cut at phase open.
+Deterministic import rehearsals on production-shaped snapshots (3× identical manifests; abort +
+crash-at-every-phase drills; DR exercise); then one internal ClusterTenant runs **entirely** on
+green through the full acceptance matrix. Go/no-go signed independently of the implementers.
+
+### R9 — atomic per-ClusterTenant cutovers
+
+One silo at a time, cohort-ordered (internal/reset-eligible → small full-fidelity → largest):
+fence fleet mutations → maintenance mode → drain → write barrier → blue quarantine (proven fence)
+→ checkpoint-bound export/import → verify manifest → green quarantined start → read-only handoff
+(CAS, epoch bump) → commit → credential custody transfer → monotonic
+writes/models/tools/schedules activation. Rollback is clean **only before the commit**; after
+green writes, recovery is forward (accepted at R0).
+
+### R10 — decommission and replace main
+
+After the last retention window: green branch replaces `main`; delete the frozen blue platform,
+OpenClaw surface, Tenant/AccessPolicy CRDs, active-slot machinery;
+[#231](https://github.com/italanta/opencrane/issues/231) naming pass and
+[#227](https://github.com/italanta/opencrane/issues/227) image cleanup land here; docs/website
+sync; CI checks against retired concepts.
 
 ## Deferred / research
 
 | Issue | Scope | Status |
 |-------|-------|--------|
-| [#136](https://github.com/italanta/opencrane/issues/136) — Dedicated-compute tiers · guardrail stream · pooling/scale-to-zero | Re-lands as AgentService deployment profiles (Phase F+) | Future. |
-| [#154](https://github.com/italanta/opencrane/issues/154) — Plugin system spike | Replaced per disposition: derive a small app/module contract from Cognee/Obot/artifact/runtime needs — no generic plugin framework first | Re-scope when Phase F opens. |
+| [#136](https://github.com/italanta/opencrane/issues/136) — Dedicated-compute tiers · guardrail stream · pooling/scale-to-zero | Re-lands as green AgentService deployment profiles (post-R9) | Future. |
+| [#154](https://github.com/italanta/opencrane/issues/154) — Plugin system spike | Replaced per disposition: green app/module contracts come from Cognee/Obot/artifact/runtime needs — no generic plugin framework | Re-scope after R2. |
+| [#133](https://github.com/italanta/opencrane/issues/133) — Zot-only skill cutover | **Superseded by the freeze route**: skills convert to ArtifactVersions in R3/R4; Zot is not ported into green. Close at R0 with the frozen-catalog decision. | Supersede at R0. |

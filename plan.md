@@ -121,10 +121,13 @@ Green app topology (owner naming, 2026-07-17): the runtime app is **`apps/feat-p
 (supersedes `apps/feat-openclaw-tenant` at its silo's R9 cutover; the design docs' provisional
 `apps/agent-runtime` name is overridden). There is **no separate skill-registry app in green**:
 the skill catalog is an OpenCrane API module and skill bytes live in the artifact service —
-`apps/feat-skill-registry` freezes with blue and dies at R10. `apps/feat-central-agents` dissolves
-into AgentService records at R5: **each managed agent gets its own runtime workload** (a dedicated
-Deployment, or a Job per scheduled run) from the same pinned `feat-personal-agent` image —
-per-agent runtime isolation without per-agent codebases.
+`apps/feat-skill-registry` freezes with blue and dies at R10. Managed agents (owner, 2026-07-17): **each first-party managed agent is its own lightweight
+monorepo app** (`apps/agents/<name>` — a rollup composing shared runtime libs with that agent's
+persona/skills/schedule/budget manifest and, only when needed, bespoke baked tools), each running
+in its own workload (dedicated Deployment or per-run Job). `apps/feat-central-agents` is replaced
+by these per-agent apps at R5. The boundary: repo-defined agents are apps; **tenant/user-created
+managed agents are AgentService records** on the shared managed-runtime image — they are created
+at runtime and cannot be monorepo apps.
 
 **R2:** target app packages (into the Phase B structure), green Postgres schema
 (AgentService/Run/Thread/Message/RunEvent/Approval/Persona/Artifact/Skill), authorization facade +

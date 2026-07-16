@@ -7,3 +7,4 @@ export * from "./lib/data/__test__/settings.fixtures.js";
 export * from "./lib/data/__test__/settings-form.fixtures.js";
 export * from "./lib/data/__test__/settings-form-fixtures.types.js";
 export * from "./lib/data/__test__/capabilities.fixtures.js";
+export * from "./lib/data/__test__/connectors.fixtures.js";

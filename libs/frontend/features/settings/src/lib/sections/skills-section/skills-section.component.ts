@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from "@angular/core";
+import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
 
 import { CapabilityGroup, CapabilityIcon, CapabilityIntegrationKind } from "@opencrane/core";
 import { CAPABILITY_GROUPS_FIXTURE } from "@opencrane/core/testing";
@@ -14,7 +14,7 @@ import { CAPABILITY_GROUPS_FIXTURE } from "@opencrane/core/testing";
 export class SkillsSectionComponent
 {
 	/** Capability groups rendered in the handoff's canonical scope order. */
-	public readonly groups = input<readonly CapabilityGroup[]>(CAPABILITY_GROUPS_FIXTURE);
+	public readonly groups = signal<readonly CapabilityGroup[]>(CAPABILITY_GROUPS_FIXTURE);
 
 	/** Origami icon values exposed to the external template. */
 	public readonly CapabilityIcon = CapabilityIcon;

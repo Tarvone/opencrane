@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { InputSignal, ɵInputSignalNode, ɵSIGNAL, ɵresolveComponentResources } from "@angular/core";
+import { ɵresolveComponentResources } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { compileString } from "sass";
@@ -25,13 +25,6 @@ function _render(): ComponentFixture<SkillsSectionComponent>
 	const fixture = TestBed.createComponent(SkillsSectionComponent);
 	fixture.detectChanges();
 	return fixture;
-}
-
-/** Apply a value to an input signal in the framework-light component fixture. */
-function _setInput<T>(target: InputSignal<T>, value: T): void
-{
-	const node = target[ɵSIGNAL] as ɵInputSignalNode<T, T>;
-	node.applyValueToInputSignal(node, value);
 }
 
 beforeAll(async function prepareAngularSkills(): Promise<void>
@@ -104,7 +97,7 @@ describe("SkillsSectionComponent", function skillsSectionSuite(): void
 	{
 		const fixture = _render();
 		const groups: readonly CapabilityGroup[] = [{ id: "personal", scope: "Personal", items: [] }];
-		_setInput(fixture.componentInstance.groups, groups);
+		fixture.componentInstance.groups.set(groups);
 		fixture.detectChanges();
 
 		const root = fixture.nativeElement as HTMLElement;

@@ -9,7 +9,7 @@ import { ɵresolveComponentResources } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { NavigationEnd, Route, Router, Routes, provideRouter } from "@angular/router";
+import { NavigationEnd, Route, Router, Routes, provideRouter, withComponentInputBinding } from "@angular/router";
 import { RouterTestingHarness } from "@angular/router/testing";
 import { filter, firstValueFrom, take } from "rxjs";
 import { compileString } from "sass";
@@ -89,7 +89,7 @@ beforeAll(async function prepareAngularRouter(): Promise<void>
 beforeEach(function configureRouter(): void
 {
 	TestBed.configureTestingModule({
-		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }]), { provide: LocationStrategy, useClass: MockLocationStrategy }]
+		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }], withComponentInputBinding()), { provide: LocationStrategy, useClass: MockLocationStrategy }]
 	});
 });
 
@@ -199,10 +199,12 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("activates the Skills implementation at its stable route", async function skillsRoute(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/skills");
+		const skills = harness.fixture.debugElement.query(By.directive(SkillsSectionComponent)).componentInstance as SkillsSectionComponent;
 
 		expect(harness.fixture.debugElement.query(By.directive(SkillsSectionComponent))).not.toBeNull();
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
 		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/skills");
+		expect(skills.groups()).toHaveLength(4);
 	});
 
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>

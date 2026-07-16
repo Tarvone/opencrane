@@ -20,6 +20,7 @@ import { SettingsScope, SettingsSectionId } from "../settings-navigation.types.j
 import { SettingsPlaceholderComponent } from "../settings-placeholder/settings-placeholder.component.js";
 import { SETTINGS_ROUTES } from "../settings.routes.js";
 import { ConnectorsSectionComponent } from "../sections/connectors-section/connectors-section.component.js";
+import { DataNetworkSectionComponent } from "../sections/data-network-section/data-network-section.component.js";
 import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component.js";
 
 /** Resolve an external settings component template or stylesheet. */
@@ -27,7 +28,7 @@ function _componentResource(resourceUrl: string): string
 {
 	const file = resourceUrl.replace(/^\.\//, "");
 	const componentFolder = file.split(".component")[0];
-	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
+	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
 	return readFileSync(resolve(process.cwd(), "src/lib", folder, file), "utf8");
 }
 
@@ -50,7 +51,7 @@ function _testableRoutes(routes: Routes): Routes
 	{
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
-	if (route.path === "skills" || route.path === "connectors") return route;
+	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network") return route;
 	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent };
 	});
 }
@@ -218,6 +219,17 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
 		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/connectors");
 		expect(connectors.installedConnectors()).toHaveLength(5);
+	});
+
+	it("activates Data & Network at its stable route", async function dataNetworkRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/data-network");
+		const dataNetwork = harness.fixture.debugElement.query(By.directive(DataNetworkSectionComponent)).componentInstance as DataNetworkSectionComponent;
+
+		expect(harness.fixture.debugElement.query(By.directive(DataNetworkSectionComponent))).not.toBeNull();
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/data-network");
+		expect(dataNetwork.domains()).toHaveLength(3);
 	});
 
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>

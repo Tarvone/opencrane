@@ -46,7 +46,16 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 		}
 	},
 	_placeholderRoute("channels", "Channels", "Agent and messaging-surface configuration will be delivered in milestone 4."),
-	_placeholderRoute("data-network", "Data & Network", "Data-sovereignty and egress controls will be delivered in milestone 4."),
+	{
+		path: "data-network",
+		loadComponent: function loadDataNetworkSection()
+		{
+			return import("./sections/data-network-section/data-network-section.component.js").then(function pickDataNetworkSection(module)
+			{
+				return module.DataNetworkSectionComponent;
+			});
+		}
+	},
 	_placeholderRoute("provider-keys", "API Keys", "Workspace AI provider keys will be delivered in milestone 4."),
 	{ path: "**", redirectTo: "pod" }
 ];

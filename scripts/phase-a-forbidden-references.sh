@@ -14,7 +14,7 @@ cd "$REPO_ROOT"
 FAILURES=0
 INVENTORY="docs/agents/linkerd-frozen-blue-inventory.txt"
 
-ADOPTED_RECORDS='^(plan\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-rewrite-freeze-plan|personal-agent-platform-simplification-plan|openclaw-agent-loop-replacement-plan)\.md|docs/adr/000[56]-[^/]+\.md)$'
+ADOPTED_RECORDS='^(plan\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-rewrite-freeze-plan|personal-agent-platform-simplification-plan|personal-agent-platform-r0-(product|migration)-contract|openclaw-agent-loop-replacement-plan)\.md|docs/adr/000[56]-[^/]+\.md)$'
 MIGRATION_HISTORY='^apps/opencrane/prisma/migrations/'
 RESEARCH_HISTORY='^(docs/research/litellm-byok-byom-research\.md|docs/specs/mcp-catalog-credential-spec\.md)$'
 HISTORICAL_RECORDS='^(plan-done\.md|CHANGELOG\.md|silo-multi-tenant-plan\.md|docs/briefs/mcp-skills-platform-brief\.md|docs/design/stage5-silo-autonomous-controllers-plan\.md|docs/agents/deploy-ledger\.md)$'

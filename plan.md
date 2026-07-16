@@ -80,7 +80,7 @@ Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked
 
 ### Phase B — monorepo topology: apps are lightweight rollups — ✅ COMPLETE (see `plan-done.md`)
 
-### R0 — estate audit and irreversible decisions (opens with Phase A)
+### R0 — estate audit and irreversible decisions — 🚧 PARTIAL EVIDENCE; ESTATE COMPLETENESS + APPROVAL PENDING ([#252](https://github.com/italanta/opencrane/issues/252))
 
 Classify every ClusterTenant **reset-eligible vs full-fidelity** (dev/staging estate is expected
 to be largely reset-eligible — verify, don't assume); frozen capability catalog; grant

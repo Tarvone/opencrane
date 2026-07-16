@@ -1,0 +1,20 @@
+<div class="wo-citation" [style.border-left-color]="typeColor().color">
+	<div class="wo-citation__corner"></div>
+	<span class="wo-citation__id wo-mono" [style.background]="typeColor().bg" [style.color]="typeColor().color">
+		{{ displayId() }}
+	</span>
+	<span class="wo-citation__title">{{ card().label }}</span>
+	@if (card().scope) {
+		<span class="wo-citation__scope" [style.background]="scopeColor().bg" [style.color]="scopeColor().color">
+			{{ card().scope }}
+		</span>
+	}
+	@if (card().ref) {
+		<code class="wo-citation__ref wo-mono">{{ card().ref }}</code>
+	}
+	@if (statusColor(); as sc2) {
+		<span class="wo-citation__status" [style.border-color]="sc2" [style.color]="sc2">
+			{{ card().status }}
+		</span>
+	}
+</div>

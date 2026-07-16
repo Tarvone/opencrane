@@ -1,0 +1,15 @@
+<div class="wo-origami">
+	<div class="wo-origami__facets">
+		@for (c of facets; track $index) {
+			<div 
+				class="wo-origami__facet" 
+				[class.wo-origami__facet--even]="$index % 2 === 0"
+				[class.wo-origami__facet--odd]="$index % 2 !== 0"
+				[style.background]="c"
+				[style.animation-delay]="$index * 0.16 + 's'"
+				[style.margin-left]="$index === 0 ? '0' : '-4px'"
+			></div>
+		}
+	</div>
+	<span class="wo-origami__text">Folding…</span>
+</div>

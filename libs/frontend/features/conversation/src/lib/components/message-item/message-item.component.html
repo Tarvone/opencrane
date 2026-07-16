@@ -7,7 +7,7 @@
 	</div>
 } @else {
 	<div class="wo-msg">
-		@for (block of blocks(); track $index) {
+		@for (block of mainBlocks(); track $index) {
 			@switch (block.kind) {
 				@case ("tools") {
 					<!-- A run of consecutive tool calls, collapsed into one unobtrusive disclosure. -->
@@ -106,20 +106,28 @@
 								</div>
 							}
 							@default {
-								<wo-ledger-card
-									[entryId]="card.id ?? ''"
-									[kind]="card.type"
-									[label]="card.label ?? ''"
-									[scope]="card.scope"
-									[entryRef]="card.ref"
-									[status]="card.status"
-								/>
+								<wo-citation-strip [card]="card" />
 							}
 						}
 					}
 				}
 			}
 		}
+
+		@if (message().carousel; as carousel) {
+			<div class="wo-msg__carousel">
+				@for (item of carousel; track $index) {
+					<wo-carousel-card [label]="item" />
+				}
+			</div>
+		}
+
+		@for (block of citationBlocks(); track $index) {
+			@if (block.card; as card) {
+				<wo-citation-strip [card]="card" />
+			}
+		}
+
 		@if (deliveryState() === delivery.Error) {
 			<div class="wo-msg__delivery wo-msg__delivery--error">
 				<i class="pi pi-exclamation-triangle"></i>

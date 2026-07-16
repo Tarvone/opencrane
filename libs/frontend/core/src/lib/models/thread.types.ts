@@ -122,6 +122,8 @@ export interface ThreadMessage
 	 * surface a distinct badge.
 	 */
 	delivery?: MessageDelivery;
+	/** Optional list of capability suggestions to render as a carousel. */
+	carousel?: string[];
 }
 
 /** A selectable model from the pod catalogue (`models.list`). */

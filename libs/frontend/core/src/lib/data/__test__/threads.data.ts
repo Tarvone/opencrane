@@ -61,7 +61,8 @@ Want me to draft any of these in full? I'd suggest starting with section 3 since
 					},
 					{ type: MessageCardKind.Observation, id: "R1", scope: ScopeLevel.Dept, label: "ARR target implies 18% QoQ growth", ref: "product-strategy-q3.md" },
 					{ type: MessageCardKind.Policy, id: "P1", scope: ScopeLevel.Org, label: "Resourcing decisions require VP sign-off", ref: "org_policy.v2.1", status: "applied" }
-				]
+				],
+				carousel: ["Draft section 1", "Draft section 3", "Review dependencies"]
 			},
 			{
 				id: "m3",

@@ -2,11 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 
 import { MessageCard, MessageCardKind, MessageDelivery, ThreadMessage } from "@opencrane/core";
 import { A2uiCanvasComponent } from "@opencrane/elements/a2ui";
-import { LedgerCardComponent } from "@opencrane/elements/ui";
 
-import { CopyCodeDirective } from "../../directives/copy-code.directive";
-import { MarkdownPipe } from "../../pipes/markdown.pipe";
-import { ToolGroupComponent } from "../tool-group/tool-group.component";
+import { CopyCodeDirective } from "../../directives/copy-code.directive.js";
+import { MarkdownPipe } from "../../pipes/markdown.pipe.js";
+import { ToolGroupComponent } from "../tool-group/tool-group.component.js";
+import { CarouselCardComponent } from "../carousel-card/carousel-card.component.js";
+import { CitationStripComponent } from "../citation-strip/citation-strip.component.js";
 
 /**
  * A block in the assistant card stack: either a single non-tool card, or a run of
@@ -26,7 +27,7 @@ interface RenderBlock
 @Component({
 	selector: "wo-message-item",
 	standalone: true,
-	imports: [LedgerCardComponent, ToolGroupComponent, MarkdownPipe, CopyCodeDirective, A2uiCanvasComponent],
+	imports: [ToolGroupComponent, MarkdownPipe, CopyCodeDirective, A2uiCanvasComponent, CarouselCardComponent, CitationStripComponent],
 	templateUrl: "./message-item.component.html",
 	styleUrl: "./message-item.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush
@@ -83,6 +84,16 @@ export class MessageItemComponent
 		}
 		return blocks;
 	});
+
+	private _isCitation(block: RenderBlock): boolean
+	{
+		if (block.kind !== "card" || !block.card) return false;
+		const t = block.card.type;
+		return t === MessageCardKind.Observation || t === MessageCardKind.Policy || t === MessageCardKind.Action;
+	}
+
+	public readonly mainBlocks = computed<RenderBlock[]>(() => this.blocks().filter(b => !this._isCitation(b)));
+	public readonly citationBlocks = computed<RenderBlock[]>(() => this.blocks().filter(b => this._isCitation(b)));
 
 	/** Delivery-outcome enum for template comparisons. */
 	public readonly delivery = MessageDelivery;

@@ -3,8 +3,14 @@
 		@if (variant() === 'rail') {
 			<i class="pi pi-chevron-down wo-section__chevron" [class.wo-section__chevron--closed]="!open()"></i>
 			<span class="wo-section__title">{{ title() }}</span>
+			@if (!open() && badgeCount() !== undefined) {
+				<span class="wo-section__badge">{{ badgeCount() }}</span>
+			}
 		} @else {
 			<span class="wo-section__title">{{ title() }}</span>
+			@if (!open() && badgeCount() !== undefined) {
+				<span class="wo-section__badge">{{ badgeCount() }}</span>
+			}
 			<i class="pi pi-chevron-down wo-section__chevron" [class.wo-section__chevron--closed]="!open()"></i>
 		}
 	</button>

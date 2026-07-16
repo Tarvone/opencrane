@@ -23,9 +23,20 @@
 	}
 
 	&__logo {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+	}
+
+	&__wordmark {
 		font-size: 14.5px;
-		color: #ffffff;
 		font-weight: 600;
+		color: #fff;
+		letter-spacing: -0.2px;
+
+		span {
+			color: #0db5cc;
+		}
 	}
 
 	&__tenant {

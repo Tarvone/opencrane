@@ -109,19 +109,20 @@ export class DestructiveConfirmationComponent
 	}
 
 	/** Keep Tab navigation within the two available dialog actions. */
-	public onTab(event: KeyboardEvent): void
+	public onTab(event: Event): void
 	{
+		const keyboardEvent = event as KeyboardEvent;
 		const actions = Array.from(this._host.nativeElement.querySelectorAll<HTMLElement>("[data-dialog-focus]:not(:disabled), button:not(:disabled)"));
 		const first = actions[0];
 		const last = actions.at(-1);
-		if (event.shiftKey && document.activeElement === first)
+		if (keyboardEvent.shiftKey && document.activeElement === first)
 		{
-			event.preventDefault();
+			keyboardEvent.preventDefault();
 			last?.focus();
 		}
-		else if (!event.shiftKey && document.activeElement === last)
+		else if (!keyboardEvent.shiftKey && document.activeElement === last)
 		{
-			event.preventDefault();
+			keyboardEvent.preventDefault();
 			first?.focus();
 		}
 	}

@@ -1,21 +1,26 @@
 # @opencrane/features/settings
 
-The settings view: a section nav plus eight settings sections.
+The route-driven settings shell plus workspace and personal settings sections.
 
 ## Import
 
 ```ts
-import { SettingsPageComponent } from "@opencrane/features/settings";
+import { SETTINGS_ROUTES } from "@opencrane/features/settings";
 ```
 
 ## Contents
 
-- `settings-page` — left nav + active section (`@switch` on a `SettingsSection`
-  enum).
-- `sections/*` — pod · model-budget · awareness · skills · channels · access ·
-  network · account.
-- `components/model-chip` — provider-coloured model pill (memoised `computed`s).
-- `components/toggle-field` — `p-toggleswitch` wrapper (`linkedSignal` value).
+- `settings.routes` — canonical `/settings/workspace/**` and
+  `/settings/personal/**` child routes, redirects, and later-milestone
+  placeholders.
+- `settings-page` — persistent Paper shell with route-derived navigation and a
+  child router outlet.
+- `settings-navigation` — feature-owned stable IDs, labels, exact URLs, and
+  handoff SVG paths.
+- `sections/*` — the surviving pod, awareness, and account pages used until
+  their milestone 4/5 replacements land.
+- `settings-placeholder` — explicit leaf content for routes whose final page
+  is owned by a later milestone.
 
 ## Dependencies
 
@@ -24,5 +29,5 @@ row, save button, scope chip). Must not import other feature libs.
 
 ## Note
 
-Section controls (save, promote, toggles) are local-only today; wire to
-`core/api` when the backend is connected.
+Section controls (save, promote, toggles) are mock-only during the UI handoff.
+Final section pages replace placeholders without changing their stable routes.

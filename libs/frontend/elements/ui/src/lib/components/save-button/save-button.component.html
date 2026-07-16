@@ -1,10 +1,38 @@
 <div class="wo-save">
-	<button type="button" class="wo-save__button" [class.wo-save__button--saved]="saved()" (click)="save()">
-		@if (saved()) {
-			<i class="pi pi-check"></i>
-			Saved
+	@if (feedback(); as feedbackValue) {
+		<p
+			class="wo-save__feedback"
+			[class.wo-save__feedback--error]="feedbackValue.kind === SettingsFormFeedbackKind.Error"
+			[attr.role]="feedbackValue.kind === SettingsFormFeedbackKind.Success ? 'status' : 'alert'"
+			aria-live="polite"
+		>
+			{{ feedbackValue.message }}
+		</p>
+	}
+
+	<div class="wo-save__actions">
+		@if (state()?.phase === SettingsFormPhase.Conflict) {
+			<button type="button" class="wo-save__secondary" (click)="returnToEditingIntent.emit()">
+				Return to editing
+			</button>
+			<button type="button" class="wo-save__secondary" (click)="reloadLatestIntent.emit()">
+				Reload latest
+			</button>
 		} @else {
-			Save changes
+			@if (canReset()) {
+				<button type="button" class="wo-save__secondary" [disabled]="pending()" (click)="resetIntent.emit()">
+					Reset
+				</button>
+			}
+			<button type="button" class="wo-save__button" [disabled]="!canSubmit()" (click)="submit()">
+				@if (pending()) {
+					Saving…
+				} @else if (state()?.phase === SettingsFormPhase.RecoverableError) {
+					Retry save
+				} @else {
+					Save changes
+				}
+			</button>
 		}
-	</button>
+	</div>
 </div>

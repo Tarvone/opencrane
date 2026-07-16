@@ -1,85 +1,4 @@
-import { ScopeLevel } from "./scope.types";
-
-/** Settings navigation sections. */
-export enum SettingsSection
-{
-	/** Pod & session settings. */
-	Pod = "pod",
-	/** Model routing & budget settings. */
-	Model = "model",
-	/** Awareness contract settings. */
-	Awareness = "awareness",
-	/** Skills management. */
-	Skills = "skills",
-	/** Harvest channel connectors. */
-	Channels = "channels",
-	/** Access & dataset memberships. */
-	Access = "access",
-	/** Network & egress allowlist. */
-	Network = "network",
-	/** Account & identity. */
-	Account = "account"
-}
-
-/** A settings nav item. */
-export interface SettingsNavItem
-{
-	/** Section id. */
-	id: SettingsSection;
-	/** Nav label. */
-	label: string;
-	/** PrimeIcons class. */
-	icon: string;
-	/** Optional badge (e.g. budget percentage). */
-	badge?: string;
-}
-
-/** An available LLM with pricing. */
-export interface ModelInfo
-{
-	/** Stable model id. */
-	id: string;
-	/** Provider name. */
-	provider: string;
-	/** Display label. */
-	label: string;
-	/** USD per 1M input tokens (0 = local). */
-	inputPer1M: number;
-	/** USD per 1M output tokens (0 = local). */
-	outputPer1M: number;
-}
-
-/** A routed model class with primary + fallbacks. */
-export interface ModelClass
-{
-	/** Stable class id. */
-	id: string;
-	/** Class label. */
-	label: string;
-	/** Class accent colour. */
-	color: string;
-	/** What the class is used for. */
-	description: string;
-	/** Configuration guidance. */
-	hint: string;
-	/** Primary model id. */
-	primary: string;
-	/** Ordered fallback model ids. */
-	fallbacks: string[];
-	/** Whether the class is enabled. */
-	enabled: boolean;
-}
-
-/** A spend slice in the monthly budget breakdown. */
-export interface SpendSlice
-{
-	/** Slice label. */
-	label: string;
-	/** Percentage of monthly spend. */
-	pct: number;
-	/** Slice colour. */
-	color: string;
-}
+import { ScopeLevel } from "./scope.types.js";
 
 /** A Cognee search mode definition. */
 export interface SearchModeInfo
@@ -140,27 +59,6 @@ export interface SkillRow
 	digest: string;
 	/** Status ("active" | "pending-promotion"). */
 	status: string;
-}
-
-/** A harvest channel connector row. */
-export interface HarvestChannel
-{
-	/** Stable channel id. */
-	id: string;
-	/** Connector name. */
-	name: string;
-	/** Single-letter icon glyph. */
-	icon: string;
-	/** Scope level. */
-	scope: ScopeLevel;
-	/** Target dataset label. */
-	dataset: string;
-	/** Sync status ("healthy" | "syncing" | "error"). */
-	status: string;
-	/** Last sync (relative). */
-	lastSync: string;
-	/** Indexed entry count. */
-	entries: number;
 }
 
 /** A dataset access membership row. */

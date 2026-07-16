@@ -1,42 +1,54 @@
-import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, ElementRef, Signal, computed, inject } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
+import { filter, map } from "rxjs";
 
-import { SETTINGS_NAV, SettingsNavItem, SettingsSection } from "@opencrane/core";
-import { PodSectionComponent } from "../sections/pod-section/pod-section.component";
-import { ModelBudgetSectionComponent } from "../sections/model-budget-section/model-budget-section.component";
-import { AwarenessSectionComponent } from "../sections/awareness-section/awareness-section.component";
-import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component";
-import { ChannelsSectionComponent } from "../sections/channels-section/channels-section.component";
-import { AccessSectionComponent } from "../sections/access-section/access-section.component";
-import { NetworkSectionComponent } from "../sections/network-section/network-section.component";
-import { AccountSectionComponent } from "../sections/account-section/account-section.component";
+import { PERSONAL_SETTINGS_NAVIGATION, WORKSPACE_SETTINGS_NAVIGATION, _SettingsScopeFromUrl } from "../settings-navigation.js";
+import { SettingsNavigationItem, SettingsScope } from "../settings-navigation.types.js";
 
 /** Settings view: section nav + active section content. */
 @Component({
 	selector: "wo-settings-page",
 	standalone: true,
-	imports:
-	[
-		PodSectionComponent,
-		ModelBudgetSectionComponent,
-		AwarenessSectionComponent,
-		SkillsSectionComponent,
-		ChannelsSectionComponent,
-		AccessSectionComponent,
-		NetworkSectionComponent,
-		AccountSectionComponent
-	],
+	imports: [RouterLink, RouterLinkActive, RouterOutlet],
 	templateUrl: "./settings-page.component.html",
 	styleUrl: "./settings-page.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsPageComponent
 {
-	/** Section enum for the template. */
-	public readonly sections = SettingsSection;
+	/** Typed scope values exposed to the route-driven template. */
+	public readonly scopes = SettingsScope;
 
-	/** Settings navigation items. */
-	public readonly nav: SettingsNavItem[] = SETTINGS_NAV;
+	/** Router providing the canonical settings scope and section state. */
+	private readonly _router = inject(Router);
 
-	/** Active section. */
-	public readonly active = signal<SettingsSection>(SettingsSection.Pod);
+	/** Settings host used to find the persistent routed-content focus target. */
+	private readonly _host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+	/** Active scope derived from completed router navigations. */
+	public readonly activeScope: Signal<SettingsScope> = toSignal(this._router.events.pipe(
+		filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+		map((event): SettingsScope => _SettingsScopeFromUrl(event.urlAfterRedirects))
+	), { initialValue: _SettingsScopeFromUrl(this._router.url) });
+
+	/** Navigation items for the active route scope. */
+	public readonly navigation: Signal<readonly SettingsNavigationItem[]> = computed((): readonly SettingsNavigationItem[] =>
+	{
+		return this.activeScope() === SettingsScope.Personal ? PERSONAL_SETTINGS_NAVIGATION : WORKSPACE_SETTINGS_NAVIGATION;
+	});
+
+	/** Switch to another settings scope while preserving an already-active scope. */
+	public async selectScope(scope: SettingsScope): Promise<void>
+	{
+		// 1. Active scope — return without navigation so the current route and draft component remain intact.
+		if (scope === this.activeScope()) return;
+
+		// 2. Scope default — enter the requested scope at its canonical first section.
+		const destination = scope === SettingsScope.Personal ? "/settings/personal/account" : "/settings/workspace/pod";
+		const navigated = await this._router.navigateByUrl(destination);
+
+		// 3. Focus transfer — move keyboard users into the newly routed settings content after activation.
+		if (navigated) this._host.nativeElement.querySelector<HTMLElement>(".wo-settings__content")?.focus();
+	}
 }

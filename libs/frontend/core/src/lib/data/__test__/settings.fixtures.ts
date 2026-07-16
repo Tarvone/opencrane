@@ -1,15 +1,5 @@
-import { CogneeDataset, DatasetAccess, EgressDomain, HarvestChannel, SkillRow, SpendSlice } from "../../models/settings.types";
-import { ScopeLevel } from "../../models/scope.types";
-
-/** Monthly spend breakdown slices. */
-export const SPEND_SLICES: SpendSlice[] =
-[
-	{ label: "Routing", pct: 3, color: "#7A766D" },
-	{ label: "Writing", pct: 41, color: "#5A8A7A" },
-	{ label: "Reasoning", pct: 28, color: "#7A6AA0" },
-	{ label: "High", pct: 22, color: "#C84B31" },
-	{ label: "Other", pct: 6, color: "#4A6B8A" }
-];
+import { CogneeDataset, DatasetAccess, EgressDomain, SkillRow } from "../../models/settings.types.js";
+import { ScopeLevel } from "../../models/scope.types.js";
 
 /** Cognee scope datasets in the awareness contract. */
 export const COGNEE_DATASETS: CogneeDataset[] =
@@ -28,16 +18,6 @@ export const SKILLS: SkillRow[] =
 	{ name: "jira-sync", scope: ScopeLevel.Project, version: "2.0.0", digest: "sha256:c55e", status: "active" },
 	{ name: "personal-notes", scope: ScopeLevel.Personal, version: "local", digest: "—", status: "active" },
 	{ name: "data-summariser", scope: ScopeLevel.Personal, version: "local", digest: "—", status: "pending-promotion" }
-];
-
-/** Harvest channel connectors. */
-export const HARVEST_CHANNELS: HarvestChannel[] =
-[
-	{ id: "ch1", name: "Slack", icon: "S", scope: ScopeLevel.Org, dataset: "acme-corp · org", status: "syncing", lastSync: "4m ago", entries: 14820 },
-	{ id: "ch2", name: "Slack #product-leadership", icon: "S", scope: ScopeLevel.Dept, dataset: "Product · dept", status: "healthy", lastSync: "12m ago", entries: 3204 },
-	{ id: "ch3", name: "Jira (platform-v2)", icon: "J", scope: ScopeLevel.Project, dataset: "platform-v2 · project", status: "healthy", lastSync: "1h ago", entries: 891 },
-	{ id: "ch4", name: "Confluence", icon: "C", scope: ScopeLevel.Org, dataset: "acme-corp · org", status: "healthy", lastSync: "2h ago", entries: 6411 },
-	{ id: "ch5", name: "Google Drive (Product)", icon: "G", scope: ScopeLevel.Dept, dataset: "Product · dept", status: "error", lastSync: "6h ago", entries: 1032 }
 ];
 
 /** Dataset access memberships. */

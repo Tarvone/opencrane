@@ -1,0 +1,97 @@
+.wo-destructive {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	background: rgba(26, 25, 24, 0.42);
+
+	&__panel {
+		width: min(100%, 440px);
+		padding: 24px;
+		border: 1px solid var(--oc-border, #dedad2);
+		border-radius: 12px;
+		background: #fff;
+		box-shadow: 0 18px 48px rgba(26, 25, 24, 0.2);
+
+		h2 {
+			margin: 0 0 10px;
+			color: var(--oc-text-primary, #1a1918);
+			font-size: 20px;
+		}
+
+		p {
+			margin: 0;
+			color: var(--oc-text-secondary, #6a6660);
+			font-size: 14px;
+			line-height: 1.5;
+		}
+	}
+
+	&__status {
+		margin-top: 14px !important;
+	}
+
+	&__pending {
+		margin-top: 14px !important;
+		padding: 8px 10px;
+		border-radius: 6px;
+		background: var(--oc-paper, #f5f2ec);
+
+		&:focus-visible {
+			outline: 3px solid color-mix(in srgb, var(--oc-teal, #0db5cc) 35%, transparent);
+			outline-offset: 2px;
+		}
+	}
+
+	&__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+		margin-top: 24px;
+
+		button {
+			padding: 8px 16px;
+			border: 1px solid var(--oc-border, #dedad2);
+			border-radius: var(--radius, 8px);
+			font: inherit;
+			font-size: 13px;
+			cursor: pointer;
+			transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+
+			&:focus-visible {
+				outline: 3px solid color-mix(in srgb, var(--oc-teal, #0db5cc) 35%, transparent);
+				outline-offset: 2px;
+			}
+
+			&:disabled {
+				cursor: not-allowed;
+				opacity: 0.55;
+			}
+		}
+	}
+
+	&__cancel {
+		background: #fff;
+		box-shadow: 0 1px 0 #c7c2b8, 0 2px 3px rgba(0, 0, 0, 0.08);
+		color: var(--oc-text-primary, #1a1918);
+
+		&:not(:disabled):hover {
+			background: linear-gradient(135deg, #fff 0%, #fff 50%, #f5f2ec 50%);
+			transform: translateY(-1px);
+		}
+	}
+
+	&__confirm {
+		border-color: var(--oc-danger, #c1392b) !important;
+		background: var(--oc-danger, #c1392b);
+		box-shadow: 0 1px 0 #942c22, 0 2px 3px rgba(193, 57, 43, 0.24);
+		color: #fff;
+
+		&:not(:disabled):hover {
+			background: linear-gradient(135deg, #d44a3c 0%, #d44a3c 50%, #c1392b 50%);
+			transform: translateY(-1px);
+		}
+	}
+}

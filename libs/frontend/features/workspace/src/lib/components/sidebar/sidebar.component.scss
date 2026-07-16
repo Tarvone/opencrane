@@ -65,6 +65,10 @@
 		&--active {
 			color: #0db5cc; /* Teal active state */
 		}
+
+		&--settings.wo-rail__action--active {
+			display: none;
+		}
 	}
 
 	&__bell-dot {

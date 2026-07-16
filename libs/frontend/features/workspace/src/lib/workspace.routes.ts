@@ -2,7 +2,7 @@ import { Routes } from "@angular/router";
 
 import { provideWoA2ui } from "@opencrane/elements/a2ui";
 
-import { WorkspacePageComponent } from "./workspace-page.component";
+import { WorkspacePageComponent } from "./workspace-page.component.js";
 
 /**
  * Routes for the operator workspace.
@@ -49,11 +49,11 @@ export const WORKSPACE_ROUTES: Routes =
 			},
 			{
 				path: "settings",
-				loadComponent: function loadSettingsPage()
+				loadChildren: function loadSettingsRoutes()
 				{
-					return import("@opencrane/features/settings").then(function pickComponent(m)
+					return import("@opencrane/features/settings").then(function pickSettingsRoutes(m)
 					{
-						return m.SettingsPageComponent;
+						return m.SETTINGS_ROUTES;
 					});
 				}
 			},

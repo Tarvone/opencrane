@@ -17,7 +17,12 @@
 			<a [routerLink]="['/tools']" routerLinkActive="wo-rail__action--active" class="wo-rail__action" title="Tools">
 				<i class="pi pi-th-large"></i>
 			</a>
-			<a [routerLink]="['/settings']" routerLinkActive="wo-rail__action--active" class="wo-rail__action">
+			<a
+				[routerLink]="['/settings']"
+				routerLinkActive="wo-rail__action--active"
+				class="wo-rail__action wo-rail__action--settings"
+				aria-label="Settings"
+			>
 				<i class="pi pi-cog"></i>
 			</a>
 		</div>

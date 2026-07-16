@@ -117,6 +117,15 @@ profile becomes a freeze condition.
 
 ### R2/R3 — green foundations + migration factory (parallel; on `feat/agent-platform-v2`)
 
+Green app topology (owner naming, 2026-07-17): the runtime app is **`apps/feat-personal-agent`**
+(supersedes `apps/feat-openclaw-tenant` at its silo's R9 cutover; the design docs' provisional
+`apps/agent-runtime` name is overridden). There is **no separate skill-registry app in green**:
+the skill catalog is an OpenCrane API module and skill bytes live in the artifact service —
+`apps/feat-skill-registry` freezes with blue and dies at R10. `apps/feat-central-agents` dissolves
+into AgentService records at R5: **each managed agent gets its own runtime workload** (a dedicated
+Deployment, or a Job per scheduled run) from the same pinned `feat-personal-agent` image —
+per-agent runtime isolation without per-agent codebases.
+
 **R2:** target app packages (into the Phase B structure), green Postgres schema
 (AgentService/Run/Thread/Message/RunEvent/Approval/Persona/Artifact/Skill), authorization facade +
 proof-bound capabilities, channel-proxy + agent-controller as apps, artifact CAS, app-owned

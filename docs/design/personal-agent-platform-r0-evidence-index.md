@@ -27,11 +27,14 @@ Missing environments are missing evidence, not proof that no other estate exists
 
 ## Reproducible collection
 
-Run the read-only collector into a newly named directory in the approved secured evidence system:
+Create the private local enclave once, then run the read-only collector into a newly named direct
+child:
 
 ```bash
+install -d -m 700 "$PWD/.agent-reviews"
 scripts/collect-r0-estate-evidence.mjs \
-  --output-dir /absolute/path/to/new-r0-evidence-directory \
+  --output-dir "$PWD/.agent-reviews/new-r0-evidence-directory" \
+  --allow-local-agent-reviews \
   --context approved-context-name
 ```
 
@@ -40,7 +43,8 @@ string:
 
 ```bash
 scripts/collect-r0-estate-evidence.mjs \
-  --output-dir /absolute/path/to/new-r0-evidence-directory \
+  --output-dir "$PWD/.agent-reviews/new-r0-evidence-directory" \
+  --allow-local-agent-reviews \
   --context approved-context-name \
   --database logical-label=approved-readonly-pgservice
 ```
@@ -53,8 +57,10 @@ Exact counts require separately provisioned, narrowly granted aggregate views or
 functions; the collector never creates them and never reads a base table.
 
 The collector requires every Kubernetes context explicitly and never changes or falls back to the
-current context. It refuses relative, existing, symbolic-link-component, wrong-owner,
-group/world-accessible, and repository-local destinations.
+current context. It accepts only a safe-named direct child of the active worktree's pre-existing
+`.agent-reviews/` directory, with explicit `--allow-local-agent-reviews` opt-in. It refuses external,
+nested, primary-checkout-from-linked-worktree, existing, symbolic-link, wrong-owner,
+group/world-accessible, or Git-trackable destinations.
 It creates directories mode `0700` and files mode `0600`; records exact commands, timestamps,
 failures, configured/reachable/unreachable contexts, and count/hash provenance; and permits only
 server-returned Kubernetes metadata tables, Helm client-version inspection, and hard-coded
@@ -66,7 +72,11 @@ that an approved Kubernetes printer table does not expose remain explicitly unpr
 public manifest carries the hash of `secured/file-manifest.json` but omits source counts,
 reachability, failure detail, and estate-specific incompleteness. That detail and all exact context,
 ClusterTenant, workload, volume, and database evidence stay below the private `secured/`
-directory. Never commit the generated pack.
+directory. Normal Git staging refuses the generated pack; never force-add it.
+
+The ignored local pack is temporary review evidence, not a durable archive. `git clean -fdX`, worktree
+deletion, or manual cleanup can remove it. Copy an approved public manifest/hash to a durable evidence
+system only after review; force-adding ignored evidence is outside the collector's threat model.
 
 The pack is deliberately marked incomplete even when every command succeeds. It cannot discover an
 unconfigured estate, determine whether state is valuable or reproducible, test credential custody,

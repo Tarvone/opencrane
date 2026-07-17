@@ -2,13 +2,14 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const _collectorVersion = "1";
 const _querySetVersion = "r0-safe-metadata-v2";
 const _root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+const _reviewsRoot = join(_root, ".agent-reviews");
 const _maxOutputBytes = 25 * 1024 * 1024;
 const _maxFailureBytes = 16 * 1024;
 const _kubernetesTableResources = new Map([
@@ -33,20 +34,6 @@ const _kubernetesTableResources = new Map([
   ["dnsendpoints.externaldns.k8s.io", true],
 ]);
 
-/** Resolve every repository root that must remain evidence-free, including the primary checkout. */
-function _repositoryRoots()
-{
-  const result = spawnSync("git", ["-C", _root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
-    cwd: _root,
-    encoding: "utf8",
-  });
-  if (result.status !== 0 || !result.stdout.trim()) throw new Error("Unable to resolve the repository common directory for output-path validation.");
-  const primaryRoot = dirname(realpathSync(result.stdout.trim()));
-  return [...new Set([_root, primaryRoot])];
-}
-
-const _protectedRepositoryRoots = _repositoryRoots();
-
 /** Print command usage. */
 function _usage()
 {
@@ -56,19 +43,22 @@ function _usage()
 Options:
   --context NAME                 Required explicit context to inspect; repeatable.
   --database LABEL=PGSERVICE    Collect metadata-only SQL through a libpq service; repeatable.
+  --allow-local-agent-reviews   Explicitly allow the private, local-only evidence enclave.
   --request-timeout SECONDS     Per-command timeout, 1-60 (default: 10).
   --help                        Show this help.
 
-The destination must be an absent absolute directory outside the repository. The collector
-creates it mode 0700 and writes files mode 0600. Database targets accept libpq service names only;
-connection strings and raw credentials are rejected.
+The destination must be an absent canonical direct child of the repository's pre-existing
+.agent-reviews/ directory. That enclave and every output directory are mode 0700; files are mode
+0600. All paths must be current-user-owned and fully ignored by Git. Local ignored evidence is not
+durable. Database targets accept libpq service names only; connection strings and raw credentials
+are rejected.
 `);
 }
 
 /** Parse and validate command-line options without touching the filesystem. */
 function _parseArguments(argv)
 {
-  const options = { outputDir: "", contexts: [], databases: [], requestTimeout: 10 };
+  const options = { outputDir: "", contexts: [], databases: [], allowLocalAgentReviews: false, requestTimeout: 10 };
   for (let index = 0; index < argv.length; index += 1)
   {
     const argument = argv[index];
@@ -107,6 +97,11 @@ function _parseArguments(argv)
       index += 1;
       continue;
     }
+    if (argument === "--allow-local-agent-reviews")
+    {
+      options.allowLocalAgentReviews = true;
+      continue;
+    }
     if (argument === "--request-timeout")
     {
       const seconds = Number(argv[index + 1]);
@@ -120,6 +115,7 @@ function _parseArguments(argv)
   if (!options.outputDir) throw new Error("--output-dir is required.");
   if (!isAbsolute(options.outputDir)) throw new Error("--output-dir must be an absolute path.");
   if (options.contexts.length === 0) throw new Error("At least one explicit --context is required.");
+  if (!options.allowLocalAgentReviews) throw new Error("--allow-local-agent-reviews is required for local ignored evidence.");
   const databaseLabels = new Set(options.databases.map(function _label(database) { return database.label; }));
   if (databaseLabels.size !== options.databases.length) throw new Error("Each --database label must be unique.");
   return options;
@@ -128,24 +124,44 @@ function _parseArguments(argv)
 /** Create a new private output directory after resolving and validating its parent. */
 function _createOutputDirectory(requested)
 {
+  if (requested !== resolve(requested)) throw new Error("--output-dir must be a canonical absolute path without dot components.");
+  const safeBasename = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u;
+  if (dirname(requested) !== _reviewsRoot || !safeBasename.test(basename(requested)))
+  {
+    throw new Error("--output-dir must be a direct safe-named child of the active worktree's .agent-reviews directory.");
+  }
   if (lstatSync(requested, { throwIfNoEntry: false })) throw new Error("--output-dir must not already exist.");
-  const parent = dirname(requested);
-  if (!existsSync(parent)) throw new Error("--output-dir parent must already exist and be a directory.");
-  const parentStatus = lstatSync(parent);
-  if (parentStatus.isSymbolicLink()) throw new Error("--output-dir parent must not be a symbolic link.");
-  if (!parentStatus.isDirectory()) throw new Error("--output-dir parent must already exist and be a directory.");
   if (typeof process.getuid !== "function") throw new Error("--output-dir ownership cannot be verified on this platform.");
   const currentUserId = process.getuid();
-  if (parentStatus.uid !== currentUserId) throw new Error("--output-dir parent must be owned by the current user.");
-  const realParent = realpathSync(parent);
-  if (realParent !== resolve(parent)) throw new Error("--output-dir parent path must not contain symbolic-link components.");
-  const target = join(realParent, basename(requested));
-  if (_protectedRepositoryRoots.some(function _insideRepository(repositoryRoot) {
-    return target === repositoryRoot || target.startsWith(`${repositoryRoot}${sep}`);
-  }))
+  const repositoryStatus = lstatSync(_root);
+  if (repositoryStatus.uid !== currentUserId) throw new Error("The repository root must be owned by the current user.");
+  if (!existsSync(_reviewsRoot)) throw new Error("The active worktree's .agent-reviews directory must pre-exist with mode 0700.");
+  const reviewsStatus = lstatSync(_reviewsRoot);
+  if (reviewsStatus.isSymbolicLink() || !reviewsStatus.isDirectory() || realpathSync(_reviewsRoot) !== _reviewsRoot
+    || reviewsStatus.uid !== currentUserId || (reviewsStatus.mode & 0o777) !== 0o700)
   {
-    throw new Error("--output-dir must be outside the repository.");
+    throw new Error("The repository's .agent-reviews directory must be canonical, mode 0700, and owned by the current user.");
   }
+  const ignored = _isGitIgnored(requested) && _isGitIgnored(join(requested, ".collector-ignore-probe"));
+  const trackedIgnoreFile = spawnSync("git", ["-C", _root, "ls-files", "--error-unmatch", "--", ".gitignore"], {
+    cwd: _root,
+    encoding: "utf8",
+  });
+  const tracked = spawnSync("git", ["-C", _root, "ls-files", "--", ".agent-reviews"], {
+    cwd: _root,
+    encoding: "utf8",
+  });
+  if (!ignored || trackedIgnoreFile.status !== 0 || tracked.status !== 0 || tracked.stdout.trim())
+  {
+    throw new Error("The .agent-reviews enclave must be fully Git-ignored and contain no tracked files.");
+  }
+  const parentStatus = lstatSync(_reviewsRoot);
+  if (parentStatus.isSymbolicLink()) throw new Error("--output-dir parent must not be a symbolic link.");
+  if (!parentStatus.isDirectory()) throw new Error("--output-dir parent must already exist and be a directory.");
+  if (parentStatus.uid !== currentUserId) throw new Error("--output-dir parent must be owned by the current user.");
+  const realParent = realpathSync(_reviewsRoot);
+  if (realParent !== _reviewsRoot) throw new Error("--output-dir parent path must not contain symbolic-link components.");
+  const target = join(realParent, basename(requested));
   if ((parentStatus.mode & 0o077) !== 0) throw new Error("--output-dir parent must not be group- or world-accessible.");
   mkdirSync(target, { mode: 0o700 });
   chmodSync(target, 0o700);
@@ -155,7 +171,77 @@ function _createOutputDirectory(requested)
   {
     throw new Error("--output-dir could not be proven to be a private current-user-owned directory.");
   }
-  return target;
+  const output = {
+    outputDir: target,
+    reviewsIdentity: { dev: reviewsStatus.dev, ino: reviewsStatus.ino },
+    targetIdentity: { dev: targetStatus.dev, ino: targetStatus.ino },
+  };
+  _verifyEvidenceEnclave(output.outputDir, output.reviewsIdentity, output.targetIdentity);
+  return output;
+}
+
+/** Prove that one exact path is covered by the tracked root ignore rule. */
+function _isGitIgnored(path)
+{
+  const result = spawnSync("git", ["-C", _root, "check-ignore", "--verbose", "--no-index", "--", path], {
+    cwd: _root,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return false;
+  const lines = result.stdout.trim().split("\n").filter(Boolean);
+  if (lines.length !== 1) return false;
+  const separatorIndex = lines[0].indexOf("\t");
+  if (separatorIndex < 0) return false;
+  const rule = lines[0].slice(0, separatorIndex);
+  const parts = rule.split(":");
+  if (parts.length < 3) return false;
+  const source = parts.slice(0, -2).join(":");
+  const pattern = parts.at(-1);
+  return [".gitignore", join(_root, ".gitignore")].includes(source) && pattern === "/.agent-reviews/";
+}
+
+/** Revalidate enclave identities and Git-ignore coverage before publishing a complete pack. */
+function _verifyEvidenceEnclave(outputDir, reviewsIdentity, targetIdentity)
+{
+  if (typeof process.getuid !== "function") throw new Error("Evidence ownership cannot be verified on this platform.");
+  const currentUserId = process.getuid();
+  const reviewsStatus = lstatSync(_reviewsRoot);
+  const targetStatus = lstatSync(outputDir);
+  if (reviewsStatus.isSymbolicLink() || !reviewsStatus.isDirectory() || realpathSync(_reviewsRoot) !== _reviewsRoot
+    || reviewsStatus.uid !== currentUserId || (reviewsStatus.mode & 0o777) !== 0o700
+    || reviewsStatus.dev !== reviewsIdentity.dev || reviewsStatus.ino !== reviewsIdentity.ino)
+  {
+    throw new Error("The .agent-reviews enclave identity or security properties changed during collection.");
+  }
+  if (targetStatus.isSymbolicLink() || !targetStatus.isDirectory() || realpathSync(outputDir) !== outputDir
+    || targetStatus.uid !== currentUserId || (targetStatus.mode & 0o777) !== 0o700
+    || targetStatus.dev !== targetIdentity.dev || targetStatus.ino !== targetIdentity.ino)
+  {
+    throw new Error("The evidence output identity or security properties changed during collection.");
+  }
+  const entries = [];
+  function _walk(directory)
+  {
+    entries.push(directory);
+    for (const entry of readdirSync(directory, { withFileTypes: true }))
+    {
+      const absolute = join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Evidence output unexpectedly contains a symbolic link.");
+      if (entry.isDirectory()) _walk(absolute);
+      else if (entry.isFile()) entries.push(absolute);
+      else throw new Error("Evidence output contains an unsupported filesystem entry.");
+    }
+  }
+  _walk(outputDir);
+  if (entries.some(function _trackable(entry) { return !_isGitIgnored(entry); }))
+  {
+    throw new Error("An evidence-pack entry is no longer covered by the .agent-reviews Git ignore rule.");
+  }
+  const tracked = spawnSync("git", ["-C", _root, "ls-files", "--", ".agent-reviews"], {
+    cwd: _root,
+    encoding: "utf8",
+  });
+  if (tracked.status !== 0 || tracked.stdout.trim()) throw new Error("The .agent-reviews enclave contains a tracked path.");
 }
 
 /** Return an ISO-8601 UTC timestamp. */
@@ -198,9 +284,25 @@ function _inside(outputDir, relativePath)
 /** Create an internal private directory. */
 function _makePrivateDirectory(outputDir, relativePath)
 {
-  const directory = _inside(outputDir, relativePath);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  chmodSync(directory, 0o700);
+  if (typeof process.getuid !== "function") throw new Error("Evidence ownership cannot be verified on this platform.");
+  const currentUserId = process.getuid();
+  const components = relativePath === "" ? [] : relativePath.split(sep);
+  if (components.some(function _unsafe(component) { return !component || component === "." || component === ".."; }))
+  {
+    throw new Error("Internal evidence directory contains an unsafe path component.");
+  }
+  let directory = outputDir;
+  for (const component of components)
+  {
+    directory = _inside(outputDir, relative(outputDir, join(directory, component)));
+    if (!lstatSync(directory, { throwIfNoEntry: false })) mkdirSync(directory, { mode: 0o700 });
+    const status = lstatSync(directory);
+    if (status.isSymbolicLink() || !status.isDirectory() || status.uid !== currentUserId
+      || (status.mode & 0o777) !== 0o700 || realpathSync(directory) !== directory)
+    {
+      throw new Error("Internal evidence directory is not canonical, private, and current-user-owned.");
+    }
+  }
   return directory;
 }
 
@@ -619,14 +721,43 @@ function _files(directory, base = directory)
 /** Apply the promised permissions recursively. */
 function _securePermissions(outputDir)
 {
+  if (typeof process.getuid !== "function") throw new Error("Evidence ownership cannot be verified on this platform.");
+  const currentUserId = process.getuid();
   function _walk(directory)
   {
+    const beforeDirectoryStatus = lstatSync(directory);
+    if (beforeDirectoryStatus.isSymbolicLink() || !beforeDirectoryStatus.isDirectory())
+    {
+      throw new Error("Evidence output unexpectedly contains a symbolic link or non-directory.");
+    }
     chmodSync(directory, 0o700);
+    const directoryStatus = lstatSync(directory);
+    if (directoryStatus.uid !== currentUserId || (directoryStatus.mode & 0o777) !== 0o700
+      || realpathSync(directory) !== resolve(directory)
+      || directoryStatus.dev !== beforeDirectoryStatus.dev || directoryStatus.ino !== beforeDirectoryStatus.ino)
+    {
+      throw new Error("Evidence directory ownership, mode, or canonical path verification failed.");
+    }
     for (const entry of readdirSync(directory, { withFileTypes: true }))
     {
       const absolute = join(directory, entry.name);
       if (entry.isDirectory()) _walk(absolute);
-      else if (entry.isFile()) chmodSync(absolute, 0o600);
+      else if (entry.isFile())
+      {
+        const beforeFileStatus = lstatSync(absolute);
+        if (beforeFileStatus.isSymbolicLink() || !beforeFileStatus.isFile())
+        {
+          throw new Error("Evidence output unexpectedly contains a symbolic link or non-file.");
+        }
+        chmodSync(absolute, 0o600);
+        const fileStatus = lstatSync(absolute);
+        if (fileStatus.uid !== currentUserId || (fileStatus.mode & 0o777) !== 0o600
+          || realpathSync(absolute) !== resolve(absolute)
+          || fileStatus.dev !== beforeFileStatus.dev || fileStatus.ino !== beforeFileStatus.ino)
+        {
+          throw new Error("Evidence file ownership, mode, or canonical path verification failed.");
+        }
+      }
       else throw new Error("Evidence output contains an unsupported filesystem entry.");
     }
   }
@@ -638,7 +769,8 @@ function _main()
 {
   process.umask(0o077);
   const options = _parseArguments(process.argv.slice(2));
-  const outputDir = _createOutputDirectory(options.outputDir);
+  const output = _createOutputDirectory(options.outputDir);
+  const outputDir = output.outputDir;
   const startedAt = _now();
   const partialMarker = _writePrivate(outputDir, ".partial", `${startedAt}\n`);
   const securedDir = _makePrivateDirectory(outputDir, "secured");
@@ -928,7 +1060,7 @@ function _main()
     completedAt: _now(),
     repositoryRevision,
     repositoryDirty,
-    packWriteStatus: "complete",
+    packWriteStatus: "complete-when-.complete-marker-present",
     evidenceCompleteness: "incomplete",
     securedFileManifestSha256: securedManifestSha256,
     securityBoundary: "Source scopes, counts, reachability, failures, and detailed evidence stay in the mode-0700 secured directory; Kubernetes collection used server-returned tables and requested no full objects, Secret resources, ConfigMap resources, or credential values.",
@@ -937,8 +1069,13 @@ function _main()
   const publicManifestSha256 = _sha256(readFileSync(publicManifestPath));
   _writePrivate(outputDir, "public-manifest.sha256", `${publicManifestSha256}  public-manifest.json\n`);
   _securePermissions(outputDir);
-  _writePrivate(outputDir, ".complete", `${_now()}\n`);
-  unlinkSync(partialMarker);
+  _verifyEvidenceEnclave(outputDir, output.reviewsIdentity, output.targetIdentity);
+  const completeMarker = _inside(outputDir, ".complete");
+  if (lstatSync(completeMarker, { throwIfNoEntry: false }) || !_isGitIgnored(completeMarker))
+  {
+    throw new Error("The completion marker is not exclusively available and covered by the tracked .agent-reviews ignore rule.");
+  }
+  renameSync(partialMarker, completeMarker);
 
   process.stdout.write(`R0 estate evidence pack written to ${outputDir}\n`);
   process.stdout.write(`Public manifest SHA-256: ${publicManifestSha256}\n`);

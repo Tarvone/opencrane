@@ -53,6 +53,23 @@ export interface AccountProfileUpdate
  * and routing classes the section also renders are static configuration, not
  * part of this per-tenant read.
  */
+/** A single by-model-class spend row. */
+export interface ModelClassSpend
+{
+	/** Display name for the model class (e.g. "Writing"). */
+	className: string;
+
+	/** Comma-separated model names used for this class (e.g. "claude-sonnet-4-6"). */
+	modelNames: string;
+
+	/** Spend for this class in USD. */
+	spendUsd: number;
+
+	/** Percentage of total spend (0–100). */
+	percentage: number;
+}
+
+/** Personal budget read model containing spend limit and active breakdown. */
 export interface BudgetSpend
 {
 	/** Monthly spend ceiling in USD. */
@@ -63,6 +80,12 @@ export interface BudgetSpend
 
 	/** Budget alert band derived server-side. */
 	alertState: "ok" | "warning" | "exceeded";
+
+	/** Spend breakdown by model class, ordered by spend descending. */
+	modelClasses: ModelClassSpend[];
+
+	/** ISO date string of next monthly reset (e.g. "Jul 1"). */
+	resetDate: string;
 }
 
 /**

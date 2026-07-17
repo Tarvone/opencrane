@@ -84,7 +84,10 @@ const PERSONAL_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("budget", "My Budget", "Personal spend and model-class usage will be delivered in milestone 5."),
+	{
+		path: "budget",
+		loadComponent: () => import("./sections/budget-section/budget-section.component").then(m => m.BudgetSectionComponent)
+	},
 	_placeholderRoute("api-keys", "API Keys", "Personal API key management will be delivered in milestone 5."),
 	{ path: "**", redirectTo: "account" }
 ];

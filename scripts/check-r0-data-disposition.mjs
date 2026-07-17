@@ -9,7 +9,7 @@ const _root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const _defaultMapPath = join(_root, "docs/design/personal-agent-platform-r0-data-disposition.json");
 const _schemaRoot = join(_root, "apps/opencrane/prisma/schema");
 const _migrationsRoot = join(_root, "apps/opencrane/prisma/migrations");
-const _allowedDispositions = ["archive", "drop", "migrate", "rebuild"];
+const _allowedDispositions = ["archive", "drop"];
 const _approvalStates = ["approved", "pending-owner-approval"];
 const _requiredEstateClasses = [
   "artifact-and-upload-bytes",
@@ -42,10 +42,20 @@ const _credentialDatasetIds = new Set([
   "prisma:McpServerCredential",
   "prisma:McpServerInstall",
   "prisma:ProviderApiKey",
+  "prisma:ProviderCredential",
   "prisma:TenantLiteLlmKey",
   "estate:litellm-upstream-state",
   "estate:obot-credential-custody",
   "estate:third-party-credential-values",
+]);
+const _dropOnlyDatasetIds = new Set([
+  ..._credentialDatasetIds,
+  "estate:backup-and-restore-sets",
+  "estate:obot-managed-mcp-volumes",
+  "estate:opencrane-cnpg-database",
+  "estate:repository-abb08074718bfb86",
+  "estate:usertenant-gcs-state",
+  "prisma:SessionScope",
 ]);
 
 /** Fail validation with one stable diagnostic. */
@@ -60,6 +70,23 @@ function _isIsoDate(value)
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value ?? "")) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/** Return whether a value is a canonical UTC timestamp. */
+function _isIsoTimestamp(value)
+{
+  if (typeof value !== "string") return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString() === value;
+}
+
+/** Return whether an object contains exactly the named keys. */
+function _hasExactKeys(value, keys)
+{
+  return value !== null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 }
 
 /** Return the current Prisma model inventory keyed by model name. */
@@ -161,8 +188,35 @@ export function _RepositoryStateId(key)
 /** Validate one parsed R0 disposition map against a Prisma inventory. */
 export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(), historicalInventory = _ReadHistoricalInventory(), repositoryStateInventory = _ReadRepositoryStateInventory())
 {
-  if (map.schemaVersion !== 1) _fail("schemaVersion must be 1.");
+  if (!_hasExactKeys(map, ["approvalPolicies", "cleanGreen", "datasets", "lifecyclePolicies", "schemaVersion", "status"]))
+  {
+    _fail("map must contain only the canonical top-level contract fields.");
+  }
+  if (map.schemaVersion !== 2) _fail("schemaVersion must be 2.");
   if (map.status !== "proposal-owner-approval-required") _fail("status must keep owner approval explicit.");
+  if (map.cleanGreen?.greenInitialState !== "empty") _fail("greenInitialState must be empty.");
+  const forbiddenTransferFlags = [
+    "legacyDataTransferAllowed",
+    "legacyDataMigrationAllowed",
+    "legacyDataImportAllowed",
+    "legacyStateTransferAllowed",
+    "legacyConfigTransferAllowed",
+    "legacyIdentityTransferAllowed",
+    "legacyIdentifierTransferAllowed",
+    "legacyCredentialTransferAllowed",
+    "legacyKeyTransferAllowed",
+    "legacySaltTransferAllowed",
+    "legacySchemaTransferAllowed",
+    "legacyProtocolTransferAllowed",
+    "legacyArtifactTransferAllowed",
+    "legacyByteTransferAllowed",
+    "legacySemanticTransferAllowed",
+    "legacyOtherValueTransferAllowed",
+  ];
+  for (const flag of forbiddenTransferFlags)
+  {
+    if (map.cleanGreen?.[flag] !== false) _fail(`${flag} must be false.`);
+  }
   if (map.cleanGreen?.compatibilityAllowed !== false) _fail("compatibilityAllowed must be false.");
   if (map.cleanGreen?.dualPathAllowed !== false) _fail("dualPathAllowed must be false.");
   if (map.cleanGreen?.legacyStoreAdoptionAllowed !== false) _fail("legacyStoreAdoptionAllowed must be false.");
@@ -171,36 +225,66 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
   if (map.cleanGreen?.legacyIdentityAdoptionAllowed !== false) _fail("legacyIdentityAdoptionAllowed must be false.");
   if (map.cleanGreen?.legacyKeyAdoptionAllowed !== false) _fail("legacyKeyAdoptionAllowed must be false.");
   if (map.cleanGreen?.reverseBridgeAllowed !== false) _fail("reverseBridgeAllowed must be false.");
+  if (map.cleanGreen?.staticTokenEscapeAllowed !== false) _fail("staticTokenEscapeAllowed must be false.");
+  const cleanGreenKeys = [
+    "allowedDispositions", "compatibilityAllowed", "dualPathAllowed", "greenInitialState",
+    "legacyArtifactTransferAllowed", "legacyByteTransferAllowed", "legacyConfigTransferAllowed",
+    "legacyCredentialAdoptionAllowed", "legacyCredentialTransferAllowed", "legacyDataImportAllowed",
+    "legacyDataMigrationAllowed", "legacyDataTransferAllowed", "legacyDatabaseAdoptionAllowed",
+    "legacyIdentifierTransferAllowed", "legacyIdentityAdoptionAllowed", "legacyIdentityTransferAllowed",
+    "legacyKeyAdoptionAllowed", "legacyKeyTransferAllowed", "legacyOtherValueTransferAllowed",
+    "legacyProtocolTransferAllowed", "legacySaltTransferAllowed", "legacySchemaTransferAllowed",
+    "legacySemanticTransferAllowed", "legacyStateTransferAllowed", "legacyStoreAdoptionAllowed",
+    "reverseBridgeAllowed", "staticTokenEscapeAllowed",
+  ].sort();
+  if (JSON.stringify(Object.keys(map.cleanGreen ?? {}).sort()) !== JSON.stringify(cleanGreenKeys))
+  {
+    _fail("cleanGreen must contain only the canonical empty-green invariants.");
+  }
   if (JSON.stringify(map.cleanGreen?.allowedDispositions) !== JSON.stringify(_allowedDispositions))
   {
-    _fail("allowedDispositions must be archive, drop, migrate, rebuild in canonical order.");
+    _fail("allowedDispositions must be archive, drop in canonical order.");
   }
   const approvalPolicy = map.approvalPolicies?.["r0-dataset-disposition"];
   const requiredAuthorities = ["data-owner", "fleet-owner", "integration-owner", "legal-security-owner", "operations-owner", "product-customer-owner"];
-  if (JSON.stringify(approvalPolicy?.requiredAuthorities) !== JSON.stringify(requiredAuthorities))
+  if (!_hasExactKeys(map.approvalPolicies, ["r0-dataset-disposition"])
+    || !_hasExactKeys(approvalPolicy, ["requiredAuthorities"])
+    || JSON.stringify(approvalPolicy?.requiredAuthorities) !== JSON.stringify(requiredAuthorities))
   {
     _fail("r0-dataset-disposition must require the canonical owner authorities.");
   }
   const lifecyclePolicies = map.lifecyclePolicies;
-  if (lifecyclePolicies?.migrate?.sourceAccess !== "read-only" || lifecyclePolicies?.migrate?.writeDirection !== "blue-read-green-write"
-    || lifecyclePolicies?.migrate?.importer !== "idempotent" || lifecyclePolicies?.migrate?.runtimeReachable !== false
-    || lifecyclePolicies?.migrate?.legacyStoreAdopted !== false || lifecyclePolicies?.migrate?.postWriteRecovery !== "forward-only"
-    || lifecyclePolicies?.migrate?.validationManifest !== "required" || lifecyclePolicies?.migrate?.removalGate !== "R10")
+  if (JSON.stringify(Object.keys(lifecyclePolicies ?? {}).sort()) !== JSON.stringify(["archive", "drop"]))
   {
-    _fail("migrate lifecycle policy must enforce bounded clean-green execution and R10 removal.");
+    _fail("lifecyclePolicies must contain only archive and drop.");
   }
-  if (lifecyclePolicies?.archive?.retention !== "required-before-execution" || lifecyclePolicies?.archive?.deletionOwner !== "required-before-execution"
-    || lifecyclePolicies?.archive?.terminalAction !== "drop-or-approved-permanent-record" || lifecyclePolicies?.archive?.removalGate !== "R10")
+  const archivePolicyKeys = [
+    "accessLogging", "deletionOwner", "encryption", "fixedDeletionDate", "greenReadable",
+    "iamIsolation", "immutability", "isolation", "mounted", "networkIsolation", "ownerRestriction",
+    "removalGate", "restorableIntoGreen", "runtimeReachable", "sealTimestamp", "separateCredentials", "storageIsolation",
+    "terminalAction",
+  ];
+  const requiredArchiveControls = [
+    "accessLogging", "deletionOwner", "encryption", "fixedDeletionDate", "iamIsolation",
+    "immutability", "isolation", "networkIsolation", "ownerRestriction", "sealTimestamp", "separateCredentials",
+    "storageIsolation",
+  ];
+  if (!_hasExactKeys(lifecyclePolicies?.archive, archivePolicyKeys)
+    || requiredArchiveControls.some(function _notRequired(field) { return lifecyclePolicies.archive[field] !== "required-before-execution"; })
+    || lifecyclePolicies?.archive?.runtimeReachable !== false
+    || lifecyclePolicies?.archive?.greenReadable !== false
+    || lifecyclePolicies?.archive?.mounted !== false
+    || lifecyclePolicies?.archive?.restorableIntoGreen !== false
+    || lifecyclePolicies?.archive?.terminalAction !== "drop"
+    || lifecyclePolicies?.archive?.removalGate !== "R10")
   {
-    _fail("archive lifecycle policy must enforce retention, deletion ownership, and terminal action.");
+    _fail("archive lifecycle policy must enforce every custody control, green isolation, fixed deletion, and terminal drop.");
   }
-  if (lifecyclePolicies?.drop?.deletionOwner !== "required-before-execution" || lifecyclePolicies?.drop?.reasonEvidence !== "required-before-execution")
+  if (!_hasExactKeys(lifecyclePolicies?.drop, ["deletionOwner", "reasonEvidence"])
+    || lifecyclePolicies?.drop?.deletionOwner !== "required-before-execution"
+    || lifecyclePolicies?.drop?.reasonEvidence !== "required-before-execution")
   {
     _fail("drop lifecycle policy must enforce deletion ownership and reason evidence.");
-  }
-  if (lifecyclePolicies?.rebuild?.reproducibilityProof !== "required-before-blue-deletion" || lifecyclePolicies?.rebuild?.legacyStoreAdopted !== false)
-  {
-    _fail("rebuild lifecycle policy must enforce reproducibility and forbid legacy-store adoption.");
   }
   if (!Array.isArray(map.datasets) || map.datasets.length === 0) _fail("datasets must be a non-empty array.");
 
@@ -216,6 +300,8 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
     if (ids.has(dataset.id)) _fail(`dataset ${dataset.id} is duplicated.`);
     ids.add(dataset.id);
     if (!_allowedDispositions.includes(dataset.disposition)) _fail(`dataset ${dataset.id} has an invalid disposition.`);
+    if (dataset.legacyInputAllowed !== false) _fail(`dataset ${dataset.id} must forbid every legacy input.`);
+    if (_dropOnlyDatasetIds.has(dataset.id) && dataset.disposition !== "drop") _fail(`dataset ${dataset.id} contains credential or restorable store state and must be dropped.`);
     if (!_approvalStates.includes(dataset.approval)) _fail(`dataset ${dataset.id} has an invalid approval state.`);
     if (dataset.approvalPolicy !== "r0-dataset-disposition") _fail(`dataset ${dataset.id} lacks the canonical approval policy.`);
     if (dataset.lifecyclePolicy !== dataset.disposition) _fail(`dataset ${dataset.id} has the wrong lifecycle policy.`);
@@ -223,6 +309,7 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
     {
       const evidence = dataset.approvalEvidence;
       if (!evidence || typeof evidence !== "object") _fail(`approved dataset ${dataset.id} lacks approvalEvidence.`);
+      if (!_hasExactKeys(evidence, ["approver", "authorities", "date", "reference"])) _fail(`approved dataset ${dataset.id} has non-canonical approval evidence.`);
       if (typeof evidence.approver !== "string" || !evidence.approver.trim()) _fail(`approved dataset ${dataset.id} lacks an approver.`);
       if (!Array.isArray(evidence.authorities) || JSON.stringify([...new Set(evidence.authorities)].sort()) !== JSON.stringify(requiredAuthorities))
       {
@@ -232,64 +319,66 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
       if (typeof evidence.reference !== "string" || !evidence.reference.trim()) _fail(`approved dataset ${dataset.id} lacks a stable approval reference.`);
       const lifecycle = dataset.lifecycleEvidence;
       if (!lifecycle || typeof lifecycle !== "object") _fail(`approved dataset ${dataset.id} lacks lifecycleEvidence.`);
-      if (dataset.disposition === "migrate")
-      {
-        const required = ["migrationOwner", "removalOwner", "removalCondition", "removalReference", "sourceCheckpoint", "validationManifestReference"];
-        if (required.some(function _missing(field) { return typeof lifecycle[field] !== "string" || !lifecycle[field].trim(); }) || lifecycle.removalGate !== "R10")
-        {
-          _fail(`approved migrated dataset ${dataset.id} lacks concrete migration and R10 removal evidence.`);
-        }
-      }
       if (dataset.disposition === "archive")
       {
-        const required = ["retention", "deletionOwner", "terminalTrigger"];
+        const archiveEvidenceKeys = [
+          "accessLogReference", "archiveSealedAt", "credentialIsolationReference", "deletionOwner", "encryptionReference",
+          "fixedDeletionDate", "greenReadable", "iamIsolationReference", "immutabilityReference",
+          "isolationReference", "mounted", "networkIsolationReference", "ownerRestrictionReference",
+          "removalGate", "restorableIntoGreen", "runtimeReachable", "storageIsolationReference",
+          "terminalAction",
+        ];
+        const required = [
+          "accessLogReference", "credentialIsolationReference", "deletionOwner", "encryptionReference",
+          "iamIsolationReference", "immutabilityReference", "isolationReference",
+          "networkIsolationReference", "ownerRestrictionReference", "storageIsolationReference",
+        ];
+        if (!_hasExactKeys(lifecycle, archiveEvidenceKeys)) _fail(`approved archived dataset ${dataset.id} has non-canonical lifecycle evidence.`);
         if (required.some(function _missing(field) { return typeof lifecycle[field] !== "string" || !lifecycle[field].trim(); })
+          || !_isIsoTimestamp(lifecycle.archiveSealedAt)
+          || !_isIsoDate(lifecycle.fixedDeletionDate)
+          || lifecycle.fixedDeletionDate <= lifecycle.archiveSealedAt.slice(0, 10)
+          || lifecycle.runtimeReachable !== false
+          || lifecycle.greenReadable !== false
+          || lifecycle.mounted !== false
+          || lifecycle.restorableIntoGreen !== false
           || lifecycle.removalGate !== "R10"
-          || !["drop", "permanent-record"].includes(lifecycle.terminalAction))
+          || lifecycle.terminalAction !== "drop")
         {
-          _fail(`approved archived dataset ${dataset.id} lacks concrete retention and terminal disposition evidence.`);
+          _fail(`approved archived dataset ${dataset.id} lacks concrete isolation, fixed deletion, and terminal drop evidence.`);
         }
       }
       if (dataset.disposition === "drop")
       {
         const required = ["deletionOwner", "reason", "reasonReference"];
+        if (!_hasExactKeys(lifecycle, required)) _fail(`approved dropped dataset ${dataset.id} has non-canonical lifecycle evidence.`);
         if (required.some(function _missing(field) { return typeof lifecycle[field] !== "string" || !lifecycle[field].trim(); }))
         {
           _fail(`approved dropped dataset ${dataset.id} lacks concrete deletion evidence.`);
         }
       }
-      if (dataset.disposition === "rebuild")
-      {
-        const required = ["reproducibilityProof", "proofReference", "blueDeletionOwner"];
-        if (required.some(function _missing(field) { return typeof lifecycle[field] !== "string" || !lifecycle[field].trim(); }))
-        {
-          _fail(`approved rebuilt dataset ${dataset.id} lacks concrete reproducibility evidence.`);
-        }
-      }
     }
-    if (dataset.disposition === "migrate" && (dataset.migrationMode !== "one-way-semantic" || dataset.sourceReproducibility !== "non-reproducible-owner-state"))
+    const forbiddenLifecycleFields = ["migrationMode", "sourceReproducibility", "rebuildSource"];
+    for (const field of forbiddenLifecycleFields)
     {
-      _fail(`migrated dataset ${dataset.id} must be typed as one-way semantic non-reproducible owner state.`);
-    }
-    if (dataset.disposition !== "migrate" && dataset.migrationMode !== undefined)
-    {
-      _fail(`non-migrated dataset ${dataset.id} must not declare migrationMode.`);
-    }
-    if (dataset.disposition !== "migrate" && dataset.sourceReproducibility !== undefined)
-    {
-      _fail(`non-migrated dataset ${dataset.id} must not declare sourceReproducibility.`);
+      if (dataset[field] !== undefined) _fail(`dataset ${dataset.id} must not declare ${field}.`);
     }
     if (dataset.credentialAction !== undefined && !_credentialActions.includes(dataset.credentialAction))
     {
       _fail(`dataset ${dataset.id} has an invalid credentialAction.`);
     }
-    if (dataset.credentialAction !== undefined && dataset.disposition === "migrate") _fail(`credential dataset ${dataset.id} cannot migrate.`);
     if (_credentialDatasetIds.has(dataset.id) && dataset.credentialAction === undefined) _fail(`credential dataset ${dataset.id} lacks a green credential action.`);
     if (typeof dataset.greenAuthority !== "string" || !dataset.greenAuthority.trim()) _fail(`dataset ${dataset.id} lacks greenAuthority.`);
     if (typeof dataset.rule !== "string" || !dataset.rule.trim()) _fail(`dataset ${dataset.id} lacks a cutover rule.`);
 
+    const datasetKeys = ["approval", "approvalPolicy", "disposition", "greenAuthority", "id", "legacyInputAllowed", "lifecyclePolicy", "rule", "source"];
+    if (dataset.credentialAction !== undefined) datasetKeys.push("credentialAction");
+    if (dataset.approval === "approved") datasetKeys.push("approvalEvidence", "lifecycleEvidence");
+    if (!_hasExactKeys(dataset, datasetKeys)) _fail(`dataset ${dataset.id} must contain only canonical disposition fields.`);
+
     if (dataset.source?.kind === "prisma-model")
     {
+      if (!_hasExactKeys(dataset.source, ["kind", "model", "path"])) _fail(`dataset ${dataset.id} has non-canonical Prisma source fields.`);
       const model = dataset.source.model;
       if (typeof model !== "string" || !model) _fail(`dataset ${dataset.id} lacks a Prisma model name.`);
       if (dataset.id !== `prisma:${model}`) _fail(`dataset ${dataset.id} does not match its Prisma source identity.`);
@@ -299,6 +388,7 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
     }
     if (dataset.source?.kind === "estate-class")
     {
+      if (!_hasExactKeys(dataset.source, ["class", "kind"])) _fail(`dataset ${dataset.id} has non-canonical estate source fields.`);
       const estateClass = dataset.source.class;
       if (typeof estateClass !== "string" || !estateClass) _fail(`dataset ${dataset.id} lacks an estate class.`);
       if (dataset.id !== `estate:${estateClass}`) _fail(`dataset ${dataset.id} does not match its estate source identity.`);
@@ -308,6 +398,7 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
     }
     if (dataset.source?.kind === "historical-state")
     {
+      if (!_hasExactKeys(dataset.source, ["kind", "state"])) _fail(`dataset ${dataset.id} has non-canonical historical source fields.`);
       const historicalState = dataset.source.state;
       if (typeof historicalState !== "string" || !historicalState) _fail(`dataset ${dataset.id} lacks a historical state name.`);
       if (dataset.id !== `historical:${historicalState}`) _fail(`dataset ${dataset.id} does not match its historical source identity.`);
@@ -317,6 +408,7 @@ export function _ValidateDispositionMap(map, inventory = _ReadPrismaInventory(),
     }
     if (dataset.source?.kind === "repository-state")
     {
+      if (!_hasExactKeys(dataset.source, ["key", "kind", "label"])) _fail(`dataset ${dataset.id} has non-canonical repository source fields.`);
       const repositoryState = dataset.source.key;
       if (typeof repositoryState !== "string" || !repositoryState) _fail(`dataset ${dataset.id} lacks a repository state key.`);
       if (dataset.id !== _RepositoryStateId(repositoryState)) _fail(`dataset ${dataset.id} does not match its repository source identity.`);

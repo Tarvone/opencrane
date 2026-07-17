@@ -1,11 +1,10 @@
 # Personal-agent platform simplification plan
 
-Status: **proposed for review — 2026-07-16.** This plan executes the proposed
-[personal-agent platform architecture](personal-agent-platform-architecture.md). It does not make
-that proposal an accepted decision.
-
-Delivery alternative: compare this incremental strangler with the
-[rewrite-freeze and whole-silo blue/green plan](personal-agent-platform-rewrite-freeze-plan.md).
+Status: **REJECTED / HISTORICAL — DO NOT EXECUTE.** This document preserves the incremental
+strangler proposal considered on 2026-07-16. The adopted
+[rewrite-freeze and whole-silo blue/green plan](personal-agent-platform-rewrite-freeze-plan.md)
+uses a clean, empty green build with no legacy transfer; this proposal is not an escape route,
+fallback, or source of executable requirements.
 
 ## Outcome
 

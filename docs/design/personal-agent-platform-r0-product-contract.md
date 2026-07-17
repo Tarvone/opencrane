@@ -8,109 +8,116 @@ This document makes the R0 product decisions reviewable. Rows marked “adopted�
 architecture; rows marked “proposed” are not authorized until a named product or security owner
 approves them. Green implementation must not treat a proposal as an accepted contract.
 
+The capability boundary defines what the new product does, not what legacy state survives. Green
+starts empty and receives no legacy data, state, configuration, identity or identifier, credential,
+key, salt, schema, protocol, byte, or semantic decision. Legacy material is only archived in an
+inert, green-unreadable enclave under an approved deadline or dropped.
+
 ## Frozen-capability candidate
 
 | Capability | Candidate outcome | State |
 |------------|-------------------|-------|
-| Organization identity and membership | Retain OIDC subject binding, roles, and suspension. Fleet-managed lifecycle/membership remains upstream authority with a fail-closed silo read model; per-silo OpenCrane is authoritative only for silo-owned business state | Adopted architecture; live freshness policy proposed below |
-| Personal agent conversation | Retain streaming messages, ordered history, tool events, abort, retry/recovery, and stable thread ownership; replace OpenClaw protocol internals with the runtime-neutral Thread/Run/RunEvent contract | Adopted target; exact blue parity fixtures pending R1 |
-| Persona and preferences | Retain persona meaning and user edits; replace mutable files as live product authority with versioned PersonaRevision state | Adopted target; conflict policy proposed below |
-| Personal and agent memory | Retain non-reproducible personal/agent/org memory with dataset identity, scope, and provenance in Cognee; OpenCrane owns policy, grants, and persona authority | Adopted target; per-estate disposition pending |
-| Company, document, and artifact knowledge indexes | Keep canonical bytes/versions/events in their OpenCrane authorities and rebuild Cognee indexes from them | Adopted target; blue inventory pending |
-| Artifacts and documents | Retain uploads, generated outputs, ownership, hashes, MIME, provenance, and conversation/run links in canonical artifact storage | Adopted target; blue inventory pending |
-| Models, BYOK, and budgets | Retain semantic provider choice, model catalog, routing defaults, budget policy, and usage evidence; recreate upstream LiteLLM state from approved authority | Adopted target; credential decisions pending |
-| MCP integrations | Retain governed catalog, assignment, grants, scoped execution, and Obot as credential custodian/PEP | Adopted target; real credential custody verification pending |
-| Skills | Retain immutable skill revisions, entitlements, posture, review, and artifact bytes; retire Zot/legacy registry fallbacks | Adopted target; live byte inventory pending |
-| Schedules and managed runs | Retain schedules, pause/resume, approval, retry, and exactly-once intent through green AgentRun/CronJob/Job ownership | Adopted target; live schedule inventory pending |
-| Audit and operations | Retain immutable security/product audit evidence, run observability, backup/restore evidence, and operator controls | Adopted target; retention thresholds pending |
-| Awareness rollout/participation | Remove the compatibility product surface from green; archive/drop scope remains an R0 retention decision | Removal adopted; archive/drop proposed and pending |
-| Pairing, BrokeredDevice, SessionScope, gateway-admin state | Do not reconstruct green authority from these retired surfaces; archive/drop scope remains an R0 retention decision | Retirement adopted; archive/drop proposed and pending |
-| Tenant and AccessPolicy CRDs as business authority | Retire them from green business authority while Kubernetes remains execution state; exact export/archive scope remains an R0 decision | Retirement adopted; export/archive proposed and pending |
-| OpenClaw protocol, workspace compatibility, plugins, and runtime state shape | Do not port these shapes into green; exact semantic/byte import scope remains an R0 decision | Non-port adopted; import scope proposed and pending |
+| Organization identity and membership | Use current OIDC and fleet lifecycle/membership contracts as live external authorities. Create a fresh fail-closed silo read model from post-activation authority responses; do not copy legacy silo bindings, rows, or identifiers | Adopted architecture; live freshness policy proposed below |
+| Personal agent conversation | Provide streaming messages, ordered history, tool events, abort, retry/recovery, and stable thread ownership through the new Thread/Run/RunEvent contract; start with no legacy threads or history | Adopted target; exact behavioral fixtures pending R1 |
+| Persona and preferences | Provide versioned PersonaRevision state created through fresh onboarding and later user edits; mutable legacy files are never read by green | Adopted target; onboarding policy proposed below |
+| Personal and agent memory | Begin with empty, newly provisioned Cognee datasets; capture only new green memory with dataset identity, scope, and provenance | Adopted target |
+| Company, document, and artifact knowledge | Create new canonical bytes, versions, and events through green authorities and index only that new content in Cognee | Adopted target |
+| Artifacts and documents | Provide uploads, generated outputs, ownership, hashes, MIME, provenance, and conversation/run links for content created in green | Adopted target |
+| Models, BYOK, and budgets | Configure provider choice, model catalog, routing, budgets, and usage afresh; create fresh LiteLLM state and credentials from new owner input | Adopted target; owner workflow pending |
+| MCP integrations | Provide a new governed catalog, assignments, grants, scoped execution, and fresh Obot credential custody; every integration is installed and authorized again | Adopted target; scoped-credential acceptance pending |
+| Skills | Provide new immutable skill revisions, entitlements, review, and artifact bytes; never copy Zot, registry, database, or runtime-file state | Adopted target |
+| Schedules and managed runs | Provide new schedules, pause/resume, approval, retry, and exactly-once intent through green AgentRun/CronJob/Job ownership | Adopted target |
+| Audit and operations | Start new immutable security/product audit evidence, run observability, backup/restore evidence, and operator controls at green activation | Adopted target; retention thresholds pending |
+| Awareness rollout/participation | Remove this product surface from green; archive approved legacy evidence in isolation or drop it | Removal adopted; retention approval pending |
+| Pairing, BrokeredDevice, SessionScope, gateway-admin state | Do not reconstruct green authority from these retired surfaces; archive approved non-secret evidence in isolation or drop it | Retirement adopted; retention approval pending |
+| Tenant and AccessPolicy CRDs as business authority | Retire them from green business authority; archive approved blue manifests in isolation or drop them | Retirement adopted; retention approval pending |
+| OpenClaw protocol, workspace, plugins, runtime state, schema, and configuration | Do not port or parse these shapes in green; archive approved blue material as opaque evidence or drop it | Non-port adopted; retention approval pending |
 
-New blue features wait until after the green launch unless they are required to meet the R1 freeze
-gate or address a security/availability incident.
+New blue features wait until after the green launch unless required for the R1 freeze gate or a
+security/availability incident.
 
 ## Authorization proposal
 
-Until product and security owners approve a replacement rule, migration must preserve the current
-effective semantics:
+Green defines authorization directly; it does not preserve or import legacy grant rows or decisions:
 
-1. compile all applicable direct and group grants;
+1. compile all applicable direct and group grants created in green;
 2. choose the highest priority;
 3. at equal priority, Deny wins;
-4. preserve timestamps when the existing tie-break depends on recency;
-5. keep `project` as an explicit scope vocabulary value and dataset-mapping input; do not silently
-   collapse it into team, department, or organization;
-6. treat dataset-membership rows as derived projections and rebuild them from approved grants.
+4. use green timestamps only where an approved tie-break requires recency;
+5. keep `project` as a separate containment dimension whose membership may span departments;
+6. treat dataset-membership rows as derived green projections and create them only from green grants.
 
-Product direction recorded on 2026-07-17: `project` is a separate containment dimension whose
-membership may span departments. Department membership neither grants nor prevents project
-membership. Project grants remain explicit and combine with other applicable grants through the
-priority and Deny-at-equal-priority rules above. Required security co-approval remains pending;
-raw-row migration before that approval is not semantic parity.
+Product direction recorded on 2026-07-17: department membership neither grants nor prevents project
+membership. Project grants remain explicit and combine with other green grants through the priority
+and Deny-at-equal-priority rules. Required security co-approval remains pending. No legacy grant,
+group, membership, subject binding, timestamp, priority, or ID enters this model.
 
 ## Membership freshness proposal
 
-- Fleet lifecycle and membership revision remains upstream authority.
-- A silo may continue serving already-authorized work during a bounded fleet outage only from a
-  signed/captured revision within the approved freshness window.
-- Unknown membership status, a missing subject binding, or a revision older than the approved
-  window must not authorize a new login, new run, grant expansion, or cutover commit.
+- Fleet lifecycle and membership remains a live external authority.
+- A fresh silo read model records only post-activation signed authority responses; it is not seeded
+  from blue databases, CRDs, archives, exports, or cached subject bindings.
+- A silo may continue serving already-authorized green work during a bounded fleet outage only from
+  a signed revision within the approved freshness window.
+- Unknown membership, a missing current subject binding, or a revision older than the approved
+  window must not authorize a new login, run, grant expansion, or cutover commit.
 - Fleet read failure must not turn an unknown member into Active.
-- The cutover captures one fleet revision, leases the ClusterTenant, and queues later mutations for
-  replay after commit or abort.
 
 Pending operating proposal: set the maximum freshness window to five minutes from the last
 successfully applied signed fleet revision. After that boundary, deny new login, new run, grant
-expansion, administrative capability, capability renewal, and cutover commit. The duration,
-queued-mutation owner, and required fleet/silo/security approvals remain unapproved.
+expansion, administrative capability, capability renewal, and cutover commit. The duration and
+required fleet/silo/security approvals remain unapproved.
 
-## Persona precedence proposal
+## Persona onboarding proposal
 
-R0 should not declare either the database or mutable workspace files universally authoritative.
-For each full-fidelity UserTenant:
+Green never reads or reconciles legacy database documents, `SOUL.md`, `IDENTITY.md`, `USER.md`,
+workspace files, or Cognee recall to initialize a persona. Every user receives a fresh default
+PersonaRevision and may review, edit, or replace it through the green product. Subsequent revisions
+record green provenance and remain deterministic, reviewable, and reversible.
 
-1. freeze and hash the database workspace documents and the live `SOUL.md`, `IDENTITY.md`, and
-   `USER.md` files;
-2. if both match their last managed baseline, import the approved database version;
-3. if only the live file changed, import it as a user-authored PersonaRevision with provenance;
-4. if both changed, block that UserTenant's import until an owner resolves the conflict;
-5. never use Cognee recall or a delivery-version marker as proof of persona equality.
-
-This conflict-blocking rule is proposed and requires product approval.
+This fresh-onboarding rule is proposed and requires product approval. It replaces the former
+legacy-source precedence question; there is no persona conflict or import path to resolve.
 
 ## Retention proposal
 
-- Full-fidelity defaults preserve transcripts, tool events, artifacts, uploads, persona, schedules,
-  unresolved approvals, user-authored memory, credential/reconnect evidence, and security audit.
-- Reproducible projections and indexes are rebuilt, not migrated as authority.
-- Reset candidates are snapshotted and archived before deletion until their owner approves a shorter
-  retention period.
-- Browser caches and ephemeral sessions are dropped; users sign in and reconnect to green.
-- No raw credential or secret value enters an exporter bundle, Git, logs, or audit metadata.
-- Legal/security/product owners must approve retention duration and deletion authority.
+- Legacy state is either archived as inert evidence or dropped; it is never a green authority or
+  delayed initialization source.
+- An archive is encrypted, immutable, access-logged, owner-restricted, protected by separate
+  credentials plus network/IAM/storage isolation, green-unreadable, non-restorable into green, and
+  tied to a recorded seal timestamp, a later deletion deadline, and a deletion owner.
+- Green starts new transcript, tool-output, audit, artifact, persona, schedule, memory, and content
+  retention clocks at activation.
+- Browser caches and process sessions are dropped; users sign in again.
+- Raw credentials, private keys, salts, static tokens, encryption material, and secret values are
+  revoked and dropped, never archived.
+- Legal/security/product owners must approve archive duration and deletion authority.
 
-Pending operating proposal: retain a reset-candidate cutover archive for 30 days after successful
-green commit, encrypted, immutable, access-logged, and owner-restricted; delete only after
-reconciliation and owner sign-off, with legal hold overriding deletion. This does not set
-full-fidelity or long-term audit retention and remains unapproved.
+Pending operating proposal: retain an approved legacy archive for 30 days after successful green
+commit, then delete after custody verification and owner sign-off, with legal hold overriding the
+deadline. This does not set green product or long-term audit retention and remains unapproved.
 
 ## Acceptance proposal
 
 Cutover qualification should require:
 
-- 100% pass of the frozen capability fixtures and authorization decision table;
-- a complete manifest for every migrated byte/record, with hashes and zero unexplained orphans;
-- every legacy credential has a verified rotate, recreate, reconnect, or revoke outcome, with owner
-  evidence and no carried-forward credential identity or key material;
+- 100% pass of independently authored green capability fixtures and the new green authorization
+  decision table; neither may be extracted, copied, translated, or derived from blue behavior,
+  frames, data, schemas, protocols, identifiers, or decisions;
+- proof that every green authority was freshly initialized and contains no blue-derived record,
+  byte, identifier, credential, configuration, schema, protocol, or semantic decision;
+- repository, manifest, network, and runtime checks proving no importer, exporter, compatibility
+  reader, blue-store reference, archive mount, static-token escape, or reverse bridge exists;
+- every blue credential has a verified revoke/drop outcome and every enabled green integration has
+  a distinct newly issued credential or fresh owner authorization;
+- every retained archive has verified isolation, hash/custody evidence, deadline, deletion owner,
+  and no green identity or network route;
 - no unresolved Critical or High security finding;
-- backup and restore rehearsal from immutable evidence;
-- measured import plus verification within half the approved maintenance window;
+- backup and restore rehearsal using green-created state only;
+- activation and fresh-login verification inside the approved maintenance window;
 - load, latency, availability, and cost at least as good as the measured frozen-blue baseline or an
   explicitly approved exception;
 - scoped-credential MCP tests, identity isolation probes, operator rehearsal, and product UAT;
-- independent go/no-go approval separate from the migration executor.
+- independent go/no-go approval separate from the cutover executor.
 
 Exact SLO thresholds, the maintenance window, and approvers remain unassigned.
 
@@ -121,12 +128,12 @@ Exact SLO thresholds, the maintenance window, and approvers remain unassigned.
 | Frozen capability boundary | Product owner | Pending |
 | Grant/project semantics | Product + security | Product direction recorded; security approval pending |
 | Membership freshness/failure policy | Fleet + silo owners + security | Pending |
-| Persona conflict policy | Product + data owner | Pending |
-| Retention and deletion policy | Product + legal/security | Pending |
+| Fresh persona onboarding | Product owner | Pending |
+| Legacy archive/drop and green retention policy | Product + legal/security + data owner | Pending |
 | Acceptance thresholds and go/no-go owner | Operations + security + product | Pending |
 
 R0 cannot close while any row is pending.
 
 > See also: [estate evidence index](personal-agent-platform-r0-evidence-index.md),
-> [migration contract](personal-agent-platform-r0-migration-contract.md), and
+> [clean-build cutover contract](personal-agent-platform-r0-migration-contract.md), and
 > [approval record](personal-agent-platform-r0-approval-record.md).

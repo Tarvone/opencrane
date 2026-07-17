@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Phase A deletion-debt guard (#245/#248).
 #
-# Retired runtime/CLI concepts may remain only in exact decision evidence, applied migration
+# Retired runtime/CLI concepts may remain only in exact decision evidence, applied Prisma schema
 # history, and named temporary blue contracts. The patterns deliberately avoid generic words such
 # as "channels", "MCP", or "session": those remain valid product concepts. Linkerd is governed by
 # an exact path inventory because it is frozen blue, not yet retired.
@@ -160,10 +160,11 @@ _check_pattern "PAIRING-DEVICE" '(BrokeredDevice|brokered-device|openclaw-pairin
 POD_TOKEN_R9="^(libs/backend/identity/main/src/auth\.router\.ts|libs/backend/connections/main/src/(core/gateway-resolve|routes/auth-connections|__tests__/auth-connections\.test)\.ts|website/security/connection-security\.md|docs/agents/(architecture|apps/opencrane)\.md|CHANGELOG\.md|plan\.md|plan-done\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-rewrite-freeze-plan|personal-agent-platform-simplification-plan|openclaw-agent-loop-replacement-plan)\.md)$"
 _check_pattern "POD-TOKEN-R9-BOUNDARY" '(/api/v1/auth/pod-token|["`]/?pod-token(/cut)?["`])' "$POD_TOKEN_R9"
 
-# SessionScope rows are retained read-only as migration evidence. All runtime CRUD/client/package
-# references are forbidden outside the exact schema, applied migrations, and decision records.
-R0_DISPOSITION_MAP='^docs/design/personal-agent-platform-r0-data-disposition\.json$'
-SESSION_SCOPE_RETENTION="($ADOPTED_RECORDS|$MIGRATION_HISTORY|$HISTORICAL_RECORDS|$R0_DISPOSITION_MAP|^apps/opencrane/prisma/schema/sessions\.prisma$|^docs/agents/apps/opencrane\.md$)"
+# SessionScope rows may exist only as isolated archive/drop evidence. Green cannot read, restore,
+# translate, or derive authorization from them. All runtime CRUD/client/package references are
+# forbidden outside the exact blue schema, applied Prisma schema history, and decision records.
+R0_DISPOSITION_CONTRACT='^(docs/design/personal-agent-platform-r0-data-disposition\.json|scripts/check-r0-data-disposition(\.test)?\.mjs)$'
+SESSION_SCOPE_RETENTION="($ADOPTED_RECORDS|$MIGRATION_HISTORY|$HISTORICAL_RECORDS|$R0_DISPOSITION_CONTRACT|^apps/opencrane/prisma/schema/sessions\.prisma$|^docs/agents/apps/opencrane\.md$)"
 _check_pattern "SESSION-SCOPE" '(SessionScope|session-scope([^[:alnum:]]|$)|@opencrane/backend-sessions|/sessions/[^[:space:]`"]*/scope)' "$SESSION_SCOPE_RETENTION"
 
 # The Obot registry poll was a no-op. The spec is retained only as evidence explaining its removal.

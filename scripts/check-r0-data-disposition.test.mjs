@@ -30,6 +30,7 @@ test("checked-in R0 disposition map covers the current estate", function _valid(
   const result = _ValidateDispositionMap(_copyMap(), _inventory);
   assert.equal(result.prismaModels, _inventory.size);
   assert.equal(result.datasets, result.prismaModels + result.historicalStates + result.repositoryStates + result.estateClasses);
+  assert.deepEqual([...new Set(_map.datasets.map(function _disposition(entry) { return entry.disposition; }))].sort(), ["archive", "drop"]);
 });
 
 test("a newly unclassified Prisma model fails closed", function _missingModel()
@@ -108,30 +109,135 @@ test("legacy credential and identity adoption are never allowed", function _cred
   assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /legacyCredentialAdoptionAllowed must be false/u);
 });
 
-test("lifecycle policy cannot make the legacy store reachable or adopted", function _lifecyclePolicy()
+test("green always starts empty", function _emptyGreen()
 {
   const map = _copyMap();
-  map.lifecyclePolicies.migrate.runtimeReachable = true;
-  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /migrate lifecycle policy must enforce bounded clean-green execution/u);
+  map.cleanGreen.greenInitialState = "seeded";
+  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /greenInitialState must be empty/u);
 });
 
-test("migrate always means one-way semantic import", function _oneWay()
+test("every legacy transfer class remains forbidden", function _legacyTransfer()
 {
-  const map = _copyMap();
-  const migrated = map.datasets.find(function _migrated(entry) { return entry.disposition === "migrate"; });
-  delete migrated.migrationMode;
-  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /one-way semantic non-reproducible owner state/u);
+  for (const flag of ["legacyDataTransferAllowed", "legacyStateTransferAllowed", "legacyConfigTransferAllowed",
+    "legacyIdentityTransferAllowed", "legacyIdentifierTransferAllowed", "legacyCredentialTransferAllowed",
+    "legacyKeyTransferAllowed", "legacySaltTransferAllowed", "legacySchemaTransferAllowed",
+    "legacyProtocolTransferAllowed", "legacyArtifactTransferAllowed", "legacyByteTransferAllowed",
+    "legacySemanticTransferAllowed", "legacyOtherValueTransferAllowed"])
+  {
+    const map = _copyMap();
+    map.cleanGreen[flag] = true;
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, new RegExp(`${flag} must be false`, "u"));
+  }
 });
 
-test("credential state can never be changed to migrate", function _credentialMigration()
+test("static-token escape and ad-hoc clean-green exceptions fail closed", function _cleanGreenShape()
+{
+  const tokenMap = _copyMap();
+  tokenMap.cleanGreen.staticTokenEscapeAllowed = true;
+  assert.throws(function _validate() { _ValidateDispositionMap(tokenMap, _inventory); }, /staticTokenEscapeAllowed must be false/u);
+  const extraMap = _copyMap();
+  extraMap.cleanGreen.temporaryTransferExceptionAllowed = false;
+  assert.throws(function _validate() { _ValidateDispositionMap(extraMap, _inventory); }, /only the canonical empty-green invariants/u);
+});
+
+test("migrate and rebuild dispositions fail closed", function _legacyDispositions()
+{
+  for (const disposition of ["migrate", "rebuild"])
+  {
+    const map = _copyMap();
+    map.datasets[0].disposition = disposition;
+    map.datasets[0].lifecyclePolicy = disposition;
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /invalid disposition/u);
+  }
+});
+
+test("migrate and rebuild lifecycle policies fail closed", function _legacyLifecyclePolicies()
+{
+  for (const disposition of ["migrate", "rebuild"])
+  {
+    const map = _copyMap();
+    map.lifecyclePolicies[disposition] = {};
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /lifecyclePolicies must contain only archive and drop/u);
+  }
+});
+
+test("nested lifecycle and dataset exceptions fail closed", function _nestedExceptions()
+{
+  const lifecycleMap = _copyMap();
+  lifecycleMap.lifecyclePolicies.archive.restoreAllowed = true;
+  assert.throws(function _validate() { _ValidateDispositionMap(lifecycleMap, _inventory); }, /archive lifecycle policy must enforce every custody control/u);
+
+  for (const field of ["greenSeedFromBlue", "migrationAllowed", "reverseBridgeAllowed"])
+  {
+    const map = _copyMap();
+    map.datasets[0][field] = true;
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /must contain only canonical disposition fields/u);
+  }
+
+  const sourceMap = _copyMap();
+  sourceMap.datasets[0].source.legacyTable = "access_tokens";
+  assert.throws(function _validate() { _ValidateDispositionMap(sourceMap, _inventory); }, /non-canonical Prisma source fields/u);
+});
+
+test("every dataset independently forbids legacy input", function _datasetLegacyInput()
+{
+  assert.equal(_map.datasets.every(function _forbidden(dataset) { return dataset.legacyInputAllowed === false; }), true);
+  const map = _copyMap();
+  map.datasets[0].legacyInputAllowed = true;
+  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /must forbid every legacy input/u);
+});
+
+test("credential and restorable store datasets are drop only", function _dropOnly()
+{
+  for (const id of [
+    "prisma:McpServerCredential", "prisma:McpServerInstall", "prisma:ProviderApiKey",
+    "prisma:ProviderCredential", "prisma:SessionScope", "estate:backup-and-restore-sets",
+    "estate:obot-managed-mcp-volumes", "estate:opencrane-cnpg-database",
+    "estate:repository-abb08074718bfb86", "estate:usertenant-gcs-state",
+  ])
+  {
+    const checkedIn = _map.datasets.find(function _id(dataset) { return dataset.id === id; });
+    assert.equal(checkedIn.disposition, "drop", id);
+    const map = _copyMap();
+    const dataset = map.datasets.find(function _id(entry) { return entry.id === id; });
+    dataset.disposition = "archive";
+    dataset.lifecyclePolicy = "archive";
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /contains credential or restorable store state and must be dropped/u);
+  }
+});
+
+test("archive state is isolated from green", function _archiveIsolation()
+{
+  for (const field of ["runtimeReachable", "greenReadable", "mounted", "restorableIntoGreen"])
+  {
+    const map = _copyMap();
+    map.lifecyclePolicies.archive[field] = true;
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /archive lifecycle policy must enforce every custody control/u);
+  }
+  for (const field of ["accessLogging", "encryption", "iamIsolation", "immutability", "isolation",
+    "networkIsolation", "ownerRestriction", "sealTimestamp", "separateCredentials", "storageIsolation"])
+  {
+    const map = _copyMap();
+    map.lifecyclePolicies.archive[field] = "optional";
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /archive lifecycle policy must enforce every custody control/u);
+  }
+});
+
+test("archive can never become a permanent record", function _permanentArchive()
 {
   const map = _copyMap();
-  const credential = map.datasets.find(function _credential(entry) { return entry.id === "prisma:ProviderApiKey"; });
-  credential.disposition = "migrate";
-  credential.lifecyclePolicy = "migrate";
-  credential.sourceReproducibility = "non-reproducible-owner-state";
-  credential.migrationMode = "one-way-semantic";
-  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /credential dataset prisma:ProviderApiKey cannot migrate/u);
+  map.lifecyclePolicies.archive.terminalAction = "permanent-record";
+  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /archive lifecycle policy must enforce every custody control/u);
+});
+
+test("migration and rebuild fields are forbidden on every dataset", function _legacyFields()
+{
+  for (const field of ["migrationMode", "sourceReproducibility", "rebuildSource"])
+  {
+    const map = _copyMap();
+    map.datasets[0][field] = "legacy-input";
+    assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, new RegExp(`must not declare ${field}`, "u"));
+  }
 });
 
 test("approved rows require durable evidence", function _approvalEvidence()
@@ -163,10 +269,8 @@ test("approval evidence requires a real calendar date", function _approvalDate()
 test("approved rows require disposition-specific lifecycle evidence", function _approvedLifecycle()
 {
   const expectations = new Map([
-    ["migrate", /lacks lifecycleEvidence/u],
     ["archive", /lacks lifecycleEvidence/u],
     ["drop", /lacks lifecycleEvidence/u],
-    ["rebuild", /lacks lifecycleEvidence/u],
   ]);
   for (const [disposition, expected] of expectations)
   {
@@ -178,22 +282,72 @@ test("approved rows require disposition-specific lifecycle evidence", function _
   }
 });
 
-test("approved migration evidence is bound to the R10 removal gate", function _r10Removal()
+test("approved archive evidence is isolated and time bounded", function _archiveEvidence()
 {
   const map = _copyMap();
-  const dataset = map.datasets.find(function _migrate(entry) { return entry.disposition === "migrate"; });
+  const dataset = map.datasets.find(function _archive(entry) { return entry.disposition === "archive"; });
   dataset.approval = "approved";
   dataset.approvalEvidence = structuredClone(_approvalEvidence);
   dataset.lifecycleEvidence = {
-    migrationOwner: "migration-owner",
-    removalOwner: "reaper-owner",
-    removalGate: "never",
-    removalCondition: "all approved imports verified",
-    removalReference: "issue:removal",
-    sourceCheckpoint: "checkpoint:1",
-    validationManifestReference: "manifest:1",
+    accessLogReference: "evidence:access-log",
+    archiveSealedAt: "2026-07-17T12:00:00.000Z",
+    credentialIsolationReference: "evidence:credentials",
+    fixedDeletionDate: "2026-08-17",
+    deletionOwner: "deletion-owner",
+    encryptionReference: "evidence:encryption",
+    iamIsolationReference: "evidence:iam",
+    immutabilityReference: "evidence:immutability",
+    isolationReference: "archive:1",
+    networkIsolationReference: "evidence:network",
+    ownerRestrictionReference: "evidence:owner",
+    runtimeReachable: false,
+    greenReadable: false,
+    mounted: false,
+    restorableIntoGreen: false,
+    removalGate: "R10",
+    storageIsolationReference: "evidence:storage",
+    terminalAction: "drop",
   };
-  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /lacks concrete migration and R10 removal evidence/u);
+  assert.doesNotThrow(function _validate() { _ValidateDispositionMap(map, _inventory); });
+  for (const field of ["accessLogReference", "credentialIsolationReference", "encryptionReference",
+    "iamIsolationReference", "immutabilityReference", "isolationReference",
+    "networkIsolationReference", "ownerRestrictionReference", "storageIsolationReference"])
+  {
+    const missingControl = structuredClone(map);
+    delete missingControl.datasets.find(function _id(entry) { return entry.id === dataset.id; }).lifecycleEvidence[field];
+    assert.throws(function _validate() { _ValidateDispositionMap(missingControl, _inventory); }, /non-canonical lifecycle evidence/u);
+  }
+  dataset.lifecycleEvidence.fixedDeletionDate = "retained-forever";
+  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /lacks concrete isolation, fixed deletion, and terminal drop evidence/u);
+});
+
+test("archive deletion deadline follows the archive seal", function _archiveDeadlineOrder()
+{
+  const map = _copyMap();
+  const dataset = map.datasets.find(function _archive(entry) { return entry.disposition === "archive"; });
+  dataset.approval = "approved";
+  dataset.approvalEvidence = structuredClone(_approvalEvidence);
+  dataset.lifecycleEvidence = {
+    accessLogReference: "evidence:access-log",
+    archiveSealedAt: "2026-07-17T12:00:00.000Z",
+    credentialIsolationReference: "evidence:credentials",
+    fixedDeletionDate: "2020-01-01",
+    deletionOwner: "deletion-owner",
+    encryptionReference: "evidence:encryption",
+    iamIsolationReference: "evidence:iam",
+    immutabilityReference: "evidence:immutability",
+    isolationReference: "archive:1",
+    networkIsolationReference: "evidence:network",
+    ownerRestrictionReference: "evidence:owner",
+    runtimeReachable: false,
+    greenReadable: false,
+    mounted: false,
+    restorableIntoGreen: false,
+    removalGate: "R10",
+    storageIsolationReference: "evidence:storage",
+    terminalAction: "drop",
+  };
+  assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /lacks concrete isolation, fixed deletion, and terminal drop evidence/u);
 });
 
 test("known historical state cannot silently disappear", function _historicalCoverage()
@@ -204,7 +358,7 @@ test("known historical state cannot silently disappear", function _historicalCov
   assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /unclassified required historical states: brokered_devices/u);
 });
 
-test("a newly discovered migration residue fails closed", function _newHistoricalState()
+test("a newly discovered historical residue fails closed", function _newHistoricalState()
 {
   const historical = new Set(_ReadHistoricalInventory());
   historical.add("future_retired_table");
@@ -272,9 +426,17 @@ test("active clean-green contracts never regress to legacy adoption", function _
   assert.doesNotMatch(loopPlan, /### L2 — bridge OpenClaw into the canonical plane/u);
   assert.match(loopPlan, /L2 — superseded bridge \(strangler route only; do not execute under rewrite-freeze\)/u);
   assert.doesNotMatch(loopPlan, /unless a reverse migration is executed/u);
+  assert.doesNotMatch(loopPlan, /behavioral parity|black-box trajectory recorder|production-shaped turns|Use only as a behavioral oracle/iu);
+  assert.match(loopPlan, /OpenClaw behavior is not a\s+compatibility target, fixture source, oracle, or acceptance baseline/iu);
+  assert.doesNotMatch(loopPlan, /fixtures must target the deployed pinned\s+artifact/iu);
+  const runtimeAdr = readFileSync(join(_root, "docs/adr/0005-opencrane-owned-agent-runtime.md"), "utf8");
+  assert.doesNotMatch(runtimeAdr, /behavioral oracle|frozen trajectories|exact pinned blue behavior/iu);
+  assert.match(runtimeAdr, /not a green dependency, fixture source, behavior oracle, or conformance baseline/iu);
+  assert.doesNotMatch(architecture, /frozen-trajectory/iu);
   const executionPlan = readFileSync(join(_root, "plan.md"), "utf8");
   assert.doesNotMatch(executionPlan, /credential\s+(?:adoption|adopt-vs-reconnect)/iu);
+  assert.doesNotMatch(executionPlan, /frozen trajectories|trajectory recorder/iu);
   const productContract = readFileSync(join(_root, "docs/design/personal-agent-platform-r0-product-contract.md"), "utf8");
   assert.doesNotMatch(productContract, /credential(?:s)?\s+(?:proven\s+)?adopted/iu);
-  assert.match(productContract, /legacy credential has a verified rotate, recreate, reconnect, or revoke outcome/iu);
+  assert.match(productContract, /every blue credential has a verified revoke\/drop outcome/iu);
 });

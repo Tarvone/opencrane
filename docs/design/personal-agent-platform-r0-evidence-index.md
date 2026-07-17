@@ -21,9 +21,11 @@ complete**.
   reachability, failures, counts, and topology below the secured manifest hash.
 - The collector never requested full Kubernetes objects, row contents, secret values, ConfigMaps,
   logs, events, or Helm release state.
-- The secured evidence prevents treating reset eligibility as an estate-wide assumption. It does
-  not establish estate completeness or prove that any stored state is valuable, reproducible, or
-  safe to discard.
+- The collector is only an estate-completeness, retention, and deletion-evidence tool. It does not
+  authorize or support transferring any legacy material into green.
+- The secured evidence prevents an undiscovered legacy store from escaping archive/drop ownership.
+  It does not establish estate completeness or prove that any state is approved for archival or
+  deletion.
 
 Missing environments are missing evidence, not proof that no other estate exists.
 
@@ -96,61 +98,71 @@ deletion, or manual cleanup can remove it. Copy an approved public manifest/hash
 system only after review; force-adding ignored evidence is outside the collector's threat model.
 
 The pack is deliberately marked incomplete even when every command succeeds. It cannot discover an
-unconfigured estate, determine whether state is valuable or reproducible, test credential custody,
-inspect transcript/artifact/memory bytes, or supply owner approvals and rollback/retention decisions.
-Those limitations are recorded in both manifests rather than inferred from a green command exit.
+unconfigured estate, inspect content or secret values, prove archive isolation or deletion, or
+supply owner approvals and rollback/retention decisions. It is never an exporter, semantic
+manifest, ID map, source checkpoint, green initializer, or archive reader. Those limitations are
+recorded in both manifests rather than inferred from a green command exit.
 
 ## Coarse live conclusions
 
-- Reset eligibility is not proven for the estate. Every unclassified ClusterTenant remains
-  cutover-ineligible until its owner approves a reset or full-fidelity disposition.
-- The secured evidence contains candidate classifications and legacy-residue findings, but no
-  classification or deletion is owner-approved.
-- Database state, transcript/artifact/persona/memory bytes, upstream provider/MCP state, credential
-  custody, backup/restore, image digests, release baselines, and acceptance evidence remain
-  unproven or outside the collector's safe public boundary.
+- Estate completeness is not proven. Every ClusterTenant remains cutover-ineligible until all of
+  its legacy surfaces have an approved archive or drop outcome, deletion owner, and signatory.
+- The secured evidence contains candidate dispositions and legacy-residue findings, but no archive
+  or deletion is owner-approved.
+- Database state, transcript/artifact/persona/memory stores, upstream provider/MCP state,
+  credentials, backups, volumes, buckets, images, and release artifacts remain unproven or outside
+  the collector's safe public boundary.
+- Nothing in the pack is authorized to enter green. Green starts empty with fresh stores,
+  identities, credentials, configuration, schemas, protocols, agents, personas, grants, catalogs,
+  skills, providers, and content.
 
-These are evidence-bounded defaults, not owner-approved classifications.
+These are evidence-bounded defaults, not owner-approved archive or deletion decisions.
 
-## Classification rules
+## Disposition rules
 
-A ClusterTenant is reset-eligible only when its owner approves all of the following:
+A ClusterTenant is cutover-eligible only when its owners approve all of the following:
 
-- conversation history, tool output, workspace files, schedules, persona changes, artifacts, and
-  personal memory may be archived or discarded;
-- providers, MCP integrations, and external sources may be reconnected or rotated;
-- any initialized upstream state is either proven reproducible or assigned an approved archive/drop
-  disposition;
-- the reset and reconnect can be rehearsed inside the approved maintenance window.
+- every legacy store, record class, volume, bucket, image, configuration surface, and upstream state
+  has an explicit archive or drop outcome;
+- every archive is encrypted, immutable, access-logged, owner-restricted, protected by separate
+  credentials plus network/IAM/storage isolation, green-unreadable, non-restorable into green,
+  sealed at a recorded timestamp, time-bounded after that seal, and assigned a deletion owner;
+- secret values, private keys, salts, static tokens, and encryption material are revoked and dropped,
+  never archived;
+- providers, MCP integrations, external sources, users, personas, grants, catalogs, agents, skills,
+  documents, and artifacts will be created or authorized afresh in green;
+- fencing, archive-isolation confirmation when required, activation, fresh sign-in, and pre-commit
+  abort are rehearsed inside the approved maintenance window.
 
-An unclassified ClusterTenant is cutover-ineligible. A full-fidelity classification authorizes only
-the smallest one-way semantic import of explicitly approved non-reproducible data into green
-authorities; it never authorizes a compatibility layer, legacy runtime shape, or raw database copy.
+An unclassified ClusterTenant is cutover-ineligible. No disposition authorizes transfer, import,
+export, copy, semantic conversion, legacy schema/protocol parsing, ID preservation, compatibility,
+archive restore, static-token escape, or reverse bridge.
 
 ## Required secured evidence
 
 The secured estate pack must contain, per ClusterTenant:
 
-- owner, purpose, environment, member count, activity, reset/full-fidelity approval, and signatory;
-- CRD, fleet revision, silo database, upstream database, state-volume, bucket, and object-store
-  manifests with counts, hashes, sensitivity, provenance, and reproducibility;
-- transcript, tool-output, schedule, in-flight run, upload, artifact, persona, and memory disposition;
-- Cognee dataset identity/provenance/exportability;
-- Obot catalog, grant, credential/OAuth custody, encryption, audit, and reconnect evidence;
-- LiteLLM team/key/model/budget/spend plus salt/master-key custody and issue #174 evidence;
-- skill bytes/digests/publication state and source-token reconnect requirements;
-- backup, WAL, snapshot, restore, object-storage, encryption, and KMS evidence;
-- maximum maintenance window, measured export/import/verification time, cohort owner, abort
-  authority, commit signer, staffing, capacity, budget, and on-call coverage.
+- owner, purpose, environment, member count, activity, archive/drop/deletion consent, and signatory;
+- CRD, fleet/silo database, upstream database, state-volume, bucket, object-store, image, and
+  configuration inventories sufficient to prove no legacy surface was omitted;
+- archive/drop decisions for transcript, tool-output, schedule, run, upload, artifact, persona,
+  memory, document, grant, catalog, skill, provider, model, and audit state;
+- Cognee, Obot, LiteLLM, Langfuse, skill-registry, and external-source store dispositions;
+- credential revocation/drop and fresh reconnect/recreation ownership without credential values;
+- archive encryption, immutability, access logging, owner restriction, separate credentials,
+  network/IAM/storage isolation, seal timestamp, later retention deadline, deletion owner, and
+  deletion-proof requirements;
+- maximum maintenance window, cohort owner, abort authority, commit signer, staffing, capacity,
+  budget, and on-call coverage.
 
 The secured system must expose a stable reference and content hash to this index without copying
 tenant data or proprietary fleet logic into Git.
 
 ## Proposed cohort shape
 
-1. Rehearse the reset factory on an owner-approved reset candidate.
-2. Exercise the least-state full-fidelity cohort next, unless its owner explicitly approves reset.
-3. Cut the richest full-fidelity cohort last.
+1. Rehearse the empty-green cutover on an internal/dogfood silo.
+2. Cut the least operationally critical external silo next.
+3. Cut the most critical silo last.
 
 This is a proposed shape, not an approved cohort list or schedule.
 
@@ -159,15 +171,15 @@ This is a proposed shape, not an approved cohort list or schedule.
 | Decision | State |
 |----------|-------|
 | Estate discovery | Partial; exact source scope and reachability stay secured, and completeness is unverified |
-| Per-ClusterTenant classification | Secured evidence-bounded defaults exist; owner approvals stay secured and are missing |
+| Per-ClusterTenant disposition | Archive/drop defaults exist; owner consent, deadlines, and deletion owners are missing |
 | Secured evidence reference and hash | Temporary local pack and hashes verified; approved durable reference missing |
-| Data and credential disposition | Drafted in the migration contract; owner/security approval missing |
+| Legacy state and credential disposition | Drafted in the clean-build cutover contract; owner/security approval missing |
 | Product contract | Drafted; product approval missing |
-| Post-write rollback | Unanswered; rewrite-freeze route remains provisional |
+| Post-write rollback | Product direction is forward-only/no reverse bridge; operations/program co-approval missing |
 | Cohorts and maintenance windows | Shape proposed; identities, owners, and windows missing |
 | Acceptance thresholds | Proposed; approval and measured blue baselines missing |
 | Staffing, budget, schedule, sign-off authority | Unassigned |
 
 > See also: [R0 product contract](personal-agent-platform-r0-product-contract.md),
-> [R0 migration contract](personal-agent-platform-r0-migration-contract.md), and
+> [R0 clean-build cutover contract](personal-agent-platform-r0-migration-contract.md), and
 > [R0 approval record](personal-agent-platform-r0-approval-record.md).

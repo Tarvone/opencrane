@@ -28,11 +28,13 @@ The non-obvious shape of the system (verified June 2026). Read this before touch
 | **feat-skill-registry** | Entitlement-gated skill-bundle delivery; validates pod identity via TokenReview, proxies to opencrane-api. Non-entitled → **404** (existence-hiding). | opencrane-api, tenant pods |
 | **feat-central-agents** | Background ingestion worker (Slack connector → Postgres `OrgDocument`). Not API-first. | external sources, Postgres |
 
-**Identity is multi-credential**, with non-interchangeable purposes: (1) OIDC session cookie for
-human operators, (2) **projected SA tokens** for in-cluster workloads (audience-bound:
+**Blue identity is multi-credential**, with non-interchangeable purposes: (1) OIDC session cookie
+for human operators, (2) **projected SA tokens** for in-cluster workloads (audience-bound:
 `aud=obot-gateway|feat-skill-registry|opencrane-server`, short-lived and rotated, never handed to a
-browser), and (3) static `OPENCRANE_API_TOKEN` as an explicit automation/break-glass migration
-target. The temporary `POST /api/v1/auth/pod-token` connection-preflight route resolves the tenant
+browser), and (3) the legacy static `OPENCRANE_API_TOKEN`. That static token is a frozen-blue
+deletion target, not a green migration or emergency-access path: revoke and drop it at cutover.
+Green emergency access, if approved, is short-lived, IAM-backed, and audited. The temporary
+`POST /api/v1/auth/pod-token` connection-preflight route resolves the tenant
 **solely from the verified session email** (fail-closed `409 AMBIGUOUS_TENANT`) and returns connection
 coordinates, not a pod or gateway credential. It expires at that silo's R9 cutover.
 
@@ -41,6 +43,11 @@ coordinates, not a pod or gateway credential. It expires at that silo's R9 cutov
 - **`___AuthMiddleware` does NOT enforce per-route roles today** (`libs/infra/auth/src/auth-middleware.ts`). It's a fallback chain: public paths → OIDC cookie → env token → DB access token → dev bypass. Role/capability claims are a *planned* target — do not assume RBAC at the route layer.
 - **State is dual-written: CRD is source of truth, Postgres is a projection.** Every Tenant/AccessPolicy mutation hits both. Drift between them is expected and has explicit tooling (`GET /tenants/drift`, `POST /tenants/repair`, projection-drift metrics). Don't "fix" a divergence by writing only one side.
 
+This describes frozen blue, not a transfer contract. Green starts empty: no legacy row, CRD,
+projection, subject/ID binding, credential, configuration, schema, protocol, byte, or semantic
+decision initializes it. Blue material is archived in a green-unreadable isolated enclave under a
+deletion deadline or dropped.
+
 **Effective contract:** each tenant's entitlements compile into one SHA256-keyed JSON blob (`GET /:name/effective-contract`) covering awareness datasets + MCP servers + skill bundles. Tenant pods re-pull it on a ~30s loop; on `contractId` change the pod gets a SIGHUP + a re-rendered config. This is the runtime authorization mechanism — changing a grant is not effective until the contract recompiles and the pod re-pulls.
 
 ## IAM-First
@@ -48,7 +55,8 @@ coordinates, not a pod or gateway credential. It expires at that silo's R9 cutov
 OpenCrane is IAM-first.
 
 - Prefer federated identity, Workload Identity, OIDC, and cloud IAM over static bearer tokens.
-- Treat bearer tokens as temporary compatibility shims or break-glass paths, not the default architecture.
+- Do not provide a static bearer-token compatibility or break-glass path in green. Any approved
+  emergency access is short-lived, federated/IAM-backed, and audited.
 - Every platform service and every tenant workload should have an explicit workload identity.
 - Every human operator should authenticate through centrally managed identity, not shared long-lived tokens.
 
@@ -65,7 +73,7 @@ Identity and authorization must be described centrally.
 ## Token Policy
 
 - Do not introduce new bearer-token control paths when IAM or OIDC can solve the problem.
-- Existing bearer-token paths should be treated as migration targets.
+- Existing bearer-token paths are frozen-blue revocation/deletion targets and never enter green.
 - If a bearer token is unavoidable, document why IAM cannot be used, constrain its scope, and define a removal path.
 
 ## OpenCrane-Specific Direction

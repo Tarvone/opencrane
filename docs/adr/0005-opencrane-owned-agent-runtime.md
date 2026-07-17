@@ -37,12 +37,13 @@ OpenCrane will own the personal and managed-agent runtime end to end:
   runtime.
 - The green runtime contains no OpenClaw package, protocol, config renderer, transcript mirror,
   workspace compatibility, plugin hook, or reverse bridge.
-- The frozen OpenClaw image is a behavioral oracle and blue rollback artifact, not a green runtime
-  dependency.
+- The frozen OpenClaw image is only a blue support, quarantine, pre-commit restore, and deletion
+  artifact. It is not a green dependency, fixture source, behavior oracle, or conformance baseline.
 
 The TypeScript toolkit is deliberately **not** selected by this ADR. Gate L4 runs
-`@openai/agents` and `ai`/`ToolLoopAgent` against the same frozen trajectories and real LiteLLM
-matrix. It records one winner and exact dependency pins; the losing production adapter is removed.
+`@openai/agents` and `ai`/`ToolLoopAgent` against the same independently authored green fixtures and
+real target LiteLLM matrix. It records one winner and exact dependency pins; the losing production
+adapter is removed.
 
 ## Alternatives considered
 
@@ -59,8 +60,8 @@ matrix. It records one winner and exact dependency pins; the losing production a
 
 - OpenCrane assumes production responsibility for session correctness, reconnect, cancellation,
   compaction, recovery, approval resume, and run persistence.
-- Gate L0 must preserve the exact pinned blue behavior as deterministic fixtures before green
-  replacement work relies on it.
+- Gate L0 proves only blue support, quarantine, pre-commit restore, and deletion. Green fixtures
+  trace exclusively to the approved R0 product contract and cannot be observed or derived from blue.
 - CI forbids OpenClaw and retired-domain imports in green from the first green PR.
 - After each silo's cutover and retention window, the OpenClaw installer, runtime, protocol,
   workspace, pairing/device, and transcript compatibility surface is deleted rather than deprecated.

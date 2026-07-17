@@ -1,138 +1,139 @@
-# Personal-agent platform R0 migration contract
+# Personal-agent platform R0 clean-build cutover contract
 
-Status: **draft for approval; rewrite-freeze route remains provisional**
+Status: **draft for approval; clean-build direction recorded, authority approvals pending**
 
 Issue: [#252](https://github.com/italanta/opencrane/issues/252)
 
-This contract records the conservative migration posture implied by the repository and reachable
-estate. It does not authorize a reset, secret export, maintenance window, or cutover commit.
+The filename is retained for stable links, but this is not a migration contract. Green starts empty.
+This contract does not authorize an archive, deletion, maintenance window, or cutover commit.
 
-## Clean-green rule
+## Clean-build rule
 
-Green is built as if the legacy implementation had never been in production. Nothing in green may
-exist solely to accept a legacy protocol, schema, workspace/plugin shape, configuration flag, or
-runtime behavior. There is no dual read/write path, compatibility mode, raw database copy, or
-reverse bridge.
+Green is built as if the legacy implementation had never been in production. No legacy data,
+state, configuration, identity or identifier, credential, key, salt, schema, protocol, byte, or
+semantic decision is transferred, imported, exported, copied, converted, rebuilt from blue, or
+used to initialize green. There is no dual read/write path, compatibility mode, raw database copy,
+static-token escape, or reverse bridge.
 
-Legacy work stops at evidence, disposition, and the smallest one-way semantic export required for
-explicitly approved non-reproducible user-owned data. The exporter writes only green contracts and
-is deleted with the rest of the migration factory after cutover. Derived state is rebuilt from
-green authorities; obsolete state is archived or dropped with the required approval. An
-unclassified ClusterTenant is cutover-ineligible and does not justify broad compatibility work.
+Every green database, volume, object store, Cognee dataset, Obot installation, LiteLLM registration,
+credential, catalog, grant, agent, persona, skill, document, and artifact starts fresh. Users sign in
+again, reconnect integrations, and create or publish green content through green product contracts.
+Continuing external fleet and OIDC authorities are runtime dependencies, not migration sources:
+green may validate their current live contracts after activation, but it does not copy legacy silo
+projections, identifiers, rows, or credentials.
 
-## Data-disposition ledger
+Legacy state has exactly two outcomes:
+
+- **archive** — place only the approved legacy material in an encrypted, immutable, access-logged,
+  owner-restricted enclave that is isolated from green networks, identities, databases, runtimes,
+  deployment tooling, and application APIs. Green cannot read, mount, restore, query, or derive
+  state from it. Every archive has an approved retention deadline and deletion owner;
+- **drop** — revoke access and delete the state under an approved owner and evidence record.
+
+An archive is a time-bounded custody obligation, not a delayed importer or rollback store. At its
+retention trigger it is deleted. Secret values, private keys, salts, static tokens, and encryption
+material are revoked and dropped rather than archived.
+
+## Legacy-disposition ledger
 
 The machine-readable [R0 data-disposition map](personal-agent-platform-r0-data-disposition.json)
-expands this ledger across every current Prisma model, migration-derived retired table/column,
-repository-derived CRD spec/status and PVC, and the versioned upstream-store registry. Its validator
-rejects missing, duplicate, or stale source-derived entries as well as compatibility, dual paths,
-legacy-store/credential/identity/key adoption, and reverse bridges. Every row remains a candidate
-until its required owner approval is recorded; map coverage does not authorize migration or R1.
+expands this ledger across every current Prisma model, schema-history-derived retired table/column,
+repository-owned CRD spec/status and PVC, and versioned upstream-store registry. Its validator must
+permit only archive or drop and reject any green-readable archive, transfer path, compatibility,
+legacy-store adoption, credential or identity adoption, static-token escape, or reverse bridge.
+Every row remains a candidate until its required owner approval is recorded; map coverage does not
+authorize archival, deletion, or R1.
 
-| Legacy state | Default disposition | Green authority | Cutover rule |
-|--------------|---------------------|-----------------|--------------|
-| Fleet ClusterTenant identity, membership, role, owner subject, lifecycle revision | Migrate | Fleet lifecycle/membership contract | Preserve stable public IDs; capture one revision at lease acquisition |
-| UserTenant desired state and AccessPolicy intent | Migrate semantics; archive raw manifests | Silo Postgres policy/agent state | Repair drift first; never import duplicate fleet-namespace CRs as extra agents |
-| CRD status, Deployments, Services, Ingress, NetworkPolicy, PVC status | Rebuild | Kubernetes execution state | Preserve as signed evidence only; green reconciles from business authority |
-| OpenClaw sessions, transcripts, tool events, in-flight state, schedules | Migrate for full-fidelity; archive/drop only with reset approval | Thread, Message, Run, RunEvent, Approval, Schedule | Preserve order, IDs, timestamps, ownership, interrupted state, and pause triggers |
-| Uploads, generated files, workspace bytes | Migrate for full-fidelity | ArtifactStore canonical bytes and ArtifactVersion metadata | Hash every byte and resolve every transcript/tool reference |
-| Mutable persona files and TenantWorkspaceDoc | Migrate after conflict resolution | PersonaRevision | Hash both sources; conflict blocks import |
-| Cognee personal/user/agent/organization memory | One-way semantic export/import of owner-approved non-reproducible memory | Fresh Cognee durable supporting memory; OpenCrane policy, scope, grants, and persona authority | Record source dataset identity, scope, provenance, and stable subject binding as migration metadata; never adopt the legacy database |
-| Cognee artifact/company-document indexes | Rebuild | Canonical ArtifactVersions, company-document versions, and events; Cognee derived index | Prove reproducibility before discarding any legacy dataset |
-| Company docs and versions | Migrate approved current versions; archive required history | Versioned company-document authority | Preserve IDs, hashes, publication order, and unresolved proposals |
-| Grants and Groups | Migrate semantic decisions | Per-silo authorization facade | Preserve current priority/Deny/timestamp behavior until approved replacement |
-| TenantDatasetMembership and membership projections | Rebuild | Derived projection | Recompute from approved membership/grants revision |
-| MCP catalog, assignment, grants | Migrate semantics | OpenCrane catalog/grant authority | Verify every server/tool contract against live Obot state |
-| Obot installs and credential references | Archive non-secret intent; reconnect in green | Obot credential custody | Never adopt legacy credential identity or key material; a random/local `credentialRef` is not proof of an upstream recoverable credential |
-| Skill bundles, entitlements, posture, provenance | Migrate bytes/digests and current decisions | SkillRevision plus ArtifactStore | Verify digest; rebuild runtime copies; retire Zot/registry fallback |
-| ProviderCredential and model definitions | Migrate non-secret intent; rotate/recreate credentials and upstream registrations | OpenCrane metadata plus secret manager/LiteLLM | Never export raw keys; validate every model against a usable green credential |
-| Legacy ProviderApiKey raw rows | Rotate then drop | Secret manager | Never put raw legacy values in migration artifacts |
-| LiteLLM keys, teams, budgets, models, encrypted provider state | Rebuild from approved non-secret intent; archive evidence, then drop legacy state | Fresh LiteLLM projection of approved OpenCrane policy | Recreate teams, budgets, and models; mint new keys; never adopt the legacy database, encrypted state, master key, or salt |
-| AuditEntry and upstream audit/trace stores | Archive/migrate according to retention policy | Append-only audit authority | Do not claim best-effort application audit is complete |
-| Awareness participation/rollout state | Archive required safety evidence, then drop | None in green | No compatibility behavior in green |
-| SessionScope, BrokeredDevice, pairing, browser cache, OIDC process sessions | Archive named evidence, then drop | Green identity/run authority | Never reconstruct authorization from legacy rows; force re-login |
-| Metrics, measurements, proposals, spend snapshots | Archive if operational/financially required; rebuild live projections | Observability and approved cost authority | Reconcile against upstream LiteLLM/Langfuse before archive |
+| Legacy state | Required disposition | Fresh green behavior |
+|--------------|----------------------|----------------------|
+| Fleet/silo projections, Tenant and AccessPolicy CRDs, Postgres rows | Archive approved non-secret evidence or drop | Resolve current fleet/OIDC authority through the live target contract after activation; create new silo business state |
+| Kubernetes status, workloads, routes, policies, identities, Jobs, PVCs | Archive approved operational evidence or drop | Reconcile new execution state solely from new green business authority |
+| OpenClaw sessions, transcripts, tool events, schedules, uploads, generated files, workspaces, persona files | Archive or drop | Start empty Thread, Message, Run, Persona, Schedule, and Artifact authorities; users create new state |
+| Company documents, grants, groups, MCP catalog/assignments, skills, budgets, model definitions, source metadata | Archive or drop | Onboard, authorize, publish, and configure each green resource afresh |
+| Cognee memory and indexes | Archive the isolated legacy store or drop | Create fresh datasets; learn or ingest only from new green actions and content |
+| Obot installs, volumes, catalog projections, credential custody | Archive approved non-secret audit evidence or drop | Install a fresh Obot instance and reconnect integrations into fresh custody |
+| LiteLLM teams, keys, budgets, models, Redis, encrypted provider state | Archive approved non-secret audit evidence or drop; keys/salts/secrets always drop | Provision fresh teams, policy, registrations, keys, database, cache, master key, and salt |
+| Skill registry/Zot bytes and PVCs | Archive or drop | Publish new SkillRevisions and bytes through the green ArtifactStore |
+| Audit, trace, cost, safety, and financial evidence | Archive under the approved legal/security retention rule or drop | Start new green audit, trace, run, and cost authorities |
+| SessionScope, BrokeredDevice, pairing, browser cache, OIDC process sessions | Archive named non-secret evidence or drop | Force fresh sign-in and authorize from green contracts; never reconstruct authority from legacy rows |
+| Credential-bearing or restorable databases, backups, volumes, buckets, object stores, and upstream stores | Drop the complete store and every restorable copy; separately generated non-restorable deletion evidence may be archived | Provision fresh stores; no green reader, restore, schema adapter, or reference may target blue or deletion evidence |
 
-Migrate means a bounded, deterministic, one-way semantic exporter and idempotent green importer with
-a manifest. It preserves only the approved meaning required by the target contract, never the old
-mechanism, and never means copying an entire legacy database into green.
+Archive integrity evidence may record hashes, size, custody, and deletion status. It must not become
+a semantic manifest, ID map, source checkpoint, or green reconstruction contract.
 
 ## Credential and reconnect ledger
 
-| Credential class | Default action | Evidence required before changing default |
-|------------------|----------------|-------------------------------------------|
-| Human OIDC browser session | Drop; force sign-in | None; session is ephemeral |
-| Fleet/silo service identity | Mint distinct green credential; revoke blue at commit | Signed workload identity and least-privilege binding tests |
-| Provider BYOK | Rotate/recreate green Secret and LiteLLM registration | Owner consent plus verified green custody and a usable registration |
-| Legacy raw ProviderApiKey | Force rotation/reconnect | No adoption of raw database value |
-| Tenant/Cognee LiteLLM virtual key | Mint green key | No exception; legacy key, database, master key, and salt are not adopted |
-| Cognee user/agent/silo identity | Reprovision in green and attach approved semantic memory imports | Stable subject binding, owner-approved dataset export manifest, and green isolation proof |
-| Obot static/OAuth/user credential | Reconnect | Recreate green custody with owner consent; legacy credential identity and key material are not adopted |
-| MCP install `credentialRef` | Treat as unverified intent | Matching live Obot credential and successful scoped tool call |
-| Slack/third-party source token | Reconnect | External owner consent and approved secret-manager target |
-| Static OpenCrane API/break-glass token | Revoke and drop | Any green emergency access is a separate security-approved, audited, short-lived IAM capability, never a compatibility token |
-| Tenant encryption key | Never copy into green | Temporary migration-tool custody only for an approved decrypt/re-encrypt operation, with an evidence ledger and immediate revocation |
-| Langfuse/optional upstream secrets | Recreate or archive store | Approved continuity requirement plus all encryption/session keys |
+| Credential class | Required action | Green rule |
+|------------------|-----------------|------------|
+| Human browser/OIDC session | Drop; force sign-in | Validate a fresh session against the live OIDC authority |
+| Fleet/silo workload identity | Revoke blue at commit; mint distinct green identity | Prove least-privilege binding; do not copy the old subject, token, or secret |
+| Provider BYOK and third-party source credential | Reconnect or recreate from fresh owner input | Create a new secret and upstream registration; do not copy old metadata or values |
+| Legacy raw ProviderApiKey | Revoke and drop | Never place the value in evidence, archives, logs, or green |
+| LiteLLM virtual/master keys and salt | Revoke and drop | Mint fresh keys and salt in a fresh LiteLLM store |
+| Cognee identity and credential | Revoke and drop | Provision a fresh green identity and empty datasets |
+| Obot static/OAuth/user credential | Revoke and drop; reconnect from fresh owner authorization | Create new green custody; legacy credential identity and key material are not adopted |
+| MCP install `credentialRef` | Drop | Reinstall and authorize through green; a legacy reference proves nothing |
+| Static OpenCrane API/break-glass token | Revoke and drop | Green has no static-token escape; emergency access is short-lived, IAM-backed, security-approved, and audited |
+| Tenant encryption key | Revoke and drop after any approved archive is sealed | The key is never copied, mounted, or used to initialize green |
+| Langfuse and optional upstream secrets | Revoke and drop | Provision fresh only when the green product explicitly enables the upstream |
 
-No credential value is included in the R0 repository evidence.
+No credential value is included in R0 repository evidence or a retained archive.
 
 ## Cutover lease and writer contract proposal
 
-1. Acquire a fleet-owned lease for exactly one ClusterTenant and capture fleet lifecycle/membership
-   revision `F0` plus blue generation `B0`.
-2. Reject or queue new lifecycle/membership mutations after `F0`; do not apply them to blue or green
-   while ownership is ambiguous.
-3. Quiesce schedules, new runs, external side effects, and credential mutations.
-4. Snapshot blue and export from the checkpoint-bound, read-only generation.
-5. Import green idempotently, verify manifests and credentials, and keep green network-quarantined.
-6. Before commit, abort restores signed `B0` and replays queued mutations after a consistency check.
-7. Commit atomically changes the active slot, writer ownership, routing, and credential custody.
-8. After green accepts writes or side effects, recovery is forward under ADR 0006. If the
-   organization requires post-write reverse rollback, this route is invalid and cutover does not
-   start.
-9. Replay queued mutations against the committed owner only, in captured revision order.
-10. Keep blue immutable for the approved retention window, then revoke/delete it through R10.
+1. Acquire a fleet-owned lease for exactly one ClusterTenant and fence blue lifecycle, membership,
+   schedules, runs, external side effects, credential changes, and public mutations.
+2. If retention requires an archive, seal it in the isolated enclave and prove its hash, custody,
+   green-unreadability, deadline, and deletion owner. Do not inspect it from green.
+3. Confirm the separately provisioned green silo is empty, qualified, network-quarantined, and uses
+   only fresh stores, identities, credentials, configuration, schemas, and protocols.
+4. Before commit, an abort restores the exact signed blue deployment and reopens blue only after
+   its fence and health are verified.
+5. Commit atomically changes routing, active-slot ownership, and execution authority to green.
+6. Revoke blue credentials and store access. Users establish fresh sessions, reconnect integrations,
+   and create new green agents, personas, grants, catalogs, skills, providers, and content.
+7. After green accepts writes or side effects, recovery is forward in green. Blue and its archive
+   are never a writable rollback target and no reverse translator exists.
+8. Delete blue and every archive at the approved per-silo retention trigger, recording deletion
+   evidence through R10.
 
-Lease duration, mutation queue authority, and operational owner are pending approval.
+Lease duration, change-fence behavior, and operational owner remain pending approval.
 
 ## Rollback decision
 
-ADR 0006 defines the engineering route: rollback is safe before green writes; recovery is forward
-after commit. R0 must still answer whether the organization requires post-write reverse rollback.
+Product direction recorded on 2026-07-17 is **no post-write reverse rollback**. Before commit, the
+signed blue deployment may be restored as an abort. After commit, recovery is forward in green;
+there is no reverse bridge, legacy write path, archive restore, or static-token escape.
 
-- If **no**, the rewrite-freeze route remains viable subject to the other gates.
-- If **yes**, stop this route and separately plan the strangler/hybrid strategy. A reverse event or
-  side-effect bridge is not part of clean green.
-
-Current answer: **pending**. Implementation cannot assume “no.”
+Operations and program-sponsor co-approval remains pending. Implementation cannot treat the product
+direction alone as complete authority for M-04.
 
 ## Cohort and maintenance proposal
 
-Proposed order: owner-approved reset candidate → least-state full-fidelity cohort → richest
-full-fidelity cohort last.
+Proposed order is internal/dogfood first, then the least operationally critical external silo, then
+the most critical. Cohorts are ordered by blast radius and operator readiness, not by legacy data
+volume or fidelity because no legacy state enters green.
 
-The importer plus verification must complete within half the approved maintenance window so abort
-and blue restore retain equal time. Pending operating proposal: set the maximum window to four
-hours, measured from entering maintenance until green commit or restored blue service, and require
-import plus verification to qualify within two hours. No maximum window has been approved, so R7
-cannot claim timing qualification yet.
+Pending operating proposal: set the maximum window to four hours, measured from entering
+maintenance until green commit or restored blue service. The window qualifies fencing, archive
+isolation when required, routing activation, and synthetic/fresh-login verification; it contains no
+export, import, conversion, or legacy-data verification threshold. No maximum has been approved.
 
 ## Ownership and approval ledger
 
 | Responsibility | Required owner | Assignment |
 |----------------|----------------|------------|
-| Product contract and per-ClusterTenant reset/full-fidelity approval | Product/customer owner | Pending |
-| Retention and deletion | Legal/security/data owner | Pending |
-| Post-write rollback strategy decision | Product + operations + program sponsor | Pending |
-| Credential rotation/recreation/reconnect and revocation | Security/integration owner | Pending |
-| Fleet lease/revision and mutation queue | Fleet owner | Pending |
-| Export/import implementation | Migration owner | Pending |
-| Blue maintenance and restore | Blue operations owner | Pending |
-| Green runtime/platform | Runtime/platform owners | Pending |
-| Independent acceptance and commit point | Go/no-go signer, not migration executor | Pending |
-| Budget, duplicate-stack capacity, schedule, on-call coverage | Program sponsor | Pending |
+| Product contract and per-ClusterTenant archive/drop/deletion consent | Product/customer + data owner | Pending |
+| Retention, archive isolation, and deletion | Legal/security/data owner | Pending |
+| Forward-only post-commit recovery | Operations + program sponsor | Pending; product direction recorded |
+| Credential revocation and fresh reconnect/recreation | Security/integration owner | Pending |
+| Fleet lease and mutation fence | Fleet owner | Pending |
+| Blue maintenance, archive sealing, and pre-commit restore | Blue operations owner | Pending |
+| Green runtime/platform and fresh provisioning | Runtime/platform owners | Pending |
+| Independent acceptance and commit point | Go/no-go signer, not the cutover executor | Pending |
+| Budget, duplicate-stack capacity, schedule, and on-call coverage | Program sponsor | Pending |
 
-R0 cannot close while these assignments or the post-write rollback answer are pending.
+R0 cannot close while these assignments and required co-approvals are pending.
 
 > See also: [estate evidence index](personal-agent-platform-r0-evidence-index.md),
 > [product contract](personal-agent-platform-r0-product-contract.md),

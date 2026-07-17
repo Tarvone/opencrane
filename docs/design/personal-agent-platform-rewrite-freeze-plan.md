@@ -3,8 +3,8 @@
 Status: **adopted — 2026-07-16.** [ADR 0006](../adr/0006-rewrite-freeze-whole-silo-cutover.md)
 selects this production rewrite freeze and whole-silo blue/green replacement for the target in the
 [personal-agent platform architecture](personal-agent-platform-architecture.md), instead of the
-[strangler migration](personal-agent-platform-simplification-plan.md). The strangler remains the R0
-escape route if post-write rollback is mandatory.
+[rejected historical strangler proposal](personal-agent-platform-simplification-plan.md). That
+proposal is not executable and is not a rollback or delivery escape route.
 The pinned baseline and toolkit decision in the
 [OpenClaw loop investigation](openclaw-agent-loop-replacement-plan.md) apply to this route too: its
 L0 baseline is part of R1, and its L3–L5 bake-off/reliability gates are part of R4.
@@ -19,10 +19,11 @@ The adopted freeze route is:
 1. stabilize and tag one supportable OpenClaw-based release;
 2. freeze legacy product/schema development;
 3. build the final OpenCrane-owned, OpenClaw-free platform in an isolated green release with no OpenClaw
-   compatibility layer or legacy-shaped imports;
-4. build bounded read-only semantic exporters and idempotent green importers only for explicitly
-   approved non-reproducible data; rebuild, archive, or drop the rest;
-5. rehearse against production-shaped snapshots;
+   compatibility layer or legacy-shaped inputs;
+4. initialize every green store, identity, identifier, credential, configuration, artifact, and
+   product record fresh, without reading, exporting, importing, copying, converting, or reconstructing
+   anything from blue;
+5. rehearse clean empty-store provisioning, blue-archive isolation, activation, abort, and recovery;
 6. replace one complete ClusterTenant silo at a time;
 7. delete the legacy platform after every silo's retention window.
 
@@ -31,35 +32,35 @@ uses a mixture of old/new agent loop, transcript authority, artifacts, schedules
 Cutting silos in cohorts limits blast radius without becoming a feature-by-feature strangler.
 
 A rewrite freeze gives the implementation team a cleaner construction environment. It gives the
-organization a harder migration:
+organization a harder cutover:
 
 - no product value reaches production until the whole green platform is ready;
 - user/runtime feedback is delayed until dogfood and cutover;
-- every state conversion and credential exception converges in one maintenance window;
+- every fresh provisioning and user onboarding dependency converges at cutover;
 - rollback is safe only before green accepts writes or performs external side effects;
 - blue and green infrastructure must be operated simultaneously;
 - the frozen platform still needs security and availability maintenance.
 
 The freeze is likely simpler overall when there are few live ClusterTenants, most users are internal
-or pilot users, and state can be reset/reconnected or migrated once without post-write rollback. If
-personal history, memory, artifacts, and credentials are valuable production state, the freeze
-produces cleaner code but is not the simpler delivery route.
+or pilot users, and everyone accepts a completely fresh start. Personal history, memory, artifacts,
+identifiers, configuration, and credentials are not preserved; users sign in, configure, create,
+and reconnect anew through green after activation.
 
 ## Decision test
 
-Use this before choosing the delivery strategy:
+The delivery strategy is fixed. These rows record why the rejected alternatives do not apply:
 
 | Production condition | Recommended route |
 |---|---|
-| Users can reset personal history and reconnect providers/tools | Rewrite freeze is likely cleaner |
-| Data must be preserved, but rollback is required only before green writes are enabled | Rewrite freeze remains viable |
-| Data must be preserved and post-write rollback is mandatory | Use the strangler; a reverse bridge recreates its complexity |
-| Requirements/persona/runtime behavior are still changing rapidly | Use the strangler for real production learning |
-| Current estate is small, internal, and can accept a multi-month product freeze | Rewrite freeze is a credible option |
-| Current estate is active production with frequent feature/tenant onboarding | Use the strangler |
+| Users accept empty green stores and fresh onboarding | Adopted clean-build route |
+| Any legacy value must enter green | Out of scope; do not add a transfer path |
+| Post-write reverse rollback is requested | Out of scope; recover forward in green |
+| Requirements/persona/runtime behavior are still changing rapidly | Stabilize the green contract before activation; do not revive a bridge |
+| Current estate is small, internal, and can accept a multi-month product freeze | Fits the adopted route |
+| Current estate cannot accept a fresh start | This program does not preserve that estate; raise a separate product decision, not a hidden transfer mechanism |
 
-Gate R0 must inventory the actual estate and classify every ClusterTenant as **reset-eligible** or
-**full-fidelity migration**. Do not choose the freeze from code aesthetics alone.
+Gate R0 records the no-transfer boundary and the product/operating approvals needed to activate an
+empty green silo. It does not classify data or create exceptions.
 
 ## What “rewrite” means
 
@@ -145,7 +146,7 @@ Only newly discovered issues in these classes may modify blue:
 - data loss or corruption;
 - production outage or runaway reconcile/resource consumption;
 - critical dependency/provider breakage;
-- defect blocking export, migration rehearsal, or cutover verification.
+- defect blocking clean provisioning, archive isolation, abort, or cutover verification.
 
 Every exception must be minimal, backward-compatible, independently reviewed, added to the frozen
 conformance suite, and accompanied by a recorded green-applicability decision. Security is never
@@ -154,7 +155,7 @@ frozen.
 ### Changes prohibited after the freeze
 
 - new product behavior, channels, tools, workflows, or model features;
-- new legacy database/CRD fields except a migration-critical fix approved at R0;
+- new legacy database/CRD fields;
 - discretionary OpenClaw/plugin upgrades or more vendored gateway/rendering surface;
 - legacy refactors, renames, topology changes, CLI expansion, or plugin-framework work;
 - implementing a feature in both blue and green;
@@ -172,7 +173,7 @@ frozen.
 - The final mainline replacement PR is large mechanically, but every constituent capability has
   already passed review, CI, and acceptance on the protected green branch.
 
-Reserve **0.5–1 engineer** for blue maintenance and migration support. Do not count that person as
+Reserve **0.5–1 engineer** for blue maintenance and cutover support. Do not count that person as
 full-time green delivery capacity.
 
 ## Isolated green topology
@@ -223,7 +224,7 @@ Before handoff, green uses an internal test host and its public-edge and side-ef
 disabled. The runbook invokes the authoritative compare-and-swap; it is not itself the authority and
 `activeSlot` is not a product feature flag.
 
-The active-slot control is migration infrastructure. Remove it after all ClusterTenants and rollback
+The active-slot control is cutover infrastructure. Remove it after all ClusterTenants and rollback
 windows have completed.
 
 ## Delivery map
@@ -232,10 +233,10 @@ windows have completed.
 flowchart TD
   R0["R0: estate audit and decisions"] --> R1["R1: stabilize and freeze blue"]
   R1 --> R2["R2: green foundations"]
-  R1 --> R3["R3: migration factory"]
+  R1 --> R3["R3: fresh provisioning and deletion readiness"]
   R2 --> R4["R4: personal runtime and data planes"]
   R2 --> R5["R5: AgentService and authorization"]
-  R3 --> R7["R7: migration rehearsal"]
+  R3 --> R7["R7: empty-store activation rehearsal"]
   R4 --> R6["R6: product surfaces and authoring"]
   R5 --> R6
   R4 --> R7
@@ -248,35 +249,30 @@ flowchart TD
 
 R2/R3 and R4/R5 run concurrently. No green capability serves a live blue ClusterTenant before R9.
 
-## R0 — estate audit and irreversible decisions
+## R0 — clean-build boundary and irreversible decisions
 
 Expected effort: **2–3 engineering weeks.**
 
 Decide:
 
-- reset-eligible versus full-fidelity classification for every ClusterTenant;
 - exact scope/persona/runtime capability baseline—new feature requests wait until after launch;
 - grant deny/priority semantics and project-scope handling;
 - fleet-managed membership freshness/failure policy;
-- canonical persona precedence when DB workspace docs and mutable files disagree;
-- transcript, tool-output, audit, and artifact retention rules;
-- credential rotation/recreation/reconnect and revocation;
+- fresh persona, agent, integration, skill, document, and user-onboarding behavior;
+- green-only transcript, tool-output, audit, artifact, and retention rules;
+- fresh green credential issuance plus blue revocation/deletion;
 - fleet lifecycle/membership cutover lease, revision, and queued-mutation contract;
 - maximum per-silo maintenance window;
-- whether post-write rollback is mandatory;
 - cutover cohort/order and who may sign the commit point;
 - minimum SLO, load, security, disaster-recovery, and operator acceptance evidence.
 
-Classify every legacy dataset as:
+The legacy-state decision is singular: exclude it from green. No dataset, file, byte, record,
+identifier, identity, configuration, credential, schema, protocol, or derived value has an exception.
+Blue may be retained as an isolated read-only archive until its approved deletion trigger, but no
+green component or provisioning tool may read it.
 
-- **migrate** with semantic parity;
-- **rebuild** from canonical bytes/events;
-- **archive** as immutable historical evidence;
-- **drop** with named owner and approved reason.
-
-Exit gate: target architecture ADRs, frozen product contract, data disposition, cutover/rollback
-policy, owners, budget, and schedule are approved. If post-write reverse rollback is mandatory, stop
-this route and separately plan the strangler/hybrid strategy.
+Exit gate: target architecture ADRs, frozen product contract, no-transfer cutover/rollback policy,
+owners, budget, and schedule are approved. Post-commit recovery is forward in green.
 
 ## R1 — stabilize, snapshot, and freeze blue
 
@@ -285,23 +281,25 @@ record the baseline.
 
 Deliver:
 
-- execute Gate L0 from the linked loop plan against the exact frozen artifact, including the
-  immutable-image cold-start baseline and normalized trajectories;
+- execute Gate L0 from the linked loop plan against the exact frozen artifact, limited to the
+  immutable-image cold-start, support, quarantine, and deletion baseline;
 - finish the pre-freeze issue set and close/split the legacy portions;
 - install and rehearse the slot-neutral blue quarantine/reactivation supervisor against the exact
-  frozen workload manifest; this migration prerequisite is complete before source freeze;
+  frozen workload manifest; this cutover prerequisite is complete before source freeze;
 - tag, sign, and publish the frozen source/image/chart/config manifest;
-- capture OpenAPI, DB schemas, CRDs, effective-contract format, Helm renders, gateway behavior, and
-  generated-client snapshots;
+- inventory OpenAPI, DB schemas, CRDs, effective-contract format, Helm renders, gateway behavior,
+  and generated clients only to support, fence, and delete blue; none is a green input;
 - record current SLOs, resource/cost baselines, tenant counts, data volumes, state-volume layouts,
   Cognee datasets, Obot/LiteLLM versions, and credential types;
-- create golden conversation, memory, MCP, authorization, persona, artifact, schedule, and failure
-  fixtures from sanitized data;
+- author green conversation, memory, MCP, authorization, persona, artifact, schedule, and failure
+  fixtures independently from the approved R0 product contract, without observing or deriving them
+  from blue behavior, frames, data, schemas, protocols, identifiers, or decisions;
 - create a blue maintenance matrix and escalation/on-call owner;
 - lower DNS TTLs only when entering a scheduled cutover window, not for the whole program.
 
-Exit gate: blue can be supported without feature development, and green has a versioned source
-contract rather than reverse-engineering a moving target.
+Exit gate: blue can be supported, fenced, restored before commit, and deleted without feature
+development. Green's only versioned source contract is the independently approved R0 product
+contract; blue behavior and artifacts are not conformance inputs.
 
 ## R2 — build clean green foundations
 
@@ -311,7 +309,7 @@ Deliver:
 
 - target app packages and app-owned deployment units;
 - Postgres schema for AgentService/Revision/Run, transcript/events, persona, artifacts, skills,
-  approvals, audit, membership projection, and migration mappings;
+  approvals, audit, and membership projection;
 - OpenCrane authorization facade, capability classes, proof-of-possession, controller-bound Pod/Job
   assignment, action-token replay/idempotency, and effective-access explanations;
 - channel proxy delegating OIDC/session/membership decisions to OpenCrane;
@@ -340,63 +338,43 @@ Validation:
 - backup/restore rebuilds execution and Cognee state from green authorities;
 - blue/green edge and scheduler ownership are mutually exclusive.
 
-## R3 — build the migration factory
+## R3 — fresh provisioning, archive isolation, and deletion readiness
 
-Expected effort: **6–10 engineering weeks** for full-fidelity migration, starting beside R2. If
-every silo is reset-eligible, reduce this to a **2–4 engineering-week** reset/archive/reconnect
-factory; do not build importers for state that users and owners have explicitly approved for drop.
+Expected effort: **2–4 engineering weeks**, starting beside R2.
 
-Migration tools run outside blue with read-only access to snapshots, APIs, and volumes. Avoid adding
-export behavior to frozen runtime code unless no safe read-only extractor exists.
+R3 has no read path into blue. Its jobs and service accounts cannot reach a blue database, API,
+volume, bucket, object store, secret, ConfigMap, identity provider registration, Cognee/Obot/LiteLLM
+store, or runtime filesystem. It builds and proves only the fresh green path.
 
-| Legacy state | Green handling and cutover blocker |
-|---|---|
-| Tenant/AccessPolicy CRDs plus Postgres projection | Freeze writes, detect/repair or reject drift, emit one canonical AgentService/network-policy manifest |
-| ClusterTenant, membership, identities | Preserve CT IDs and OIDC `sub`; explicitly resolve null/ambiguous legacy subjects; retain fleet authority contract |
-| OpenClaw sessions/transcripts | Parse versioned JSONL/state files into Thread/Message/RunEvent; terminate in-flight runs; archive unconvertible records |
-| `SessionScope` | Use only as migration evidence; derive signed scope from current grants and verify it narrows rather than widens access |
-| Workspace files plus Company/Tenant docs | Hash both sources, apply approved persona precedence, and block silent divergence |
-| Uploads/generated files | Snapshot/copy into CAS; verify size/hash/MIME/owner and every live reference |
-| Cognee personal memory | Export non-reproducible user memory with scope/provenance; rebuild document indexes from artifacts |
-| Skills/company documents | Convert to immutable ArtifactVersions and Skill/Persona revisions; scan before publish |
-| MCP catalog/grants/credentials | Convert approved assignment/grant semantics and create an explicit per-user reconnect list; do not adopt legacy credential identity or key material |
-| LiteLLM providers/keys/budgets | Recreate scoped teams/virtual keys/model policy from references; never export provider secrets into the migration bundle |
-| Schedules/harvesting cursors | Convert to AgentService triggers and checkpoints; do not start them before active-slot commit |
-| Awareness/participation/audit | Convert safety/liveness/violation evidence where semantics match; otherwise archive immutably with query access |
-| CLI/UI operator state | Map required automation to API/generated client and document removed commands |
+Deliver:
 
-Each import is idempotent and emits a signed per-silo reconciliation manifest containing:
+- deterministic creation of empty green Postgres, ArtifactStore, Cognee, Obot, LiteLLM, cache,
+  telemetry, and runtime stores from target-owned schemas and configuration;
+- fresh organization, user, agent, policy, model, integration, skill, and document onboarding through
+  green APIs in disposable test silos, with no blue identifier, subject, row, file, reference, or
+  configuration as an input; destroy those fixtures after proof so every production cutover silo
+  remains empty until its post-commit onboarding;
+- fresh IAM, workload identities, service credentials, keys, salts, session secrets, encryption keys,
+  upstream registrations, and user-authorized integration reconnects;
+- blue archive isolation that denies every green KSA, controller, runtime, Job, human product path,
+  and network identity access to retained blue data and control surfaces;
+- deletion-readiness inventory for blue workloads, stores, credentials, routes, CRDs, PVCs, buckets,
+  images, configuration, and code, without extracting their contents;
+- idempotent empty-store provisioning and deletion runbooks with explicit abort points.
 
-- source release/schema and snapshot IDs;
-- application checkpoint ID, DB/WAL position, outbox/event high-water marks, and bound volume/blob
-  snapshot IDs;
-- fleet lifecycle/membership source revision and cutover-lease ID;
-- counts and cryptographic hashes per entity/blob type;
-- old→new ID mapping;
-- identity and effective-access comparison;
-- persona/document divergence decisions;
-- missing/reconnect-required credentials;
-- the per-integration credential custody-transfer, rotation, or reconnect action required at commit;
-- archived/dropped records with reasons;
-- elapsed time and cutover-window forecast;
-- eligibility, warnings, and hard blockers.
+Validation:
 
-Important repo-grounded hazards:
+- a fresh silo can be created from reviewed green artifacts alone, with all stores demonstrably empty;
+- builds, Helm renders, Jobs, and runtime configuration contain no blue endpoint, mount, identifier,
+  credential reference, schema adapter, protocol adapter, converter, or transfer tool;
+- network and IAM probes prove green cannot read a retained blue archive and blue cannot call green;
+- deleting and recreating an unactivated green silo produces the same target topology from empty
+  authorities;
+- blue deletion preflight names every resource class and fails closed when an owner, retention
+  trigger, dependency, or revocation action is missing.
 
-- CRDs currently own Tenant/AccessPolicy desired state while Postgres is a projection, so drift must
-  be resolved before export;
-- canonical messages are not in Postgres—`SessionScope` stores bindings, not transcripts;
-- OpenClaw sessions, uploads, and mutable workspace/persona files share each user's state volume;
-- on-prem state volumes are RWO/Recreate, so green must use a snapshot/clone/copy and never mount the
-  live blue disk;
-- persona can differ between TenantWorkspaceDoc and mutable workspace files;
-- MCP/LiteLLM tables largely hold credential references, not transferable secrets;
-- green cannot reconcile the public edge or schedules until active-slot handoff.
-
-Evidence: [current dual-write/source model](../agents/architecture.md),
-[session scope schema](../../apps/opencrane/prisma/schema/sessions.prisma),
-[company/workspace documents](../../apps/opencrane/prisma/schema/company-docs.prisma), and
-[user state PVC](../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/3-state-pvc.ts).
+The only relationship between the stacks is the slot-neutral cutover authority. It can fence blue
+and activate a separately qualified green release; it cannot read or translate product state.
 
 ## R4 — complete the personal-agent runtime and data planes
 
@@ -404,9 +382,9 @@ Expected effort: **10–16 engineering weeks.**
 
 Deliver:
 
-- execute L3–L5 from the linked loop plan: run both TypeScript adapters against the same frozen
-  trajectories and real LiteLLM matrix, record one selected driver, and build its reliability
-  envelope;
+- execute L3–L5 from the linked loop plan: run both TypeScript adapters against the same
+  independently authored green acceptance fixtures and real target LiteLLM matrix, record one
+  selected driver, and build its reliability envelope;
 - pinned selected TypeScript runtime with LiteLLM, MCP, memory, artifact, session, approval,
   tracing, cancellation, recovery, compaction, and budget adapters;
 - canonical Thread/Message/RunEvent protocol behind `ConversationGateway`;
@@ -462,31 +440,31 @@ Deliver one OpenCrane UI/API path for:
 Upstream Obot, Cognee, Langfuse, and Kubernetes consoles are diagnostic only, never parallel product
 configuration surfaces.
 
-## R7 — migration rehearsal
+## R7 — clean empty-store activation, abort, and recovery rehearsal
 
-Expected effort: **3–5 engineering weeks** plus repeated execution time for full fidelity, or
-**1–2 engineering weeks** for an all-reset-eligible estate with no converted user history.
+Expected effort: **2–4 engineering weeks** plus repeated execution time.
 
-Rehearse on sanitized, production-shaped snapshots for every storage/topology variant:
+Rehearse freshly provisioned green silos for every supported storage/topology variant:
 
-- cloud and on-prem RWO volume paths;
-- standalone and fleet-managed membership;
-- empty, small, and largest ClusterTenant;
-- active users with divergent workspace/persona state;
-- Cognee-heavy memory, large transcripts, skills, uploads, schedules, and MCP credentials;
-- reset-eligible and full-fidelity tenants.
+- cloud and on-prem empty RWO volume paths;
+- standalone and fleet-managed membership contracts created through green;
+- minimum, typical, and largest target topology sizes with no product data;
+- empty Cognee, Obot, LiteLLM, ArtifactStore, transcript, schedule, and integration state;
+- fresh IAM, workload identities, secrets, keys, salts, OIDC registrations, and user onboarding.
 
 Required evidence:
 
-- three consecutive deterministic imports produce the same reconciliation manifest;
-- worst-case import plus validation completes within half the maintenance window;
+- three consecutive empty-store provisions produce the same reviewed target topology and all start
+  with zero legacy records, files, references, identities, credentials, or configuration;
+- worst-case fresh provisioning plus validation completes within the approved maintenance window;
 - one pre-commit abort after blue quarantine and route handoff restores the exact signed blue
   manifest under a new generation, re-proves its egress policy, and resumes without duplicate work;
 - one crash/retry at every activation phase leaves exactly one active epoch and cannot release a
   stale Job, schedule, notification, model call, or tool action;
-- one cross-store checkpoint test proves metadata/blob references at the recorded DB/WAL/outbox
-  frontier and rebuilds Cognee from that captured frontier;
-- one disaster-recovery exercise restores green plus artifact/Cognee state;
+- one archive-isolation test proves no green identity or network path can read any retained blue
+  database, volume, bucket, API, credential, or configuration;
+- one disaster-recovery exercise restores independently created green data plus artifact/Cognee
+  state from a backup produced by green after activation;
 - no rehearsal can call production tools/providers or send external messages;
 - operators can explain and resolve every hard-blocking exception.
 
@@ -509,61 +487,57 @@ Acceptance must cover:
 - load/cost/capacity, chaos, upgrade/rollback-before-write, observability, and on-call runbooks;
 - full product/UAT acceptance against the frozen capability catalog.
 
-Gate: green has no critical/high findings, accepted SLO/security/DR evidence, migration eligibility for
-the first cohort, and a signed go/no-go decision independent of the rewrite implementers.
+Gate: green has no critical/high findings, accepted SLO/security/DR and archive-isolation evidence,
+fresh onboarding succeeds, and a signed go/no-go decision is independent of the rewrite implementers.
 
 ## R9 — atomic per-ClusterTenant cutover
 
-Expected effort: **2–6 engineering weeks across a full-fidelity estate**, or **1–3 engineering
-weeks** for a small all-reset-eligible cohort, plus the per-silo maintenance windows. R0 must
-re-estimate this from ClusterTenant count, data size, and the measured rehearsal duration.
+Expected effort: **1–3 engineering weeks** plus the per-silo maintenance windows. R0 must
+re-estimate this from ClusterTenant count and the measured clean-provisioning rehearsal duration.
 
-Never cut the whole fleet at once. Start with internal/reset-eligible silos, then small
-full-fidelity silos, then the largest/most critical.
+Never cut the whole fleet at once. Start with an internal silo, then advance through independently
+approved cohorts only after the previous cohort passes its observation window.
 
 For each ClusterTenant:
 
-1. acquire the fleet authority's per-CT cutover lease; fence or queue lifecycle/membership mutations
-   and capture its immutable source revision. An emergency offboard/revoke aborts the cutover and is
-   applied to blue before a new revision is captured;
+1. acquire the fleet authority's per-CT cutover lease and fence lifecycle/membership mutations for
+   the cutover duration. Do not queue blue changes for replay into green. An emergency
+   offboard/revoke aborts the cutover and is applied to blue;
 2. announce and enter maintenance mode; block all silo state-changing ingress;
 3. pause schedules and drain/cancel active agent/tool runs;
 4. raise a per-CT application write barrier and fence uploads, artifact leases/finalizers, outbox
    consumers, Cognee indexers, garbage collection, controller retries, delayed callbacks, and every
    other internal producer;
-5. reconcile or reject CRD/Postgres drift, flush transactions/outbox events, and record one
-   application checkpoint with the DB/WAL position and event high-water marks;
-6. have the slot-neutral operator suspend blue reconcilers, scale all execution, scheduler,
+5. have the slot-neutral operator suspend blue reconcilers, scale all execution, scheduler,
    notification, model, and tool components to zero, remove mutating endpoints, apply the blue
    cutover egress fence, and prove `blueFenceState=quarantined` with live probes;
-7. bind the database backup, every user/artifact volume or blob snapshot, non-reproducible Cognee
-   export, and relevant external configuration to that checkpoint. Rebuild derived Cognee indexes
-   from the captured artifact/event frontier rather than trusting an independently timed snapshot;
-8. run the final immutable export/import;
-9. verify counts, hashes, cross-store references, identities, effective access, persona decisions,
-   artifacts, memory, archived evidence, credential/reconnect exceptions, and that green's
-   membership projection
-   exactly matches the fenced fleet source revision;
-10. provision and validate distinct green service credentials, IAM bindings, LiteLLM keys, and Obot
-   controller credentials. Record whether each user/provider credential will transfer, rotate, or
-   remain disabled pending reconnect;
-11. start green in quarantine with public ingress, schedules, tool/model egress, and notifications
+6. seal blue as a read-only archive under separate credentials, network policy, storage attachment,
+   and operator authority; prove no green KSA, Job, controller, runtime, product API, or user path can
+   read it;
+7. verify the qualified green silo was created only from reviewed green artifacts and that every
+   product store is empty, every identity/identifier is fresh, and no configuration, reference,
+   schema adapter, protocol adapter, credential, file, or byte came from blue;
+8. provision and validate distinct green service credentials, IAM bindings, LiteLLM keys, Obot
+   controller credentials, salts, encryption keys, and OIDC registrations without blue inputs;
+9. start green in quarantine with public ingress, schedules, tool/model egress, and notifications
    disabled;
-12. run read-only and synthetic smoke tests;
-13. compare-and-swap the single organization-host/backend state to `green/read-only` using the
-    expected deployment generation, membership revision, activation epoch, verified blue fence, and
-    live cutover lease. This increments the green epoch; legacy blue remains physically quarantined;
-14. re-establish OIDC/channel sessions and run a no-write user smoke;
-15. obtain the named cutover authority's commit decision;
-16. transfer credential custody: revoke blue service keys, sessions, IAM bindings, and runtime
-    secret access; rotate upstream credentials where supported; remove transferred secrets from blue
-    storage/mount paths; and keep any unverifiable integration disabled until user reauthorization;
-17. release the fleet mutation fence, apply queued changes to green, and require green's membership
-    projection to reach the new fleet revision before capability issuance resumes;
-18. advance green through `writes`, `models`, `tools`, and `schedules` using idempotent
+10. run read-only and synthetic smoke tests that assert zero legacy state and no blue reachability;
+11. compare-and-swap the single organization-host/backend state to `green/read-only` using the
+    expected deployment generation, activation epoch, verified blue fence, and live cutover lease.
+    This increments the green epoch; legacy blue remains physically quarantined;
+12. validate the fresh OIDC registration with a synthetic, non-persisting sign-in probe and run a
+    no-write smoke that proves the empty green product creates no user or membership state;
+13. obtain the named cutover authority's commit decision;
+14. revoke blue service keys, sessions, IAM bindings, and runtime secret access. User/provider
+    integrations remain disabled until freshly authorized against green custody;
+15. release the fleet mutation fence without replaying blue-era changes; new lifecycle/membership
+    operations target green after the commit;
+16. advance green through `writes`, `models`, `tools`, and `schedules` using idempotent
     compare-and-swap transitions. Every PEP validates the recorded slot/epoch/phase;
-19. retain blue's non-secret data/images read-only for the agreed window; its reconcilers and
-    execution workloads remain suspended and its cutover egress fence remains in force.
+17. create each user's green membership, persona, agents, integrations, skills, configuration, and
+    other product state through fresh green onboarding only;
+18. retain blue read-only for the agreed window with no green access; its reconcilers and execution
+    workloads remain suspended and its cutover egress fence remains in force.
 
 Every step is idempotent or has a documented abort point. A failed eligibility check routes back to
 blue before the commit and does not consume the cutover window.
@@ -577,49 +551,38 @@ green/read-only route handoff; blue fence verified, green epoch issued
       ↓
 cutover commit
       ↓
-credential transfer and monotonic activation phases
+blue credential revocation and monotonic activation phases
 ```
 
 Before the commit, compare-and-swap the slot back to blue under a new generation, have the neutral
 operator restore the exact signed frozen workload/egress manifest, verify it, and only then reopen
 blue ingress. Discard or rebuild green.
 
-After green writes or tool side effects begin, blue is stale. The supported choices are:
-
-- recover forward in green;
-- restore the cutover snapshot and explicitly accept lost local work while reconciling external
-  side effects that cannot be rolled back; or
-- build and operate a green→blue event/side-effect translator.
-
-Snapshot restore is never a blind database rewind. First quiesce green and preserve the post-cutover
-append-only external-action ledger, provider receipts, audit sequence, and idempotency keys outside
-the restore set. After restoring, reconcile or compensate every recorded external action and seed
-the preserved idempotency/deny-replay state before execution resumes. If that evidence cannot be
-preserved, restore is not an allowed recovery path.
-
-The translator adds approximately **5–8 engineering weeks** and recreates a dual-runtime migration
-contract. If it is mandatory, classify the program as a strangler/hybrid rather than claiming a pure
-rewrite freeze.
+After green writes or tool side effects begin, recovery is forward in green. Quiesce green, preserve
+the append-only external-action ledger, provider receipts, audit sequence, and idempotency keys,
+repair or restore from a green-produced backup, reconcile or compensate every external action, and
+prove replay denial before execution resumes. Blue is never a recovery data source and no reverse
+event, side-effect, state, or protocol bridge is permitted.
 
 ## R10 — decommission and replace main
 
 Expected effort: **2–4 engineering weeks after the last retention window.**
 
 - merge the already-reviewed green integration history as the new mainline;
-- remove the entire blue deployment profile and migration-only active-slot mechanism;
-- retain only immutable audit archives and deliberately archived import tooling/formats;
+- remove the entire blue deployment profile and cutover-only active-slot mechanism;
+- delete all blue archives at their approved retention trigger; retain no transfer tooling or format;
 - delete OpenClaw, gateway/config/plugin/workspace adapters, Tenant/AccessPolicy CRDs, projection
   repairers, legacy schema/routes/tests, `feat-*` apps, Zot, Linkerd, obsolete charts/values/env,
   old images/PVCs/secrets, dashboards, docs, and issue references;
-- verify every per-CT credential transfer/revocation record and rotate any remaining program-level
-  bootstrap or break-glass credential that existed in blue;
+- verify every per-CT blue credential revocation record; revoke and delete every program-level
+  bootstrap or static break-glass credential that existed in blue, while green emergency access is
+  separately identity-backed and short-lived;
 - update ADRs, AGENTS/docs/website, README, CHANGELOG, runbooks, and generated clients;
 - add CI checks preventing retired names/dependencies/configuration from returning;
 - close/supersede the old backlog and create only measured post-launch work.
 
-Exit: a fresh checkout contains only the target architecture and migration archives with explicit
-retention. Operators have one path to create, share, schedule, observe, revoke, and delete agents and
-assets.
+Exit: a fresh checkout contains only the target architecture. Operators have one path to create,
+share, schedule, observe, revoke, and delete agents and assets.
 
 ## Live GitHub issue disposition under a freeze
 
@@ -633,7 +596,7 @@ freeze, not mutations performed by this plan.
 | [#127](https://github.com/italanta/opencrane/issues/127) | Finish enforcing default-deny/CNI floor, per-CT routing, encrypted-storage declaration/preflight, and live probes |
 | [#135](https://github.com/italanta/opencrane/issues/135) | Remove broad provider-secret broadcast or disable the dependent legacy path; no risk-freeze exception by default |
 | [#150](https://github.com/italanta/opencrane/issues/150) | Finish/version the remaining fleet→silo lifecycle/OIDC contract, then close |
-| [#162](https://github.com/italanta/opencrane/issues/162) | Narrow to a supportable chart-native UI image/deploy/migration/status/rollback slice and finish |
+| [#162](https://github.com/italanta/opencrane/issues/162) | Narrow to a supportable chart-native UI image/deploy/status/rollback slice and finish |
 | [#174](https://github.com/italanta/opencrane/issues/174) | Fix LiteLLM Team provisioning and bounded reconcile retry/backoff |
 | [#220](https://github.com/italanta/opencrane/issues/220) | Narrow to one fixed least-privilege OpenClaw production baseline; move profile/lifecycle product work to green |
 | [#221](https://github.com/italanta/opencrane/issues/221) | Fix full namespaced KSA parsing and repair affected identities |
@@ -655,7 +618,7 @@ freeze, not mutations performed by this plan.
 | Issue | Replacement |
 |---|---|
 | [#117](https://github.com/italanta/opencrane/issues/117) | Split minimum enforcing-CNI into #127; create corrected green Cilium/KSA network-PEP work without conflating SPIRE and Cilium identity |
-| [#133](https://github.com/italanta/opencrane/issues/133) | Artifact PVC/CAS replaces the Zot-only migration; OCI remains optional export only |
+| [#133](https://github.com/italanta/opencrane/issues/133) | Artifact PVC/CAS replaces the Zot-only path; OCI remains an optional product distribution adapter only |
 | [#154](https://github.com/italanta/opencrane/issues/154) | Concrete app/module contracts replace the broad plugin-kernel direction |
 | [#216](https://github.com/italanta/opencrane/issues/216) | Record API authority + UI human path + thin generated automation client; freeze and delete feature-parity CLI expansion |
 | [#231](https://github.com/italanta/opencrane/issues/231) | Avoid legacy DNS churn; introduce final names directly in green and switch them at whole-silo cutover |
@@ -672,36 +635,32 @@ reserved for new incidents.
 
 ## Effort and staffing
 
-These are planning ranges until R0 measures live estate and importer complexity. Engineering effort
-is additive person-effort; parallel work reduces calendar duration, not the totals.
+These are planning ranges until R0 fixes the operating approvals and R7 measures clean provisioning.
+Engineering effort is additive person-effort; parallel work reduces calendar duration, not the totals.
 
-| Variant | Engineering effort | Likely calendar |
+| Route | Engineering effort | Likely calendar |
 |---|---:|---:|
-| Reset-eligible rewrite freeze | 42–72 engineering weeks after stabilization | 5–7 months with 4–5 focused engineers |
-| Full-fidelity rewrite freeze | 49–84 engineering weeks after stabilization | 6–9 months with 4–5 engineers plus shared SRE/security |
-| Existing strangler estimate | 34–54 engineering weeks | 4–6 months with three focused engineers |
+| Clean-build rewrite freeze | 43–74 engineering weeks after stabilization | 5–7 months with 4–5 focused engineers |
 
-Add the **12–22 engineering-week stabilization runway** to the rewrite variants if the listed
+Add the **12–22 engineering-week stabilization runway** if the listed
 pre-freeze blockers are not already resolved.
 
-A three-person full-fidelity rewrite is likely an **8–12 month** program because runtime, platform,
-migration, UI, and independent operational acceptance cannot all proceed concurrently.
+A three-person clean-build rewrite is likely a **7–10 month** program because runtime, platform,
+provisioning, UI, and independent operational acceptance cannot all proceed concurrently.
 
 The ranges reconcile to the workstreams as follows:
 
 - shared green product and retirement work is **38–63 engineering weeks**: R0, R1's post-stabilization
   baseline, R2, R4, R5, R6, R8, and R10;
-- an all-reset-eligible estate uses a reduced R3 reset/archive/reconnect factory (**2–4**), reduced
-  R7 rehearsal (**1–2**), and small-cohort R9 cutover (**1–3**), producing **42–72** total;
-- full fidelity adds the stated R3 (**6–10**), R7 (**3–5**), and R9 (**2–6**) ranges, producing
-  **49–84** total;
+- R3 fresh provisioning/deletion readiness (**2–4**), R7 empty-store activation rehearsal (**2–4**),
+  and R9 cohort activation (**1–3**) produce **43–74** total;
 Recommended green staffing:
 
 - two platform/data engineers;
 - two runtime/product engineers;
 - one frontend/console engineer;
 - shared SRE, security, and test capacity;
-- one named migration owner independent of runtime implementation;
+- one named provisioning/cutover owner independent of runtime implementation;
 - 0.5–1 engineer reserved for frozen-blue maintenance.
 
 ## Direct comparison with the strangler
@@ -711,22 +670,22 @@ Recommended green staffing:
 | Production evolution | Changes incrementally behind stable seams | Blue feature/schema work stops after stabilization |
 | Code cleanliness during build | Temporary compatibility adapters and projections | Clean green dependency boundary from day one |
 | First user value | Earlier, per capability/cohort | None until whole green product is accepted |
-| Product/runtime feedback | Real production canaries throughout | Dogfood and snapshot replay until CT cutover |
+| Product/runtime feedback | Real production canaries throughout | Fresh dogfood silo until CT cutover |
 | Dual operation | Hybrid paths inside the evolving platform | Two whole stacks; a CT is exclusively blue or green |
-| Data migration | Domain-by-domain expand/backfill | Coordinated offline import across every store |
+| Legacy transfer | Domain-by-domain expand/backfill | None; every green store starts empty |
 | Cutover risk | Distributed into small gates | Concentrated at whole-silo handoff |
 | Rollback | Per slice/user/cohort and comparatively strong | Whole silo; safe only before green writes/tools |
 | Security improvement | Can land progressively in production | Delayed unless separately patched into frozen blue |
 | Legacy merge pressure | Repeated seam changes | Maintenance fixes must be assessed/ported across branches |
-| Infrastructure during migration | Temporary adapters and selective dual runtime | Duplicate complete blue/green silo capacity |
+| Infrastructure during replacement | Temporary adapters and selective dual runtime | Duplicate complete blue/green silo capacity |
 | Final codebase | Clean if deletion gates are enforced | Equally clean if the cutover succeeds |
-| Residue risk | Old fallbacks can survive incremental work | Lower in green; migration/archive tooling can still become residue |
-| Staffing | Works with a smaller integrated team | Needs parallel platform/runtime/UI/migration/ops ownership |
-| Best fit | Active production and valuable state | Early/pilot or resettable estate with stable requirements |
+| Residue risk | Old fallbacks can survive incremental work | Lower in green; no transfer tooling exists |
+| Staffing | Works with a smaller integrated team | Needs parallel platform/runtime/UI/provisioning/ops ownership |
+| Best fit | Active production and valuable state | Early/pilot estate that accepts a completely fresh start |
 
 ### What the freeze removes from the strangler plan
 
-- no lean-OpenClaw immutable bridge as a product migration stage;
+- no lean-OpenClaw immutable bridge as a product delivery stage;
 - no OpenClaw `ConversationGateway` compatibility adapter in green;
 - no live AgentService/Tenant shadow writer switch;
 - no live transcript mirror or per-domain cutover;
@@ -739,7 +698,7 @@ Recommended green staffing:
 - a pre-freeze stabilization program;
 - duplicate full-stack blue/green infrastructure and capacity;
 - strict branch/change-control and blue maintenance ownership;
-- a broad migration factory across CRDs, DB, PVCs, Cognee, Obot, LiteLLM, and files;
+- deterministic fresh provisioning plus blue archive isolation and deletion readiness;
 - active-slot ingress/scheduler quarantine;
 - full-product qualification before production feedback;
 - per-silo maintenance windows and a sharp post-write rollback boundary;
@@ -747,17 +706,15 @@ Recommended green staffing:
 
 ## Failure modes that block cutover
 
-- a hidden OpenClaw state file or transcript version is absent from the importer;
-- mutable workspace persona conflicts with database persona and no approved precedence exists;
-- CRD/Postgres drift silently changes desired state;
-- identity/grant conversion widens effective access;
-- legacy tenants without OIDC subjects bind to the wrong person;
-- shared CAS digest deletion/reference semantics lose an artifact;
-- Cognee contains personal memory that cannot be reconstructed or exported with scope;
-- Obot/LiteLLM credential handles cannot be adopted and reconnect users are not ready;
+- any green component, Job, build, or operator can read blue data, files, APIs, configuration, or secrets;
+- any green store is non-empty before fresh onboarding;
+- a blue identity, identifier, subject binding, credential, key, salt, or registration is reused;
+- a legacy schema, protocol, adapter, converter, mount, endpoint, or reference enters green;
+- blue archive isolation or deletion ownership is incomplete;
+- fresh sign-in, onboarding, integration authorization, or credential issuance is not ready;
 - schedules or blue/green controllers both fire during quarantine/handoff;
 - green smoke tests call a real tool/provider or send an external message;
-- the importer exceeds the maintenance window;
+- clean provisioning and validation exceed the maintenance window;
 - duplicate infrastructure lacks cluster capacity;
 - a blue security fix is not assessed/applied in green;
 - late parity discoveries extend the freeze indefinitely;
@@ -765,12 +722,9 @@ Recommended green staffing:
 
 Every item requires an automated preflight or an explicitly accepted, cutover-blocking exception.
 
-## Adopted route and R0 escape
+## Adopted route
 
-The rewrite freeze is adopted, subject to the estate and rollback truth established at R0. R0 must
-stop this route and revert the program to the strangler/hybrid strategy if mandatory post-write
-rollback, estate fidelity, staffing, or operating constraints invalidate the decision test. It must
-not waive those facts to preserve a preferred implementation shape.
-
-Both routes can reach the same target. The accepted route stays a rewrite freeze only while green
-has no reverse bridge or permanent blue compatibility path and each ClusterTenant cuts atomically.
+The clean-build rewrite freeze is adopted. The rejected strangler/hybrid proposal is not an escape
+route. Green remains valid only while it starts empty, receives nothing from blue, has no reverse
+bridge or permanent blue compatibility path, and activates each ClusterTenant atomically. After the
+commit frontier, recovery is forward in green.

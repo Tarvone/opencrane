@@ -13,7 +13,8 @@
 ADR 0005 defines an OpenClaw-free target but does not by itself choose how production reaches it.
 The strangler proposal would replace capabilities behind temporary live bridges and projections.
 The rewrite-freeze proposal instead stabilizes one immutable blue release, builds the complete green
-platform without compatibility imports, and replaces one complete ClusterTenant silo at a time.
+platform from empty stores without any legacy transfer, and activates one complete ClusterTenant
+silo at a time.
 
 The owner selected the rewrite-freeze route on 2026-07-16 to hard-rewire the OpenClaw tenant in one
 go, as far as safely possible, and retain direct control over the runtime. This is not authorization
@@ -24,37 +25,37 @@ for a fleet-wide big bang: the ClusterTenant remains the atomic isolation and cu
 - Stabilize, test, sign, and freeze one immutable OpenClaw-based blue release.
 - Keep `main` as the protected blue maintenance line and integrate green through ordinary reviewed
   pull requests on protected `feat/agent-platform-v2`.
-- Build green with no OpenClaw bridge, transcript mirror, dual-write compatibility adapter,
-  legacy-shaped import, or reverse bridge in runtime paths.
-- Export blue read-only and import green idempotently from checkpoint-bound snapshots or explicitly
-  approved reset/archive/reconnect inputs.
-- Rehearse production-shaped migration and failure paths, qualify one entire dogfood silo, then cut
-  one complete ClusterTenant at a time.
+- Build green from empty stores with no OpenClaw bridge, transcript mirror, dual-write compatibility
+  adapter, legacy-shaped input, or reverse bridge in runtime paths.
+- Do not export, import, copy, convert, reconstruct, or otherwise transfer any legacy data, state,
+  configuration, identity, identifier, credential, schema, protocol, artifact, or value into green.
+  Create every green authority and value anew through green provisioning and onboarding.
+- Rehearse clean provisioning, archive isolation, activation, abort, and failure paths; qualify one
+  entirely fresh dogfood silo; then activate one complete ClusterTenant at a time.
 - Before the commit point, rollback restores the exact signed blue manifest under a new generation.
-  After green accepts writes or performs side effects, recovery is forward. If post-write reverse
-  rollback is mandatory, this route is not used.
+  After green accepts writes or performs side effects, recovery is forward in green; post-write
+  reverse rollback is not supported.
 
-The active-slot/quarantine mechanism is migration infrastructure only. It is removed after all
+The active-slot/quarantine mechanism is cutover infrastructure only. It is removed after all
 ClusterTenants and rollback windows complete.
 
-## R0 escape hatch
+## R0 clean-build invariant
 
-R0 must inventory the real estate and classify every ClusterTenant as reset-eligible or requiring
-full-fidelity migration. It must also decide whether post-write rollback is mandatory. If mandatory
-post-write rollback is a product or operating requirement, this ADR's route is no longer viable:
-the program stops and the organization separately plans the strangler/hybrid strategy. A reverse
-event or side-effect bridge is not part of this clean-green route.
+R0 records the irreversible clean-build boundary: green starts empty, receives nothing from blue,
+and uses fresh identities, identifiers, credentials, configuration, stores, and product state.
+Blue may remain isolated and read-only for its approved retention window, but green cannot read it
+and no archive is a source for green. After green accepts writes or performs side effects, recovery
+is forward in green; post-write reverse rollback and a strangler/hybrid escape are not supported.
 
 This is a decision gate, not a documentation formality.
 
 ## Alternatives considered
 
-- **Feature-by-feature strangler** — rejected for the current route because it adds temporary live
-  compatibility seams to the same domain being replaced. It remains the mandatory escape hatch if
-  R0 requires post-write rollback.
-- **Fleet-wide big bang** — rejected. One failed migration must not expose every ClusterTenant.
+- **Feature-by-feature strangler** — rejected historical design work because it adds temporary live
+  compatibility seams to the same domain being replaced. It is not an executable escape route.
+- **Fleet-wide big bang** — rejected. One failed activation must not expose every ClusterTenant.
 - **Permanent blue/green runtime choice** — rejected. A silo has one active runtime and one writer;
-  dual operation exists only as quarantined migration infrastructure.
+  dual operation exists only as quarantined cutover infrastructure.
 - **Reverse bridge by default** — rejected. It recreates a dual-runtime contract and invalidates the
   claimed rewrite-freeze simplicity.
 
@@ -63,9 +64,9 @@ This is a decision gate, not a documentation formality.
 - No green product capability serves a live blue ClusterTenant before its atomic cutover.
 - Blue receives only the named stabilization runway and later security/availability-class fixes;
   green applicability is assessed for every exception.
-- Migration correctness, credential custody, side-effect fencing, immutable manifests, and
-  deterministic rehearsal become release-blocking work.
+- Clean provisioning, fresh credential custody, archive isolation, side-effect fencing, immutable
+  release evidence, and deterministic rehearsal become release-blocking work.
 - Product value is delayed until full green qualification, and blue/green capacity must coexist
   during the program.
 - R10 replaces `main` only after every silo's retention window, then deletes blue and the
-  migration-only slot machinery.
+  cutover-only slot machinery.

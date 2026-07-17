@@ -37,10 +37,11 @@ The recommended direction is:
 - choose the OpenAI Agents SDK if its LiteLLM path, resumable approvals, cancellation, and event
   semantics pass; choose AI SDK if its thinner, provider-neutral loop proves materially safer;
 - build a minimal custom loop only if both toolkits fail a hard gate;
-- migrate behind the existing frontend `ConversationGateway`, but introduce an OpenCrane-owned
-  backend run/event protocol rather than reproducing Gateway v4;
-- prove behavioral parity before switching a tenant, then delete the OpenClaw installer, config,
-  protocol, workspace, plugin, and transcript compatibility surface.
+- replace the backend behind the existing frontend `ConversationGateway`, but introduce an
+  OpenCrane-owned run/event protocol rather than reproducing Gateway v4;
+- prove the independently approved green product contract before activating a freshly initialized
+  tenant, then delete the OpenClaw installer, config, protocol, workspace, plugin, and transcript
+  compatibility surface.
 
 This investigation establishes the evidence for a **TypeScript** default and refines the wider
 architecture around a conformance-selected loop driver. Python remains appropriate for isolated
@@ -57,8 +58,9 @@ The evidence below is pinned to the exact upstream runtime selected by this repo
   [OpenCrane config](../../apps/opencrane/src/app/config.ts), and
   [infra values](../../apps/opencrane-infra/values.yaml)
 
-Current OpenClaw `main` may differ. Parity and migration fixtures must target the deployed pinned
-artifact first; any later upgrade is a separate decision.
+Current OpenClaw `main` may differ. The deployed pinned artifact is evidence only for blue support,
+quarantine, pre-commit restore, and deletion. Green conformance fixtures are authored independently
+from the approved R0 product contract and must not target or derive from any OpenClaw artifact.
 
 ## How a web-chat turn really runs
 
@@ -161,7 +163,7 @@ The OpenClaw harness and embedded runner add the difficult behavior around that 
 | Concern | What the pinned runtime does | Replacement implication |
 |---|---|---|
 | Session serialization | Per-session command lane, global capacity lane, transcript file-owner guard, and process-aware write lock | Use a durable one-active-run lease per thread plus bounded global worker capacity |
-| Transcript | `sessions.json` metadata plus append-only, tree-structured `<sessionId>.jsonl` messages, tool results and compaction entries | Import/archive it, but make immutable Postgres messages/events canonical |
+| Transcript | `sessions.json` metadata plus append-only, tree-structured `<sessionId>.jsonl` messages, tool results and compaction entries | Do not carry it into green; start an empty immutable Postgres message/event history |
 | Context construction | Rebuilds system prompt, active tools, workspace bootstrap, skills, provider fixups and session branch before calls | Create one versioned OpenCrane `RunInputSnapshot` and prompt compiler |
 | Persistence timing | Appends each completed message; flushes queued session mutations at turn end; emits a save point and settled event | Persist normalized events transactionally before exposing them; never trust only an in-memory stream |
 | Tool lifecycle | Resolve, validate, policy hook, execute with partial updates, result hook, append result, continue | Keep authorization and idempotency outside the toolkit adapter |
@@ -258,7 +260,8 @@ Do **not** reproduce OpenClaw implementation choices that are not product requir
   navigation unless a proven UI requirement depends on one;
 - OpenClaw's built-in memory and tool policy when Cognee and Obot are the accepted authorities.
 
-The goal is behavioral compatibility at the OpenCrane product boundary, not source-level cloning.
+The goal is the independently approved OpenCrane product contract. OpenClaw behavior is not a
+compatibility target, fixture source, oracle, or acceptance baseline.
 
 ## Current OpenCrane seam and missing contract
 
@@ -393,7 +396,7 @@ conformance run instead of treating an investigation-day "latest" number as an a
 | `@langchain/langgraph` | Excellent checkpoints, replay, interrupts and deterministic graph workflows | Its thread/checkpoint runtime competes with OpenCrane's canonical run/event authority; too much machinery for a bounded loop | Reject unless long-lived deterministic graphs become a product requirement |
 | `@mastra/core` | Broad agent, workflow, memory, storage, MCP and observability platform | High overlap with nearly every OpenCrane authority this design is trying to simplify | Reject as the loop substrate |
 | Google ADK TypeScript | Runner/session/memory abstractions and a growing ecosystem | TypeScript path is less mature and brings another runtime/session authority; LiteLLM support is stronger on Python | Reject for this cutover; re-evaluate later |
-| OpenClaw `@openclaw/agent-core` | Exact inner-loop semantics | Private, release-coupled API; vendoring/forking keeps the OpenClaw upgrade tax | Use only as a behavioral oracle |
+| OpenClaw `@openclaw/agent-core` | Blue-only implementation evidence | Private, release-coupled API; using it would preserve legacy semantics and the OpenClaw upgrade tax | Reject; do not use as a green dependency or oracle |
 | Minimal custom TypeScript loop | Complete control and direct LiteLLM fit | OpenCrane owns every malformed-stream, tool-call and provider edge case forever | Last-resort escape hatch |
 
 Primary documentation:
@@ -439,12 +442,12 @@ it:
    session, approval, context, retry and event behavior in OpenCrane.
 4. Build a minimal loop only if both candidates fail safe approval recovery or provider
    conformance. Record the failing fixtures and the exact custom surface required.
-5. Do not maintain both toolkits after selection. The loser remains a test oracle only until the
-   chosen adapter is canary-qualified.
+5. Do not maintain both toolkits after selection. Delete the losing adapter after the selected
+   driver passes the independently authored green fixture suite.
 
 ## Delivery plan
 
-### Gate L0 — freeze the behavioral baseline
+### Gate L0 — freeze the blue support and deletion baseline
 
 Deliverables:
 
@@ -452,31 +455,28 @@ Deliverables:
   and rollback to the previous image, then stop installing/updating the runtime on the tenant PVC at
   startup;
 - record the upstream tag, commit, rendered config, model aliases, enabled tools/plugins and
-  effective tenant contract for each test run;
-- extract real Gateway frames already represented in frontend specs into shared golden fixtures;
-- add an OpenClaw black-box trajectory recorder that normalizes away timestamps and private values;
-- capture fixtures for plain text, reasoning, one tool, multiple sequential/parallel tools,
-  malformed and unknown tools, denial, approval, media, abort, reconnect, compaction, restart,
-  provider/auth fallback, memory recall/capture and terminal errors;
-- classify every current OpenClaw behavior as **must preserve**, **intentional change**, or
-  **unused—delete**.
+  effective tenant contract only for blue support, quarantine, pre-commit restore, and deletion;
+- author target conversation, tool, approval, media, abort, reconnect, compaction, restart,
+  provider/auth fallback, memory, and terminal-error fixtures independently from the approved R0
+  product contract;
+- prohibit extracting, recording, normalizing, translating, or reusing Gateway frames, blue
+  trajectories, legacy data, schemas, protocols, identifiers, or behavioral decisions as green
+  fixtures or acceptance expectations.
 
-Useful existing fixtures include `openclaw-connection.spec.ts`, `chat-event.util.spec.ts`,
-`tool-results-media.spec.ts`, `history-fold.spec.ts`, `history.util.spec.ts`,
-`operation.util.spec.ts`, `reconnect.util.spec.ts`, the proxy/auth suites, and the runtime contract
-suites.
+Existing OpenClaw fixtures and runtime-contract suites remain blue-only maintenance evidence. Green
+test authors must not import, copy, translate, derive, or treat them as an oracle.
 
 Exit gate:
 
-- every required trajectory has deterministic normalized event and transcript expectations;
-- the pinned OpenClaw bridge passes the suite;
-- product owners accept the intentional-change and deletion inventory.
+- the pinned blue artifact passes its maintenance, quarantine, and pre-commit restore checks;
+- the independently authored green fixtures trace only to the approved R0 product contract;
+- the deletion inventory names every blue-only fixture, recorder, protocol, and adapter for R10.
 
 ### L1 — define the canonical conversation and run plane
 
 Deliverables:
 
-- Prisma models and migrations for the canonical model above;
+- Prisma schema definitions and empty-store initialization for the canonical model above;
 - append-only event writer with unique `(runId, sequence)` and one terminal-event constraint;
 - one-active-run thread lease with fencing token and expiry/reconciliation;
 - idempotent send, abort, approval and tool-dispatch APIs;
@@ -485,7 +485,7 @@ Deliverables:
   necessary; commands remain authenticated HTTP endpoints;
 - runtime-neutral client adapter implementing the current `ConversationGateway` plus explicit
   approval/attachment/run affordances;
-- transcript export/import/archive policy for existing OpenClaw JSONL.
+- green-only transcript retention/deletion policy; existing OpenClaw JSONL never enters green.
 
 Exit gate:
 
@@ -496,10 +496,10 @@ Exit gate:
 
 ### L2 — superseded bridge (strangler route only; do not execute under rewrite-freeze)
 
-This phase belongs only to the rejected strangler alternative. The adopted rewrite-freeze route
-must not build or serve through this bridge: R3 performs bounded read-only export and one-way green
-import for approved non-reproducible owner state, then R4 serves the direct green runtime. The
-bridge has no deliverables or exit gate on this route.
+This phase belongs only to the rejected historical strangler alternative. The adopted rewrite-freeze
+route must not build or serve through this bridge: R3 creates empty green authorities without blue
+access, then R4 serves the direct green runtime. The bridge has no deliverables or exit gate on this
+route and is not an escape path.
 
 ### L3 — extract versioned runtime inputs
 
@@ -546,8 +546,8 @@ Exit gate:
 
 - apply the decision rule above and record one selected, exact-pinned toolkit;
 - remove the losing production adapter;
-- document any intentional difference from OpenClaw and update the golden expectations only after
-  approval.
+- record conformance only against the independently approved green fixtures; do not compare with or
+  update expectations from OpenClaw behavior.
 
 ### L5 — build the OpenCrane reliability envelope
 
@@ -579,34 +579,37 @@ Exit gate:
 - every non-terminal run is recoverable or deterministically reconciled after worker restart;
 - compaction changes only derived model context, never canonical transcript history.
 
-### L6 — shadow, canary and cut over
+### L6 — qualify empty green and activate whole silos
 
 Rollout order:
 
-1. replay L0 fixtures offline;
-2. shadow production-shaped turns with all external side effects disabled and no shadow output shown
-   to users;
-3. dogfood in an isolated silo;
-4. canary complete tenants, never individual turns within one thread;
-5. expand cohorts only after the observation window and parity/SLO report pass;
-6. switch the stable tenant service/proxy target to the new runtime;
-7. permit an OpenClaw traffic rollback only before the canary's first canonical new-runtime write;
-   after that frontier, rollback means the prior OpenCrane runtime image against the same canonical
-   store. Post-write recovery is forward against green; OpenClaw image/data remain an immutable
-   archive until their approved retention trigger, with no reverse migration path.
+1. run the independently authored green fixture suite in disposable empty test silos and destroy
+   every fixture store afterward;
+2. qualify the exact green image, chart, configuration, target LiteLLM matrix, and empty-store
+   provisioning without observing or replaying blue traffic;
+3. activate one freshly initialized internal silo through the R7/R8 whole-silo gate;
+4. expand R9 cohorts one complete silo at a time only after the approved observation window and
+   green SLO/security report pass;
+5. before commit, abort by restoring the signed blue deployment while green is still empty and
+   write-disabled;
+6. at commit, atomically switch the stable silo service/proxy target and writer authority to green;
+7. after commit, recover forward using the prior qualified green runtime image against the same
+   green store. OpenClaw remains isolated and unreadable until its approved deletion trigger, with
+   no reverse state, traffic, or protocol path.
 
-Canary gates:
+Activation gates:
 
 - no lost, duplicated, reordered or late events;
 - no duplicate external side effects across retry, crash, approval resume or reconnect;
 - p95 first-token and terminal latency within the accepted budget;
-- model/tool success, cancellation, compaction and provider fallback meet or improve the baseline;
+- model/tool success, cancellation, compaction and provider fallback meet the independently
+  approved green thresholds;
 - memory scope, persona, skill entitlement and Obot denial remain tenant-correct;
 - usage/cost reconciliation and trace coverage are complete;
-- before the first new-runtime write, rollback restores OpenClaw without two transcript writers;
-  afterward, rollback restores the previous OpenCrane runtime version against canonical state.
+- before commit, abort restores blue while green remains empty and write-disabled; afterward,
+  recovery uses the previous qualified green runtime against canonical green state.
 
-### L7 — delete OpenClaw compatibility
+### L7 — delete blue and every OpenClaw compatibility surface
 
 After every tenant passes its rollback window, delete rather than deprecate:
 
@@ -617,7 +620,7 @@ After every tenant passes its rollback window, delete rather than deprecate:
   compatibility, and OpenClaw resource names;
 - workspace marker/persona renderers, OpenClaw skill copies, plugin installation and Cognee plugin
   lifecycle;
-- JSONL session/compaction compatibility after export/retention obligations end;
+- every JSONL session/compaction compatibility path; blue retention never authorizes green access;
 - bridge-only fields, URLs, environment variables, Helm values, tests and observability labels;
 - the losing toolkit adapter and the rollout switch.
 
@@ -627,7 +630,7 @@ Exit gate:
 - backup/restore, upgrade, conversation, approval, memory, MCP, artifact and revoke smoke tests pass;
 - the new runtime is the only supported personal-agent execution path.
 
-## Parity acceptance matrix
+## Green acceptance matrix
 
 | Scenario | Required invariant |
 |---|---|
@@ -648,21 +651,21 @@ Exit gate:
 | Obot unavailable/denies | Fail closed for governed tools; no local policy bypass |
 | Budget exhaustion | Tool/model work stops; durable classified terminal outcome and usage |
 | Child agent | Durable parent/root lineage, inherited policy, bounded depth/count/cost and idempotent completion delivery |
-| Tenant cutover/rollback | A tenant uses one runtime and one canonical writer at a time; OpenClaw rollback closes at the first new-runtime write frontier |
+| Tenant cutover/recovery | A silo uses one runtime and one canonical writer at a time; blue abort closes at commit and post-commit recovery is forward in green |
 
 ## Decisions required before implementation
 
 Gate L0 should record these explicitly:
 
-1. whether current production data requires full JSONL import or an immutable searchable archive;
+1. confirm that green starts with empty transcript, memory, artifact, persona, schedule, integration,
+   and credential state and cannot access retained OpenClaw data;
 2. whether a second user message during a run queues, steers the active run, or is rejected—the
    default recommendation is queue as the next run, with steering deferred until a proven need;
 3. which tools require durable human approval and which can ever execute in parallel;
 4. the permitted model fallback set and whether fallback after visible output is forbidden;
 5. quantitative per-run token, cost, time, tool and child-agent budgets;
 6. the Cognee failure policy for recall and capture;
-7. the tenant canary cohort, observation window and point after which rollback is data migration,
-   not a traffic switch.
+7. the silo cohort, observation window, atomic commit authority, and forward-recovery thresholds.
 
 None of these decisions changes the toolkit boundary: OpenCrane remains the authority and the
 selected library remains a replaceable bounded loop driver.

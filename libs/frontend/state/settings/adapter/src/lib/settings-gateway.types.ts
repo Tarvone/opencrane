@@ -80,6 +80,12 @@ export interface AwarenessContractInfo
 
 	/** Resolved contract version string (e.g. `v2.3.1`). */
 	contractVersion: string;
+
+	/** Fallback behaviour when Cognee is unreachable mid-loop. */
+	fallbackBehaviour: "proceed" | "pause" | "abort";
+
+	/** Whether citation mode is enabled on grounded responses. */
+	citationMode: boolean;
 }
 
 /**

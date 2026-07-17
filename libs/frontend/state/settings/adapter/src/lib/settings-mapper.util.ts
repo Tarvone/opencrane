@@ -206,6 +206,12 @@ export interface EffectiveContractWire
 
 	/** Resolved contract version string. */
 	contractVersion?: string;
+
+	/** Fallback behaviour when Cognee is unreachable mid-loop. */
+	fallbackBehaviour?: "proceed" | "pause" | "abort";
+
+	/** Whether citation mode is enabled on grounded responses. */
+	citationMode?: boolean;
 }
 
 /**
@@ -219,7 +225,9 @@ export function _MapAwarenessContract(wire: EffectiveContractWire): AwarenessCon
 {
 	return {
 		contractId: wire.contractId ?? "",
-		contractVersion: wire.contractVersion ?? ""
+		contractVersion: wire.contractVersion ?? "",
+		fallbackBehaviour: wire.fallbackBehaviour ?? "proceed",
+		citationMode: wire.citationMode ?? true
 	};
 }
 

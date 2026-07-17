@@ -362,7 +362,7 @@ select {
 	border: 1px solid var(--border);
 	outline: none;
 	font-size: 13px;
-	background: var(--background);
+	background: var(--oc-surface-card);
 	transition: border-color 120ms ease;
 
 	&:hover {
@@ -375,7 +375,7 @@ select {
 	border-radius: var(--radius);
 	border: 1px solid var(--border);
 	outline: none;
-	background: var(--background);
+	background: var(--oc-surface-card);
 	font-size: 13px;
 	transition: border-color 120ms ease;
 

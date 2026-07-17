@@ -46,7 +46,7 @@
 	&__button {
 		padding: 10px 20px;
 		border: none;
-		border-radius: 7px;
+		border-radius: var(--oc-radius-button);
 		background: var(--oc-teal);
 		box-shadow: var(--paper-button-primary-shadow);
 		color: var(--oc-text-inverse);

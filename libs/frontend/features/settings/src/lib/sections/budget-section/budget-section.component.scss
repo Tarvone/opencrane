@@ -6,7 +6,7 @@
 	&__card {
 		background: var(--oc-surface-card);
 		border: 1px solid var(--oc-border);
-		border-radius: 10px;
+		border-radius: var(--oc-radius-card);
 		padding: 20px 24px;
 		margin-bottom: 24px;
 	}
@@ -56,14 +56,14 @@
 	&__bar-track {
 		height: 7px;
 		background: var(--oc-border-light);
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 		overflow: hidden;
 	}
 
 	&__bar-fill {
 		height: 100%;
 		background: var(--oc-text-muted);
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 		transition: width 300ms ease;
 
 		&--red {
@@ -80,7 +80,7 @@
 	&__table {
 		background: var(--oc-surface-card);
 		border: 1px solid var(--oc-border);
-		border-radius: 10px;
+		border-radius: var(--oc-radius-card);
 		overflow: hidden;
 	}
 
@@ -124,7 +124,7 @@
 	&__empty {
 		background: var(--oc-surface-card);
 		border: 1px solid var(--oc-border);
-		border-radius: 10px;
+		border-radius: var(--oc-radius-card);
 		padding: 48px 24px;
 		text-align: center;
 		font-size: 14px;

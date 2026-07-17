@@ -95,7 +95,7 @@
 		font-family: var(--font-mono, monospace);
 		font-size: 12.5px;
 		padding: 1px 5px;
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 		background: var(--secondary);
 		border: 1px solid var(--border);
 	}
@@ -172,7 +172,7 @@
 		font-size: 11px;
 		color: var(--muted-foreground);
 		padding: 2px 6px;
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 
 		&:hover {
 			color: var(--foreground);

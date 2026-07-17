@@ -13,7 +13,7 @@
 
 	&--active {
 		background: color-mix(in srgb, var(--wo-sidebar-fg) 7%, transparent);
-		border-radius: 6px;
+		border-radius: var(--oc-radius-control);
 	}
 
 	&__dot {
@@ -63,7 +63,7 @@
 	&__unread {
 		font-size: 10px;
 		color: var(--oc-surface-paper);
-		border-radius: 10px;
+		border-radius: var(--oc-radius-card);
 		padding: 1px 5px;
 	}
 }

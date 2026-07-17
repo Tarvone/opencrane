@@ -223,7 +223,7 @@
 		color: var(--foreground);
 		background: transparent;
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--oc-radius-control);
 		cursor: pointer;
 
 		&:hover {
@@ -370,7 +370,7 @@
 		gap: 8px;
 		background: var(--oc-surface-paper);
 		border: 1px solid var(--oc-border);
-		border-radius: 6px;
+		border-radius: var(--oc-radius-control);
 		padding: 6px 10px;
 		font-size: 12px;
 		color: var(--oc-text-primary);
@@ -419,7 +419,7 @@
 		color: var(--oc-text-muted);
 		cursor: pointer;
 		padding: 2px;
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -499,7 +499,7 @@
 	&__stop {
 		background: var(--oc-surface-paper);
 		border: 1px solid var(--oc-border);
-		border-radius: 7px;
+		border-radius: var(--oc-radius-button);
 		padding: 6px;
 		color: var(--oc-text-primary);
 		cursor: pointer;

@@ -154,7 +154,13 @@
 	--input-background: var(--oc-surface-card);
 	--switch-background: #cec9c3;
 	--ring: var(--oc-teal-edge);
-	--radius: 0.25rem;
+
+	/* Geometry */
+	--oc-radius-inner: 4px;
+	--oc-radius-control: 6px;
+	--oc-radius-button: 7px;
+	--oc-radius-card: 10px;
+	--radius: var(--oc-radius-inner);
 	--focus-ring-width: 3px;
 	--focus-ring-offset: 2px;
 
@@ -361,7 +367,7 @@ select {
 .wo-text-input {
 	width: 100%;
 	padding: 8px 12px;
-	border-radius: var(--radius);
+	border-radius: var(--oc-radius-control);
 	border: 1px solid var(--border);
 	outline: none;
 	font-size: 13px;
@@ -375,7 +381,7 @@ select {
 
 .wo-select {
 	padding: 8px 12px;
-	border-radius: var(--radius);
+	border-radius: var(--oc-radius-control);
 	border: 1px solid var(--border);
 	outline: none;
 	background: var(--oc-surface-card);
@@ -392,7 +398,7 @@ select {
 	align-items: center;
 	gap: 8px;
 	padding: 8px 12px;
-	border-radius: var(--radius);
+	border-radius: 6px;
 	border: 1px dashed var(--border);
 	font-size: 13px;
 	color: var(--muted-foreground);

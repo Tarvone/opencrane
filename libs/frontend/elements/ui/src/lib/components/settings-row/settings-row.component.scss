@@ -1,7 +1,7 @@
 .wo-row {
 	display: grid;
 	grid-template-columns: 260px minmax(0, 1fr);
-	align-items: start;
+	align-items: center;
 	gap: 24px;
 	padding: 17px 0;
 	border-bottom: 1px solid var(--border);

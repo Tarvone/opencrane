@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: #1a1918; height: 100vh; overflow: hidden; color: #1a1918; }
+    input, button, textarea { font-family: inherit; }
+    ::placeholder { color: #b0ada8; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #9fdde8, #0db5cc); border-radius: 99px; }
+    a { color: #0a94a7; } a:hover { color: #0db5cc; }
+    @keyframes ocFold { 0%, 12% { transform: rotateX(0); filter: brightness(1); } 42%, 55% { transform: rotateX(-178deg); filter: brightness(.72); } 88%, 100% { transform: rotateX(0); filter: brightness(1); } }
+    @keyframes ocPop { 0% { transform: translateY(14px) scale(.97); opacity: 0; } 60% { opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden">
+
+  <dc-import name="Sidebar" my-items="{{ sbMy }}" shared-items="{{ sbShared }}" has-shared="{{ sbHasShared }}" user-initials="{{ initials }}" user-name="{{ fullName }}" hint-size="192px,100%"></dc-import>
+
+  <div style="flex:1;display:flex;flex-direction:column;background:#f5f3ec;overflow:hidden">
+    <div style="height:48px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e0ddd6;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:15px;font-weight:600;letter-spacing:-.2px">Say hello to OpenCrane</span>
+        <span style="font-size:11.5px;padding:2px 8px;border-radius:4px;background:#d9f4f8;color:#0a94a7;font-weight:500">Onboarding</span>
+      </div>
+      <span style="font-size:12px;color:#9a9690;padding:3px 9px;border:1px solid #dedad2;border-radius:5px">sonnet-4-6</span>
+    </div>
+
+    <div id="sim-chat" style="flex:1;overflow-y:auto;padding:32px 0 12px">
+      <div style="max-width:700px;margin:0 auto;padding:0 24px">
+        <x-import component-from-global-scope="MessageList" from="./MessageList.jsx" messages="{{ messages }}" thinking="{{ thinking }}" hint-size="100%,120px"></x-import>
+
+        <sc-if value="{{ offer }}" hint-placeholder-val="{{ false }}">
+          <div style="animation:ocPop .5s cubic-bezier(.22,.9,.3,1) both;margin-top:2px;background:#fff;border:1px solid #e0ddd6;border-radius:13px;padding:18px 18px 16px;box-shadow:0 1px 0 #ece9e3, 0 6px 18px rgba(13,181,204,.08);position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;right:0;width:24px;height:24px;background:linear-gradient(225deg,#f5f2ec 0%,#f5f2ec 50%,#dedad2 50%,#ece9e3 100%);border-bottom-left-radius:5px;box-shadow:-1px 1px 2px rgba(0,0,0,.06)"></div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:15px">
+              <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#0db5cc,#0a8ba0);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(13,181,204,.3)">
+                <svg width="19" height="17" viewBox="0 0 16 14"><polygon points="1,13 6,5 8,13" fill="#ffffff" opacity=".65"></polygon><polygon points="6,5 11,13 8,13" fill="#ffffff" opacity=".9"></polygon><polygon points="6,5 12,1 11,13" fill="#ffffff"></polygon><polygon points="12,1 15,3 13,5" fill="#ffe0b8"></polygon></svg>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#0a94a7">Your working style</div>
+                <div style="font-size:18px;font-weight:600;letter-spacing:-.3px;margin-top:1px">You're a Campaigner · <span style="font-family:'DM Mono',monospace;color:#0a7a8c">ENFP</span></div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <sc-for list="{{ dims }}" as="d" hint-placeholder-count="4">
+                <div style="flex:1;text-align:center;border:1px solid #e2ebe9;background:#f3fbfc;border-radius:9px;padding:9px 4px">
+                  <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:#0db5cc">{{ d.letter }}</div>
+                  <div style="font-size:10.5px;color:#7a756c;margin-top:1px">{{ d.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9a9690;margin-bottom:8px">How I'll work with you</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:17px">
+              <sc-for list="{{ prefs }}" as="p" hint-placeholder-count="4">
+                <div style="display:flex;align-items:flex-start;gap:9px">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#0db5cc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M3.5 8.5l3 3 6-7"></path></svg>
+                  <span style="font-size:13.5px;color:#3a3835;line-height:1.4">{{ p }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ showForm }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:10px">
+                <button onClick="{{ save }}" style="background:#0db5cc;border:none;border-radius:8px;padding:9px 16px;font-size:13.5px;font-weight:600;color:#fff;cursor:pointer;box-shadow:0 1px 0 #0a94a7, 0 2px 5px rgba(13,181,204,.28);transition:all .13s ease" style-hover="background:#22c7dd;transform:translateY(-1px)" style-active="transform:translateY(0)">Sounds like me</button>
+                <button onClick="{{ replay }}" style="background:transparent;border:none;padding:9px 6px;font-size:13px;color:#8a8682;cursor:pointer" style-hover="color:#4a4845">Retake</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:10px;border-top:1px solid #ece9e3;padding-top:14px">
+                <div style="width:26px;height:26px;border-radius:50%;background:#e0f0e8;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#1a5c38" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"></path></svg></div>
+                <div style="font-size:13px;color:#6a6660;line-height:1.5">Saved to your profile — I'll adapt from here. Fine-tune it anytime in <a href="#" style="text-decoration:none;font-weight:500">Settings → Awareness</a>.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="padding:0 24px 18px;flex-shrink:0">
+      <div style="max-width:700px;margin:0 auto">
+        <dc-import name="Composer" placeholder-visible="{{ placeholderVisible }}" has-composer-text="{{ hasComposerText }}" c-pre="{{ composerText }}" caret="{{ caret }}" send-bg="{{ sendBg }}" send-stroke="{{ sendStroke }}" hint-size="100%,58px"></dc-import>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px">
+          <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:#9a9690">
+            <div style="width:7px;height:7px;border-radius:50%;background:{{ statusDot }}"></div>{{ statusText }}
+          </div>
+          <button onClick="{{ replay }}" style="background:#fff;border:1px solid #dedad2;border-radius:6px;padding:4px 11px;font-size:12px;font-weight:500;color:#6a6660;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 0 #dcd8d0;transition:all .13s ease" style-hover="transform:translateY(-1px);color:#0a94a7">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>
+            Replay
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;userName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Maya&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;User&quot;},&quot;playbackSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:3,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Playback&quot;}}">
+class Component extends DCLogic {
+  state = { shown: [], thinking: false, offer: false, saved: false, playing: true, composerText: '', caret: true };
+  timers = [];
+
+  typeInComposer(startClock, k, text) {
+    let t = startClock;
+    const step = 40 * k;
+    for (let i = 1; i <= text.length; i++) { const q = text.slice(0, i); this.at(() => this.setState({ composerText: q }), t); t += step; }
+    return t + 500 * k;
+  }
+
+  componentDidMount() { this.play(); }
+  componentWillUnmount() { this.clearTimers(); }
+  clearTimers() { this.timers.forEach(clearTimeout); this.timers = []; }
+  at(fn, d) { const id = setTimeout(fn, d); this.timers.push(id); }
+  scrollDown() { setTimeout(() => { const el = document.getElementById('sim-chat'); if (el) el.scrollTop = el.scrollHeight; }, 60); }
+
+  name() { return this.props.userName ?? 'Maya'; }
+
+  sb(o) {
+    const active = !!o.active;
+    return {
+      label: o.label, sub: o.sub || '', hasSub: !!o.sub, subPad: o.dot ? '13px' : '0',
+      hasDot: !!o.dot, dot: o.dot || '#0db5cc',
+      hasBadge: !!o.badge, badge: o.badge || '', badgeBg: o.badgeBg || '#ddd8cf', badgeColor: o.badgeColor || '#7a756c', badgeWeight: o.badgeWeight || '400',
+      bg: active ? '#ffffff' : 'transparent', shadow: active ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
+      nameColor: active ? '#1a1918' : '#6a655e', nameWeight: active ? '500' : '400',
+      rootOpacity: o.muted ? '.6' : '1',
+    };
+  }
+
+  script() {
+    const n = this.name();
+    return [
+      { role: 'assistant', id: 'a1', think: 1400, text: "Hi " + n + " — good to finally meet you. I'm going to be your day-to-day agent, so before any real work, I'd love to learn how you *tick*. Four quick questions, then I'll shape how I talk to you. No wrong answers.\n\n**First:** when a tricky problem lands, do you chew on it solo, or talk it out loud with people?" },
+      { role: 'user', id: 'u1', text: "Talk it out, for sure — my best ideas show up mid-conversation." },
+      { role: 'assistant', id: 'a2', think: 1400, text: "A thinker-out-loud — noted. I'll bounce ideas *with* you rather than just hand over answers.\n\n**Next:** do you trust hard details and what's proven, or patterns and where things could go?" },
+      { role: 'user', id: 'u2', text: "Patterns, mostly. I like seeing the big picture first." },
+      { role: 'assistant', id: 'a3', think: 1400, text: "Big-picture first — got it. I'll lead with the *why* before the *what*.\n\n**And decisions:** does the logic win, or how it lands on people?" },
+      { role: 'user', id: 'u3', text: "People. How something lands really matters to me." },
+      { role: 'assistant', id: 'a4', think: 1400, text: "So the human side always counts — I'll keep that front of mind.\n\n**Last one:** plans locked in, or room to improvise?" },
+      { role: 'user', id: 'u4', text: "Room to improvise — I like keeping my options open." },
+      { role: 'assistant', id: 'a5', think: 1600, offer: true, text: "That's all I need. Here's the read I'm getting on you, " + n + " —" },
+    ];
+  }
+
+  play() {
+    this.clearTimers();
+    const speed = this.props.playbackSpeed ?? 1;
+    const k = 1 / (speed || 1);
+    this.setState({ shown: [], thinking: false, offer: false, saved: false, playing: true, composerText: '' });
+    this._caret = setInterval(() => this.setState(s => ({ caret: !s.caret })), 500);
+    this.timers.push(this._caret);
+    let clock = 500 * k;
+    this.script().forEach(step => {
+      if (step.role === 'user') {
+        clock = this.typeInComposer(clock, k, step.text);
+        this.at(() => { this.setState(s => ({ shown: s.shown.concat([step]), composerText: '' })); this.scrollDown(); }, clock);
+        clock += 650 * k;
+      } else {
+        this.at(() => { this.setState({ thinking: true }); this.scrollDown(); }, clock);
+        clock += (step.think || 1400) * k;
+        this.at(() => { this.setState(s => ({ thinking: false, shown: s.shown.concat([step]) })); this.scrollDown(); }, clock);
+        clock += 900 * k;
+        if (step.offer) { this.at(() => { this.setState({ offer: true, playing: false }); this.scrollDown(); }, clock); clock += 300; }
+      }
+    });
+    this.at(() => { clearInterval(this._caret); }, clock);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const name = this.name();
+    return {
+      initials: name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+      fullName: name,
+      sbMy: [ this.sb({ label: 'Say hello to OpenCrane', sub: 'Onboarding · step 1', dot: '#0db5cc', active: true }), this.sb({ label: 'Connect your tools', sub: 'Up next', muted: true }) ],
+      sbShared: [ this.sb({ label: 'Team playbook', sub: 'Company-wide' }) ],
+      sbHasShared: true,
+      messages: s.shown, thinking: s.thinking,
+      composerText: s.composerText, placeholderVisible: (s.composerText || '').length === 0, hasComposerText: (s.composerText || '').length > 0,
+      caret: s.caret ? 1 : 0,
+      sendBg: (s.composerText || '').trim().length ? '#0db5cc' : '#eae6df',
+      sendStroke: (s.composerText || '').trim().length ? '#ffffff' : '#b0ada8',
+      offer: s.offer, showForm: !s.saved, saved: s.saved,
+      dims: [
+        { letter: 'E', label: 'Extraverted' },
+        { letter: 'N', label: 'Intuitive' },
+        { letter: 'F', label: 'Feeling' },
+        { letter: 'P', label: 'Prospecting' },
+      ],
+      prefs: [
+        "Lead with the big picture, then fill in the details",
+        "Keep things warm and conversational, not clipped",
+        "Offer a few options instead of one ultimatum",
+        "Bounce ideas back and forth as we go",
+      ],
+      save: () => { this.setState({ saved: true }); this.scrollDown(); },
+      replay: () => this.play(),
+      playing: s.playing,
+      statusText: s.playing ? 'Getting to know you…' : 'Onboarding complete',
+      statusDot: s.playing ? '#0db5cc' : '#b8b4ad',
+    };
+  }
+}
+</script>
+</body>
+</html>

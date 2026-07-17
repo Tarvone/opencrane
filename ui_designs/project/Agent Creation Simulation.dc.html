@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: #1a1918; height: 100vh; overflow: hidden; color: #1a1918; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #9fdde8, #0db5cc); border-radius: 99px; }
+    a { color: #0a94a7; } a:hover { color: #0db5cc; }
+    @keyframes ocPop { 0% { transform: translateY(10px) scale(.99); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden">
+  <dc-import name="Sidebar" my-items="{{ sbMy }}" shared-items="{{ sbShared }}" has-shared="{{ true }}" user-initials="DK" user-name="Daniel Okoro" user-bg="#2a5c9a" hint-size="192px,100%"></dc-import>
+
+  <div style="flex:1;display:flex;overflow:hidden">
+    <dc-import name="SettingsNav" active-id="agents" tab="workspace" hint-size="200px,100%"></dc-import>
+
+    <!-- Settings Content -->
+    <div style="flex:1;overflow-y:auto;background:#f3f0ea;padding:40px 52px 72px">
+
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+        <div style="animation:ocPop .3s ease both">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px">
+            <div>
+              <div style="font-size:26px;font-weight:600;letter-spacing:-.5px">Agents</div>
+              <div style="font-size:14px;color:#8a8682;margin-top:4px;max-width:520px">Automations that watch information sources and act using your workspace's skills — scoped to the org, a department, a team, or a single project.</div>
+            </div>
+            <button style="background:{{ createBg }};color:#fff;border:none;border-radius:7px;padding:9px 18px;font-size:13.5px;font-weight:500;cursor:pointer;margin-top:4px;flex-shrink:0;box-shadow:{{ createShadow }};transform:{{ createTransform }};transition:all .13s ease;white-space:nowrap">+ New agent</button>
+          </div>
+
+          <div style="background:#fff;border:1px solid #dedad2;border-radius:10px;overflow:hidden">
+            <sc-for list="{{ agentRows }}" as="ag" hint-placeholder-count="1">
+              <div style="padding:16px 20px;border-bottom:{{ ag.rowBorder }};animation:{{ ag.anim }}">
+                <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+                  <div style="width:32px;height:32px;border-radius:8px;background:#f0f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="13" viewBox="0 0 16 14"><polygon points="1,13 6,5 8,13" fill="{{ ag.ic1 }}"></polygon><polygon points="6,5 11,13 8,13" fill="{{ ag.ic2 }}"></polygon><polygon points="6,5 12,1 11,13" fill="{{ ag.ic3 }}"></polygon></svg></div>
+                  <div style="flex:1;min-width:160px">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <span style="font-size:14.5px;font-weight:600">{{ ag.name }}</span>
+                      <span style="font-size:11px;padding:1px 7px;border-radius:4px;background:{{ ag.scopeBg }};color:{{ ag.scopeColor }}">{{ ag.scopeLabel }}</span>
+                      <span style="font-size:11px;padding:1px 7px;border-radius:4px;background:#f0ede8;color:#6a6660;font-family:'DM Mono',monospace">v{{ ag.version }}</span>
+                    </div>
+                    <div style="font-size:12.5px;color:#9a9690;margin-top:3px">{{ ag.desc }}</div>
+                  </div>
+                  <div style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#b0ada8;flex-shrink:0" style-hover="background:#f0ede8;color:#6a6660"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2.5" r="1.3"></circle><circle cx="7" cy="7" r="1.3"></circle><circle cx="7" cy="11.5" r="1.3"></circle></svg></div>
+                </div>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#9a9690;padding-left:44px">
+                  <span>Watching <b style="color:#6a6660;font-weight:500">{{ ag.watchingSummary }}</b></span>
+                  <span>Uses <b style="color:#6a6660;font-weight:500">{{ ag.skillsSummary }}</b></span>
+                  <span>Runs <b style="color:#6a6660;font-weight:500">{{ ag.triggerLabel }}</b></span>
+                  <span>Reachable via <b style="color:#6a6660;font-weight:500">{{ ag.channelsSummary }}</b></span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:ocPop .3s ease both">
+          <div style="margin-bottom:20px">
+            <button style="background:transparent;border:none;padding:0;font-size:13.5px;color:{{ backColor }};cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;transition:color .13s ease">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2L4 7l5 5"></path></svg>
+              Agents
+            </button>
+          </div>
+          <div style="min-width:0;background:#fff;border:1px solid #dedad2;border-radius:10px;padding:20px 24px;overflow:hidden">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px">
+              <div style="flex:1;min-width:0;margin-right:16px">
+                <div style="font-size:20px;font-weight:600;letter-spacing:-.3px;padding:2px 0;min-height:26px;color:{{ nameColor }}">{{ nameShown }}<span style="opacity:{{ caretName }};color:#0db5cc;font-weight:400">|</span></div>
+                <div style="font-size:13px;color:#8a8682;padding:2px 0;margin-top:2px;min-height:18px">{{ descShown }}<span style="opacity:{{ caretDesc }};color:#0db5cc">|</span></div>
+              </div>
+              <div style="display:flex;align-items:center;flex-shrink:0;margin-top:2px">
+                <div style="width:26px;height:26px;border-radius:50%;background:#2a5c9a;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#fff;border:2px solid #fff">DK</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+              <div>
+                <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600;margin-bottom:6px">Scope</div>
+                <div style="position:relative">
+                  <div style="display:flex;align-items:center;gap:8px;border:1px solid {{ scopeSearchBorder }};background:#fff;border-radius:6px;padding:7px 10px">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0ada8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4-4"></path></svg>
+                    <sc-if value="{{ scopeChosen }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#0a7a8c;font-weight:500">{{ scopeVal }}</span></sc-if>
+                    <sc-if value="{{ scopeShowQuery }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#2a2825">{{ scopeQuery }}<span style="opacity:{{ caretScope }};color:#0db5cc;font-weight:600">|</span></span></sc-if>
+                    <sc-if value="{{ scopePlaceholder }}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;color:#b0ada8">Search scope…</span></sc-if>
+                  </div>
+                  <sc-if value="{{ scopeOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:10;background:#fff;border:1px solid #e2ddd4;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.1);padding:5px;animation:ocPop .16s ease both">
+                      <sc-for list="{{ scopeResults }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:{{ r.rowBg }}">
+                          <div style="width:6px;height:6px;border-radius:2px;background:#0db5cc"></div>
+                          <span style="font-size:13px;color:#1a1918;flex:1;min-width:0">{{ r.name }}</span>
+                          <sc-if value="{{ r.picked }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#0db5cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"></path></svg></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600;margin-bottom:6px">Version</div>
+                <div style="font-size:13px;color:#6a6660;padding:7px 0;font-family:'DM Mono',monospace">v0.1.0</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:1px;margin-bottom:20px;border:1px solid #ece9e2;border-radius:9px;overflow:hidden">
+              <div style="background:#fbfaf7;padding:12px 16px;border-bottom:1px solid #ece9e2">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600;margin-bottom:8px">Watching</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;min-height:24px">
+                  <sc-for list="{{ watching }}" as="w" hint-placeholder-count="1">
+                    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 5px 3px 9px;border-radius:20px;background:#f0ede8;color:#6a6660;white-space:nowrap;animation:ocPop .25s ease both">{{ w }}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a8a49c" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  </sc-for>
+                  <sc-if value="{{ noWatching }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:#b0ada8">Nothing yet</span></sc-if>
+                </div>
+                <div style="position:relative;max-width:320px">
+                  <div style="display:flex;align-items:center;gap:8px;border:1px solid {{ watchSearchBorder }};background:#fff;border-radius:7px;padding:7px 10px">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0ada8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4-4"></path></svg>
+                    <span style="font-size:12.5px;color:#2a2825;min-height:16px">{{ watchQuery }}<span style="opacity:{{ caretWatch }};color:#0db5cc;font-weight:600">|</span></span>
+                    <sc-if value="{{ watchEmpty }}" hint-placeholder-val="{{ true }}"><span style="font-size:12.5px;color:#b0ada8">Search sources to add…</span></sc-if>
+                  </div>
+                  <sc-if value="{{ watchOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:10;background:#fff;border:1px solid #e2ddd4;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.1);padding:5px;animation:ocPop .16s ease both">
+                      <sc-for list="{{ watchResults }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:{{ r.rowBg }}">
+                          <span style="font-size:12.5px;color:#1a1918;flex:1;min-width:0">{{ r.name }}</span>
+                          <sc-if value="{{ r.picked }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#0db5cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"></path></svg></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div style="background:#fbfaf7;padding:12px 16px;border-bottom:1px solid #ece9e2">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600">Uses skills</div>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#0a94a7;cursor:pointer;font-weight:500" style-hover="color:#0db5cc">Manage skills<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+                </div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;min-height:24px">
+                  <sc-for list="{{ skillChips }}" as="sk" hint-placeholder-count="1">
+                    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 4px 3px 9px;border-radius:4px;background:#efe8f8;color:#6b3fa0;font-family:'DM Mono',monospace;white-space:nowrap;animation:ocPop .25s ease both">{{ sk }}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a888c8" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  </sc-for>
+                  <sc-if value="{{ noSkills }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:#b0ada8">No skills yet</span></sc-if>
+                </div>
+                <div style="position:relative;max-width:320px">
+                  <div style="display:flex;align-items:center;gap:8px;border:1px solid {{ skillSearchBorder }};background:#fff;border-radius:7px;padding:7px 10px">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0ada8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4-4"></path></svg>
+                    <span style="font-size:12.5px;color:#2a2825;min-height:16px">{{ skillQuery }}<span style="opacity:{{ caretSkill }};color:#0db5cc;font-weight:600">|</span></span>
+                    <sc-if value="{{ skillEmpty }}" hint-placeholder-val="{{ true }}"><span style="font-size:12.5px;color:#b0ada8">Search skills to add…</span></sc-if>
+                  </div>
+                  <sc-if value="{{ skillDropOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:10;background:#fff;border:1px solid #e2ddd4;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.1);padding:5px;animation:ocPop .16s ease both">
+                      <sc-for list="{{ skillResults }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:{{ r.rowBg }}">
+                          <span style="font-size:12px;font-family:'DM Mono',monospace;color:#6b3fa0;background:#efe8f8;padding:1px 6px;border-radius:3px">{{ r.name }}</span>
+                          <span style="font-size:11.5px;color:#9a948b;flex:1;min-width:0">{{ r.desc }}</span>
+                          <sc-if value="{{ r.picked }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#0db5cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"></path></svg></sc-if>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ skillNoResults }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#b0ada8;padding:7px 8px">No skills match</div></sc-if>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div style="background:#fbfaf7;padding:12px 16px;border-bottom:1px solid #ece9e2">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600;margin-bottom:8px">Runs on</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <sc-for list="{{ triggerPills }}" as="t" hint-placeholder-count="3">
+                    <span style="font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;background:{{ t.bg }};color:{{ t.color }};font-weight:{{ t.weight }}">{{ t.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="background:#fbfaf7;padding:12px 16px">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#9a9690;font-weight:600;margin-bottom:8px">Connected channels</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;min-height:24px">
+                  <sc-for list="{{ channels }}" as="c" hint-placeholder-count="1">
+                    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 5px 3px 9px;border-radius:20px;background:#fff;border:1px solid #dedad2;color:#3a3835;white-space:nowrap;animation:ocPop .25s ease both">{{ c }}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#b0ada8" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  </sc-for>
+                  <sc-if value="{{ noChannels }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:#b0ada8">None</span></sc-if>
+                </div>
+                <div style="position:relative;max-width:320px">
+                  <div style="display:flex;align-items:center;gap:8px;border:1px solid {{ chanSearchBorder }};background:#fff;border-radius:7px;padding:7px 10px">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0ada8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4-4"></path></svg>
+                    <span style="font-size:12.5px;color:#2a2825;min-height:16px">{{ chanQuery }}<span style="opacity:{{ caretChan }};color:#0db5cc;font-weight:600">|</span></span>
+                    <sc-if value="{{ chanEmpty }}" hint-placeholder-val="{{ true }}"><span style="font-size:12.5px;color:#b0ada8">Search channels to add…</span></sc-if>
+                  </div>
+                  <sc-if value="{{ chanOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:10;background:#fff;border:1px solid #e2ddd4;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.1);padding:5px;animation:ocPop .16s ease both">
+                      <sc-for list="{{ chanResults }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:{{ r.rowBg }}">
+                          <span style="font-size:12.5px;color:#1a1918;flex:1;min-width:0">{{ r.name }}</span>
+                          <sc-if value="{{ r.picked }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#0db5cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"></path></svg></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #dedad2;border-radius:10px;padding:16px 20px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:13px;font-weight:600">Prompt</span>
+                <span style="font-size:12.5px;color:#0db5cc;cursor:pointer;font-family:inherit">Collapse</span>
+              </div>
+              <div style="width:100%;border:1px solid #d0cdc6;border-radius:7px;padding:12px 14px;font-family:'DM Mono',monospace;font-size:12.5px;line-height:1.65;color:#1a1918;background:#fbfaf7;min-height:96px;white-space:pre-wrap">{{ prompt }}<span style="opacity:{{ caretPrompt }};color:#0db5cc;font-weight:600">|</span></div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <div style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e0ddd6;border-radius:8px;padding:6px 8px 6px 14px;box-shadow:0 4px 14px rgba(0,0,0,.1)">
+    <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#9a9690"><div style="width:7px;height:7px;border-radius:50%;background:{{ statusDot }}"></div>{{ statusText }}</div>
+    <button onClick="{{ replay }}" style="background:#fff;border:1px solid #dedad2;border-radius:6px;padding:5px 12px;font-size:12.5px;font-weight:500;color:#6a6660;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0a94a7">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>Replay
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;playbackSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:3,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Playback&quot;}}">
+class Component extends DCLogic {
+  state = { phase: 'list', createActive: false, backActive: false, name: '', desc: '', trigger: '', watching: [], skills: [], channels: [], prompt: '', caretField: '',
+    scopeVal: '', scopeQuery: '', scopeResults: [], scopeOpen: false,
+    watchQuery: '', watchResults: [], watchOpen: false,
+    skillQuery: '', skillResults: [], skillDropOpen: false,
+    chanQuery: '', chanResults: [], chanOpen: false,
+    saved: false, playing: true, _c: true };
+  timers = [];
+
+  dirs() {
+    return {
+      scope: [
+        { id: 'org', name: 'Org-wide' }, { id: 'dept-eng', name: 'Department · Engineering' },
+        { id: 'dept-fin', name: 'Department · Finance' }, { id: 'team-fin', name: 'Team · Finance' },
+        { id: 'team-fe', name: 'Team · Frontend' }, { id: 'proj-cp', name: 'Project · Customer Portal' },
+      ],
+      watch: [
+        { id: 'fin-inv', name: 'Finance drive · invoices' }, { id: 'slack-fin', name: 'Slack · #finance' },
+        { id: 'gmail-bill', name: 'Gmail · billing@' }, { id: 'xero', name: 'Xero · bills' }, { id: 'drive-rec', name: 'Drive · receipts' },
+      ],
+      skill: [
+        { id: 'read-invoices', name: 'read-invoices', desc: 'Parse invoice files' },
+        { id: 'flag-anomalies', name: 'flag-anomalies', desc: 'Detect policy breaks' },
+        { id: 'post-to-finance', name: 'post-to-finance', desc: 'Post to a channel' },
+        { id: 'summarize-thread', name: 'summarize-thread', desc: 'Condense a thread' },
+        { id: 'extract-tables', name: 'extract-tables', desc: 'Pull tables from docs' },
+        { id: 'reconcile-ledger', name: 'reconcile-ledger', desc: 'Match ledger entries' },
+      ],
+      chan: [
+        { id: 'finance', name: 'Finance' }, { id: 'slack-fin', name: 'Slack · #finance' },
+        { id: 'telegram', name: 'Telegram' }, { id: 'email', name: 'Email digest' },
+      ],
+    };
+  }
+
+  // cfg: { dir, qKey, resKey, openKey, caret, letters, pickId, commit(entry) }
+  typeSelect(startClock, k, cfg) {
+    let t = startClock;
+    const step = 105 * k;
+    const filt = (q) => cfg.dir.filter(d => d.name.toLowerCase().includes(q.toLowerCase()));
+    for (let i = 1; i <= cfg.letters.length; i++) {
+      const q = cfg.letters.slice(0, i);
+      this.at(() => this.setState({ [cfg.qKey]: q, [cfg.openKey]: true, caretField: cfg.caret, [cfg.resKey]: filt(q) }), t);
+      t += step;
+    }
+    t += 400 * k;
+    this.at(() => this.setState(st => ({ [cfg.resKey]: st[cfg.resKey].map(r => r.id === cfg.pickId ? { ...r, picked: true } : r) })), t); t += 380 * k;
+    const entry = cfg.dir.find(d => d.id === cfg.pickId);
+    this.at(() => cfg.commit(entry), t); t += 500 * k;
+    return t;
+  }
+
+  componentDidMount() { this.start(); }
+  componentWillUnmount() { this.clearTimers(); }
+  clearTimers() { this.timers.forEach(t => { clearTimeout(t); clearInterval(t); }); this.timers = []; }
+  at(fn, d) { const id = setTimeout(fn, d); this.timers.push(id); }
+
+  sb(o) {
+    const active = !!o.active;
+    return { label: o.label, sub: o.sub || '', hasSub: !!o.sub, subPad: o.dot ? '13px' : '0',
+      hasDot: !!o.dot, dot: o.dot || '#0db5cc', hasBadge: false, badge: '', badgeBg: '#ddd8cf', badgeColor: '#7a756c', badgeWeight: '400',
+      bg: active ? '#ffffff' : 'transparent', shadow: active ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
+      nameColor: active ? '#1a1918' : '#6a655e', nameWeight: active ? '500' : '400', rootOpacity: o.muted ? '.6' : '1' };
+  }
+
+  typeField(startClock, k, field, text, caretKey) {
+    let t = startClock;
+    const step = 32 * k;
+    for (let i = 1; i <= text.length; i++) { const q = text.slice(0, i); this.at(() => this.setState({ [field]: q, caretField: caretKey }), t); t += step; }
+    return t + 380 * k;
+  }
+
+  start() {
+    this.clearTimers();
+    const k = 1 / (this.props.playbackSpeed || 1);
+    this.setState({ phase: 'list', createActive: false, backActive: false, name: '', desc: '', trigger: '', watching: [], skills: [], channels: [], prompt: '', caretField: '', scopeVal: '', scopeQuery: '', scopeResults: [], scopeOpen: false, watchQuery: '', watchResults: [], watchOpen: false, skillQuery: '', skillResults: [], skillDropOpen: false, chanQuery: '', chanResults: [], chanOpen: false, saved: false, playing: true });
+    this._caret = setInterval(() => this.setState(s => ({ _c: !s._c })), 500);
+    this.timers.push(this._caret);
+    const D = this.dirs();
+    let t = 750 * k;
+    this.at(() => this.setState({ createActive: true }), t); t += 500 * k;
+    this.at(() => this.setState({ createActive: false, phase: 'edit' }), t); t += 800 * k;
+    t = this.typeField(t, k, 'name', 'Invoice watcher', 'name');
+    t = this.typeField(t, k, 'desc', 'Flags incoming invoices that break policy and posts a summary to Finance.', 'desc');
+    this.at(() => this.setState({ caretField: '' }), t); t += 150 * k;
+    t = this.typeSelect(t, k, { dir: D.scope, qKey: 'scopeQuery', resKey: 'scopeResults', openKey: 'scopeOpen', caret: 'scope', letters: 'finance', pickId: 'team-fin', commit: (e) => this.setState({ scopeVal: e.name, scopeQuery: '', scopeResults: [], scopeOpen: false, caretField: '' }) });
+    t = this.typeSelect(t, k, { dir: D.watch, qKey: 'watchQuery', resKey: 'watchResults', openKey: 'watchOpen', caret: 'watch', letters: 'invoice', pickId: 'fin-inv', commit: (e) => this.setState(st => ({ watching: st.watching.concat([e.name]), watchQuery: '', watchResults: [], watchOpen: false, caretField: '' })) });
+    t = this.typeSelect(t, k, { dir: D.skill, qKey: 'skillQuery', resKey: 'skillResults', openKey: 'skillDropOpen', caret: 'skill', letters: 'invoice', pickId: 'read-invoices', commit: (e) => this.setState(st => ({ skills: st.skills.concat([e.name]), skillQuery: '', skillResults: [], skillDropOpen: false, caretField: '' })) });
+    t = this.typeSelect(t, k, { dir: D.skill, qKey: 'skillQuery', resKey: 'skillResults', openKey: 'skillDropOpen', caret: 'skill', letters: 'flag', pickId: 'flag-anomalies', commit: (e) => this.setState(st => ({ skills: st.skills.concat([e.name]), skillQuery: '', skillResults: [], skillDropOpen: false, caretField: '' })) });
+    this.at(() => this.setState({ trigger: 'schedule' }), t); t += 620 * k;
+    t = this.typeSelect(t, k, { dir: D.chan, qKey: 'chanQuery', resKey: 'chanResults', openKey: 'chanOpen', caret: 'chan', letters: 'finance', pickId: 'finance', commit: (e) => this.setState(st => ({ channels: st.channels.concat([e.name]), chanQuery: '', chanResults: [], chanOpen: false, caretField: '' })) });
+    t = this.typeField(t, k, 'prompt', "Review each new invoice against the T&E policy. Flag anything over the cap or missing receipts, and post a short summary to the Finance thread.", 'prompt');
+    this.at(() => this.setState({ caretField: '', backActive: true }), t); t += 600 * k;
+    this.at(() => { clearInterval(this._caret); this.setState({ backActive: false, phase: 'list', saved: true, playing: false }); }, t);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const isEdit = s.phase === 'edit';
+    const isList = s.phase === 'list';
+
+    const existing = { name: 'Scope reviewer', desc: 'Watches indexed project streams for new client scope or commercial risk.', scopeLabel: 'Customer Portal', scopeBg: '#e0f0e8', scopeColor: '#1a5c38', version: '1.4.2', ic1: '#9fdde8', ic2: '#22c7dd', ic3: '#0d8ba0', watchingSummary: 'Customer Portal streams', skillsSummary: 'Cognee memory', triggerLabel: 'after upstream agents', channelsSummary: 'Telegram' };
+    const created = { name: s.name || 'Invoice watcher', desc: s.desc, scopeLabel: 'Finance', scopeBg: '#fef0d0', scopeColor: '#7a5010', version: '0.1.0', ic1: '#9fdde8', ic2: '#22c7dd', ic3: '#0db5cc', watchingSummary: 'Finance drive · invoices', skillsSummary: 'read-invoices, flag-anomalies', triggerLabel: 'on a schedule', channelsSummary: 'Finance' };
+    const agentRows = [ { ...existing, rowBorder: s.saved ? '1px solid #f0ede8' : 'none', anim: 'none' } ];
+    if (s.saved) agentRows.push({ ...created, rowBorder: 'none', anim: 'ocPop .4s ease both' });
+
+    const trig = (key, label) => ({ label, bg: s.trigger === key ? '#0db5cc' : '#f0ede8', color: s.trigger === key ? '#fff' : '#6a6660', weight: s.trigger === key ? '500' : '400' });
+    const blink = s._c ? 1 : 0;
+    return {
+      sbMy: [ this.sb({ label: 'Client pitch — Nova rebrand', sub: 'Product', dot: '#f47920' }), this.sb({ label: 'Campaign copy — Vermeulen', sub: 'Marketing' }) ],
+      sbShared: [ this.sb({ label: 'Social calendar — August', sub: 'Marketing' }), this.sb({ label: 'Retainer proposal — Baxter', sub: 'Business Development' }) ],
+      isList, isEdit,
+      createBg: s.createActive ? '#0a94a7' : '#0db5cc',
+      createShadow: s.createActive ? '0 0 0 4px rgba(13,181,204,.22)' : '0 1px 0 #0a94a7, 0 2px 3px rgba(13,181,204,.25)',
+      createTransform: s.createActive ? 'translateY(1px)' : 'translateY(0)',
+      backColor: s.backActive ? '#0a94a7' : '#6a6660',
+      agentRows,
+      nameShown: s.name || 'New agent', nameColor: s.name ? '#1a1918' : '#b0ada8',
+      descShown: s.desc || 'Describe what this agent does…',
+      caretName: (s.caretField === 'name') ? blink : 0,
+      caretDesc: (s.caretField === 'desc') ? blink : 0,
+      caretPrompt: (s.caretField === 'prompt') ? blink : 0,
+      scopeVal: s.scopeVal,
+      scopeChosen: !!s.scopeVal && !s.scopeOpen,
+      scopeShowQuery: s.scopeOpen && s.scopeQuery.length > 0,
+      scopePlaceholder: (!s.scopeVal && !s.scopeOpen) || (s.scopeOpen && s.scopeQuery.length === 0),
+      scopeQuery: s.scopeQuery, caretScope: (s.caretField === 'scope') ? blink : 0,
+      scopeSearchBorder: (s.scopeOpen || s.scopeVal) ? '#0db5cc' : '#d0cdc6',
+      scopeOpen: s.scopeOpen,
+      scopeResults: s.scopeResults.map(r => ({ ...r, rowBg: r.picked ? '#e9f9fc' : 'transparent', picked: !!r.picked })),
+      watching: s.watching, noWatching: s.watching.length === 0,
+      watchQuery: s.watchQuery, watchEmpty: s.watchQuery.length === 0, caretWatch: (s.caretField === 'watch') ? blink : 0,
+      watchSearchBorder: s.watchOpen ? '#0db5cc' : '#d0cdc6', watchOpen: s.watchOpen,
+      watchResults: s.watchResults.map(r => ({ ...r, rowBg: r.picked ? '#e9f9fc' : 'transparent', picked: !!r.picked })),
+      skillChips: s.skills, noSkills: s.skills.length === 0,
+      skillQuery: s.skillQuery, skillEmpty: s.skillQuery.length === 0, caretSkill: (s.caretField === 'skill') ? blink : 0,
+      skillSearchBorder: s.skillDropOpen ? '#0db5cc' : '#d0cdc6',
+      skillDropOpen: s.skillDropOpen,
+      skillResults: s.skillResults.map(r => ({ ...r, rowBg: r.picked ? '#e9f9fc' : 'transparent', picked: !!r.picked })),
+      skillNoResults: s.skillDropOpen && s.skillResults.length === 0,
+      channels: s.channels, noChannels: s.channels.length === 0,
+      chanQuery: s.chanQuery, chanEmpty: s.chanQuery.length === 0, caretChan: (s.caretField === 'chan') ? blink : 0,
+      chanSearchBorder: s.chanOpen ? '#0db5cc' : '#d0cdc6', chanOpen: s.chanOpen,
+      chanResults: s.chanResults.map(r => ({ ...r, rowBg: r.picked ? '#e9f9fc' : 'transparent', picked: !!r.picked })),
+      triggerPills: [ trig('manual', 'Manual'), trig('schedule', 'Schedule'), trig('after', 'After agents run') ],
+      prompt: s.prompt,
+      replay: () => this.start(),
+      statusText: s.playing ? 'Creating an agent…' : 'Agent created',
+      statusDot: s.playing ? '#0db5cc' : '#b8b4ad',
+    };
+  }
+}
+</script>
+</body>
+</html>

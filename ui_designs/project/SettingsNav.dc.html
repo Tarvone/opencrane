@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="width:200px;height:100%;flex-shrink:0;background:#ebe8e2;border-right:1px solid #dedad2;display:flex;flex-direction:column">
+  <div style="padding:16px 16px 10px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9a9690">Settings</span><svg width="26" height="8" viewBox="0 0 26 8"><polygon points="0,8 4,0 8,8" fill="#0db5cc" opacity=".55"></polygon><polygon points="6,8 10,0 14,8" fill="#0d8ba0" opacity=".45"></polygon><polygon points="12,8 16,0 20,8" fill="#22c7dd" opacity=".5"></polygon><polygon points="18,8 22,0 26,8" fill="#f47920" opacity=".5"></polygon></svg></div>
+  <div style="margin:0 10px 12px;display:flex;background:#dedad3;border-radius:7px;padding:3px;gap:2px">
+    <div style="flex:1;text-align:center;padding:5px 6px;font-size:12px;font-weight:{{ wsWeight }};border-radius:5px;cursor:pointer;background:{{ wsBg }};color:{{ wsColor }};box-shadow:{{ wsShadow }}">Workspace</div>
+    <div style="flex:1;text-align:center;padding:5px 6px;font-size:12px;font-weight:{{ pWeight }};border-radius:5px;cursor:pointer;background:{{ pBg }};color:{{ pColor }};box-shadow:{{ pShadow }}">Personal</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:1px">
+    <sc-for list="{{ nav }}" as="item" hint-placeholder-count="8">
+      <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;background:{{ item.bg }};color:{{ item.color }};font-weight:{{ item.fw }};box-shadow:{{ item.shadow }}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ item.icon }}"></path></svg>
+        <span>{{ item.label }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;200px&quot;,&quot;height&quot;:&quot;560px&quot;},&quot;activeId&quot;:{&quot;editor&quot;:null,&quot;default&quot;:&quot;agents&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;tab&quot;:{&quot;editor&quot;:null,&quot;default&quot;:&quot;workspace&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  defs() {
+    const I = {
+      pod: 'M3 4h10v8H3zm0 3.5h10M6 4v3.5M10 4v3.5',
+      members: 'M8 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3.5 13c0-2.485 2.015-4.5 4.5-4.5s4.5 2.015 4.5 4.5',
+      budgets: 'M8 3v10M5.5 5.5h3.5a2 2 0 0 1 0 4H5.5',
+      skills: 'M9.5 2.5L6 9.5h4.5L7 14 13 7h-4.5z',
+      connectors: 'M5.5 2.5v4a2.5 2.5 0 0 0 5 0v-4M5.5 2.5h5M8 9v2.5M8 11.5v2',
+      agents: 'M8 8.2a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM3.5 3.5l3.2 3.6M12.5 3.5l-3.2 3.6M8 9.5V13',
+      datanet: 'M8 2l-6 3.5v5L8 14l6-3.5v-5zm0 0v12M2 5.5l6 3.5 6-3.5',
+      apikeys: 'M6.5 9.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm3.5-.5 5 5',
+      account: 'M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6c0-2.761 2.239-5 5-5s5 2.239 5 5',
+      awareness: 'M2 6.5h12v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm4-3v3M8 3.5v3M12 3.5v3M8 10v2',
+    };
+    return {
+      workspace: [
+        { id: 'pod', label: 'Pod', icon: I.pod }, { id: 'members', label: 'Members', icon: I.members },
+        { id: 'budgets', label: 'Budgets', icon: I.budgets }, { id: 'capabilities', label: 'Skills', icon: I.skills },
+        { id: 'skills', label: 'Connectors', icon: I.connectors }, { id: 'agents', label: 'Agents', icon: I.agents },
+        { id: 'datanet', label: 'Data & Network', icon: I.datanet }, { id: 'apikeys', label: 'LLM Providers', icon: I.apikeys },
+      ],
+      personal: [
+        { id: 'account', label: 'Account', icon: I.account }, { id: 'awareness', label: 'Awareness', icon: I.awareness },
+        { id: 'mybudget', label: 'My Budget', icon: I.budgets }, { id: 'mykeys', label: 'API Keys', icon: I.apikeys },
+      ],
+    };
+  }
+
+  renderVals() {
+    const tab = this.props.tab === 'personal' ? 'personal' : 'workspace';
+    const activeId = this.props.activeId ?? 'agents';
+    const nav = this.defs()[tab].map(item => {
+      const on = item.id === activeId;
+      return { ...item, bg: on ? '#e6f8fc' : 'transparent', color: on ? '#0994a8' : '#6a6660', fw: on ? '600' : '400', shadow: on ? '0 1px 3px rgba(13,181,204,.12)' : 'none' };
+    });
+    const wt = tab === 'workspace';
+    return {
+      nav,
+      wsBg: wt ? '#fff' : 'transparent', wsColor: wt ? '#1a1918' : '#8a8682', wsWeight: wt ? '500' : '400', wsShadow: wt ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
+      pBg: !wt ? '#fff' : 'transparent', pColor: !wt ? '#1a1918' : '#8a8682', pWeight: !wt ? '500' : '400', pShadow: !wt ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
+    };
+  }
+}
+</script>
+</body>
+</html>

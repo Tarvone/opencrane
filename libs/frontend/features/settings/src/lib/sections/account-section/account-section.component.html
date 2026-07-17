@@ -2,8 +2,8 @@
 
 <wo-settings-row label="Profile picture">
 	<div woSettingsControl class="wo-account__avatar-row">
-		<div class="wo-account__avatar">{{ avatarInitials() }}</div>
-		<button class="wo-account__change-photo">Change photo</button>
+		<wo-avatar-circle [initials]="avatarInitials()" [accessibleName]="formState().draft.fullName || 'Current user'" color="var(--oc-teal)" size="profile" />
+		<button type="button" class="wo-account__change-photo">Change photo</button>
 	</div>
 </wo-settings-row>
 
@@ -33,4 +33,3 @@
 </wo-settings-row>
 
 <wo-save-button [state]="formState()" (submitIntent)="save()" />
-

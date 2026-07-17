@@ -16,7 +16,8 @@ describe("Sidebar avatar contract", function sidebarAvatarSuite(): void
 		const template = _sidebarTemplate();
 
 		expect(template).toContain("[accessibleName]=\"userName() || 'Current user'\"");
-		expect(template).toContain("color=\"#0db5cc\"");
+		expect(template).toContain("color=\"var(--oc-teal)\"");
 		expect(template).toContain("size=\"large\"");
+		expect(template).not.toMatch(/#[0-9a-fA-F]{3,6}/);
 	});
 });

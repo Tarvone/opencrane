@@ -43,14 +43,14 @@
 		margin: 0 10px 12px;
 		padding: 3px;
 		border-radius: 7px;
-		background: var(--oc-border);
+		background: #dedad3; // SettingsNav.dc.html:12
 	}
 
 	&__scope-link {
 		flex: 1;
 		padding: 5px 6px;
 		border-radius: 5px;
-		color: var(--oc-text-muted);
+		color: #8a8682; // SettingsNav.dc.html:65-66
 		font-size: 12px;
 		font-weight: 400;
 		text-align: center;
@@ -111,17 +111,6 @@
 			color: var(--oc-teal-edge);
 			font-weight: 600;
 		}
-	}
-
-	&__sovereignty {
-		display: flex;
-		gap: 4px;
-		margin: 0 10px 12px;
-		padding: 7px 10px;
-		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.05);
-		color: var(--oc-text-muted);
-		font-size: 10.5px;
 	}
 
 	&__content {

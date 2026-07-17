@@ -49,6 +49,7 @@ function _testableRoutes(routes: Routes): Routes
 {
 	return routes.map(function testableRoute(route): Route
 	{
+	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." } }] };
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
 	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network") return route;
@@ -116,12 +117,12 @@ describe("settings navigation contract", function settingsNavigationSuite(): voi
 			SettingsSectionId.Budgets,
 			SettingsSectionId.Capabilities,
 			SettingsSectionId.Connectors,
-			SettingsSectionId.Channels,
+			SettingsSectionId.Agents,
 			SettingsSectionId.DataNetwork,
 			SettingsSectionId.ProviderKeys
 		]);
 		expect(WORKSPACE_SETTINGS_NAVIGATION.map(function label(item): string { return item.label; })).toEqual([
-			"Pod", "Members", "Budgets", "Skills", "Connectors", "Channels", "Data & Network", "API Keys"
+			"Pod", "Members", "Budgets", "Skills", "Connectors", "Agents", "Data & Network", "LLM Providers"
 		]);
 		expect(WORKSPACE_SETTINGS_NAVIGATION.map(function route(item): string { return item.route; })).toEqual([
 			"/settings/workspace/pod",
@@ -129,7 +130,7 @@ describe("settings navigation contract", function settingsNavigationSuite(): voi
 			"/settings/workspace/budgets",
 			"/settings/workspace/skills",
 			"/settings/workspace/connectors",
-			"/settings/workspace/channels",
+			"/settings/workspace/agents",
 			"/settings/workspace/data-network",
 			"/settings/workspace/provider-keys"
 		]);
@@ -176,7 +177,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("declares every public leaf route without legacy aliases", function routeLeaves(): void
 	{
 		expect(_scopeChildren(SettingsScope.Workspace).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
-			"pod", "members", "budgets", "skills", "connectors", "channels", "data-network", "provider-keys"
+			"pod", "members", "budgets", "skills", "connectors", "agents", "data-network", "provider-keys"
 		]);
 		expect(_scopeChildren(SettingsScope.Personal).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
 			"account", "awareness", "budget", "api-keys"
@@ -232,6 +233,18 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(dataNetwork.domains()).toHaveLength(3);
 	});
 
+	it("keeps the owning navigation item active on a nested section route", async function nestedSectionRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/agents/edit");
+		const router = TestBed.inject(Router);
+		const activeLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
+		const nestedPlaceholder = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+
+		expect(router.url).toBe("/settings/workspace/agents/edit");
+		expect(activeLink?.getAttribute("href")).toBe("/settings/workspace/agents");
+		expect(nestedPlaceholder.title).toBe("Edit agent");
+	});
+
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/members");
@@ -239,9 +252,14 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		const firstPlaceholder = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
 		const firstActiveLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
 		const scopeButtons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLButtonElement[];
+		const navigationIcons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-item svg")) as SVGElement[];
+		const brandFacets = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-title polygon")) as SVGPolygonElement[];
 
 		expect(firstPlaceholder.title).toBe("Members");
 		expect(firstActiveLink?.getAttribute("href")).toBe("/settings/workspace/members");
+		expect(navigationIcons.every(function iconSize(icon): boolean { return icon.getAttribute("width") === "14" && icon.getAttribute("height") === "14"; })).toBe(true);
+		expect(brandFacets.map(function fill(facet): string | null { return facet.getAttribute("fill"); })).toEqual(["var(--oc-teal)", "var(--oc-teal-fold-dark)", "var(--oc-teal-hover)", "var(--oc-orange)"]);
+		expect(harness.fixture.nativeElement.querySelector(".wo-settings__sovereignty")).toBeNull();
 		expect(scopeButtons.map(function label(button): string { return button.textContent?.trim() ?? ""; })).toEqual(["Workspace", "Personal"]);
 		expect(scopeButtons.every(function nativeButton(button): boolean { return button instanceof HTMLButtonElement; })).toBe(true);
 		expect(scopeButtons[0]?.getAttribute("aria-pressed")).toBe("true");

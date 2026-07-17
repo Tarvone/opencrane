@@ -8,6 +8,14 @@ This tenant-identity-free register is the public approval surface for R0. It doe
 identities, secured counts, proprietary fleet evidence, or credential details into Git. Those facts
 stay in the secured evidence record referenced by hash.
 
+The machine-checked [data-disposition map](personal-agent-platform-r0-data-disposition.json) records
+candidate outcomes for the complete current Prisma, migration-derived historical, repository-owned
+CRD/PVC, and versioned upstream-store inventories. Its `pending-owner-approval` rows remain
+non-authorizing inputs to M-01 and the per-ClusterTenant decision process.
+The map deliberately requires the union of product/customer, data, legal/security, fleet,
+operations, and integration authority before any row can become `approved`; this conservative R0
+policy prevents a generic dataset approval from bypassing the source-specific owner registers below.
+
 An approval is valid only when its row records the exact decision, a named approver with the required
 authority, an ISO date, and a stable approval reference such as an issue comment or signed decision
 record. A contract-level “yes” does not fill a duration, owner, threshold, tenant classification, or
@@ -43,7 +51,7 @@ SHA-256: `fbafdda39cb22ec275c5b730e494fe56beae904d797067c7b64c1a6e5fb5b46f`.
 | ID | Decision | Contract source | Required authority | Current state | Approver | Date | Approval evidence |
 |----|----------|-----------------|--------------------|---------------|----------|------|-------------------|
 | M-01 | Clean-slate green plus semantic migrate/rebuild/archive/drop defaults and per-dataset exceptions | [Clean-green rule](personal-agent-platform-r0-migration-contract.md#clean-green-rule) | Product/customer + data owner | Product direction recorded: no compatibility; only minimal one-way semantic import where approved; data-owner disposition pending | `jrosseel` (requester) | 2026-07-17 | [Issue comment](https://github.com/italanta/opencrane/issues/252#issuecomment-5001980699) |
-| M-02 | Credential adoption, rotation, reconnect, and revocation defaults | [Credential ledger](personal-agent-platform-r0-migration-contract.md#credential-and-reconnect-ledger) | Security + integration owner | Pending; adopt only with ledger evidence, otherwise rotate/reconnect | — | — | Missing |
+| M-02 | Credential rotation, recreation, reconnect, and revocation defaults | [Credential ledger](personal-agent-platform-r0-migration-contract.md#credential-and-reconnect-ledger) | Security + integration owner | Pending; legacy credential identity and key material are never adopted | — | — | Missing |
 | M-03 | Fleet lease duration, captured revision, queued mutations, and queue authority | [Writer contract](personal-agent-platform-r0-migration-contract.md#cutover-lease-and-writer-contract-proposal) | Fleet + operations owner | Pending | — | — | Missing |
 | M-04 | Post-write reverse rollback requirement | [Rollback decision](personal-agent-platform-r0-migration-contract.md#rollback-decision) | Product + operations + program sponsor | Pending; `Yes` stops rewrite-freeze and requires a separately planned strangler/hybrid route | — | — | Missing |
 | M-05 | Reset-candidate archive retention | [Retention proposal](personal-agent-platform-r0-product-contract.md#retention-proposal) | Product + legal/security + tenant owner | Pending; proposed 30 days after successful green commit, subject to legal hold | — | — | Missing |

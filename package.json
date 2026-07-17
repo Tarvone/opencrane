@@ -20,6 +20,8 @@
     "check:phase-b-topology": "./scripts/phase-b-topology.sh",
     "test:phase-b-topology": "./scripts/phase-b-topology-negative-tests.sh",
     "test:r0-estate-evidence": "./scripts/collect-r0-estate-evidence.test.sh",
+    "check:r0-data-disposition": "node ./scripts/check-r0-data-disposition.mjs",
+    "test:r0-data-disposition": "node --test ./scripts/check-r0-data-disposition.test.mjs",
     "docs:sync-openapi": "npm run refresh-openapi -w website",
     "docs:dev": "npm run dev -w website",
     "docs:build": "npm run build -w website",

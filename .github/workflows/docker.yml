@@ -85,6 +85,15 @@ jobs:
       - name: Prove Phase B topology guard rejects drift
         run: npm run test:phase-b-topology
 
+      - name: Enforce source-derived clean-green R0 data disposition
+        run: npm run check:r0-data-disposition
+
+      - name: Prove the R0 data-disposition guard fails closed
+        run: npm run test:r0-data-disposition
+
+      - name: Prove the private R0 evidence collector fails closed
+        run: npm run test:r0-estate-evidence
+
       - name: Enforce Phase A runtime contracts
         run: |
           ./libs/k8s-platform/tests/tenant-entrypoint-contract-policy.sh

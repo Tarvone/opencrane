@@ -494,25 +494,12 @@ Exit gate:
 - reconnect from any persisted cursor produces no duplicate or missing normalized event;
 - process death cannot leave two writers owning the same run/thread.
 
-### L2 — bridge OpenClaw into the canonical plane
+### L2 — superseded bridge (strangler route only; do not execute under rewrite-freeze)
 
-Deliverables:
-
-- translate the required Gateway v4 live frames and history rows into normalized `RunEvent` and
-  `Message` records before client delivery;
-- persist OpenClaw run identity, model/usage, tool lifecycle, operation and terminal state;
-- use the canonical API for the frontend while OpenClaw remains the execution backend;
-- detect divergence between OpenClaw history and the canonical projection;
-- create explicit migration/archive handling for sessions beyond the existing 1,000-row UI window.
-
-This phase prevents the toolkit decision from being entangled with the protocol, storage and UI
-rewrite. The bridge is temporary and has a deletion issue before it is merged.
-
-Exit gate:
-
-- OpenClaw still serves users through the new product protocol;
-- canonical replay matches all L0 fixtures;
-- OpenClaw JSONL is no longer the only source for a user-visible run after it begins.
+This phase belongs only to the rejected strangler alternative. The adopted rewrite-freeze route
+must not build or serve through this bridge: R3 performs bounded read-only export and one-way green
+import for approved non-reproducible owner state, then R4 serves the direct green runtime. The
+bridge has no deliverables or exit gate on this route.
 
 ### L3 — extract versioned runtime inputs
 
@@ -605,7 +592,8 @@ Rollout order:
 6. switch the stable tenant service/proxy target to the new runtime;
 7. permit an OpenClaw traffic rollback only before the canary's first canonical new-runtime write;
    after that frontier, rollback means the prior OpenCrane runtime image against the same canonical
-   store, while the OpenClaw image/data remain an archive unless a reverse migration is executed.
+   store. Post-write recovery is forward against green; OpenClaw image/data remain an immutable
+   archive until their approved retention trigger, with no reverse migration path.
 
 Canary gates:
 

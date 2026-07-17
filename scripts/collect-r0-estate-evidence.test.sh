@@ -238,6 +238,18 @@ while IFS= read -r table; do
     printf '{"section":"table","schema":"public","table":"%s","present":false,"approximateRows":null,"lastAnalyze":null,"lastAutoAnalyze":null,"selectGranted":false,"columnSelectGranted":false,"writeGranted":false,"columnWriteGranted":false,"ownsTable":false}\n' "$table"
   fi
 done < <(grep -Eo "\('public', '[^']+'\)" <<<"$query" | sed -E "s/\('public', '([^']+)'\)/\1/" | sort -u)
+if [[ "${FAKE_PSQL_HISTORICAL_COLUMN_MISSING:-0}" != "1" ]]; then
+  while IFS=$'\t' read -r schema table column; do
+    column_select=false
+    column_write=false
+    [[ "${FAKE_PSQL_HISTORICAL_COLUMN_SELECT:-0}" == "1" ]] && column_select=true
+    [[ "${FAKE_PSQL_HISTORICAL_COLUMN_WRITE:-0}" == "1" ]] && column_write=true
+    printf '{"section":"column","schema":"%s","table":"%s","column":"%s","present":true,"selectGranted":%s,"writeGranted":%s}\n' "$schema" "$table" "$column" "$column_select" "$column_write"
+  done < <(grep -Eo "\('[^']+', '[^']+', '[^']+'\)" <<<"$query" | sed -E "s/\('([^']+)', '([^']+)', '([^']+)'\)/\1\t\2\t\3/" | sort -u)
+fi
+if [[ "${FAKE_PSQL_HISTORICAL_COLUMN_EXTRA:-0}" == "1" ]]; then
+  printf '%s\n' '{"section":"column","schema":"public","table":"tenants","column":"unexpected_legacy_column","present":true,"selectGranted":false,"writeGranted":false}'
+fi
 FAKE_PSQL
 
 chmod 0700 "$FAKE_BIN/kubectl" "$FAKE_BIN/helm" "$FAKE_BIN/psql"
@@ -332,6 +344,9 @@ grep -Fq '"command":["kubectl"' "$output/secured/provenance.ndjson" || fail "exa
 grep -Fq 'default_transaction_read_only=on' "$output/secured/provenance.ndjson" || fail "read-only psql environment provenance missing"
 grep -Fq 'READ ONLY' "$PSQL_STDIN" || fail "psql query was not read-only"
 grep -Fq "('public', 'session_scopes')" "$PSQL_STDIN" || fail "psql query did not use the version-controlled table allowlist"
+grep -Fq "('public', 'brokered_devices')" "$PSQL_STDIN" || fail "psql query omitted historical brokered_devices"
+grep -Fq "('public', 'cluster_tenants', 'base_domain')" "$PSQL_STDIN" || fail "psql query omitted historical cluster_tenants.base_domain"
+grep -Fq "('public', 'tenants', 'config_overrides')" "$PSQL_STDIN" || fail "psql query omitted historical tenants.config_overrides"
 grep -Fq 'pg_stat_user_tables' "$PSQL_STDIN" || fail "psql query did not use metadata-only relation statistics"
 grep -Fq "'sessionUser', session_user" "$PSQL_STDIN" || fail "psql query did not inspect the authenticated session role"
 grep -Fq "'currentUser', current_user" "$PSQL_STDIN" || fail "psql query did not inspect the effective current role"
@@ -529,5 +544,22 @@ grep -Fq 'base-table read, write, or ownership privileges' "$writable_database_o
 broad_database_output="$REVIEWS_ROOT/$TEST_PREFIX-broad-database"
 FAKE_PSQL_GLOBAL_ACCESS=1 node "$COLLECTOR" --output-dir "$broad_database_output" --context fixture-context --allow-local-agent-reviews --database silo=fixture-service --request-timeout 2 >/dev/null
 grep -Fq 'access to a non-system relation or schema creation' "$broad_database_output/secured/failures.ndjson" || fail "out-of-allowlist relation access was not rejected"
+
+missing_column_output="$REVIEWS_ROOT/$TEST_PREFIX-missing-historical-column"
+FAKE_PSQL_HISTORICAL_COLUMN_MISSING=1 node "$COLLECTOR" --output-dir "$missing_column_output" --context fixture-context --allow-local-agent-reviews --database silo=fixture-service --request-timeout 2 >/dev/null
+grep -Fq 'complete version-controlled historical-column allowlist' "$missing_column_output/secured/failures.ndjson" || fail "missing historical-column result was not rejected"
+[[ ! -e "$missing_column_output/secured/databases/"*.ndjson ]] || fail "collector persisted incomplete historical-column evidence"
+
+extra_column_output="$REVIEWS_ROOT/$TEST_PREFIX-extra-historical-column"
+FAKE_PSQL_HISTORICAL_COLUMN_EXTRA=1 node "$COLLECTOR" --output-dir "$extra_column_output" --context fixture-context --allow-local-agent-reviews --database silo=fixture-service --request-timeout 2 >/dev/null
+grep -Fq 'complete version-controlled historical-column allowlist' "$extra_column_output/secured/failures.ndjson" || fail "extra historical-column result was not rejected"
+
+readable_column_output="$REVIEWS_ROOT/$TEST_PREFIX-readable-historical-column"
+FAKE_PSQL_HISTORICAL_COLUMN_SELECT=1 node "$COLLECTOR" --output-dir "$readable_column_output" --context fixture-context --allow-local-agent-reviews --database silo=fixture-service --request-timeout 2 >/dev/null
+grep -Fq 'historical-column read or write privileges' "$readable_column_output/secured/failures.ndjson" || fail "historical-column read privilege was not rejected"
+
+writable_column_output="$REVIEWS_ROOT/$TEST_PREFIX-writable-historical-column"
+FAKE_PSQL_HISTORICAL_COLUMN_WRITE=1 node "$COLLECTOR" --output-dir "$writable_column_output" --context fixture-context --allow-local-agent-reviews --database silo=fixture-service --request-timeout 2 >/dev/null
+grep -Fq 'historical-column read or write privileges' "$writable_column_output/secured/failures.ndjson" || fail "historical-column write privilege was not rejected"
 
 printf 'R0 estate evidence collector tests passed.\n'

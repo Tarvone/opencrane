@@ -493,6 +493,7 @@ const _databaseTables = [
   "audit_log",
   "awareness_rollouts",
   "billing_accounts",
+  "brokered_devices",
   "cluster_tenants",
   "company_doc_versions",
   "company_docs",
@@ -535,6 +536,13 @@ const _databaseTables = [
   "token_usage_snapshots",
 ];
 const _databaseTableValues = _databaseTables.map(function _table(table) { return `('public', '${table}')`; }).join(",\n    ");
+const _databaseColumns = [
+  ["public", "cluster_tenants", "base_domain"],
+  ["public", "tenants", "config_overrides"],
+];
+const _databaseColumnValues = _databaseColumns.map(function _column(column) {
+  return `('${column[0]}', '${column[1]}', '${column[2]}')`;
+}).join(",\n    ");
 
 const _databaseQuery = String.raw`\set ON_ERROR_STOP on
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
@@ -641,6 +649,40 @@ LEFT JOIN pg_class AS relation
 LEFT JOIN pg_stat_user_tables AS statistics ON statistics.relid = relation.oid
 ORDER BY requested.table_schema, requested.table_name
 ;
+WITH requested(table_schema, table_name, column_name) AS (
+  VALUES
+    ${_databaseColumnValues}
+)
+SELECT json_build_object(
+  'section', 'column',
+  'schema', requested.table_schema,
+  'table', requested.table_name,
+  'column', requested.column_name,
+  'present', attribute.attnum IS NOT NULL,
+  'selectGranted', CASE
+    WHEN attribute.attnum IS NULL THEN false
+    ELSE has_column_privilege(format('%I.%I', requested.table_schema, requested.table_name), requested.column_name, 'SELECT')
+  END,
+  'writeGranted', CASE
+    WHEN attribute.attnum IS NULL THEN false
+    ELSE has_column_privilege(format('%I.%I', requested.table_schema, requested.table_name), requested.column_name, 'INSERT')
+      OR has_column_privilege(format('%I.%I', requested.table_schema, requested.table_name), requested.column_name, 'UPDATE')
+      OR has_column_privilege(format('%I.%I', requested.table_schema, requested.table_name), requested.column_name, 'REFERENCES')
+  END
+)::text
+FROM requested
+LEFT JOIN pg_namespace AS namespace ON namespace.nspname = requested.table_schema
+LEFT JOIN pg_class AS relation
+  ON relation.relnamespace = namespace.oid
+ AND relation.relname = requested.table_name
+ AND relation.relkind IN ('r', 'p')
+LEFT JOIN pg_attribute AS attribute
+  ON attribute.attrelid = relation.oid
+ AND attribute.attname = requested.column_name
+ AND attribute.attnum > 0
+ AND NOT attribute.attisdropped
+ORDER BY requested.table_schema, requested.table_name, requested.column_name
+;
 COMMIT;
 `;
 
@@ -651,7 +693,7 @@ function _databaseEvidence(stdout)
   for (const line of stdout.split("\n").map(function _trim(value) { return value.trim(); }).filter(Boolean))
   {
     const record = JSON.parse(line);
-    if (!record || !["reader", "table"].includes(record.section)) throw new Error("psql returned an unexpected evidence section.");
+    if (!record || !["reader", "table", "column"].includes(record.section)) throw new Error("psql returned an unexpected evidence section.");
     if (record.section === "table" && record.approximateRows !== null
       && (!Number.isInteger(Number(record.approximateRows)) || Number(record.approximateRows) < 0))
     {
@@ -698,6 +740,17 @@ function _databaseEvidence(stdout)
   }))
   {
     throw new Error("psql service has base-table read, write, or ownership privileges; metadata-only access is required.");
+  }
+  const columnRecords = records.filter(function _column(record) { return record.section === "column"; });
+  const observedColumns = new Set(columnRecords.map(function _name(record) { return `${record.schema}.${record.table}.${record.column}`; }));
+  const requiredColumns = new Set(_databaseColumns.map(function _name(column) { return column.join("."); }));
+  if ([...requiredColumns].some(function _missing(column) { return !observedColumns.has(column); }) || observedColumns.size !== requiredColumns.size)
+  {
+    throw new Error("psql did not return the complete version-controlled historical-column allowlist.");
+  }
+  if (columnRecords.some(function _privileged(record) { return record.present && (record.selectGranted !== false || record.writeGranted !== false); }))
+  {
+    throw new Error("psql service has historical-column read or write privileges; metadata-only access is required.");
   }
   const partial = tableRecords.some(function _missingEstimate(record) { return record.present && record.approximateRows === null; });
   const ndjson = records.map(function _line(record) { return JSON.stringify(record); }).join("\n") + (records.length ? "\n" : "");

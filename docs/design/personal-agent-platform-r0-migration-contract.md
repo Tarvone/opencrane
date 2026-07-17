@@ -22,6 +22,13 @@ unclassified ClusterTenant is cutover-ineligible and does not justify broad comp
 
 ## Data-disposition ledger
 
+The machine-readable [R0 data-disposition map](personal-agent-platform-r0-data-disposition.json)
+expands this ledger across every current Prisma model, migration-derived retired table/column,
+repository-derived CRD spec/status and PVC, and the versioned upstream-store registry. Its validator
+rejects missing, duplicate, or stale source-derived entries as well as compatibility, dual paths,
+legacy-store/credential/identity/key adoption, and reverse bridges. Every row remains a candidate
+until its required owner approval is recorded; map coverage does not authorize migration or R1.
+
 | Legacy state | Default disposition | Green authority | Cutover rule |
 |--------------|---------------------|-----------------|--------------|
 | Fleet ClusterTenant identity, membership, role, owner subject, lifecycle revision | Migrate | Fleet lifecycle/membership contract | Preserve stable public IDs; capture one revision at lease acquisition |
@@ -36,7 +43,7 @@ unclassified ClusterTenant is cutover-ineligible and does not justify broad comp
 | Grants and Groups | Migrate semantic decisions | Per-silo authorization facade | Preserve current priority/Deny/timestamp behavior until approved replacement |
 | TenantDatasetMembership and membership projections | Rebuild | Derived projection | Recompute from approved membership/grants revision |
 | MCP catalog, assignment, grants | Migrate semantics | OpenCrane catalog/grant authority | Verify every server/tool contract against live Obot state |
-| Obot installs and credential references | Archive intent; adopt only proven credentials; otherwise reconnect | Obot credential custody | A random/local `credentialRef` is not proof of an upstream recoverable credential |
+| Obot installs and credential references | Archive non-secret intent; reconnect in green | Obot credential custody | Never adopt legacy credential identity or key material; a random/local `credentialRef` is not proof of an upstream recoverable credential |
 | Skill bundles, entitlements, posture, provenance | Migrate bytes/digests and current decisions | SkillRevision plus ArtifactStore | Verify digest; rebuild runtime copies; retire Zot/registry fallback |
 | ProviderCredential and model definitions | Migrate non-secret intent; rotate/recreate credentials and upstream registrations | OpenCrane metadata plus secret manager/LiteLLM | Never export raw keys; validate every model against a usable green credential |
 | Legacy ProviderApiKey raw rows | Rotate then drop | Secret manager | Never put raw legacy values in migration artifacts |
@@ -56,11 +63,11 @@ mechanism, and never means copying an entire legacy database into green.
 |------------------|----------------|-------------------------------------------|
 | Human OIDC browser session | Drop; force sign-in | None; session is ephemeral |
 | Fleet/silo service identity | Mint distinct green credential; revoke blue at commit | Signed workload identity and least-privilege binding tests |
-| Provider BYOK | Rotate/recreate green Secret and LiteLLM registration | Owner-approved adoption API plus custody and encryption proof |
+| Provider BYOK | Rotate/recreate green Secret and LiteLLM registration | Owner consent plus verified green custody and a usable registration |
 | Legacy raw ProviderApiKey | Force rotation/reconnect | No adoption of raw database value |
 | Tenant/Cognee LiteLLM virtual key | Mint green key | No exception; legacy key, database, master key, and salt are not adopted |
 | Cognee user/agent/silo identity | Reprovision in green and attach approved semantic memory imports | Stable subject binding, owner-approved dataset export manifest, and green isolation proof |
-| Obot static/OAuth/user credential | Reconnect by default | Real upstream credential inventory, supported adoption/export, encryption-key custody, and owner consent |
+| Obot static/OAuth/user credential | Reconnect | Recreate green custody with owner consent; legacy credential identity and key material are not adopted |
 | MCP install `credentialRef` | Treat as unverified intent | Matching live Obot credential and successful scoped tool call |
 | Slack/third-party source token | Reconnect | External owner consent and approved secret-manager target |
 | Static OpenCrane API/break-glass token | Revoke and drop | Any green emergency access is a separate security-approved, audited, short-lived IAM capability, never a compatibility token |
@@ -117,7 +124,7 @@ cannot claim timing qualification yet.
 | Product contract and per-ClusterTenant reset/full-fidelity approval | Product/customer owner | Pending |
 | Retention and deletion | Legal/security/data owner | Pending |
 | Post-write rollback strategy decision | Product + operations + program sponsor | Pending |
-| Credential adoption/reconnect and revocation | Security/integration owner | Pending |
+| Credential rotation/recreation/reconnect and revocation | Security/integration owner | Pending |
 | Fleet lease/revision and mutation queue | Fleet owner | Pending |
 | Export/import implementation | Migration owner | Pending |
 | Blue maintenance and restore | Blue operations owner | Pending |

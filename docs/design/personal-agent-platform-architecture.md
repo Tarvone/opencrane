@@ -236,7 +236,7 @@ open-source systems remain replaceable modules, not mandatory core dependencies:
 | Policy rules over structured context | Typed code and shared conformance fixtures | [OPA](https://www.openpolicyagent.org/docs) when independently authored policy bundles and a distinct policy lifecycle are proven needs |
 | Scheduling/retry | Lightweight Kubernetes CronJob trigger + transactional AgentRun + controller-created one-attempt Job | [Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/) for real DAG execution; [Temporal](https://docs.temporal.io/) or [Restate](https://docs.restate.dev/) for frequent multi-day durable orchestration/compensation |
 | Artifact bytes | Thin POSIX content-addressed service on the existing K8s storage class | S3-compatible or distributed storage only when multi-writer scale, replication, or external object clients require it; no object API by default |
-| Agent loop | Conformance-selected OpenCrane `AgentLoopDriver`; OpenAI Agents SDK is the leading candidate | OpenClaw compatibility adapter during migration; no permanent second loop |
+| Agent loop | Conformance-selected OpenCrane `AgentLoopDriver`; OpenAI Agents SDK is the leading candidate | An alternate TypeScript toolkit only if it passes the same frozen-trajectory and live LiteLLM conformance gates; OpenClaw never enters green |
 | Memory/index | Cognee behind an OpenCrane gateway | Replaceable through the memory adapter; never the artifact authority |
 | MCP runtime | Obot behind a validating gateway | Replaceable through the MCP adapter; never the grant authority |
 | Operational telemetry | Existing OpenTelemetry pipeline and OpenCrane run ledger | Langfuse for optional prompt evaluation/annotation, not required platform operation |

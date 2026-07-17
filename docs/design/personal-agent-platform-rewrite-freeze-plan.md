@@ -260,7 +260,7 @@ Decide:
 - fleet-managed membership freshness/failure policy;
 - canonical persona precedence when DB workspace docs and mutable files disagree;
 - transcript, tool-output, audit, and artifact retention rules;
-- credential adoption versus mandatory user reconnect;
+- credential rotation/recreation/reconnect and revocation;
 - fleet lifecycle/membership cutover lease, revision, and queued-mutation contract;
 - maximum per-silo maintenance window;
 - whether post-write rollback is mandatory;
@@ -359,7 +359,7 @@ export behavior to frozen runtime code unless no safe read-only extractor exists
 | Uploads/generated files | Snapshot/copy into CAS; verify size/hash/MIME/owner and every live reference |
 | Cognee personal memory | Export non-reproducible user memory with scope/provenance; rebuild document indexes from artifacts |
 | Skills/company documents | Convert to immutable ArtifactVersions and Skill/Persona revisions; scan before publish |
-| MCP catalog/grants/credentials | Convert assignments/grants; adopt supported Obot credentials or create an explicit per-user reconnect list |
+| MCP catalog/grants/credentials | Convert approved assignment/grant semantics and create an explicit per-user reconnect list; do not adopt legacy credential identity or key material |
 | LiteLLM providers/keys/budgets | Recreate scoped teams/virtual keys/model policy from references; never export provider secrets into the migration bundle |
 | Schedules/harvesting cursors | Convert to AgentService triggers and checkpoints; do not start them before active-slot commit |
 | Awareness/participation/audit | Convert safety/liveness/violation evidence where semantics match; otherwise archive immutably with query access |

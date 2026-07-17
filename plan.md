@@ -85,7 +85,7 @@ Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked
 Classify every ClusterTenant **reset-eligible vs full-fidelity** (dev/staging estate is expected
 to be largely reset-eligible — verify, don't assume); frozen capability catalog; grant
 deny/priority + project-scope handling; persona precedence (DB docs vs mutable files); credential
-adopt-vs-reconnect; **post-write rollback decision** (if mandatory → route reverts to strangler);
+rotation/recreation/reconnect/revocation; **post-write rollback decision** (if mandatory → route reverts to strangler);
 cohort order; maintenance windows; sign-off authority. Records the ADRs (with #245). Issue cut at
 open.
 
@@ -130,7 +130,7 @@ first green PR.
 **R3:** exporters/importers per the legacy-state table (or the reduced reset/archive/reconnect
 factory if R0 classifies the estate reset-eligible); signed per-silo reconciliation manifests.
 [#128](https://github.com/italanta/opencrane/issues/128) reframes to the green Obot adapter +
-credential adoption/reconnect list.
+credential rotation/recreation/reconnect and revocation list.
 
 ### R4/R5 — personal runtime + AgentService plane (parallel)
 

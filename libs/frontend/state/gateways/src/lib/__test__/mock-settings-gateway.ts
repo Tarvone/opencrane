@@ -4,7 +4,7 @@ import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
 import { DATASET_ACCESS, EGRESS_DOMAINS, SKILLS } from "@opencrane/core/testing";
 import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "@opencrane/state/settings/adapter";
 
-const _FIXTURE: AccountProfile = { name: "alex.oc", fullName: "Alex Kim", email: "alex.kim@acme-corp.com", department: "Product" };
+const _FIXTURE: AccountProfile = { name: "alex.oc", fullName: "Alex Kim", email: "alex.kim@acme-corp.com", department: "Product", role: "member" };
 
 /** In-memory SettingsGateway for tests — never imported by production code. */
 @Injectable()

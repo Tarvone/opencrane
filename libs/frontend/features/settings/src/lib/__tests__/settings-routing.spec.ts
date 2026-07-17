@@ -44,12 +44,18 @@ function _scopeChildren(scope: SettingsScope): Route[]
 	return _shellChildren().find(function findScope(route): boolean { return route.path === scope; })?.children ?? [];
 }
 
+/** Reject a test-only nested route transition to verify cancelled scope navigation. */
+function _denyNavigation(): boolean
+{
+	return false;
+}
+
 /** Replace lazy production leaves with the placeholder while preserving the real redirect tree. */
 function _testableRoutes(routes: Routes): Routes
 {
 	return routes.map(function testableRoute(route): Route
 	{
-	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." } }] };
+	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." }, canDeactivate: [_denyNavigation] }] };
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
 	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network") return route;
@@ -279,7 +285,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(scopeButtons[1]?.getAttribute("aria-pressed")).toBe("true");
 	});
 
-	it("preserves active scopes and focuses content after cross-scope selection", async function scopeSelection(): Promise<void>
+	it("resets scopes to their defaults and preserves an already-rendered default", async function scopeSelection(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/members");
 		const router = TestBed.inject(Router);
@@ -288,10 +294,16 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		const personalButton = scopeButtons[1];
 		const workspaceLeaf = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
 
+		const workspaceNavigation = _nextNavigation(router);
 		workspaceButton?.click();
+		await workspaceNavigation;
 		await harness.fixture.whenStable();
-		expect(router.url).toBe("/settings/workspace/members");
-		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance).toBe(workspaceLeaf);
+		harness.detectChanges();
+
+		const workspaceDefault = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+		expect(router.url).toBe("/settings/workspace/pod");
+		expect(workspaceDefault).not.toBe(workspaceLeaf);
+		expect(document.activeElement).toBe(harness.fixture.nativeElement.querySelector("main"));
 
 		const personalNavigation = _nextNavigation(router);
 		personalButton?.click();
@@ -305,19 +317,36 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(document.activeElement).toBe(harness.fixture.nativeElement.querySelector("main"));
 
 		if (!personalButton || !workspaceButton) throw new Error("Settings scope controls were not rendered");
+		personalButton.focus();
 		_activateNativeButton(personalButton, "Enter");
 		await harness.fixture.whenStable();
 		expect(router.url).toBe("/settings/personal/account");
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance).toBe(personalLeaf);
+		expect(document.activeElement).toBe(personalButton);
 
-		const workspaceNavigation = _nextNavigation(router);
+		const restoredWorkspaceNavigation = _nextNavigation(router);
 		_activateNativeButton(workspaceButton, " ");
-		await workspaceNavigation;
+		await restoredWorkspaceNavigation;
 		await harness.fixture.whenStable();
 		harness.detectChanges();
 		expect(router.url).toBe("/settings/workspace/pod");
 		expect(workspaceButton.getAttribute("aria-pressed")).toBe("true");
 		expect(document.activeElement).toBe(harness.fixture.nativeElement.querySelector("main"));
+	});
+
+	it("keeps route and focus when a section guard cancels scope navigation", async function cancelledScopeSelection(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/agents/edit");
+		const router = TestBed.inject(Router);
+		const personalButton = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")).at(1) as HTMLButtonElement | undefined;
+
+		if (!personalButton) throw new Error("Personal scope control was not rendered");
+		personalButton.focus();
+		personalButton.click();
+		await harness.fixture.whenStable();
+
+		expect(router.url).toBe("/settings/workspace/agents/edit");
+		expect(document.activeElement).toBe(personalButton);
 	});
 
 	it("restores scope selection through browser history", async function scopeHistory(): Promise<void>

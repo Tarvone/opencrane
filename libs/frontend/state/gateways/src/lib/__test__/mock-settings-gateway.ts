@@ -29,7 +29,7 @@ export class MockSettingsGateway implements SettingsGateway
 	}
 
 	public getBudgetSpend(_t: string): Promise<BudgetSpend> { return Promise.resolve({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, alertState: "warning" }); }
-	public getAwarenessContract(_t: string): Promise<AwarenessContractInfo> { return Promise.resolve({ contractId: "contract-acme-corp", contractVersion: "v2.3.1" }); }
+	public getAwarenessContract(_t: string): Promise<AwarenessContractInfo> { return Promise.resolve({ contractId: "contract-acme-corp", contractVersion: "v2.3.1", fallbackBehaviour: "proceed", citationMode: true }); }
 	public getDatasetAccess(_t: string): Promise<DatasetAccess[]> { return Promise.resolve(DATASET_ACCESS.map((r): DatasetAccess => ({ ...r }))); }
 	public getSkills(): Promise<SkillRow[]> { return Promise.resolve(SKILLS.map((r): SkillRow => ({ ...r }))); }
 	public getEgressDomains(): Promise<EgressDomain[]> { return Promise.resolve(EGRESS_DOMAINS.map((r): EgressDomain => ({ ...r }))); }

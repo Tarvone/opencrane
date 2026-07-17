@@ -97,6 +97,7 @@
 	--oc-surface-muted: #ebe8e2;
 	--oc-surface-hover: #f0ede7;
 	--oc-border: #dedad2;
+	--oc-border-light: #e8e5de;
 	--oc-border-strong: #d0cdc6;
 	--oc-text-primary: #1a1918;
 	--oc-text-secondary: #6a6660;
@@ -111,12 +112,20 @@
 	--oc-teal: #0db5cc;
 	--oc-teal-hover: #22c7dd;
 	--oc-teal-edge: #0a94a7;
+	--oc-teal-tint-bg: #e6f8fc;
+	--oc-teal-soft: #eefafc;
 	--oc-orange: #f47920;
 	--oc-red: #c1392b;
+	--oc-red-hover: #d44a3c;
+	--oc-red-edge: #942c22;
 	--oc-red-border: #f9c7b4;
+	--oc-red-tint-bg: #fdf2ef;
 	--oc-blue: #2a5c9a;
 	--oc-amber: #9a6b2a;
 	--oc-green: #4a9e6b;
+	--oc-green-feedback: #1a5c38;
+	--oc-green-bright: #22c55e;
+	--oc-green-tint-bg: #d8f0e4;
 
 	/* Compatibility aliases used by existing feature styles. */
 	--background: var(--oc-surface-paper);
@@ -148,9 +157,14 @@
 	--paper-button-shadow: 0 1px 0 var(--paper-button-edge), 0 2px 3px rgba(0, 0, 0, 0.04);
 	--paper-button-shadow-hover: 0 2px 0 var(--paper-button-edge), 0 3px 5px rgba(0, 0, 0, 0.06);
 	--paper-button-gradient: linear-gradient(135deg, #ffffff 0%, #ffffff 50%, var(--oc-surface-paper) 50%);
+	--paper-button-secondary-edge: #c7c2b8;
+	--paper-button-secondary-shadow: 0 1px 0 var(--paper-button-secondary-edge), 0 2px 3px rgba(0, 0, 0, 0.08);
+	--paper-button-secondary-gradient: linear-gradient(135deg, var(--oc-surface-card) 0%, var(--oc-surface-card) 50%, var(--oc-surface-paper) 50%);
 	--paper-button-primary-shadow: 0 1px 0 var(--oc-teal-edge), 0 2px 3px rgba(13, 181, 204, 0.25);
 	--paper-button-primary-shadow-hover: 0 2px 0 var(--oc-teal-edge), 0 3px 6px rgba(13, 181, 204, 0.3);
 	--paper-button-primary-gradient: linear-gradient(135deg, var(--oc-teal-hover) 0%, var(--oc-teal-hover) 50%, var(--oc-teal) 50%);
+	--paper-button-danger-shadow: 0 1px 0 var(--oc-red-edge), 0 2px 3px rgba(193, 57, 43, 0.24);
+	--paper-button-danger-gradient: linear-gradient(135deg, var(--oc-red-hover) 0%, var(--oc-red-hover) 50%, var(--oc-red) 50%);
 
 	/* Standard application geometry */
 	--layout-sidebar-width: 192px;
@@ -182,6 +196,7 @@
 	/* Status colours */
 	--wo-ok: var(--oc-green);
 	--wo-warn: var(--oc-amber);
+	--wo-danger: #b4232a;
 	--wo-finance: #a0855a;
 	--wo-teal: var(--oc-teal);
 }

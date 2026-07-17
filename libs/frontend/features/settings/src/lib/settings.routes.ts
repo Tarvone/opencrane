@@ -3,6 +3,7 @@ import { Route, Routes } from "@angular/router";
 import { SettingsPageComponent } from "./settings-page/settings-page.component.js";
 import { SettingsPlaceholderComponent } from "./settings-placeholder/settings-placeholder.component.js";
 import { _CanDeactivatePodSection } from "./sections/pod-section/pod-section.guard.js";
+import { _CanDeactivateMembersSection } from "./sections/members-section/members-section.guard.js";
 
 /** Create a leaf route for a later-milestone settings section. */
 function _placeholderRoute(path: string, title: string, description: string): Route
@@ -25,7 +26,38 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("members", "Members", "Workspace access, people, teams, and projects will be delivered in milestone 4."),
+	{
+		path: "members",
+		children:
+		[
+			{
+				path: "",
+				pathMatch: "full",
+				loadComponent: function loadMembersSection()
+				{
+					return import("./sections/members-section/members-section.component.js").then(function pickMembersSection(module)
+					{
+						return module.MembersSectionComponent;
+					});
+				}
+			},
+			...(["department", "team", "project"] as const).map(function membersEditorRoute(editorKind): Route
+			{
+				return {
+					path: `edit/${editorKind}/:id`,
+					data: { editorKind },
+					canDeactivate: [_CanDeactivateMembersSection],
+					loadComponent: function loadMembersEditor()
+					{
+						return import("./sections/members-section/members-section.component.js").then(function pickMembersEditor(module)
+						{
+							return module.MembersSectionComponent;
+						});
+					}
+				};
+			})
+		]
+	},
 	_placeholderRoute("budgets", "Budgets", "Workspace allocations and member spend controls will be delivered in milestone 4."),
 	{
 		path: "skills",

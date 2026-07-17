@@ -13,7 +13,7 @@ import { NavigationEnd, Route, Router, Routes, provideRouter, withComponentInput
 import { RouterTestingHarness } from "@angular/router/testing";
 import { filter, firstValueFrom, take } from "rxjs";
 import { compileString } from "sass";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PERSONAL_SETTINGS_NAVIGATION, WORKSPACE_SETTINGS_NAVIGATION, _SettingsNavigationForUrl, _SettingsScopeFromUrl } from "../settings-navigation.js";
 import { SettingsScope, SettingsSectionId } from "../settings-navigation.types.js";
@@ -23,13 +23,15 @@ import { _CanDeactivatePodSection } from "../sections/pod-section/pod-section.gu
 import { ConnectorsSectionComponent } from "../sections/connectors-section/connectors-section.component.js";
 import { DataNetworkSectionComponent } from "../sections/data-network-section/data-network-section.component.js";
 import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component.js";
+import { MembersSectionComponent } from "../sections/members-section/members-section.component.js";
+import { _CanDeactivateMembersSection } from "../sections/members-section/members-section.guard.js";
 
 /** Resolve an external settings component template or stylesheet. */
 function _componentResource(resourceUrl: string): string
 {
 	const file = resourceUrl.replace(/^\.\//, "");
 	const componentFolder = file.split(".component")[0];
-	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
+	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("members-section") ? "sections/members-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
 	return readFileSync(resolve(process.cwd(), "src/lib", folder, file), "utf8");
 }
 
@@ -57,10 +59,12 @@ function _testableRoutes(routes: Routes): Routes
 	return routes.map(function testableRoute(route): Route
 	{
 	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." }, canDeactivate: [_denyNavigation] }] };
+	if (route.path === "members") return route;
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
 	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network") return route;
-	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent };
+	if (route.path === "budget") return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, data: { title: "My Budget", description: "Personal budget controls." }, canDeactivate: undefined };
+	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, canDeactivate: undefined };
 	});
 }
 
@@ -188,6 +192,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 			"pod", "members", "budgets", "skills", "connectors", "agents", "data-network", "provider-keys"
 		]);
 		expect(workspaceRoutes.find(function pod(route): boolean { return route.path === "pod"; })?.canDeactivate).toEqual([_CanDeactivatePodSection]);
+		expect(workspaceRoutes.find(function members(route): boolean { return route.path === "members"; })?.children?.filter(function editor(route): boolean { return route.path?.startsWith("edit/") ?? false; }).every(function guarded(route): boolean { return route.canDeactivate?.includes(_CanDeactivateMembersSection) ?? false; })).toBe(true);
 		expect(_scopeChildren(SettingsScope.Personal).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
 			"account", "awareness", "budget", "api-keys"
 		]);
@@ -258,13 +263,15 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/members");
 		const router = TestBed.inject(Router);
-		const firstPlaceholder = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+		const firstMembers = harness.fixture.debugElement.query(By.directive(MembersSectionComponent)).componentInstance as MembersSectionComponent;
 		const firstActiveLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
 		const scopeButtons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLButtonElement[];
 		const navigationIcons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-item svg")) as SVGElement[];
 		const brandFacets = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-title polygon")) as SVGPolygonElement[];
 
-		expect(firstPlaceholder.title).toBe("Members");
+		expect(firstMembers.members).toHaveLength(5);
+		expect(harness.fixture.nativeElement.querySelector(".wo-members__header")?.textContent).toContain("5 of 10");
+		expect(harness.fixture.nativeElement.querySelector("[role='tab'][aria-selected='true']")?.textContent?.trim()).toBe("People");
 		expect(firstActiveLink?.getAttribute("href")).toBe("/settings/workspace/members");
 		expect(navigationIcons.every(function iconSize(icon): boolean { return icon.getAttribute("width") === "14" && icon.getAttribute("height") === "14"; })).toBe(true);
 		expect(brandFacets.map(function fill(facet): string | null { return facet.getAttribute("fill"); })).toEqual(["var(--oc-teal)", "var(--oc-teal-fold-dark)", "var(--oc-teal-hover)", "var(--oc-orange)"]);
@@ -282,10 +289,67 @@ describe("settings route contract", function settingsRoutesSuite(): void
 
 		expect(router.url).toBe("/settings/personal/budget");
 		expect(secondPlaceholder.title).toBe("My Budget");
-		expect(secondPlaceholder).not.toBe(firstPlaceholder);
+		expect(secondPlaceholder).not.toBe(firstMembers);
 		expect(secondActiveLink?.getAttribute("href")).toBe("/settings/personal/budget");
 		expect(scopeButtons[0]?.getAttribute("aria-pressed")).toBe("false");
 		expect(scopeButtons[1]?.getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("renders the organization tab and preserves it through an editor route", async function membersEditorRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/members");
+		const router = TestBed.inject(Router);
+		const organizationTab = harness.fixture.nativeElement.querySelectorAll("[role='tab']")[1] as HTMLButtonElement;
+		organizationTab.click();
+		await harness.fixture.whenStable();
+		harness.detectChanges();
+
+		expect(harness.fixture.nativeElement.querySelector("[role='tabpanel'] .wo-members__table")).not.toBeNull();
+		const editButton = harness.fixture.nativeElement.querySelector(".wo-members__org-row .wo-members__row-button") as HTMLButtonElement;
+		editButton.click();
+		await harness.fixture.whenStable();
+		expect(router.url).toContain("/settings/workspace/members/edit/department/eng");
+		expect(harness.fixture.nativeElement.querySelector(".wo-members__editor-row")).not.toBeNull();
+		expect((harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement).value).toBe("Engineering");
+		expect(harness.fixture.nativeElement.querySelector(".wo-members__editor-card")).not.toBeNull();
+		(harness.fixture.nativeElement.querySelector(".wo-members__back") as HTMLButtonElement).click();
+		await harness.fixture.whenStable();
+		expect(router.url).toBe("/settings/workspace/members?tab=org");
+		expect(harness.fixture.nativeElement.querySelector("[role='tabpanel'] .wo-members__table")).not.toBeNull();
+
+		await harness.navigateByUrl("/settings/workspace/members/edit/team/be?tab=org");
+		harness.detectChanges();
+		expect((harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement).value).toBe("Backend");
+		expect((harness.fixture.nativeElement.querySelector("#members-editor-department") as HTMLSelectElement).value).toBe("Engineering");
+		expect(harness.fixture.nativeElement.querySelectorAll(".wo-members__member-option")).toHaveLength(5);
+		const teamName = harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement;
+		teamName.value = "Backend team";
+		teamName.dispatchEvent(new Event("input", { bubbles: true }));
+		harness.detectChanges();
+		const confirm = vi.fn(function confirmDiscard(): boolean { return false; });
+		vi.stubGlobal("confirm", confirm);
+		(harness.fixture.nativeElement.querySelector(".wo-members__back") as HTMLButtonElement).click();
+		await harness.fixture.whenStable();
+		expect(confirm).not.toHaveBeenCalled();
+		expect(router.url).toBe("/settings/workspace/members?tab=org");
+		vi.unstubAllGlobals();
+
+		await harness.navigateByUrl("/settings/workspace/members/edit/project/p3?tab=org");
+		harness.detectChanges();
+		expect((harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement).value).toBe("Data Pipeline");
+		expect((harness.fixture.nativeElement.querySelector("#members-editor-status") as HTMLSelectElement).value).toBe("Draft");
+
+		await harness.navigateByUrl("/settings/workspace/members/edit/department/new?tab=org");
+		harness.detectChanges();
+		const newName = harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement;
+		const saveButton = harness.fixture.nativeElement.querySelector(".wo-members__save-button") as HTMLButtonElement;
+		expect(newName.value).toBe("");
+		expect(saveButton.disabled).toBe(true);
+		expect(harness.fixture.nativeElement.querySelector(".wo-members__danger-button")).toBeNull();
+		newName.value = "New department";
+		newName.dispatchEvent(new Event("input", { bubbles: true }));
+		harness.detectChanges();
+		expect(saveButton.disabled).toBe(false);
 	});
 
 	it("resets scopes to their defaults and preserves an already-rendered default", async function scopeSelection(): Promise<void>
@@ -295,7 +359,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		const scopeButtons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")) as HTMLButtonElement[];
 		const workspaceButton = scopeButtons[0];
 		const personalButton = scopeButtons[1];
-		const workspaceLeaf = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+		const workspaceLeaf = harness.fixture.debugElement.query(By.directive(MembersSectionComponent)).componentInstance as MembersSectionComponent;
 
 		const workspaceNavigation = _nextNavigation(router);
 		workspaceButton?.click();

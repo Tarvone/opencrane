@@ -12,7 +12,7 @@
 	transition: background 120ms ease;
 
 	&--active {
-		background: rgba(255, 255, 255, 0.07);
+		background: color-mix(in srgb, var(--wo-sidebar-fg) 7%, transparent);
 		border-radius: 6px;
 	}
 
@@ -34,10 +34,10 @@
 	&__name {
 		display: block;
 		font-size: 13px;
-		color: #7a7673;
+		color: color-mix(in srgb, var(--wo-sidebar-fg) 48%, transparent);
 
 		&--active {
-			color: #ffffff;
+			color: var(--wo-sidebar-fg);
 			font-weight: 500;
 		}
 	}
@@ -48,7 +48,7 @@
 		gap: 6px;
 		margin-top: 2px;
 		font-size: 11px;
-		color: #4a4845;
+		color: color-mix(in srgb, var(--wo-sidebar-fg) 28%, transparent);
 
 		.wo-mono {
 			opacity: 0.8;
@@ -57,12 +57,12 @@
 
 	&__subtitle {
 		font-size: 10px;
-		color: rgba(232, 228, 220, 0.25);
+		color: color-mix(in srgb, var(--wo-sidebar-fg) 25%, transparent);
 	}
 
 	&__unread {
 		font-size: 10px;
-		color: #f6f4ef;
+		color: var(--oc-surface-paper);
 		border-radius: 10px;
 		padding: 1px 5px;
 	}

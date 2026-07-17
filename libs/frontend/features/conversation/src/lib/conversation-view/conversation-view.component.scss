@@ -294,38 +294,67 @@
 		max-width: 700px;
 		margin: 0 auto;
 		background: var(--oc-surface-card);
-		border: 1px solid var(--oc-border);
+		border: 1px solid var(--oc-border-strong);
 		border-radius: 12px;
-		padding: 10px 12px;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+		padding: 10px;
+		box-shadow: 0 1px 0 var(--paper-shadow-subtle);
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+		transition: border 0.15s ease;
 
 		textarea {
+			width: 100%;
 			flex: 1;
 			border: none;
 			outline: none;
-			font-size: 14.5px;
-			color: var(--oc-text-primary);
+			font-size: 14px;
+			color: var(--paper-text-user);
 			background: transparent;
-			line-height: 1.55;
+			line-height: 1.5;
 			max-height: 140px;
 			overflow-y: auto;
-			padding: 1px 0;
+			padding: 6px 0 4px;
 			resize: none;
 			font-family: inherit;
-
-			&::placeholder {
-				color: var(--oc-text-placeholder);
-			}
 		}
+	}
+
+	&__input-wrap {
+		position: relative;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	&__placeholder {
+		position: absolute;
+		top: 6px;
+		left: 0;
+		right: 0;
+		pointer-events: none;
+		font-size: 14px;
+		line-height: 1.5;
+		color: var(--oc-text-placeholder);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	&__placeholder-hints {
+		color: var(--paper-border-hover);
+	}
+
+	&__placeholder-key {
+		font-weight: 600;
+		color: var(--oc-text-heading-muted);
 	}
 
 	&__composer-inner {
 		display: flex;
 		align-items: flex-end;
-		gap: 10px;
+		gap: 9px;
 	}
 
 	&__attachments {
@@ -406,15 +435,21 @@
 	}
 
 	&__attach {
-		background: transparent;
-		border: none;
-		padding: 2px 3px;
+		width: 30px;
+		height: 30px;
+		background: var(--oc-surface-card);
+		border: 1px solid var(--paper-button-edge);
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		cursor: pointer;
-		color: var(--oc-text-placeholder);
+		color: var(--oc-text-muted);
 		flex-shrink: 0;
-		margin-bottom: 1px;
+		transition: border-color 0.15s ease;
 
 		&:hover {
+			border-color: var(--paper-button-secondary-edge);
 			color: var(--oc-text-primary);
 		}
 	}
@@ -427,19 +462,24 @@
 	}
 
 	&__send {
+		width: 32px;
+		height: 32px;
 		background: var(--oc-teal);
+		color: var(--oc-text-inverse);
 		border: none;
-		border-radius: 7px;
-		padding: 6px 9px;
+		border-radius: 8px;
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
 		box-shadow: var(--paper-button-primary-shadow);
-		transition: all 0.13s ease;
+		transition: all 0.15s ease;
 
 		&:disabled {
-			opacity: 0.4;
+			background: var(--paper-button-disabled-bg);
+			color: var(--oc-text-placeholder);
+			box-shadow: none;
 			cursor: default;
 			pointer-events: none;
 		}

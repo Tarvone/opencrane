@@ -74,5 +74,10 @@
 		.wo-section__body {
 			padding-bottom: 0;
 		}
+
+		.wo-section__badge {
+			background: var(--paper-badge-bg);
+			color: var(--paper-badge-text);
+		}
 	}
 }

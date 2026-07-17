@@ -103,6 +103,7 @@
 	--oc-text-secondary: #6a6660;
 	--oc-text-muted: #9a9690;
 	--oc-text-placeholder: #b0ada8;
+	--oc-text-heading-muted: #a8a49c;
 	--oc-text-muted-aa: #6a6660;
 	--oc-text-placeholder-aa: #6a6660;
 	--oc-text-inverse: #ffffff;
@@ -160,6 +161,13 @@
 	--paper-button-shadow-hover: 0 2px 0 var(--paper-button-edge), 0 3px 5px rgba(0, 0, 0, 0.06);
 	--paper-button-gradient: linear-gradient(135deg, #ffffff 0%, #ffffff 50%, var(--oc-surface-paper) 50%);
 	--paper-button-secondary-edge: #c7c2b8;
+	--paper-border-hover: #c2beb6;
+	--paper-badge-bg: #ddd8cf;
+	--paper-badge-text: #7a756c;
+	--paper-user-bubble-bg: #e9e5dc;
+	--paper-text-user: #2a2825;
+	--paper-shadow-subtle: #ece9e3;
+	--paper-button-disabled-bg: #eae6df;
 	--paper-button-secondary-shadow: 0 1px 0 var(--paper-button-secondary-edge), 0 2px 3px rgba(0, 0, 0, 0.08);
 	--paper-button-secondary-gradient: linear-gradient(135deg, var(--oc-surface-card) 0%, var(--oc-surface-card) 50%, var(--oc-surface-paper) 50%);
 	--paper-button-primary-shadow: 0 1px 0 var(--oc-teal-edge), 0 2px 3px rgba(13, 181, 204, 0.25);
@@ -176,10 +184,10 @@
 	--layout-page-padding-top: 40px;
 	--layout-page-padding-bottom: 72px;
 
-	/* Dark sidebar rail */
-	--wo-sidebar-bg: #1a1918;
-	--wo-sidebar-fg: #ffffff;
-	--wo-sidebar-border: rgba(255, 255, 255, 0.06);
+	/* Paper sidebar rail */
+	--wo-sidebar-bg: #f1eee7;
+	--wo-sidebar-fg: #1a1918;
+	--wo-sidebar-border: #e3dfd7;
 
 	/* Scope colours (org / dept / project / personal) */
 	--wo-scope-org: #5a8a5a;

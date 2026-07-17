@@ -14,26 +14,26 @@ export class CitationStripComponent
 
 	public readonly typeColor = computed(() => {
 		const t = this.card().type;
-		if (t === MessageCardKind.Observation) return { bg: '#ddeeff', color: '#1d4d8a', short: 'R' };
-		if (t === MessageCardKind.Policy) return { bg: '#fef0d0', color: '#7a5010', short: 'P' };
-		if (t === MessageCardKind.Action) return { bg: '#d8f0e4', color: '#1a5c38', short: 'A' };
-		return { bg: '#d9f4f8', color: '#0a94a7', short: 'Ag' }; // Default
+		if (t === MessageCardKind.Observation) return { bg: 'var(--wo-observation-bg)', color: 'var(--wo-observation)', short: 'R' };
+		if (t === MessageCardKind.Policy) return { bg: 'var(--wo-policy-bg)', color: 'var(--wo-policy)', short: 'P' };
+		if (t === MessageCardKind.Action) return { bg: 'var(--oc-green-tint-bg)', color: 'var(--oc-green-feedback)', short: 'A' };
+		return { bg: 'var(--oc-teal-tint-bg)', color: 'var(--oc-teal-edge)', short: 'Ag' }; // Default
 	});
 
 	public readonly scopeColor = computed(() => {
 		const s = this.card().scope || 'org';
-		if (s === 'dept') return { bg: '#fef0d0', color: '#7a5010' };
-		if (s === 'project') return { bg: '#e0f0e8', color: '#1a5c38' };
-		if (s === 'personal') return { bg: '#fce8e4', color: '#c1392b' };
-		return { bg: '#e8e8e4', color: '#4a4845' }; // org
+		if (s === 'dept') return { bg: 'var(--wo-scope-dept-bg)', color: 'var(--wo-scope-dept-accent)' };
+		if (s === 'project') return { bg: 'var(--wo-observation-bg)', color: 'var(--wo-scope-project)' };
+		if (s === 'personal') return { bg: 'var(--oc-red-tint-bg)', color: 'var(--oc-red)' };
+		return { bg: 'var(--oc-surface-muted)', color: 'var(--wo-scope-org)' }; // org
 	});
 
 	public readonly statusColor = computed(() => {
 		const s = this.card().status;
-		if (s === 'applied') return '#9a6b2a';
-		if (s === 'done') return '#2a7d4f';
-		if (s === 'pending') return '#c1392b';
-		if (s === 'resolved') return '#8a8682';
+		if (s === 'applied') return 'var(--oc-amber)';
+		if (s === 'done') return 'var(--wo-ok)';
+		if (s === 'pending') return 'var(--oc-red)';
+		if (s === 'resolved') return 'var(--oc-text-muted)';
 		return null;
 	});
 

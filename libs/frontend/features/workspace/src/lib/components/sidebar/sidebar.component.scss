@@ -114,24 +114,27 @@
 	&__new-session {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 6px 12px;
-		margin: 4px 12px;
-		width: calc(100% - 24px);
-		color: var(--wo-sidebar-fg);
-		background: var(--oc-orange);
-		border-radius: 5px;
+		gap: 7px;
+		padding: 7px 10px;
+		margin: 4px 10px;
+		width: calc(100% - 20px);
+		color: var(--oc-text-secondary);
+		background: var(--oc-surface-card);
+		border: 1px solid var(--paper-button-edge);
+		border-radius: 7px;
+		box-shadow: 0 1px 0 var(--wo-sidebar-border);
 		font-size: 13px;
 		font-weight: 500;
 		text-decoration: none;
-		transition: opacity 120ms ease;
+		transition: all 150ms ease;
 
-		i {
+		i, svg {
 			font-size: 12px;
 		}
 
 		&:hover {
-			opacity: 0.9;
+			border-color: var(--paper-button-secondary-edge);
+			color: var(--oc-text-primary);
 		}
 	}
 

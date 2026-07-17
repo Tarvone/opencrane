@@ -102,7 +102,8 @@ Cutover qualification should require:
 
 - 100% pass of the frozen capability fixtures and authorization decision table;
 - a complete manifest for every migrated byte/record, with hashes and zero unexplained orphans;
-- every credential proven adopted/rotated or assigned to an owner-approved reconnect action;
+- every legacy credential has a verified rotate, recreate, reconnect, or revoke outcome, with owner
+  evidence and no carried-forward credential identity or key material;
 - no unresolved Critical or High security finding;
 - backup and restore rehearsal from immutable evidence;
 - measured import plus verification within half the approved maintenance window;

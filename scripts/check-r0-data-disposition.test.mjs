@@ -263,7 +263,7 @@ test("required external estate classes cannot silently disappear", function _est
   assert.throws(function _validate() { _ValidateDispositionMap(map, _inventory); }, /unclassified required estate classes: openclaw-runtime-history/u);
 });
 
-test("active architecture never regresses to an OpenClaw adapter", function _architectureWording()
+test("active clean-green contracts never regress to legacy adoption", function _architectureWording()
 {
   const architecture = readFileSync(join(_root, "docs/design/personal-agent-platform-architecture.md"), "utf8");
   assert.doesNotMatch(architecture, /OpenClaw compatibility adapter during migration/u);
@@ -274,4 +274,7 @@ test("active architecture never regresses to an OpenClaw adapter", function _arc
   assert.doesNotMatch(loopPlan, /unless a reverse migration is executed/u);
   const executionPlan = readFileSync(join(_root, "plan.md"), "utf8");
   assert.doesNotMatch(executionPlan, /credential\s+(?:adoption|adopt-vs-reconnect)/iu);
+  const productContract = readFileSync(join(_root, "docs/design/personal-agent-platform-r0-product-contract.md"), "utf8");
+  assert.doesNotMatch(productContract, /credential(?:s)?\s+(?:proven\s+)?adopted/iu);
+  assert.match(productContract, /legacy credential has a verified rotate, recreate, reconnect, or revoke outcome/iu);
 });

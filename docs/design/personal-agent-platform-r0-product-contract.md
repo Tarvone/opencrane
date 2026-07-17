@@ -44,8 +44,11 @@ effective semantics:
    collapse it into team, department, or organization;
 6. treat dataset-membership rows as derived projections and rebuild them from approved grants.
 
-Open question: whether project becomes a hierarchy tier, an ordinary label/group, or a separate
-containment dimension. Raw-row migration without this decision is not semantic parity.
+Product direction recorded on 2026-07-17: `project` is a separate containment dimension whose
+membership may span departments. Department membership neither grants nor prevents project
+membership. Project grants remain explicit and combine with other applicable grants through the
+priority and Deny-at-equal-priority rules above. Required security co-approval remains pending;
+raw-row migration before that approval is not semantic parity.
 
 ## Membership freshness proposal
 
@@ -58,7 +61,10 @@ containment dimension. Raw-row migration without this decision is not semantic p
 - The cutover captures one fleet revision, leases the ClusterTenant, and queues later mutations for
   replay after commit or abort.
 
-The maximum freshness window and queued-mutation owner are unapproved.
+Pending operating proposal: set the maximum freshness window to five minutes from the last
+successfully applied signed fleet revision. After that boundary, deny new login, new run, grant
+expansion, administrative capability, capability renewal, and cutover commit. The duration,
+queued-mutation owner, and required fleet/silo/security approvals remain unapproved.
 
 ## Persona precedence proposal
 
@@ -85,6 +91,11 @@ This conflict-blocking rule is proposed and requires product approval.
 - No raw credential or secret value enters an exporter bundle, Git, logs, or audit metadata.
 - Legal/security/product owners must approve retention duration and deletion authority.
 
+Pending operating proposal: retain a reset-candidate cutover archive for 30 days after successful
+green commit, encrypted, immutable, access-logged, and owner-restricted; delete only after
+reconciliation and owner sign-off, with legal hold overriding deletion. This does not set
+full-fidelity or long-term audit retention and remains unapproved.
+
 ## Acceptance proposal
 
 Cutover qualification should require:
@@ -107,7 +118,7 @@ Exact SLO thresholds, the maintenance window, and approvers remain unassigned.
 | Decision | Required authority | Approval |
 |----------|--------------------|----------|
 | Frozen capability boundary | Product owner | Pending |
-| Grant/project semantics | Product + security | Pending |
+| Grant/project semantics | Product + security | Product direction recorded; security approval pending |
 | Membership freshness/failure policy | Fleet + silo owners + security | Pending |
 | Persona conflict policy | Product + data owner | Pending |
 | Retention and deletion policy | Product + legal/security | Pending |
@@ -115,5 +126,6 @@ Exact SLO thresholds, the maintenance window, and approvers remain unassigned.
 
 R0 cannot close while any row is pending.
 
-> See also: [estate evidence index](personal-agent-platform-r0-evidence-index.md) and
-> [migration contract](personal-agent-platform-r0-migration-contract.md).
+> See also: [estate evidence index](personal-agent-platform-r0-evidence-index.md),
+> [migration contract](personal-agent-platform-r0-migration-contract.md), and
+> [approval record](personal-agent-platform-r0-approval-record.md).

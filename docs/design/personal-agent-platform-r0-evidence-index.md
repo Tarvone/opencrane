@@ -4,26 +4,43 @@ Status: **partial evidence captured 2026-07-17; estate completeness and approval
 
 Issue: [#252](https://github.com/italanta/opencrane/issues/252)
 
-This public index records only the scope, coarse conclusions, missing evidence, and approval state
-for the R0 rewrite-freeze decision test. Exact ClusterTenant identities, workload and database
-counts, volume fingerprints, activity, credentials, failure state, backup/network posture, and
-proprietary fleet evidence belong in an approved secured evidence system.
+This public index records only the non-sensitive boundary, manifest hashes, generic incompleteness,
+and approval state for the R0 rewrite-freeze decision test. Source scopes, counts, reachability,
+failures, exact ClusterTenant identities, topology, classifications, activity, credentials,
+backup/network posture, and proprietary fleet evidence stay in private evidence.
 
-No such secured evidence reference is approved yet. R0 is therefore **not complete**.
+A reviewed local pack now provides a temporary secured reference, but it is ignored, worktree-local,
+and deletable. No durable secured evidence reference is approved yet. R0 is therefore **not
+complete**.
 
 ## Evidence boundary
 
-- Repository baseline: `6a01422` on `feat/agent-platform-v2-r0`.
-- One configured non-production Kubernetes environment was reachable and read-only on 2026-07-17.
-- One configured local test context was unreachable; no other environment was represented in the
-  available kubeconfig.
-- Kubernetes, CNPG, upstream database metadata, and GitHub issue state were inspected without
-  reading row contents or secret values. Helm release state remains intentionally unproven because
-  its storage may contain Kubernetes Secrets.
-- The live evidence is sufficient to disprove the assumption that every development ClusterTenant
-  is resettable. It is not sufficient to prove estate completeness.
+- Repository baseline: clean revision `71a988a163edd61a071a61c67241f33781cddfb9` on
+  `feat/agent-platform-v2-r0`.
+- The collector operated only on explicitly requested sources and retained their scope,
+  reachability, failures, counts, and topology below the secured manifest hash.
+- The collector never requested full Kubernetes objects, row contents, secret values, ConfigMaps,
+  logs, events, or Helm release state.
+- The secured evidence prevents treating reset eligibility as an estate-wide assumption. It does
+  not establish estate completeness or prove that any stored state is valuable, reproducible, or
+  safe to discard.
 
 Missing environments are missing evidence, not proof that no other estate exists.
+
+## Verified local evidence pack
+
+| Field | Verified value |
+|-------|----------------|
+| Local reference | `.agent-reviews/r0-estate-20260717T095021Z/` |
+| Source revision | `71a988a163edd61a071a61c67241f33781cddfb9`, clean |
+| Public manifest SHA-256 | `2ccd613d774dc7377d970f6f8903a4c4fc54e4b811da3992986d9e304abd1bb8` |
+| Secured file-manifest SHA-256 | `fbafdda39cb22ec275c5b730e494fe56beae904d797067c7b64c1a6e5fb5b46f` |
+| Publication marker | `.complete` present; `.partial` absent |
+| Evidence completeness | `incomplete` |
+
+All secured manifest entries matched their recorded hashes, sizes, and private modes at review time.
+These checks establish pack integrity, not estate completeness. The reference becomes invalid if
+the ignored directory is removed, the worktree is deleted, or `git clean -fdX` runs.
 
 ## Reproducible collection
 
@@ -85,20 +102,13 @@ Those limitations are recorded in both manifests rather than inferred from a gre
 
 ## Coarse live conclusions
 
-- Multiple ClusterTenants are active in the reachable non-production environment.
-- At least one ClusterTenant has meaningful agent/session state, non-reproducible memory, provider
-  state, and upstream spend history. It is a **full-fidelity default** and must not be reset without
-  explicit owner approval.
-- At least one ClusterTenant has no UserTenant workload and is a **reset-eligible candidate**.
-  Initialized upstream Obot/LiteLLM state still exists, so even this candidate requires an explicit
-  owner and credential/data disposition.
-- Older duplicate desired-state resources exist outside the canonical silo locations. Their
-  identities and hashes must be archived in secured evidence and they must not be imported as
-  additional agents.
-- Silo schema, release, and image state is not yet one immutable frozen baseline. R1 must normalize,
-  qualify, pin, sign, and snapshot it.
-- Current backup/restore, network enforcement, credential custody, upstream exportability, and
-  acceptance evidence is incomplete.
+- Reset eligibility is not proven for the estate. Every unclassified ClusterTenant remains
+  cutover-ineligible until its owner approves a reset or full-fidelity disposition.
+- The secured evidence contains candidate classifications and legacy-residue findings, but no
+  classification or deletion is owner-approved.
+- Database state, transcript/artifact/persona/memory bytes, upstream provider/MCP state, credential
+  custody, backup/restore, image digests, release baselines, and acceptance evidence remain
+  unproven or outside the collector's safe public boundary.
 
 These are evidence-bounded defaults, not owner-approved classifications.
 
@@ -113,7 +123,9 @@ A ClusterTenant is reset-eligible only when its owner approves all of the follow
   disposition;
 - the reset and reconnect can be rehearsed inside the approved maintenance window.
 
-Every other ClusterTenant remains full-fidelity by default.
+An unclassified ClusterTenant is cutover-ineligible. A full-fidelity classification authorizes only
+the smallest one-way semantic import of explicitly approved non-reproducible data into green
+authorities; it never authorizes a compatibility layer, legacy runtime shape, or raw database copy.
 
 ## Required secured evidence
 
@@ -146,9 +158,9 @@ This is a proposed shape, not an approved cohort list or schedule.
 
 | Decision | State |
 |----------|-------|
-| Estate discovery | Partial: one non-production environment inspected; completeness unverified |
-| Per-ClusterTenant classification | Evidence-bounded defaults exist only in secured working evidence; owner approval missing |
-| Secured evidence reference and hash | Missing |
+| Estate discovery | Partial; exact source scope and reachability stay secured, and completeness is unverified |
+| Per-ClusterTenant classification | Secured evidence-bounded defaults exist; owner approvals stay secured and are missing |
+| Secured evidence reference and hash | Temporary local pack and hashes verified; approved durable reference missing |
 | Data and credential disposition | Drafted in the migration contract; owner/security approval missing |
 | Product contract | Drafted; product approval missing |
 | Post-write rollback | Unanswered; rewrite-freeze route remains provisional |
@@ -156,5 +168,6 @@ This is a proposed shape, not an approved cohort list or schedule.
 | Acceptance thresholds | Proposed; approval and measured blue baselines missing |
 | Staffing, budget, schedule, sign-off authority | Unassigned |
 
-> See also: [R0 product contract](personal-agent-platform-r0-product-contract.md) and
-> [R0 migration contract](personal-agent-platform-r0-migration-contract.md).
+> See also: [R0 product contract](personal-agent-platform-r0-product-contract.md),
+> [R0 migration contract](personal-agent-platform-r0-migration-contract.md), and
+> [R0 approval record](personal-agent-platform-r0-approval-record.md).

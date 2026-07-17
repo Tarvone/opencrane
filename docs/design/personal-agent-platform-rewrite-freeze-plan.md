@@ -19,8 +19,9 @@ The adopted freeze route is:
 1. stabilize and tag one supportable OpenClaw-based release;
 2. freeze legacy product/schema development;
 3. build the final OpenCrane-owned, OpenClaw-free platform in an isolated green release with no OpenClaw
-   compatibility layer or legacy imports;
-4. build deterministic read-only exporters and idempotent importers for every legacy store;
+   compatibility layer or legacy-shaped imports;
+4. build bounded read-only semantic exporters and idempotent green importers only for explicitly
+   approved non-reproducible data; rebuild, archive, or drop the rest;
 5. rehearse against production-shaped snapshots;
 6. replace one complete ClusterTenant silo at a time;
 7. delete the legacy platform after every silo's retention window.
@@ -275,7 +276,7 @@ Classify every legacy dataset as:
 
 Exit gate: target architecture ADRs, frozen product contract, data disposition, cutover/rollback
 policy, owners, budget, and schedule are approved. If post-write reverse rollback is mandatory, stop
-and use the strangler unless the organization explicitly funds the reverse bridge.
+this route and separately plan the strangler/hybrid strategy.
 
 ## R1 — stabilize, snapshot, and freeze blue
 
@@ -678,7 +679,6 @@ is additive person-effort; parallel work reduces calendar duration, not the tota
 |---|---:|---:|
 | Reset-eligible rewrite freeze | 42–72 engineering weeks after stabilization | 5–7 months with 4–5 focused engineers |
 | Full-fidelity rewrite freeze | 49–84 engineering weeks after stabilization | 6–9 months with 4–5 engineers plus shared SRE/security |
-| Full fidelity plus post-write reverse bridge | 54–92 engineering weeks after stabilization | 7–10 months; no longer a pure freeze |
 | Existing strangler estimate | 34–54 engineering weeks | 4–6 months with three focused engineers |
 
 Add the **12–22 engineering-week stabilization runway** to the rewrite variants if the listed
@@ -695,8 +695,6 @@ The ranges reconcile to the workstreams as follows:
   R7 rehearsal (**1–2**), and small-cohort R9 cutover (**1–3**), producing **42–72** total;
 - full fidelity adds the stated R3 (**6–10**), R7 (**3–5**), and R9 (**2–6**) ranges, producing
   **49–84** total;
-- a reverse bridge adds another **5–8**, producing **54–92** total.
-
 Recommended green staffing:
 
 - two platform/data engineers;

@@ -24,15 +24,15 @@ for a fleet-wide big bang: the ClusterTenant remains the atomic isolation and cu
 - Stabilize, test, sign, and freeze one immutable OpenClaw-based blue release.
 - Keep `main` as the protected blue maintenance line and integrate green through ordinary reviewed
   pull requests on protected `feat/agent-platform-v2`.
-- Build green with no OpenClaw bridge, transcript mirror, dual-write compatibility adapter, legacy
-  import, or reverse bridge in runtime paths.
+- Build green with no OpenClaw bridge, transcript mirror, dual-write compatibility adapter,
+  legacy-shaped import, or reverse bridge in runtime paths.
 - Export blue read-only and import green idempotently from checkpoint-bound snapshots or explicitly
   approved reset/archive/reconnect inputs.
 - Rehearse production-shaped migration and failure paths, qualify one entire dogfood silo, then cut
   one complete ClusterTenant at a time.
 - Before the commit point, rollback restores the exact signed blue manifest under a new generation.
-  After green accepts writes or performs side effects, recovery is forward unless the program is
-  explicitly reclassified and funds a reverse bridge.
+  After green accepts writes or performs side effects, recovery is forward. If post-write reverse
+  rollback is mandatory, this route is not used.
 
 The active-slot/quarantine mechanism is migration infrastructure only. It is removed after all
 ClusterTenants and rollback windows complete.
@@ -42,8 +42,8 @@ ClusterTenants and rollback windows complete.
 R0 must inventory the real estate and classify every ClusterTenant as reset-eligible or requiring
 full-fidelity migration. It must also decide whether post-write rollback is mandatory. If mandatory
 post-write rollback is a product or operating requirement, this ADR's route is no longer viable:
-the program stops and reverts to the strangler/hybrid strategy unless the organization explicitly
-funds and operates a reverse event/side-effect bridge.
+the program stops and the organization separately plans the strangler/hybrid strategy. A reverse
+event or side-effect bridge is not part of this clean-green route.
 
 This is a decision gate, not a documentation formality.
 

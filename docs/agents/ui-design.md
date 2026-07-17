@@ -54,6 +54,19 @@ Use a closing keyword only when the pull request fully satisfies the issue. A pa
 ## Design Language: "Paper" Theme
 All implementation must strictly adhere to the updated "Paper" visual theme and overriding design tokens. Token values must be read from `apps/opencrane-ui/src/styles.scss` (the `:root` block); the values listed below are a quick-reference summary only:
 - **Tokens First**: All components must use bare CSS variables (e.g., `var(--oc-teal)`) for colors that already have defined tokens. Do not hardcode hex values or use `var(--token, #hex)` fallbacks when a corresponding token exists in the theme.
+- **No-Hardcode Sweep (mandatory before any commit):** Before ending a work cycle, run the following check against every `.scss` and `.ts`/`.html` file you touched:
+
+  ```bash
+  grep -E "#[0-9a-fA-F]{3,6}" <file>
+  ```
+
+  For every hex value the search returns, apply exactly one of these three actions in order:
+
+  1. **Map to an existing token.** Search `styles.scss` for the exact hex value. If a `var(--*)` token already resolves to it, replace the hardcode with that token. Do not introduce a new token.
+  2. **Elevate to a new token.** Run the same regex across all of `libs/frontend/` and `apps/opencrane-ui/`. If the hex appears in **two or more component files**, it is a systemic colour — register it as a named token in the `--paper-*` or `--oc-*` group in `styles.scss` and replace every occurrence with the new token.
+  3. **Leave it (last resort, must be justified).** Only if the hex is genuinely unique to a single component and has no equivalent token may it remain hardcoded. It must carry an inline comment citing the exact mock source file and line, e.g. `// Composer.dc.html:29`.
+
+  The sweep must find **zero** unjustified raw hex values in touched files before the commit is suggested. Claiming the file is clean without running the grep is not permitted.
 - **Paper Background**: `#f5f2ec` (cards `#fff`, borders `#dedad2`).
 - **Accents**: Teal (primary/active) `#0db5cc` (hover `#22c7dd`, edge `#0a94a7`), Orange (accents/sparks) `#f47920`, Danger `#c1392b` (borders `#f9c7b4`).
 - **Text**: Primary `#1a1918`, Secondary `#6a6660`, Muted `#9a9690`.

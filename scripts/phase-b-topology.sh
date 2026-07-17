@@ -369,6 +369,68 @@ for (const podClass of renderedPodClasses.keys())
 }
 info.push(`${(workloadRegistry.renderProfiles ?? []).length} Helm profiles match their exact pod-class inventories`);
 
+function renderSilo(args, context)
+{
+  try
+  {
+    return execFileSync(
+      "helm",
+      ["template", "opencrane", workspacePath("apps/opencrane-infra"), "--namespace", "opencrane-system", ...args],
+      { cwd: root, encoding: "utf8" },
+    );
+  }
+  catch (err)
+  {
+    fail(`${context}: Helm render failed: ${err.message}`);
+    return "";
+  }
+}
+
+const namespaceManagerName = "opencrane-opencrane-server-ns-manage-opencrane-system";
+const defaultManifest = renderSilo([], "default namespace-authority contract");
+if (defaultManifest.includes(namespaceManagerName))
+{
+  fail("default namespace-authority contract: fleet-managed render must not grant namespace management");
+}
+
+const standaloneManifest = renderSilo(
+  ["--values", workspacePath("apps/opencrane-infra/values/standalone.yaml")],
+  "standalone namespace-authority contract",
+);
+const namespaceManagerDocuments = standaloneManifest.split(/^---\s*$/m).filter(function isNamespaceManager(document) {
+  return document.includes(`name: ${namespaceManagerName}`);
+});
+const namespaceManagerRole = namespaceManagerDocuments.find(function isClusterRole(document) {
+  return /^kind: ClusterRole\s*$/m.test(document);
+});
+const namespaceManagerBinding = namespaceManagerDocuments.find(function isClusterRoleBinding(document) {
+  return /^kind: ClusterRoleBinding\s*$/m.test(document);
+});
+if (!namespaceManagerRole)
+{
+  fail("standalone namespace-authority contract: app-owned server ClusterRole did not render");
+}
+else
+{
+  if (!/^\s*resources: \["namespaces"\]\s*$/m.test(namespaceManagerRole))
+  {
+    fail("standalone namespace-authority contract: ClusterRole does not target namespaces");
+  }
+  if (!/^\s*verbs: \["get", "list", "watch", "create", "patch"\]\s*$/m.test(namespaceManagerRole))
+  {
+    fail("standalone namespace-authority contract: ClusterRole verbs drifted from least privilege");
+  }
+}
+if (!namespaceManagerBinding)
+{
+  fail("standalone namespace-authority contract: app-owned server ClusterRoleBinding did not render");
+}
+else if (!namespaceManagerBinding.includes("name: opencrane-opencrane-server\n    namespace: opencrane-system"))
+{
+  fail("standalone namespace-authority contract: ClusterRoleBinding does not bind the server service account");
+}
+info.push("standalone namespace management is rendered app-locally and absent by default");
+
 const runtimeConstructs = new Map();
 for (const entry of workloadRegistry.runtimeConstructs ?? [])
 {

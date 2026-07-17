@@ -145,7 +145,6 @@ subjects:
     name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
 {{- end }}
-{{- end }}
 {{- if .Values.clustertenantManager.manageTenantNamespaces }}
 ---
 {{- /*
@@ -181,4 +180,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- end }}

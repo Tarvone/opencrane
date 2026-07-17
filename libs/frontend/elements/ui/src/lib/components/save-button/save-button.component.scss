@@ -5,12 +5,12 @@
 
 	&__feedback {
 		margin: 0;
-		color: var(--oc-text-secondary, #6a6660);
+		color: var(--oc-text-secondary);
 		font-size: 13px;
 		text-align: right;
 
 		&--error {
-			color: var(--oc-danger, #c1392b);
+			color: var(--oc-red);
 		}
 	}
 
@@ -23,7 +23,7 @@
 	&__button,
 	&__secondary {
 		padding: 8px 16px;
-		border: 1px solid var(--oc-border, #dedad2);
+		border: 1px solid var(--oc-border);
 		border-radius: var(--radius, 8px);
 		font: inherit;
 		font-size: 13px;
@@ -31,7 +31,7 @@
 		transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 
 		&:focus-visible {
-			outline: 3px solid color-mix(in srgb, var(--oc-teal, #0db5cc) 35%, transparent);
+			outline: 3px solid color-mix(in srgb, var(--oc-teal) 35%, transparent);
 			outline-offset: 2px;
 		}
 
@@ -47,36 +47,36 @@
 		padding: 10px 20px;
 		border: none;
 		border-radius: 7px;
-		background: #0db5cc;
-		box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25);
-		color: #fff;
+		background: var(--oc-teal);
+		box-shadow: var(--paper-button-primary-shadow);
+		color: var(--oc-text-inverse);
 		font-size: 14px;
 		font-weight: 500;
 
 		&:not(:disabled):hover {
-			background: linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%);
-			box-shadow: 0 2px 0 #0a94a7, 0 3px 6px rgba(13, 181, 204, 0.3);
+			background: var(--paper-button-primary-gradient);
+			box-shadow: var(--paper-button-primary-shadow-hover);
 			transform: translateY(-1px);
 		}
 
 		&:not(:disabled):active {
-			box-shadow: 0 1px 0 #0a94a7;
+			box-shadow: 0 1px 0 var(--oc-teal-edge);
 			transform: none;
 		}
 	}
 
 	&__secondary {
-		background: #fff;
-		box-shadow: 0 1px 0 #c7c2b8, 0 2px 3px rgba(0, 0, 0, 0.08);
-		color: var(--oc-text-primary, #1a1918);
+		background: var(--oc-surface-card);
+		box-shadow: var(--paper-button-secondary-shadow);
+		color: var(--oc-text-primary);
 
 		&:not(:disabled):hover {
-			background: linear-gradient(135deg, #fff 0%, #fff 50%, #f5f2ec 50%);
+			background: var(--paper-button-secondary-gradient);
 			transform: translateY(-1px);
 		}
 
 		&:not(:disabled):active {
-			box-shadow: 0 1px 0 #c7c2b8;
+			box-shadow: 0 1px 0 var(--paper-button-secondary-edge);
 			transform: none;
 		}
 	}

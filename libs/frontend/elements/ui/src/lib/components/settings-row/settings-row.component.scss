@@ -13,9 +13,9 @@
 	&__label {
 		display: block;
 		font-size: 14px;
-		font-weight: var(--font-weight-medium, 500);
+		font-weight: var(--font-weight-medium);
 		margin: 0;
-		color: var(--oc-text-primary, #1a1918);
+		color: var(--oc-text-primary);
 	}
 
 	&__description,
@@ -37,7 +37,7 @@
 	}
 
 	&__error {
-		color: var(--oc-red, #c1392b);
+		color: var(--oc-red);
 	}
 
 	&__control {
@@ -45,7 +45,7 @@
 	}
 
 	&--invalid {
-		border-bottom-color: var(--oc-red-border, #f9c7b4);
+		border-bottom-color: var(--oc-red-border);
 	}
 }
 

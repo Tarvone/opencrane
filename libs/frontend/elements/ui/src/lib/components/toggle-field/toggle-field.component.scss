@@ -15,7 +15,7 @@
 	&__label {
 		display: block;
 		font-size: 13.5px;
-		color: var(--oc-text-secondary, #6a6660);
+		color: var(--oc-text-secondary);
 		cursor: pointer;
 
 		&--hidden {
@@ -45,7 +45,7 @@
 	}
 
 	&__error {
-		color: var(--oc-red, #c1392b);
+		color: var(--oc-red);
 	}
 
 	&--pending {
@@ -68,13 +68,13 @@
 	height: 20px;
 	inset-inline-start: 2px;
 	margin-block-start: -10px;
-	background: #fff;
+	background: var(--oc-surface-card);
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 :host ::ng-deep .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-handle {
 	inset-inline-start: 22px;
-	background: #fff;
+	background: var(--oc-surface-card);
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
@@ -83,6 +83,6 @@
 :host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:focus-visible) .p-toggleswitch-handle,
 :host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover).p-toggleswitch-checked .p-toggleswitch-handle,
 :host ::ng-deep .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:focus-visible).p-toggleswitch-checked .p-toggleswitch-handle {
-	background: #fff;
+	background: var(--oc-surface-card);
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }

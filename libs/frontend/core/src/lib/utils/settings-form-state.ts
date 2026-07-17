@@ -18,6 +18,10 @@ export function _EditSettingsForm<TDraft>(state: SettingsFormState<TDraft>, draf
 	{
 		return state;
 	}
+	if (Object.keys(validationErrors).length === 0 && JSON.stringify(draft) === JSON.stringify(state.baseline))
+	{
+		return _CreateSettingsFormState(state.baseline);
+	}
 
 	return {
 		phase: Object.keys(validationErrors).length > 0 ? SettingsFormPhase.Invalid : SettingsFormPhase.Dirty,

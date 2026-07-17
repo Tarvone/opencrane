@@ -112,46 +112,15 @@ export interface AwarenessContractInfo
 }
 
 /**
- * Read model for the Pod & Session section's identity/state fields.
- *
- * Local projection of `GET /tenants/{name}` — the pod's name, display name,
- * org-managed email, team, lifecycle phase, ingress host and creation time.
- * Storage/runtime-version figures are not exposed by the pinned contract.
- */
-export interface PodIdentity
-{
-	/** Stable pod/tenant identifier. */
-	name: string;
-
-	/** Human-readable display name. */
-	displayName: string;
-
-	/** Org-managed email address. */
-	email: string;
-
-	/** Team the pod belongs to. */
-	team: string;
-
-	/** Lifecycle phase (e.g. `running`, `provisioning`). */
-	phase: string;
-
-	/** Ingress host the pod is reachable on. */
-	ingressHost: string;
-
-	/** ISO creation timestamp, or empty when the contract omits it. */
-	createdAt: string;
-}
-
-/**
  * Abstraction over the OpenCrane settings reads/writes backing the operator
  * app's settings sections.
  *
  * Components depend only on this interface, so the data source can be swapped
  * (mock fixtures → live OpenCrane client, web → desktop) without touching the
  * section components. Implementations live in this `adapter` lib; the binding is
- * provided in the app's `app.config.ts`. Carries the Account/Pod read + write the
- * migrated section needs; further sections add methods here as they move off
- * fixtures.
+ * provided in the app's `app.config.ts`. Carries the live-backed sections that
+ * still read through the gateway; sections that are mock-only stay fixture-based
+ * until their issue scope calls for a backend projection.
  */
 export interface SettingsGateway
 {
@@ -169,13 +138,6 @@ export interface SettingsGateway
 	 * @param update     - The fields to change (see {@link AccountProfileUpdate}).
 	 */
 	updateAccountProfile(tenantName: string, update: AccountProfileUpdate): Promise<AccountProfile>;
-
-	/**
-	 * Load a pod's identity/state for the Pod & Session section.
-	 *
-	 * @param tenantName - Stable pod/tenant identifier (the `/tenants/{name}` key).
-	 */
-	getPodIdentity(tenantName: string): Promise<PodIdentity>;
 
 	/**
 	 * Load a pod's live monthly spend for the Model & Budget section.

@@ -2,24 +2,9 @@ import { Injectable, inject } from "@angular/core";
 
 import { ControlPlaneApiService, DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
 
-import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "./settings-gateway.types";
-import {
-	AccountTenantWire,
-	BudgetSpendWire,
-	DatasetsWire,
-	EffectiveContractWire,
-	PodTenantWire,
-	PolicyWire,
-	SkillCatalogWire,
-	_MapAccountProfile,
-	_MapAccountUpdateToTenantPatch,
-	_MapAwarenessContract,
-	_MapBudgetSpend,
-	_MapDatasetAccess,
-	_MapEgressDomains,
-	_MapPodIdentity,
-	_MapSkills
-} from "./settings-mapper.util";
+import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, SettingsGateway } from "./settings-gateway.types.js";
+import { AccountTenantWire, BudgetSpendWire, DatasetsWire, EffectiveContractWire, PolicyWire, SkillCatalogWire } from "./settings-mapper.types.js";
+import { _MapAccountProfile, _MapAccountUpdateToTenantPatch, _MapAwarenessContract, _MapBudgetSpend, _MapDatasetAccess, _MapEgressDomains, _MapSkills } from "./settings-mapper.util.js";
 
 /**
  * Live SettingsGateway backed by the OpenCrane Tenants API.
@@ -60,17 +45,6 @@ export class OpenCraneSettingsGateway implements SettingsGateway
 		// `PUT /tenants/{name}` returns only `{ name, status }`, not the full
 		// tenant — re-read for the authoritative, fully-populated profile.
 		return this.getAccountProfile(tenantName);
-	}
-
-	/** @inheritdoc */
-	public async getPodIdentity(tenantName: string): Promise<PodIdentity>
-	{
-		const { data, error } = await this._api.client.GET("/tenants/{name}", { params: { path: { name: tenantName } } });
-		if (error || !data)
-		{
-			throw new Error(this._errorMessage(error, `failed to load pod identity: ${tenantName}`));
-		}
-		return _MapPodIdentity(data as PodTenantWire, tenantName);
 	}
 
 	/** @inheritdoc */

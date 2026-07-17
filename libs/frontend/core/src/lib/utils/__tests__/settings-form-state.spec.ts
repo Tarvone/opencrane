@@ -28,6 +28,16 @@ describe("settings form transitions", function settingsFormTransitionsSuite(): v
 		expect(_CanSubmitSettingsForm(dirty)).toBe(true);
 	});
 
+	it("returns to pristine when a valid edit matches the complete baseline", function revertedEdit(): void
+	{
+		const baseline = { displayName: "Alex", notificationsEnabled: true };
+		const dirty = _EditSettingsForm(_CreateSettingsFormState(baseline), { ...baseline, displayName: "Changed" });
+		const reverted = _EditSettingsForm(dirty, baseline);
+
+		expect(reverted.phase).toBe(SettingsFormPhase.Pristine);
+		expect(reverted.draft).toEqual(baseline);
+	});
+
 	it("captures one pending draft and blocks edits and duplicate submission", function pendingTransition(): void
 	{
 		const pristine = _CreateSettingsFormState(SETTINGS_PROFILE_BASELINE_FIXTURE);

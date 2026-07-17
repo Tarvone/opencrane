@@ -9,9 +9,8 @@ import {
 	_MapBudgetSpend,
 	_MapDatasetAccess,
 	_MapEgressDomains,
-	_MapPodIdentity,
 	_MapSkills
-} from "../settings-mapper.util";
+} from "../settings-mapper.util.js";
 
 describe("_MapAccountProfile", () =>
 {
@@ -23,7 +22,8 @@ describe("_MapAccountProfile", () =>
 			name: "alex.oc",
 			fullName: "Alex Kim",
 			email: "alex.kim@acme-corp.com",
-			department: "Product"
+			department: "Product",
+			role: "member"
 		});
 	});
 
@@ -74,50 +74,17 @@ describe("_MapAccountUpdateToTenantPatch", () =>
 	});
 });
 
-describe("_MapPodIdentity", () =>
-{
-	it("maps a fully-populated wire tenant onto the pod identity", () =>
-	{
-		const pod = _MapPodIdentity(
-			{ name: "alex", displayName: "Alex Kim", email: "alex@acme.com", team: "Product", phase: "running", ingressHost: "alex.acme.opencrane.ai", createdAt: "2026-01-12T09:00:00.000Z" },
-			"fallback"
-		);
-
-		expect(pod).toEqual({
-			name: "alex",
-			displayName: "Alex Kim",
-			email: "alex@acme.com",
-			team: "Product",
-			phase: "running",
-			ingressHost: "alex.acme.opencrane.ai",
-			createdAt: "2026-01-12T09:00:00.000Z"
-		});
-	});
-
-	it("falls back to the requested name and empty strings for missing fields", () =>
-	{
-		const pod = _MapPodIdentity({ phase: "provisioning" }, "alex");
-
-		expect(pod.name).toBe("alex");
-		expect(pod.displayName).toBe("");
-		expect(pod.email).toBe("");
-		expect(pod.ingressHost).toBe("");
-		expect(pod.createdAt).toBe("");
-		expect(pod.phase).toBe("provisioning");
-	});
-});
-
 describe("_MapBudgetSpend", () =>
 {
 	it("maps populated spend figures and a known alert band", () =>
 	{
 		expect(_MapBudgetSpend({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, budgetAlertState: "warning" }))
-			.toEqual({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, alertState: "warning" });
+			.toEqual({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, alertState: "warning", resetDate: "", modelClasses: [] });
 	});
 
 	it("collapses missing figures to zero and an unknown band to ok", () =>
 	{
-		expect(_MapBudgetSpend({})).toEqual({ monthlyLimitUsd: 0, currentSpendUsd: 0, alertState: "ok" });
+		expect(_MapBudgetSpend({})).toEqual({ monthlyLimitUsd: 0, currentSpendUsd: 0, alertState: "ok", resetDate: "", modelClasses: [] });
 		expect(_MapBudgetSpend({ budgetAlertState: "nonsense" }).alertState).toBe("ok");
 	});
 });
@@ -127,12 +94,12 @@ describe("_MapAwarenessContract", () =>
 	it("maps the contract identity fields", () =>
 	{
 		expect(_MapAwarenessContract({ contractId: "c1", contractVersion: "v2.3.1" }))
-			.toEqual({ contractId: "c1", contractVersion: "v2.3.1" });
+			.toEqual({ contractId: "c1", contractVersion: "v2.3.1", fallbackBehaviour: "proceed", citationMode: true });
 	});
 
 	it("collapses missing fields to empty strings", () =>
 	{
-		expect(_MapAwarenessContract({})).toEqual({ contractId: "", contractVersion: "" });
+		expect(_MapAwarenessContract({})).toEqual({ contractId: "", contractVersion: "", fallbackBehaviour: "proceed", citationMode: true });
 	});
 });
 

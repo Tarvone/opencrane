@@ -1,3 +1,4 @@
-export * from "./lib/settings-gateway.types";
-export * from "./lib/settings-mapper.util";
-export * from "./lib/opencrane-settings-gateway";
+export * from "./lib/settings-gateway.types.js";
+export * from "./lib/settings-mapper.types.js";
+export * from "./lib/settings-mapper.util.js";
+export * from "./lib/opencrane-settings-gateway.js";

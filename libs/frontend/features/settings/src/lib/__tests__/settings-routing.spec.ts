@@ -19,6 +19,7 @@ import { PERSONAL_SETTINGS_NAVIGATION, WORKSPACE_SETTINGS_NAVIGATION, _SettingsN
 import { SettingsScope, SettingsSectionId } from "../settings-navigation.types.js";
 import { SettingsPlaceholderComponent } from "../settings-placeholder/settings-placeholder.component.js";
 import { SETTINGS_ROUTES } from "../settings.routes.js";
+import { _CanDeactivatePodSection } from "../sections/pod-section/pod-section.guard.js";
 import { ConnectorsSectionComponent } from "../sections/connectors-section/connectors-section.component.js";
 import { DataNetworkSectionComponent } from "../sections/data-network-section/data-network-section.component.js";
 import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component.js";
@@ -182,9 +183,11 @@ describe("settings route contract", function settingsRoutesSuite(): void
 
 	it("declares every public leaf route without legacy aliases", function routeLeaves(): void
 	{
-		expect(_scopeChildren(SettingsScope.Workspace).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
+		const workspaceRoutes = _scopeChildren(SettingsScope.Workspace);
+		expect(workspaceRoutes.slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
 			"pod", "members", "budgets", "skills", "connectors", "agents", "data-network", "provider-keys"
 		]);
+		expect(workspaceRoutes.find(function pod(route): boolean { return route.path === "pod"; })?.canDeactivate).toEqual([_CanDeactivatePodSection]);
 		expect(_scopeChildren(SettingsScope.Personal).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
 			"account", "awareness", "budget", "api-keys"
 		]);

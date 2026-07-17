@@ -19,6 +19,7 @@
     "lint:boundaries": "eslint .",
     "check:phase-b-topology": "./scripts/phase-b-topology.sh",
     "test:phase-b-topology": "./scripts/phase-b-topology-negative-tests.sh",
+    "test:r0-estate-evidence": "./scripts/collect-r0-estate-evidence.test.sh",
     "docs:sync-openapi": "npm run refresh-openapi -w website",
     "docs:dev": "npm run dev -w website",
     "docs:build": "npm run build -w website",

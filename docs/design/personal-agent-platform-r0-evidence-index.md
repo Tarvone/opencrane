@@ -17,12 +17,61 @@ No such secured evidence reference is approved yet. R0 is therefore **not comple
 - One configured non-production Kubernetes environment was reachable and read-only on 2026-07-17.
 - One configured local test context was unreachable; no other environment was represented in the
   available kubeconfig.
-- Kubernetes, Helm, CNPG, upstream database metadata, count-only SQL, and GitHub issue state were
-  inspected without reading row contents or secret values.
+- Kubernetes, CNPG, upstream database metadata, and GitHub issue state were inspected without
+  reading row contents or secret values. Helm release state remains intentionally unproven because
+  its storage may contain Kubernetes Secrets.
 - The live evidence is sufficient to disprove the assumption that every development ClusterTenant
   is resettable. It is not sufficient to prove estate completeness.
 
 Missing environments are missing evidence, not proof that no other estate exists.
+
+## Reproducible collection
+
+Run the read-only collector into a newly named directory in the approved secured evidence system:
+
+```bash
+scripts/collect-r0-estate-evidence.mjs \
+  --output-dir /absolute/path/to/new-r0-evidence-directory \
+  --context approved-context-name
+```
+
+Optional metadata-only database evidence uses a preconfigured libpq service, never a connection
+string:
+
+```bash
+scripts/collect-r0-estate-evidence.mjs \
+  --output-dir /absolute/path/to/new-r0-evidence-directory \
+  --context approved-context-name \
+  --database logical-label=approved-readonly-pgservice
+```
+
+That service must use a standalone, non-elevated evidence-reader role with no inherited memberships,
+base-table access, ownership, or write privileges. The collector reads only system-catalog relation
+metadata and approximate row estimates for its version-controlled table allowlist. Elevated roles,
+base-table privileges, and sessions that cannot prove `transaction_read_only=on` are rejected.
+Exact counts require separately provisioned, narrowly granted aggregate views or `SECURITY DEFINER`
+functions; the collector never creates them and never reads a base table.
+
+The collector requires every Kubernetes context explicitly and never changes or falls back to the
+current context. It refuses relative, existing, symbolic-link-component, wrong-owner,
+group/world-accessible, and repository-local destinations.
+It creates directories mode `0700` and files mode `0600`; records exact commands, timestamps,
+failures, configured/reachable/unreachable contexts, and count/hash provenance; and permits only
+server-returned Kubernetes metadata tables, Helm client-version inspection, and hard-coded
+metadata-only `psql` operations. It never requests full Kubernetes objects, Kubernetes Secret or
+ConfigMap resources, Helm release state, Helm values/manifests, row contents, logs, or events. Fields
+that an approved Kubernetes printer table does not expose remain explicitly unproven.
+
+`public-manifest.json` and its SHA-256 file are safe to reference from this index after review. The
+public manifest carries the hash of `secured/file-manifest.json` but omits source counts,
+reachability, failure detail, and estate-specific incompleteness. That detail and all exact context,
+ClusterTenant, workload, volume, and database evidence stay below the private `secured/`
+directory. Never commit the generated pack.
+
+The pack is deliberately marked incomplete even when every command succeeds. It cannot discover an
+unconfigured estate, determine whether state is valuable or reproducible, test credential custody,
+inspect transcript/artifact/memory bytes, or supply owner approvals and rollback/retention decisions.
+Those limitations are recorded in both manifests rather than inferred from a green command exit.
 
 ## Coarse live conclusions
 

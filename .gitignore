@@ -32,3 +32,7 @@ coverage/
 .claude/.last-review-hash
 .claude/.review-context.md
 .nx/
+
+# R0 secured evidence packs — the collector also refuses repository-local output.
+/.r0-estate-evidence*/
+/.r0-evidence*/

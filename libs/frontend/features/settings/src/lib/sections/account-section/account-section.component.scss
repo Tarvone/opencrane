@@ -11,19 +11,6 @@
 		gap: 12px;
 	}
 
-	&__avatar {
-		width: 44px;
-		height: 44px;
-		border-radius: 50%;
-		background: var(--oc-teal);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 15px;
-		font-weight: 700;
-		color: var(--oc-text-inverse);
-	}
-
 	&__change-photo {
 		background: transparent;
 		border: 1px solid var(--oc-border-strong);
@@ -50,7 +37,7 @@
 		padding: 4px 10px;
 		border-radius: 4px;
 		background: #e0f0e8; /* App.dc.html:855 */
-		color: #1a5c38; /* App.dc.html:855 */
+		color: var(--oc-green-feedback);
 		font-weight: 500;
 		display: inline-block;
 	}

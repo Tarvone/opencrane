@@ -200,8 +200,15 @@ describe("AvatarCircleComponent", function avatarCircleSuite(): void
 		expect(first.accessibleName()).toBe("Alex Kim");
 		expect(first.sizePixels()).toBe(28);
 		expect(first.backgroundColor()).toBe(second.backgroundColor());
-		_setInput(first.color, "#0db5cc");
-		expect(first.backgroundColor()).toBe("#0db5cc");
+		_setInput(first.color, "var(--oc-teal)");
+		expect(first.backgroundColor()).toBe("var(--oc-teal)");
+		_setInput(first.size, "profile");
+		expect(first.sizePixels()).toBe(44);
+		expect(first.fontSizePixels()).toBe(15);
+		_setInput(first.initials, "JR");
+		expect(first.backgroundColor()).toBe("var(--oc-teal)");
+		_setInput(first.color, undefined);
+		expect(first.backgroundColor()).toBe("var(--oc-avatar-green)");
 		expect(_resource("avatar-circle/avatar-circle.component.html")).toContain("role=\"img\"");
 	});
 
@@ -210,14 +217,15 @@ describe("AvatarCircleComponent", function avatarCircleSuite(): void
 		const reference = _render(AvatarCircleComponent);
 		_setInput(reference.instance.initials, "AK");
 		_setInput(reference.instance.accessibleName, "Alex Kim");
-		_setInput(reference.instance.size, "large");
-		_setInput(reference.instance.color, "#0db5cc");
+		_setInput(reference.instance.size, "profile");
+		_setInput(reference.instance.color, "var(--oc-teal)");
 		_detect(reference);
 
 		const avatar = reference.location.nativeElement.querySelector("[role='img']") as HTMLElement;
 		expect(avatar.getAttribute("aria-label")).toBe("Alex Kim");
-		expect(avatar.style.width).toBe("28px");
-		expect(avatar.style.background).toBe("rgb(13, 181, 204)");
+		expect(avatar.style.width).toBe("44px");
+		expect(avatar.style.fontSize).toBe("15px");
+		expect(avatar.style.background).toBe("var(--oc-teal)");
 		reference.destroy();
 	});
 });
@@ -368,6 +376,7 @@ describe("ToggleFieldComponent", function toggleFieldSuite(): void
 		const slider = reference.location.nativeElement.querySelector(".p-toggleswitch-slider") as HTMLElement;
 		const handle = reference.location.nativeElement.querySelector(".p-toggleswitch-handle") as HTMLElement;
 		const label = reference.location.nativeElement.querySelector(".wo-toggle__label") as HTMLElement;
+		const styles = _resource("toggle-field/toggle-field.component.scss");
 		expect(control.disabled).toBe(true);
 		expect(control.getAttribute("aria-labelledby")).toBe(reference.instance.labelId);
 		expect(control.getAttribute("aria-describedby")).toContain(reference.instance.descriptionId);
@@ -379,10 +388,10 @@ describe("ToggleFieldComponent", function toggleFieldSuite(): void
 		expect(getComputedStyle(handle).width).toBe("20px");
 		expect(getComputedStyle(handle).height).toBe("20px");
 		expect(getComputedStyle(handle).insetInlineStart).toBe("2px");
-		expect(getComputedStyle(handle).backgroundColor).toBe("rgb(255, 255, 255)");
+		expect(styles).toContain("background: var(--oc-surface-card)");
 		expect(getComputedStyle(handle).boxShadow).toBe("0 1px 3px rgba(0, 0, 0, 0.18)");
 		expect(getComputedStyle(label).fontSize).toBe("13.5px");
-		expect(getComputedStyle(label).color).toBe("var(--oc-text-secondary, #6a6660)");
+		expect(styles).toContain("color: var(--oc-text-secondary)");
 		control.click();
 		expect(reference.instance.value()).toBe(false);
 		toggleSwitch.classList.add("p-toggleswitch-checked");
@@ -450,9 +459,9 @@ describe("SaveButtonComponent", function saveButtonSuite(): void
 
 		expect(styles).toContain("padding: 10px 20px");
 		expect(styles).toContain("border-radius: 7px");
-		expect(styles).toContain("background: #0db5cc");
-		expect(styles).toContain("box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25)");
-		expect(styles).toContain("linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%)");
+		expect(styles).toContain("background: var(--oc-teal)");
+		expect(styles).toContain("box-shadow: var(--paper-button-primary-shadow)");
+		expect(styles).toContain("background: var(--paper-button-primary-gradient)");
 	});
 
 	it("keeps save disabled until external state permits submission", function controlledSubmission(): void

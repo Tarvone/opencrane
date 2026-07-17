@@ -3,10 +3,10 @@
 		<div class="wo-rail__brand">
 			<span class="wo-rail__logo">
 				<svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true">
-					<polygon points="1,13 6,5 8,13" fill="#0d8ba0"></polygon>
-					<polygon points="6,5 11,13 8,13" fill="#22c7dd"></polygon>
-					<polygon points="6,5 12,1 11,13" fill="#0db5cc"></polygon>
-					<polygon points="12,1 15,3 13,5" fill="#f47920"></polygon>
+					<polygon points="1,13 6,5 8,13" fill="var(--oc-teal-fold-dark)"></polygon>
+					<polygon points="6,5 11,13 8,13" fill="var(--oc-teal-hover)"></polygon>
+					<polygon points="6,5 12,1 11,13" fill="var(--oc-teal)"></polygon>
+					<polygon points="12,1 15,3 13,5" fill="var(--oc-orange)"></polygon>
 				</svg>
 				<span class="wo-rail__wordmark">Open<span>Crane</span></span>
 			</span>
@@ -69,7 +69,7 @@
 			<span>Settings</span>
 		</a>
 		<div class="wo-rail__user">
-			<wo-avatar-circle [initials]="userInitials()" [accessibleName]="userName() || 'Current user'" color="#0db5cc" size="large" />
+			<wo-avatar-circle [initials]="userInitials()" [accessibleName]="userName() || 'Current user'" color="var(--oc-teal)" size="large" />
 			<div class="wo-rail__user-info">
 				<p class="wo-rail__user-name wo-truncate">{{ userName() }}</p>
 				<p class="wo-rail__user-pod wo-mono wo-truncate">{{ userSubtitle() }}</p>

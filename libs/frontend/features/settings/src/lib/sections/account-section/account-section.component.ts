@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource,
 
 import { SettingsFormPhase, SettingsFormState, SettingsMutationOutcome, _CreateSettingsFormState, _EditSettingsForm, _ResolveSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
 import { ActiveTenantStore } from "@opencrane/state/gateways";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { AvatarCircleComponent, SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
 import { AccountProfile, AccountProfileUpdate, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
 import { _settledValue } from "../../resource.util.js";
 
@@ -12,7 +12,7 @@ interface AccountFormDraft { fullName: string; }
 @Component({
 	selector: "wo-account-section",
 	standalone: true,
-	imports: [SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent],
+	imports: [AvatarCircleComponent, SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent],
 	templateUrl: "./account-section.component.html",
 	styleUrl: "./account-section.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush

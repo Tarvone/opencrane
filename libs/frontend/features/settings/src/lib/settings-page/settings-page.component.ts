@@ -38,17 +38,19 @@ export class SettingsPageComponent
 		return this.activeScope() === SettingsScope.Personal ? PERSONAL_SETTINGS_NAVIGATION : WORKSPACE_SETTINGS_NAVIGATION;
 	});
 
-	/** Switch to another settings scope while preserving an already-active scope. */
+	/** Activate a settings scope at its canonical default destination. */
 	public async selectScope(scope: SettingsScope): Promise<void>
 	{
-		// 1. Active scope — return without navigation so the current route and draft component remain intact.
-		if (scope === this.activeScope()) return;
-
-		// 2. Scope default — enter the requested scope at its canonical first section.
+		// 1. Scope destination — every activation follows the authoritative Pod/Account default interaction.
 		const destination = scope === SettingsScope.Personal ? "/settings/personal/account" : "/settings/workspace/pod";
+
+		// 2. Default no-op — preserve the routed component and focus when the scope is already at its destination.
+		if (this._router.url === destination) return;
+
+		// 3. Routed activation — allow section-owned guards to cancel navigation before local state is destroyed.
 		const navigated = await this._router.navigateByUrl(destination);
 
-		// 3. Focus transfer — move keyboard users into the newly routed settings content after activation.
+		// 4. Focus transfer — move keyboard users only after navigation successfully changes the routed content.
 		if (navigated) this._host.nativeElement.querySelector<HTMLElement>(".wo-settings__content")?.focus();
 	}
 }

@@ -2,7 +2,7 @@ import { Injectable } from "@angular/core";
 
 import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
 import { DATASET_ACCESS, EGRESS_DOMAINS, SKILLS } from "@opencrane/core/testing";
-import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "@opencrane/state/settings/adapter";
+import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, SettingsGateway } from "@opencrane/state/settings/adapter";
 
 const _FIXTURE: AccountProfile = { name: "alex.oc", fullName: "Alex Kim", email: "alex.kim@acme-corp.com", department: "Product", role: "member" };
 
@@ -20,12 +20,6 @@ export class MockSettingsGateway implements SettingsGateway
 		const next: AccountProfile = { ...current, fullName: update.fullName ?? current.fullName, department: update.department ?? current.department };
 		this._byTenant.set(tenantName, next);
 		return Promise.resolve({ ...next });
-	}
-
-	public getPodIdentity(tenantName: string): Promise<PodIdentity>
-	{
-		const p = this._seeded(tenantName);
-		return Promise.resolve({ name: tenantName, displayName: p.fullName, email: p.email, team: p.department, phase: "running", ingressHost: `${tenantName}.acme-corp.opencrane.ai`, createdAt: "2026-01-12T09:00:00.000Z" });
 	}
 
 	public getBudgetSpend(_t: string): Promise<BudgetSpend>

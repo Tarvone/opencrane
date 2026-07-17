@@ -2,6 +2,7 @@ import { Route, Routes } from "@angular/router";
 
 import { SettingsPageComponent } from "./settings-page/settings-page.component.js";
 import { SettingsPlaceholderComponent } from "./settings-placeholder/settings-placeholder.component.js";
+import { _CanDeactivatePodSection } from "./sections/pod-section/pod-section.guard.js";
 
 /** Create a leaf route for a later-milestone settings section. */
 function _placeholderRoute(path: string, title: string, description: string): Route
@@ -15,6 +16,7 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 	{ path: "", pathMatch: "full", redirectTo: "pod" },
 	{
 		path: "pod",
+		canDeactivate: [_CanDeactivatePodSection],
 		loadComponent: function loadPodSection()
 		{
 			return import("./sections/pod-section/pod-section.component.js").then(function pickPodSection(module)

@@ -108,7 +108,7 @@
 
 	&__lists {
 		flex: 1;
-		padding: 8px 0;
+		padding: 8px 6px;
 	}
 
 	&__new-session {
@@ -116,8 +116,7 @@
 		align-items: center;
 		gap: 7px;
 		padding: 7px 10px;
-		margin: 4px 10px;
-		width: calc(100% - 20px);
+		margin-bottom: 4px;
 		color: var(--oc-text-secondary);
 		background: var(--oc-surface-card);
 		border: 1px solid var(--paper-button-edge);

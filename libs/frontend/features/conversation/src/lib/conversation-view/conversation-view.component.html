@@ -17,7 +17,7 @@
 			<div class="wo-conv__header wo-conv__header--draft">
 				<div class="wo-conv__title-row">
 					<div class="wo-conv__title-group">
-						<h1 class="wo-conv__title wo-serif wo-truncate">New session</h1>
+						<h1 class="wo-conv__title wo-truncate">New session</h1>
 					</div>
 					<div class="wo-conv__header-actions">
 						<button type="button" class="wo-conv__context-toggle" [class.wo-conv__context-toggle--active]="contextOpen()" (click)="toggleContext.emit()">
@@ -30,7 +30,7 @@
 			<div class="wo-conv__header">
 				<div class="wo-conv__title-row">
 					<div class="wo-conv__title-group">
-						<h1 class="wo-conv__title wo-serif wo-truncate">#{{ thread().title }}</h1>
+						<h1 class="wo-conv__title wo-truncate">{{ thread().title }}</h1>
 						<span
 							class="wo-conv__dept wo-mono"
 							[style.color]="thread().deptColor"

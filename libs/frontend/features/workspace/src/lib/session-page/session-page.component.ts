@@ -41,7 +41,7 @@ export class SessionPageComponent
 	public readonly initialMessage: string | undefined = this._relay.consume();
 
 	/** Whether the context panel is open. */
-	public readonly contextOpen = signal<boolean>(true);
+	public readonly contextOpen = signal<boolean>(false);
 
 	/**
 	 * Start a session from the root composer's first message: mint a session id,

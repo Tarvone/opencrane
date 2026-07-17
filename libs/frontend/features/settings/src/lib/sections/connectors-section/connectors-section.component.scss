@@ -1,5 +1,5 @@
 .wo-connectors {
-	color: #1a1918;
+	color: var(--oc-text-primary);
 
 	&__header {
 		display: flex;
@@ -27,7 +27,7 @@
 
 	&__subtitle {
 		margin: 4px 0 0;
-		color: #8a8682;
+		color: var(--oc-text-muted);
 		font-size: 14px;
 	}
 
@@ -44,7 +44,7 @@
 		transition: background 130ms ease, box-shadow 130ms ease, transform 130ms ease;
 
 		&:focus-visible {
-			outline: 3px solid rgba(13, 181, 204, 0.32);
+			outline: 3px solid color-mix(in srgb, var(--oc-teal) 32%, transparent);
 			outline-offset: 2px;
 		}
 
@@ -60,21 +60,21 @@
 		padding: 9px 18px;
 		border: 0;
 		border-radius: 7px;
-		background: #0db5cc;
-		box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25);
-		color: #fff;
+		background: var(--oc-teal);
+		box-shadow: var(--paper-button-primary-shadow);
+		color: var(--oc-text-inverse);
 		cursor: pointer;
 		font-size: 13.5px;
 		font-weight: 500;
 
 		&:not(:disabled):hover {
-			background: linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%);
-			box-shadow: 0 2px 0 #0a94a7, 0 3px 6px rgba(13, 181, 204, 0.3);
+			background: var(--paper-button-primary-gradient);
+			box-shadow: var(--paper-button-primary-shadow-hover);
 			transform: translateY(-1px);
 		}
 
 		&:not(:disabled):active {
-			box-shadow: 0 1px 0 #0a94a7;
+			box-shadow: 0 1px 0 var(--oc-teal-edge);
 			transform: translateY(0);
 		}
 	}
@@ -84,12 +84,12 @@
 		padding: 0;
 		border: 0;
 		background: transparent;
-		color: #6a6660;
+		color: var(--oc-text-secondary);
 		cursor: pointer;
 		font-size: 13px;
 
 		&:not(:disabled):hover {
-			color: #1a1918;
+			color: var(--oc-text-primary);
 		}
 	}
 
@@ -104,23 +104,23 @@
 		padding: 5px 12px;
 		border: 0;
 		border-radius: 20px;
-		background: #f0ede8;
-		color: #6a6660;
+		background: var(--oc-surface-hover);
+		color: var(--oc-text-secondary);
 		cursor: pointer;
 		font-size: 12.5px;
 		font-weight: 500;
 
 		&--active {
-			background: #0db5cc;
-			color: #fff;
+			background: var(--oc-teal);
+			color: var(--oc-text-inverse);
 		}
 	}
 
 	&__card {
 		overflow: hidden;
-		border: 1px solid #dedad2;
+		border: 1px solid var(--oc-border);
 		border-radius: 10px;
-		background: #fff;
+		background: var(--oc-surface-card);
 	}
 
 	&__installed-row,
@@ -131,7 +131,7 @@
 		padding: 14px 18px;
 
 		&:not(:last-child) {
-			border-bottom: 1px solid #f0ede8;
+			border-bottom: 1px solid var(--oc-surface-hover);
 		}
 	}
 
@@ -154,7 +154,7 @@
 
 		p {
 			margin: 2px 0 0;
-			color: #9a9690;
+			color: var(--oc-text-muted);
 			font-size: 12.5px;
 		}
 	}
@@ -162,14 +162,14 @@
 	&__badge {
 		padding: 3px 8px;
 		border-radius: 4px;
-		background: #f0ede8;
-		color: #6a6660;
+		background: var(--oc-surface-hover);
+		color: var(--oc-text-secondary);
 		font-size: 11.5px;
 		text-align: center;
 	}
 
 	&__version {
-		color: #9a9690;
+		color: var(--oc-text-muted);
 		font-size: 12px;
 	}
 
@@ -180,26 +180,26 @@
 
 	&__row-button {
 		padding: 5px 12px;
-		border: 1px solid #d0cdc6;
+		border: 1px solid var(--oc-border-strong);
 		border-radius: 5px;
 		background: transparent;
-		color: #1a1918;
+		color: var(--oc-text-primary);
 		cursor: pointer;
 		font-size: 12.5px;
 
 		&:not(:disabled):hover {
-			background: linear-gradient(135deg, #fff 0%, #fff 50%, #f0ede7 50%);
-			box-shadow: 0 2px 0 #dcd8d0, 0 2px 4px rgba(0, 0, 0, 0.05);
+			background: var(--paper-button-secondary-gradient);
+			box-shadow: var(--paper-button-secondary-shadow);
 			transform: translateY(-1px);
 		}
 
 		&--danger {
-			border-color: #f9c7b4;
-			color: #c1392b;
+			border-color: var(--oc-red-border);
+			color: var(--oc-red);
 
 			&:not(:disabled):hover {
-				background: linear-gradient(135deg, #fff 0%, #fff 50%, #fdf0ec 50%);
-				box-shadow: 0 2px 0 #f2d5c8, 0 2px 4px rgba(193, 57, 43, 0.08);
+				background: linear-gradient(135deg, var(--oc-surface-card) 0%, var(--oc-surface-card) 50%, var(--oc-red-tint-bg) 50%);
+				box-shadow: 0 2px 0 var(--oc-red-border), 0 2px 4px rgba(193, 57, 43, 0.08);
 			}
 		}
 	}
@@ -211,7 +211,7 @@
 		padding: 0;
 		border: 0;
 		border-radius: 12px;
-		background: #cec9c3;
+		background: var(--switch-background);
 		cursor: pointer;
 
 		span {
@@ -221,13 +221,13 @@
 			width: 20px;
 			height: 20px;
 			border-radius: 50%;
-			background: #fff;
+			background: var(--oc-surface-card);
 			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 			transition: left 130ms ease;
 		}
 
 		&--enabled {
-			background: #0db5cc;
+			background: var(--oc-teal);
 
 			span {
 				left: 22px;
@@ -238,17 +238,17 @@
 	&__feedback,
 	&__empty {
 		margin: 14px 0 0;
-		color: #1a5c38;
+		color: var(--oc-green-feedback);
 		font-size: 13px;
 	}
 
 	&__feedback--error {
-		color: #c1392b;
+		color: var(--oc-red);
 	}
 
 	&__empty {
 		padding: 18px;
-		color: #9a9690;
+		color: var(--oc-text-muted);
 	}
 }
 

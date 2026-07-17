@@ -24,6 +24,9 @@ export interface AccountProfile
 
 	/** Team the pod belongs to, surfaced as "Department". */
 	department: string;
+
+	/** Role of the user in the workspace. */
+	role: string;
 }
 
 /**

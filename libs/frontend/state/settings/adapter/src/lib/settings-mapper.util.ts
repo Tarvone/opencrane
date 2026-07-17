@@ -21,6 +21,9 @@ export interface AccountTenantWire
 
 	/** Team the tenant belongs to. */
 	team?: string;
+
+	/** Role of the user in the workspace. */
+	role?: string;
 }
 
 /**
@@ -39,7 +42,8 @@ export function _MapAccountProfile(wire: AccountTenantWire, fallbackName: string
 		name: wire.name ?? fallbackName,
 		fullName: wire.displayName ?? "",
 		email: wire.email ?? "",
-		department: wire.team ?? ""
+		department: wire.team ?? "",
+		role: wire.role ?? "member"
 	};
 }
 

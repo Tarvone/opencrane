@@ -162,7 +162,8 @@ _check_pattern "POD-TOKEN-R9-BOUNDARY" '(/api/v1/auth/pod-token|["`]/?pod-token(
 
 # SessionScope rows are retained read-only as migration evidence. All runtime CRUD/client/package
 # references are forbidden outside the exact schema, applied migrations, and decision records.
-SESSION_SCOPE_RETENTION="($ADOPTED_RECORDS|$MIGRATION_HISTORY|$HISTORICAL_RECORDS|^apps/opencrane/prisma/schema/sessions\.prisma$|^docs/agents/apps/opencrane\.md$)"
+R0_DISPOSITION_MAP='^docs/design/personal-agent-platform-r0-data-disposition\.json$'
+SESSION_SCOPE_RETENTION="($ADOPTED_RECORDS|$MIGRATION_HISTORY|$HISTORICAL_RECORDS|$R0_DISPOSITION_MAP|^apps/opencrane/prisma/schema/sessions\.prisma$|^docs/agents/apps/opencrane\.md$)"
 _check_pattern "SESSION-SCOPE" '(SessionScope|session-scope([^[:alnum:]]|$)|@opencrane/backend-sessions|/sessions/[^[:space:]`"]*/scope)' "$SESSION_SCOPE_RETENTION"
 
 # The Obot registry poll was a no-op. The spec is retained only as evidence explaining its removal.

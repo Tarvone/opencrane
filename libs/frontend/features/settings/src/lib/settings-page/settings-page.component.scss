@@ -1,3 +1,12 @@
+// See `libs/frontend/features/workspace/src/lib/session-page/session-page.component.scss` 
+// for an explanation of why this flex host wrapper is required.
+:host {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+}
+
 .wo-settings {
 	display: flex;
 	flex: 1;

@@ -3,10 +3,10 @@
 		<div class="wo-settings__nav-title">
 			<span>Settings</span>
 			<svg width="26" height="8" viewBox="0 0 26 8" aria-hidden="true">
-				<polygon points="0,8 4,0 8,8" fill="#0db5cc" opacity=".55" />
-				<polygon points="6,8 10,0 14,8" fill="#0d8ba0" opacity=".45" />
-				<polygon points="12,8 16,0 20,8" fill="#22c7dd" opacity=".5" />
-				<polygon points="18,8 22,0 26,8" fill="#f47920" opacity=".5" />
+				<polygon points="0,8 4,0 8,8" fill="var(--oc-teal)" opacity=".55" />
+				<polygon points="6,8 10,0 14,8" fill="var(--oc-teal-fold-dark)" opacity=".45" />
+				<polygon points="12,8 16,0 20,8" fill="var(--oc-teal-hover)" opacity=".5" />
+				<polygon points="18,8 22,0 26,8" fill="var(--oc-orange)" opacity=".5" />
 			</svg>
 		</div>
 
@@ -37,20 +37,15 @@
 				class="wo-settings__nav-item"
 				[routerLink]="item.route"
 				routerLinkActive="wo-settings__nav-item--active"
-				[routerLinkActiveOptions]="{ exact: true }"
+				[routerLinkActiveOptions]="{ exact: false }"
 				ariaCurrentWhenActive="page"
 			>
-				<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+				<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
 					<path [attr.d]="item.iconPath" />
 				</svg>
 				<span>{{ item.label }}</span>
 			</a>
 		}
-		</div>
-
-		<div class="wo-settings__sovereignty">
-			<span aria-hidden="true">♾</span>
-			<span>self-hosted · data sovereign</span>
 		</div>
 	</nav>
 

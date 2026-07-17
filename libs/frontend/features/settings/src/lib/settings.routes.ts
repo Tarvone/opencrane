@@ -45,7 +45,7 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("channels", "Channels", "Agent and messaging-surface configuration will be delivered in milestone 4."),
+	_placeholderRoute("agents", "Agents", "Agent and messaging-surface configuration will be delivered in milestone 4."),
 	{
 		path: "data-network",
 		loadComponent: function loadDataNetworkSection()
@@ -56,7 +56,7 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("provider-keys", "API Keys", "Workspace AI provider keys will be delivered in milestone 4."),
+	_placeholderRoute("provider-keys", "LLM Providers", "Workspace model-provider configuration will be delivered in milestone 4."),
 	{ path: "**", redirectTo: "pod" }
 ];
 

@@ -20,11 +20,11 @@ export enum SettingsSectionId
 	Capabilities = "capabilities",
 	/** Installed external tools shown as Connectors. */
 	Connectors = "connectors",
-	/** Agent and messaging channel settings. */
-	Channels = "channels",
+	/** Workspace agent configuration and messaging surfaces. */
+	Agents = "agents",
 	/** Workspace data-sovereignty and network settings. */
 	DataNetwork = "data-network",
-	/** Workspace AI provider keys. */
+	/** Workspace LLM provider configuration. */
 	ProviderKeys = "provider-keys",
 	/** Personal account settings. */
 	Account = "account",

@@ -173,6 +173,12 @@ export interface BudgetSpendWire
 
 	/** Alert band (`ok` | `warning` | `exceeded`). */
 	budgetAlertState?: string;
+
+	/** Array of spend objects per model class. */
+	modelClasses?: Array<{ className?: string; modelNames?: string; spendUsd?: number; percentage?: number; }>;
+
+	/** Date string for the next budget reset. */
+	resetDate?: string;
 }
 
 /**
@@ -189,7 +195,14 @@ export function _MapBudgetSpend(wire: BudgetSpendWire): BudgetSpend
 	return {
 		monthlyLimitUsd: wire.monthlyLimitUsd ?? 0,
 		currentSpendUsd: wire.currentSpendUsd ?? 0,
-		alertState: alert === "warning" || alert === "exceeded" ? alert : "ok"
+		alertState: alert === "warning" || alert === "exceeded" ? alert : "ok",
+		resetDate: wire.resetDate ?? "",
+		modelClasses: (wire.modelClasses ?? []).map((m: any) => ({
+			className: m.className ?? "",
+			modelNames: m.modelNames ?? "",
+			spendUsd: m.spendUsd ?? 0,
+			percentage: m.percentage ?? 0
+		}))
 	};
 }
 

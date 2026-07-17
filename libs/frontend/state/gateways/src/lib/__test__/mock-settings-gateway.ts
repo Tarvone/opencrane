@@ -28,7 +28,20 @@ export class MockSettingsGateway implements SettingsGateway
 		return Promise.resolve({ name: tenantName, displayName: p.fullName, email: p.email, team: p.department, phase: "running", ingressHost: `${tenantName}.acme-corp.opencrane.ai`, createdAt: "2026-01-12T09:00:00.000Z" });
 	}
 
-	public getBudgetSpend(_t: string): Promise<BudgetSpend> { return Promise.resolve({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, alertState: "warning" }); }
+	public getBudgetSpend(_t: string): Promise<BudgetSpend>
+	{
+		return Promise.resolve({
+			monthlyLimitUsd: 150,
+			currentSpendUsd: 124,
+			alertState: "warning",
+			resetDate: "Jul 1",
+			modelClasses: [
+				{ className: "Writing", modelNames: "claude-sonnet-4-6", spendUsd: 48, percentage: 39 },
+				{ className: "Reasoning", modelNames: "claude-sonnet-4-6", spendUsd: 38, percentage: 31 },
+				{ className: "Routing & Retrieval", modelNames: "haiku · gemini-flash", spendUsd: 10, percentage: 7 }
+			]
+		});
+	}
 	public getAwarenessContract(_t: string): Promise<AwarenessContractInfo> { return Promise.resolve({ contractId: "contract-acme-corp", contractVersion: "v2.3.1", fallbackBehaviour: "proceed", citationMode: true }); }
 	public getDatasetAccess(_t: string): Promise<DatasetAccess[]> { return Promise.resolve(DATASET_ACCESS.map((r): DatasetAccess => ({ ...r }))); }
 	public getSkills(): Promise<SkillRow[]> { return Promise.resolve(SKILLS.map((r): SkillRow => ({ ...r }))); }

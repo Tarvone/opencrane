@@ -235,9 +235,9 @@
 	.hljs-selector-tag,
 	.hljs-built_in { color: var(--accent); }
 	.hljs-string,
-	.hljs-attr { color: var(--wo-ok, #2f7d55); }
+	.hljs-attr { color: var(--wo-ok); }
 	.hljs-number,
-	.hljs-literal { color: var(--wo-warn, #8a6d00); }
+	.hljs-literal { color: var(--wo-warn); }
 	.hljs-comment { color: var(--muted-foreground); font-style: italic; }
 	.hljs-title,
 	.hljs-section { color: var(--foreground); font-weight: 600; }

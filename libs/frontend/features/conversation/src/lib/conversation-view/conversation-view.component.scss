@@ -276,9 +276,9 @@
 		padding: 7px 12px;
 		border-radius: var(--radius);
 		font-size: 12px;
-		color: var(--wo-warn, #8a6d00);
-		background: color-mix(in srgb, var(--wo-warn, #8a6d00) 9%, transparent);
-		border: 1px solid color-mix(in srgb, var(--wo-warn, #8a6d00) 30%, transparent);
+		color: var(--wo-warn);
+		background: color-mix(in srgb, var(--wo-warn) 9%, transparent);
+		border: 1px solid color-mix(in srgb, var(--wo-warn) 30%, transparent);
 
 		i {
 			font-size: 11px;
@@ -293,8 +293,8 @@
 	&__composer {
 		max-width: 700px;
 		margin: 0 auto;
-		background: #fff;
-		border: 1px solid #d8d4cd;
+		background: var(--oc-surface-card);
+		border: 1px solid var(--oc-border);
 		border-radius: 12px;
 		padding: 10px 12px;
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -307,7 +307,7 @@
 			border: none;
 			outline: none;
 			font-size: 14.5px;
-			color: #1a1918;
+			color: var(--oc-text-primary);
 			background: transparent;
 			line-height: 1.55;
 			max-height: 140px;
@@ -317,7 +317,7 @@
 			font-family: inherit;
 
 			&::placeholder {
-				color: #b0ada8;
+				color: var(--oc-text-placeholder);
 			}
 		}
 	}
@@ -339,16 +339,16 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		background: #f5f2ec;
-		border: 1px solid #dedad2;
+		background: var(--oc-surface-paper);
+		border: 1px solid var(--oc-border);
 		border-radius: 6px;
 		padding: 6px 10px;
 		font-size: 12px;
-		color: #1a1918;
+		color: var(--oc-text-primary);
 
 		&--error {
-			border-color: #f9c7b4;
-			background: #fdf2ef;
+			border-color: var(--oc-red-border);
+			background: var(--oc-red-tint-bg);
 		}
 	}
 
@@ -363,31 +363,31 @@
 
 	&__attachment-size {
 		font-size: 10.5px;
-		color: #9a9690;
+		color: var(--oc-text-muted);
 	}
 
 	&__attachment-progress {
 		width: 40px;
 		height: 4px;
-		background: #dedad2;
+		background: var(--oc-border);
 		border-radius: 2px;
 		overflow: hidden;
 	}
 
 	&__attachment-progress-bar {
 		height: 100%;
-		background: #0db5cc;
+		background: var(--oc-teal);
 	}
 
 	&__attachment-error {
 		font-size: 11px;
-		color: #c1392b;
+		color: var(--oc-red);
 	}
 
 	&__attachment-remove {
 		background: transparent;
 		border: none;
-		color: #9a9690;
+		color: var(--oc-text-muted);
 		cursor: pointer;
 		padding: 2px;
 		border-radius: 4px;
@@ -396,8 +396,8 @@
 		justify-content: center;
 
 		&:hover {
-			color: #1a1918;
-			background: #dedad2;
+			color: var(--oc-text-primary);
+			background: var(--oc-border);
 		}
 
 		i {
@@ -410,12 +410,12 @@
 		border: none;
 		padding: 2px 3px;
 		cursor: pointer;
-		color: #b0ada8;
+		color: var(--oc-text-placeholder);
 		flex-shrink: 0;
 		margin-bottom: 1px;
 
 		&:hover {
-			color: #1a1918;
+			color: var(--oc-text-primary);
 		}
 	}
 
@@ -427,7 +427,7 @@
 	}
 
 	&__send {
-		background: #0db5cc;
+		background: var(--oc-teal);
 		border: none;
 		border-radius: 7px;
 		padding: 6px 9px;
@@ -435,7 +435,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 1px 0 #0a94a7, 0 2px 3px rgba(13, 181, 204, 0.25);
+		box-shadow: var(--paper-button-primary-shadow);
 		transition: all 0.13s ease;
 
 		&:disabled {
@@ -445,30 +445,30 @@
 		}
 
 		&:not(:disabled):hover {
-			background: linear-gradient(135deg, #22c7dd 0%, #22c7dd 50%, #0db5cc 50%);
+			background: var(--paper-button-primary-gradient);
 			transform: translateY(-1px);
-			box-shadow: 0 2px 0 #0a94a7, 0 3px 6px rgba(13, 181, 204, 0.3);
+			box-shadow: var(--paper-button-primary-shadow-hover);
 		}
 
 		&:not(:disabled):active {
 			transform: translateY(0);
-			box-shadow: 0 1px 0 #0a94a7;
+			box-shadow: 0 1px 0 var(--oc-teal-edge);
 		}
 	}
 
 	&__stop {
-		background: #f5f2ec;
-		border: 1px solid #dedad2;
+		background: var(--oc-surface-paper);
+		border: 1px solid var(--oc-border);
 		border-radius: 7px;
 		padding: 6px;
-		color: #1a1918;
+		color: var(--oc-text-primary);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 
 		&:hover {
-			background: #e8e5de;
+			background: var(--oc-border-light);
 		}
 
 		i {
@@ -480,12 +480,12 @@
 		text-align: center;
 		margin-top: 7px;
 		font-size: 11.5px;
-		color: #b0ada8;
+		color: var(--oc-text-placeholder);
 		font-family: inherit;
 	}
 
 	&__contract-active {
-		color: #f47920;
+		color: var(--oc-orange);
 		font-weight: 600;
 	}
 }

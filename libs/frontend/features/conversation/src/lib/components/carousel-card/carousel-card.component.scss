@@ -7,23 +7,23 @@
 	align-items: center;
 	gap: 8px;
 	padding: 9px 14px;
-	background: #fff;
-	border: 1px solid #e0ddd6;
+	background: var(--oc-surface-card);
+	border: 1px solid var(--oc-border);
 	border-radius: 9px;
 	font-size: 13px;
 	font-weight: 500;
-	color: #1a1918;
+	color: var(--oc-text-primary);
 	white-space: nowrap;
 	cursor: pointer;
 	flex-shrink: 0;
-	box-shadow: 0 1px 0 #e8e5de;
+	box-shadow: 0 1px 0 var(--oc-border-light);
 	transform: none;
 	transition: all 0.13s ease;
 
 	&:hover {
-		background: linear-gradient(135deg, #fff 0%, #fff 50%, #eefafc 50%);
-		border-color: #9fdde8;
-		box-shadow: 0 2px 0 #cdeef3, 0 3px 6px rgba(13,181,204,.12);
+		background: linear-gradient(135deg, var(--oc-surface-card) 0%, var(--oc-surface-card) 50%, var(--oc-teal-soft) 50%);
+		border-color: color-mix(in srgb, var(--oc-teal) 45%, transparent);
+		box-shadow: 0 2px 0 color-mix(in srgb, var(--oc-teal) 25%, transparent), 0 3px 6px rgba(13, 181, 204, 0.12);
 		transform: translateY(-1px);
 	}
 }

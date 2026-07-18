@@ -1,10 +1,13 @@
 # ADR 0005 — OpenCrane-owned agent runtime
 
-- **Status:** Accepted
+- **Status:** Accepted; amended 2026-07-18 by [ADR 0007](0007-direct-target-refactor.md)
 - **Date:** 2026-07-16
 - **Task:** `#245` — Phase A decision record
 - **Supersedes / superseded by:** supersedes the 2026-06-19 decision to retain OpenClaw as the
   platform runtime
+- **Amendment:** the accepted 2026-07-16 text made the frozen OpenClaw image a behavioral oracle
+  and its trajectories the bake-off fixtures. ADR 0007 retired that migration posture; the
+  consequences below reflect the amended direct-refactor form (original in git history)
 - **Related:** [`personal-agent-platform-architecture.md`](../design/personal-agent-platform-architecture.md) ·
   [`openclaw-agent-loop-replacement-plan.md`](../design/openclaw-agent-loop-replacement-plan.md)
 

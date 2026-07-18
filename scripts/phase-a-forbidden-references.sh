@@ -176,8 +176,11 @@ _check_pattern "OC-CLI-INVOCATION" '(^|[[:space:]`$])oc[[:space:]]+(auth|tenants
 _check_pattern "CLI-DEVICE-FLOW" '(device-grant|/auth/device(/activate|/token)?|cli-device-)' "($TARGET_RECORDS|$HISTORICAL_RECORDS)"
 
 # Production-transition vocabulary is historical only. Active plans, guidance, and code must not
-# rebuild the discarded release program around a product that has never been in production.
-_check_pattern "TRANSITION-PROGRAM" '(frozen-blue|blue/green|whole-silo|maintenance[- ]window|activeSlot|activationEpoch|mid-cutover|R0/R3|R9 cutover|green branch|strangler|through[[:space:]]+R([0-9]|10)([^[:alnum:]_]|$)|until[[:space:]]+R([0-9]|10)([^[:alnum:]_]|$)|R([0-9]|10)(/R([0-9]|10))?[[:space:]]+(gate|cutover|migration|decommission|freeze))' "$HISTORICAL_RECORDS"
+# rebuild the discarded release program around a product that has never been in production. The two
+# decision records that respectively selected (0006, superseded) and retired (0007) the program may
+# name it; nothing else may.
+TRANSITION_DECISION_RECORDS='^docs/adr/(README\.md|000[67]-[^/]+\.md)$'
+_check_pattern "TRANSITION-PROGRAM" '(frozen-blue|blue/green|whole-silo|maintenance[- ]window|activeSlot|activationEpoch|mid-cutover|R0/R3|R9 cutover|green branch|strangler|through[[:space:]]+R([0-9]|10)([^[:alnum:]_]|$)|until[[:space:]]+R([0-9]|10)([^[:alnum:]_]|$)|R([0-9]|10)(/R([0-9]|10))?[[:space:]]+(gate|cutover|migration|decommission|freeze))' "($HISTORICAL_RECORDS|$TRANSITION_DECISION_RECORDS)"
 
 # Issue #135's external secret-custody half is blocked. Existing references may shrink, but no new
 # broad-secret broadcast reference may be added while that explicit exception remains open.

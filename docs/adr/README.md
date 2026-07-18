@@ -16,7 +16,9 @@ is not itself published.
 | [0002](0002-per-clustertenant-silo-architecture.md) | Per-ClusterTenant silo architecture (dedicated operator, planes, API/DB per tenant) | Accepted |
 | [0003](0003-cilium-spiffe-identity-substrate.md) | Cilium identity and network-policy substrate | Accepted; corrected 2026-07-16 |
 | [0004](0004-open-core-fleet-silo-licence-split.md) | Open-core licence split at the fleet ↔ silo boundary (AGPL template + proprietary fleet) | Accepted |
-| [0005](0005-opencrane-owned-agent-runtime.md) | OpenCrane-owned agent runtime | Accepted |
+| [0005](0005-opencrane-owned-agent-runtime.md) | OpenCrane-owned agent runtime | Accepted; amended 2026-07-18 |
+| [0006](0006-rewrite-freeze-whole-silo-cutover.md) | Rewrite freeze with whole-silo blue/green cutover | Superseded by 0007 |
+| [0007](0007-direct-target-refactor.md) | Direct target refactor without an estate migration | Accepted |
 
 ## Writing a new ADR
 

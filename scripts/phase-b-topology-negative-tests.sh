@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GUARD="$ROOT/scripts/phase-b-topology.sh"
 WORKLOAD_REGISTRY="$ROOT/docs/agents/workload-ownership.json"
+APP_SOURCE_REGISTRY="$ROOT/docs/agents/app-source-allowlist.json"
 TMP_DIR="$(mktemp -d)"
 RENDER_PROBE="$ROOT/apps/opencrane-infra/templates/phase-b-guard-probe.yaml"
 COMPUTED_KIND_PROBE="$ROOT/apps/opencrane-infra/templates/phase-b-computed-kind-probe.yaml"
@@ -80,16 +81,33 @@ else if (action === "duplicate-owner")
   registry.workloads.push(duplicate);
   registry.requiredWorkloadIds.push(duplicate.id);
 }
-else if (action === "owner-mismatch")
+else if (action === "missing-owner")
+{
+  const workload = registry.workloads.find(function find(candidate) {
+    return candidate.id === "cnpg-database";
+  });
+  workload.owner = null;
+}
+else if (action === "invalid-classification")
 {
   const workload = registry.workloads.find(function find(candidate) {
     return candidate.id === "skill-registry";
   });
-  workload.exception.currentOwner = "apps/opencrane";
+  workload.classification = "unknown";
 }
-else if (action === "expired")
+else if (action === "missing-classification-reason")
 {
-  registry.currentProgramGate = "R10";
+  const workload = registry.workloads.find(function find(candidate) {
+    return candidate.id === "cnpg-database";
+  });
+  workload.reason = "";
+}
+else if (action === "spoof-local-owner")
+{
+  const workload = registry.workloads.find(function find(candidate) {
+    return candidate.id === "fleet-platform-external";
+  });
+  workload.localOwner = true;
 }
 else if (action === "archive")
 {
@@ -120,6 +138,20 @@ else
   throw new Error(`Unknown mutation: ${action}`);
 }
 
+writeFileSync(output, `${JSON.stringify(registry, null, 2)}\n`);
+NODE
+  printf '%s\n' "$output"
+}
+
+mutate_app_source_registry()
+{
+  local output="$TMP_DIR/app-source-invalid-classification.json"
+  node --input-type=module - "$APP_SOURCE_REGISTRY" "$output" <<'NODE'
+import { readFileSync, writeFileSync } from "node:fs";
+
+const [, , input, output] = process.argv;
+const registry = JSON.parse(readFileSync(input, "utf8"));
+registry.allowedFiles[0].classification = "unknown";
 writeFileSync(output, `${JSON.stringify(registry, null, 2)}\n`);
 NODE
   printf '%s\n' "$output"
@@ -210,13 +242,25 @@ registry="$(mutate_registry duplicate-owner)"
 expect_failure "identity 'Deployment/opencrane-server' conflicts" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
-registry="$(mutate_registry owner-mismatch)"
-expect_failure "exception currentOwner must equal its exact local app owner" \
+registry="$(mutate_registry missing-owner)"
+expect_failure "owner must be one non-empty exact value" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
-registry="$(mutate_registry expired)"
-expect_failure "exception expired at R1; current program gate is R10" \
+registry="$(mutate_registry invalid-classification)"
+expect_failure "classification must be 'delete' or 'survivor'" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
+
+registry="$(mutate_registry missing-classification-reason)"
+expect_failure "classified workload needs an exact reason" \
+  env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
+
+registry="$(mutate_registry spoof-local-owner)"
+expect_failure "localOwner must be derived from the source type" \
+  env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
+
+app_source_registry="$(mutate_app_source_registry)"
+expect_failure "classification is not an exact direct-refactor class" \
+  env PHASE_B_APP_SOURCE_REGISTRY="$app_source_registry" "$GUARD"
 
 registry="$(mutate_registry empty-runtime)"
 expect_failure "workloadIds must map the construct to at least one exact owner" \
@@ -232,4 +276,4 @@ registry="$(mutate_registry archive)"
 expect_failure "unregistered upstream archive workload template: langfuse/templates/phase-b-probe/job.yaml" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
-printf 'Phase B topology negative tests passed (14 rejection paths plus generated-output regression).\n'
+printf 'Phase B topology negative tests passed (17 rejection paths plus generated-output regression).\n'

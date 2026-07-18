@@ -5,8 +5,7 @@
 - **Task:** `#245` — Phase A decision record
 - **Supersedes / superseded by:** supersedes the 2026-06-19 decision to retain OpenClaw as the
   platform runtime
-- **Related:** [ADR 0006](0006-rewrite-freeze-whole-silo-cutover.md) ·
-  [`personal-agent-platform-architecture.md`](../design/personal-agent-platform-architecture.md) ·
+- **Related:** [`personal-agent-platform-architecture.md`](../design/personal-agent-platform-architecture.md) ·
   [`openclaw-agent-loop-replacement-plan.md`](../design/openclaw-agent-loop-replacement-plan.md)
 
 ## Context
@@ -35,13 +34,14 @@ OpenCrane will own the personal and managed-agent runtime end to end:
   OpenCrane-owned `AgentLoopDriver` contract.
 - Python remains available for isolated authoring/tool Jobs; it is not a second conversational
   runtime.
-- The green runtime contains no OpenClaw package, protocol, config renderer, transcript mirror,
+- The target runtime contains no OpenClaw package, protocol, config renderer, transcript mirror,
   workspace compatibility, plugin hook, or reverse bridge.
-- The frozen OpenClaw image is only a blue support, quarantine, pre-commit restore, and deletion
-  artifact. It is not a green dependency, fixture source, behavior oracle, or conformance baseline.
+- The OpenClaw image, installer, runtime, protocols, schemas, configuration, and deployment wiring
+  are deletion targets. They are not dependencies, fixture sources, behavior oracles, or
+  conformance baselines for the replacement.
 
 The TypeScript toolkit is deliberately **not** selected by this ADR. Gate L4 runs
-`@openai/agents` and `ai`/`ToolLoopAgent` against the same independently authored green fixtures and
+`@openai/agents` and `ai`/`ToolLoopAgent` against the same independently authored target fixtures and
 real target LiteLLM matrix. It records one winner and exact dependency pins; the losing production
 adapter is removed.
 
@@ -50,7 +50,7 @@ adapter is removed.
 - **Retain a lean OpenClaw runtime permanently** — rejected. It shortens the runtime build but keeps
   the config/protocol/plugin/workspace/session compatibility tax indefinitely.
 - **Run OpenClaw and an owned toolkit as permanent peers** — rejected. It creates two authorities
-  and two operating matrices instead of completing the cutover.
+  and two operating matrices instead of replacing the obsolete runtime.
 - **Embed a second loop inside OpenClaw** — rejected. It adds a loop without removing the larger
   OpenClaw runtime shell.
 - **Select a toolkit in the architecture ADR** — rejected. Provider, approval-resume,
@@ -60,8 +60,10 @@ adapter is removed.
 
 - OpenCrane assumes production responsibility for session correctness, reconnect, cancellation,
   compaction, recovery, approval resume, and run persistence.
-- Gate L0 proves only blue support, quarantine, pre-commit restore, and deletion. Green fixtures
-  trace exclusively to the approved R0 product contract and cannot be observed or derived from blue.
-- CI forbids OpenClaw and retired-domain imports in green from the first green PR.
-- After each silo's cutover and retention window, the OpenClaw installer, runtime, protocol,
-  workspace, pairing/device, and transcript compatibility surface is deleted rather than deprecated.
+- Runtime fixtures are authored from the accepted product contract, not observed or derived from
+  OpenClaw behavior.
+- CI forbids OpenClaw and retired-domain imports in replacement code from the first implementation
+  PR.
+- Each replacement slice deletes the OpenClaw installer, runtime, protocol, workspace,
+  pairing/device, transcript compatibility, tests, configuration, and deployment wiring it makes
+  obsolete.

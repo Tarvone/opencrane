@@ -49,9 +49,9 @@ scope, review those.
 
 1. **Correctness and behaviour changes**
    - Logic bugs, edge-case failures, off-by-one, unhandled null/undefined.
-   - Unintended violations of the declared target contract. In rewrite-freeze GREEN mode, legacy
-     incompatibility is intentional and compatibility shims are defects; frozen-blue exceptions
-     still preserve the signed support contract.
+   - Unintended violations of the declared target contract. During direct replacement, legacy
+     incompatibility is intentional, compatibility shims are defects, and superseded paths are
+     deleted with their replacement.
 2. **Reliability and operations**
    - Failure handling, retry/timeout behaviour, resource cleanup.
    - Observability: are failures logged with enough structured context?
@@ -76,7 +76,7 @@ scope, review those.
 6. **Roadmap integrity**
    - Any `plan.md` checkbox/status change must be consistent with implemented,
      validated evidence — not aspirational.
-7. **Legacy & migration residue (a migration must leave nothing behind)**
+7. **Legacy and replacement residue (a replacement must leave nothing behind)**
    - When a change adds a new way to do something, hunt for the OLD way still present:
      a superseded route/module/env/flag/config field, an implementation now coexisting
      with its replacement, or an OpenAPI/spec entry that still describes retired
@@ -93,8 +93,8 @@ scope, review those.
    - **Sequencing belongs in the procedure.** Never recommend deleting a working
      security/auth path or a required capability before its replacement is validated
      live — removing the only proven path to land a "cleanup" is a regression.
-   - For every remnant give the **removal + migration procedure** (what to delete, what
-     to migrate first, in what order), not just "this looks unused." When the caller
+   - For every remnant give the **replacement + removal procedure** (what must land, what to delete,
+     and in what order), not just "this looks unused." When the caller
      asks for fixes, perform the removal following that sequencing.
 
 ## Verify every finding before reporting (mandatory)

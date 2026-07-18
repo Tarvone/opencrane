@@ -11,9 +11,9 @@
  *   - `scope:web`     (libs/frontend/*)          may depend on web + shared libs.
  *   - `scope:app`     (apps/*)                   may depend on anything.
  *
- * Phase B starts the dimensional migration on every new or touched project. Untagged legacy
- * targets remain reachable until R2 migrates the complete graph, but newly tagged projects are
- * prevented from introducing app-to-app, lib-to-app, or upward layer dependencies now.
+ * Phase B started dimensional tags on every new or touched project. Untagged legacy targets are
+ * direct-deletion/refactor debt, while newly tagged projects are prevented from introducing
+ * app-to-app, lib-to-app, or upward layer dependencies now.
  *
  * Run via `npm run lint:boundaries`.
  */

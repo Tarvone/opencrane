@@ -17,7 +17,6 @@ is not itself published.
 | [0003](0003-cilium-spiffe-identity-substrate.md) | Cilium identity and network-policy substrate | Accepted; corrected 2026-07-16 |
 | [0004](0004-open-core-fleet-silo-licence-split.md) | Open-core licence split at the fleet ↔ silo boundary (AGPL template + proprietary fleet) | Accepted |
 | [0005](0005-opencrane-owned-agent-runtime.md) | OpenCrane-owned agent runtime | Accepted |
-| [0006](0006-rewrite-freeze-whole-silo-cutover.md) | Rewrite freeze with whole-silo blue/green cutover | Accepted |
 
 ## Writing a new ADR
 

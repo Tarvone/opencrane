@@ -40,9 +40,9 @@ fresh context — do not assume the author's intent was correct.
 
 ### DIMENSION: correctness
 - Logic bugs, edge cases, off-by-one, unhandled null/undefined.
-- Unintended violations of the declared target contract. In rewrite-freeze GREEN mode, legacy
-  incompatibility is intentional and compatibility shims are defects; frozen-blue exceptions still
-  preserve the signed support contract.
+- Unintended violations of the declared target contract. In direct-replacement work, compatibility
+  shims, dual writes, old-protocol fallbacks, and preservation of code classified for deletion are
+  defects.
 - Failure handling: retries, timeouts, resource cleanup.
 - **Silent failures are a defect**: a bare `catch {}` or fail-closed
   `return null`/`continue` on an anomalous path with no structured log line
@@ -78,14 +78,14 @@ fresh context — do not assume the author's intent was correct.
 
 ### DIMENSION: residue
 - New way added → hunt the OLD way still present (superseded route/module/env/flag/
-  config/spec entry). A migration is done only when the replaced path is gone.
+  config/spec entry). A replacement is done only when the replaced path is gone.
 - Classify each remnant: **dead** (no references — say "safe to delete"),
-  **superseded-but-wired** (migrate callers, then remove), **must-survive capability**
+  **superseded-but-wired** (switch callers, then remove), **must-survive capability**
   (mechanism changes, capability stays — never propose deleting it).
 - **Contract drift**: an `openapi/spec.ts` entry that no longer matches its handler
   breaks every generated client — always a finding.
-- Never recommend removing a working auth/security path before its replacement is
-  validated live. Give the removal **sequence**, not just "looks unused".
+- Never recommend removing a required auth/security capability before its replacement is covered by
+  contract and security tests. Remove the superseded mechanism in the same replacement slice.
 - `plan.md` status changes must be backed by implemented, validated evidence.
 
 ## Verify before you report (mandatory)

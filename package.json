@@ -4,7 +4,7 @@
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "description": "Multi-tenant OpenClaw platform on Kubernetes",
+  "description": "OpenCrane personal-agent platform on Kubernetes",
   "engines": {
     "node": ">=22"
   },
@@ -17,11 +17,9 @@
     "install:phase1:local": "KEEP_CLUSTER=1 ./libs/k8s-platform/tests/k3d-local.sh",
     "lint": "nx run-many -t lint",
     "lint:boundaries": "eslint .",
+    "test:phase-a-forbidden-references": "./scripts/phase-a-forbidden-references-negative-tests.sh",
     "check:phase-b-topology": "./scripts/phase-b-topology.sh",
     "test:phase-b-topology": "./scripts/phase-b-topology-negative-tests.sh",
-    "test:r0-estate-evidence": "./scripts/collect-r0-estate-evidence.test.sh",
-    "check:r0-data-disposition": "node ./scripts/check-r0-data-disposition.mjs",
-    "test:r0-data-disposition": "node --test ./scripts/check-r0-data-disposition.test.mjs",
     "docs:sync-openapi": "npm run refresh-openapi -w website",
     "docs:dev": "npm run dev -w website",
     "docs:build": "npm run build -w website",

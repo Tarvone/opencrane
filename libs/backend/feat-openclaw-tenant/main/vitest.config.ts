@@ -4,7 +4,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 const require = createRequire(import.meta.url);
 
-/** Vitest configuration for the frozen-blue OpenClaw tenant feature. */
+/** Vitest configuration retained only until the target runtime deletes this legacy feature. */
 export default defineConfig({
   plugins: [tsconfigPaths({ projects: ["../../../../tsconfig.vitest.json"] })],
   resolve: { alias: { "@opentelemetry/api": require.resolve("@opentelemetry/api") } },

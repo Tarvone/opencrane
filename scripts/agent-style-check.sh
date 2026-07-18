@@ -155,6 +155,16 @@ for f in "${CHECKABLE[@]}"; do
 			;;
 	esac
 
+	# ROOT-CACHE — every vitest config must anchor its Vite cache at the repo root,
+	# or the dep optimizer spawns a stray node_modules/.vite inside the package.
+	case "$f" in
+		*vitest.config.ts)
+			if ! grep -q '_PackageCacheDir' "$f"; then
+				_report "$f" 1 ERROR ROOT-CACHE "vitest config without _PackageCacheDir cacheDir — caches must live under the root node_modules (see vitest.cache.ts)"
+			fi
+			;;
+	esac
+
 done
 
 # 3. Summary + exit code: ERROR findings fail the check; WARN findings are

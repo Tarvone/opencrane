@@ -36,7 +36,7 @@ must reinforce those boundaries rather than claim to replace them.
 
 ### Cilium label-derived identities are the baseline
 
-- The green platform uses Cilium as the enforcing CNI where the target cluster supports it.
+- The target platform uses Cilium as the enforcing CNI where the target cluster supports it.
 - Standard `NetworkPolicy` remains the portable default-deny L3/L4 floor. `CiliumNetworkPolicy`
   adds ServiceAccount/application-label selection, L7 constraints, and FQDN egress.
 - Cilium identities represent stable workload properties such as namespace, application, and
@@ -60,16 +60,16 @@ mutual authentication beyond the projected-token and Cilium-policy baseline. Tha
 its own compatibility, failure-mode, rotation, observability, and operational gate. A future SVID
 must not be treated as interchangeable with a Cilium identity or as business authorization.
 
-### Linkerd is frozen blue, not a target dependency
+### Linkerd is not a target dependency
 
-The existing dormant/frozen-blue Linkerd surface may remain only for the signed blue rollback
-manifest. Phase A inventories and freezes those references. Green adds no Linkerd dependency;
-replacement and deletion occur only after the Cilium/default-deny target is enforcing at the R9/R10
-gates. Removing blue Linkerd before its replacement is proven would weaken the rollback contract.
+Linkerd is obsolete under this decision. New work adds no Linkerd dependency, and the slice that
+establishes the Cilium/default-deny target deletes the superseded Linkerd configuration, tests, and
+documentation. Version control preserves the prior implementation; no runtime compatibility path
+is retained.
 
 ## Alternatives considered
 
-- **Cilium plus mandatory SPIRE from the first green slice** — rejected. It couples two distinct
+- **Cilium plus mandatory SPIRE from the first target slice** — rejected. It couples two distinct
   identity systems before a measured mutual-authentication need proves the additional control plane.
 - **Linkerd as the permanent service mesh** — superseded. It would leave the target operating a
   second policy substrate beside the selected Cilium dataplane.
@@ -82,9 +82,9 @@ gates. Removing blue Linkerd before its replacement is proven would weaken the r
 
 - The identity model now has explicit, non-overlapping authorities: OpenCrane authorization,
   projected-token application authentication, Kubernetes RBAC, cloud IAM, and Cilium reachability.
-- Green cluster qualification must prove Cilium agent/operator readiness and live allow/deny
-  enforcement before cutover; policy application is not best effort.
-- Cluster choices for green must support the required Cilium mode. Existing blue topology remains
-  governed by its frozen release contract until per-silo replacement.
+- Target-cluster qualification must prove Cilium agent/operator readiness and live allow/deny
+  enforcement before deployment; policy application is not best effort.
+- Target cluster choices must support the required Cilium mode. Superseded network-policy and mesh
+  configuration is deleted when the target substrate lands.
 - SPIRE/SVID work no longer blocks the Cilium baseline and cannot be smuggled in as an assumed
   synonym for Cilium identity.

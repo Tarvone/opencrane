@@ -23,6 +23,27 @@ const runtimeSourceExtensions = new Set([...appSourceExtensions, ".sh", ".yaml",
 const typedSourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts"]);
 const ignoredWalkDirectories = new Set(["node_modules", "dist", "coverage", ".nx", ".cache"]);
 const workloadKinds = new Set(["Pod", "Deployment", "StatefulSet", "DaemonSet", "CronJob", "Job"]);
+const workloadClassifications = new Set(["delete", "survivor"]);
+const appSourceClassifications = new Set([
+  "app-config",
+  "browser-composition",
+  "browser-config",
+  "browser-entry-guard",
+  "browser-entry-view",
+  "browser-entrypoint",
+  "browser-route-composition",
+  "build-entrypoint",
+  "composition-test",
+  "delete",
+  "hosting-composition",
+  "migration-entrypoint",
+  "prisma-composition",
+  "process-entrypoint",
+  "process-instrumentation",
+  "process-logging",
+  "route-composition",
+  "test-config",
+]);
 const workloadKindPattern = /^\s*kind:\s*(Pod|Deployment|StatefulSet|DaemonSet|CronJob|Job)\s*$/m;
 const archiveWorkloadKindPattern = /^kind:\s*(Pod|Deployment|StatefulSet|DaemonSet|CronJob|Job|{{[^\n]+}})\s*$/m;
 const renderedWorkloadKindPattern = /^kind:\s*(Pod|Deployment|StatefulSet|DaemonSet|CronJob|Job)\s*$/m;
@@ -71,51 +92,21 @@ function projectTags(projectFile)
   return json.tags ?? json.nx?.tags ?? [];
 }
 
-function gateOrdinal(gate, context)
+function validateExactOwner(owner, context)
 {
-  if (gate === "PRE_FREEZE") return -1;
-  const match = /^R(\d+)$/.exec(gate ?? "");
-  if (!match)
+  if (typeof owner !== "string" || owner.trim() === "")
   {
-    fail(`${context}: '${gate}' is not PRE_FREEZE or one exact R-gate`);
-    return -1;
+    fail(`${context}: owner must be one non-empty exact value`);
+    return;
   }
-  return Number(match[1]);
-}
-
-function validateExactException(exception, context, requireReason = true)
-{
-  if (!exception) return;
-  const requiredFields = ["currentOwner", "expiresAt", "disposition"];
-  if (requireReason) requiredFields.push("reason");
-  for (const field of requiredFields)
+  if (/[?*\[\]]/.test(owner))
   {
-    if (typeof exception[field] !== "string" || exception[field].trim() === "")
-    {
-      fail(`${context}: exception.${field} must be a non-empty exact value`);
-    }
-  }
-  if (!/^R\d+(?:\/R\d+)?$/.test(exception.expiresAt ?? ""))
-  {
-    fail(`${context}: exception expiry '${exception.expiresAt}' is not an exact R-gate`);
-  }
-  if (/[?*\[\]]/.test(exception.currentOwner ?? ""))
-  {
-    fail(`${context}: wildcard exception owners are forbidden`);
-  }
-  const terminalGate = Math.max(...(exception.expiresAt ?? "").split("/").map(function ordinal(gate) {
-    return Number(gate.slice(1));
-  }));
-  if (currentGateOrdinal > terminalGate)
-  {
-    fail(`${context}: exception expired at ${exception.expiresAt}; current program gate is ${currentProgramGate}`);
+    fail(`${context}: wildcard owners are forbidden`);
   }
 }
 
 const workloadRegistry = readJson(workloadRegistryPath);
 const appSourceRegistry = readJson(appSourceRegistryPath);
-const currentProgramGate = workloadRegistry.currentProgramGate;
-const currentGateOrdinal = gateOrdinal(currentProgramGate, "workload registry currentProgramGate");
 
 if (workloadRegistry.version !== 1) fail("workload registry version must be 1");
 if (appSourceRegistry.version !== 1) fail("app-source registry version must be 1");
@@ -150,46 +141,59 @@ for (const workload of workloadRegistry.workloads ?? [])
   if (!workload.id || workloadIds.has(workload.id)) fail(`${context}: id is missing or duplicated`);
   workloadIds.add(workload.id);
   if (!workload.podClass || !workload.image) fail(`${context}: podClass and image are required`);
-  validateExactException(workload.exception, context);
-  const effectiveOwner = workload.owner ?? workload.exception?.currentOwner ?? "<unowned>";
+  validateExactOwner(workload.owner, context);
+  if (Object.hasOwn(workload, "exception"))
+  {
+    fail(`${context}: ownership exceptions are forbidden; assign an exact owner and direct classification`);
+  }
+  if (workload.classification !== undefined)
+  {
+    if (!workloadClassifications.has(workload.classification))
+    {
+      fail(`${context}: classification must be 'delete' or 'survivor'`);
+    }
+    if (typeof workload.reason !== "string" || workload.reason.trim() === "")
+    {
+      fail(`${context}: classified workload needs an exact reason`);
+    }
+  }
+  const source = workload.source ?? {};
+  const sourceIsRepositoryLocal = source.type === "file" || source.type === "archive-member";
+  if (workload.localOwner !== sourceIsRepositoryLocal)
+  {
+    fail(`${context}: localOwner must be derived from the source type, not self-declared`);
+  }
+  if (!sourceIsRepositoryLocal && workload.classification !== "survivor")
+  {
+    fail(`${context}: externally sourced workload must be classified 'survivor'`);
+  }
+  const effectiveOwner = workload.owner ?? "<unowned>";
   claimIdentity(podClassOwners, workload.podClass, effectiveOwner, context);
   if (workload.renderedPodClass)
   {
     claimIdentity(renderedPodClasses, workload.renderedPodClass, effectiveOwner, context);
   }
 
-  if (workload.localOwner)
+  if (sourceIsRepositoryLocal && /^apps\/[^/]+$/.test(workload.owner ?? ""))
   {
-    if (typeof workload.owner !== "string" || !/^apps\/[^/]+$/.test(workload.owner))
+    const ownerRoot = workspacePath(workload.owner);
+    if (!existsSync(ownerRoot) || !lstatSync(ownerRoot).isDirectory())
     {
-      fail(`${context}: local owner must be one exact apps/<name> root`);
+      fail(`${context}: local owner ${workload.owner} does not exist`);
     }
-    else
-    {
-      const ownerRoot = workspacePath(workload.owner);
-      if (!existsSync(ownerRoot) || !lstatSync(ownerRoot).isDirectory())
-      {
-        fail(`${context}: local owner ${workload.owner} does not exist`);
-      }
-      const projectFiles = [join(ownerRoot, "project.json"), join(ownerRoot, "package.json")];
-      const registered = projectFiles.some(function hasProject(file) {
-        if (!existsSync(file)) return false;
-        const json = readJson(file);
-        return Boolean(json.projectType || json.nx?.name);
-      });
-      if (!registered) fail(`${context}: ${workload.owner} is not registered as an NX project`);
-    }
-    if (workload.exception && workload.exception.currentOwner !== workload.owner)
-    {
-      fail(`${context}: exception currentOwner must equal its exact local app owner`);
-    }
+    const projectFiles = [join(ownerRoot, "project.json"), join(ownerRoot, "package.json")];
+    const registered = projectFiles.some(function hasProject(file) {
+      if (!existsSync(file)) return false;
+      const json = readJson(file);
+      return Boolean(json.projectType || json.nx?.name);
+    });
+    if (!registered) fail(`${context}: ${workload.owner} is not registered as an NX project`);
   }
-  else if (!workload.exception)
+  else if (sourceIsRepositoryLocal && workload.classification !== "delete")
   {
-    fail(`${context}: an ownerless workload requires an exact expiring exception`);
+    fail(`${context}: repository-defined workload needs one apps/<name> owner or a direct delete classification`);
   }
 
-  const source = workload.source ?? {};
   const sourceIdentity = source.type === "file"
     ? `file:${source.path}:${source.anchor}`
     : source.type === "archive-member"
@@ -727,8 +731,14 @@ for (const entry of appSourceRegistry.allowedFiles ?? [])
   {
     fail(`${context}: owner does not match path`);
   }
-  if (!entry.classification) fail(`${context}: classification is required`);
-  validateExactException(entry.exception, context, false);
+  if (!appSourceClassifications.has(entry.classification))
+  {
+    fail(`${context}: classification is not an exact direct-refactor class`);
+  }
+  if (Object.hasOwn(entry, "exception"))
+  {
+    fail(`${context}: ownership exceptions are forbidden; classify the file directly`);
+  }
   const path = workspacePath(entry.path ?? "");
   if (!existsSync(path)) fail(`${context}: allowlist entry is stale`);
   else if (lstatSync(path).isSymbolicLink()) fail(`${context}: symlinks are forbidden`);

@@ -1,9 +1,8 @@
-/// Legacy session-to-scope rows retained read-only as R3 migration input.
+/// Legacy session-to-scope rows retained only until the target schema deletes this model.
 ///
 /// Phase A removed every writer, API, client, and runtime consumer. These rows have no current
-/// authorization or anti-spill effect; green migration may inspect them when reconstructing
-/// historical scope intent, then R10 deletes the model. There is no Tenant foreign key because
-/// the historical principal could be either a tenant or a user.
+/// authorization or anti-spill effect and are not an input to the target schema. There is no Tenant
+/// foreign key because the historical principal could be either a tenant or a user.
 model SessionScope {
   /// OpenClaw chat-window session key (the binding's identity).
   sessionKey String   @id @map("session_key")

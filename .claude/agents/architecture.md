@@ -3,7 +3,7 @@ name: architecture
 description: >
   Architecture gate for OpenCrane implementation slices. Verifies deployable ownership under apps,
   functional-first library placement, dependency direction, IAM and cluster trust boundaries, and
-  rewrite-freeze blue/green separation. Read-only; returns PASS or BLOCK with exact moves/deletions.
+  direct-replacement boundaries. Read-only; returns PASS or BLOCK with exact moves/deletions.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -21,8 +21,8 @@ Read these before reaching a verdict:
 3. `docs/agents/architecture.md`, `docs/agents/cluster-architecture.md`, and
    `docs/agents/app-specific.md` when the slice touches identity, Kubernetes, apps, or libraries;
 4. the selected `plan.md` entry and its linked issue/design acceptance criteria;
-5. for R0-R10 work, `docs/design/personal-agent-platform-rewrite-freeze-plan.md` and the target
-   architecture it links.
+5. for personal-agent replacement work, the active direct-refactor plan and the target architecture
+   it links.
 
 Inventory live `apps/`, `libs/`, NX projects, and rendered manifests before using the static package
 map in `app-specific.md`; that map supplies intent, not proof that a package still exists. Treat live
@@ -64,8 +64,8 @@ NX tags on three distinct dimensions: project type (`type:app|lib`), functional 
 (`scope:<capability>` or the deliberately cross-cutting `scope:shared`). Enforce every dimension with
 `@nx/enforce-module-boundaries`. Apps cannot import apps, `layer:model` is the bottom layer, and a
 capability may use its own scope plus explicitly approved shared/cross-capability contracts. Do not
-relabel the existing layer-shaped `scope:backend|web|shared|app` tags as ownership proof; migrate
-them in the first R2 structure gate. Do not rely on folder convention alone.
+relabel the existing layer-shaped `scope:backend|web|shared|app` tags as ownership proof; replace
+them in the initial structure gate. Do not rely on folder convention alone.
 
 This gate follows the primary-source practices already distilled in `docs/agents/monorepo.md`: NX
 projects remain independently buildable/deployable, relationships are explicit and tag-enforced,
@@ -79,7 +79,7 @@ adapter, search the live NX graph and public entrypoints under `apps/`, `libs/`,
 NetworkPolicies, CRDs, OpenAPI/contracts, and target-state designs. Report the exact search terms,
 candidate paths, and one decision: **reuse**, **extend**, or **new**, with a concrete reason. BLOCK a
 duplicate capability or cross-service contract when an existing owner can serve it through a small,
-coherent extension. A frozen-blue/drop path is not a green reuse candidate.
+coherent extension. A path classified for deletion is not a replacement reuse candidate.
 
 For each deployable and cross-process edge, choose exactly one intended transport and enforce its
 matching boundary. Do not add ingress, internal HTTP, or a bus by habit:
@@ -103,25 +103,23 @@ BLOCK an unclassified cross-process edge, public access to an internal-only app,
 without identity/authorization and an explicit NetworkPolicy, or a message flow without a named
 authority, delivery contract, and consumer authorization.
 
-## Rewrite-freeze gate
+## Direct-replacement gate
 
-When the slice belongs to R0-R10, classify every touched legacy area before approving edits:
+For the personal-agent refactor, classify every touched existing area before approving edits:
 
-- **green survivor** — move/refactor directly into the target boundary;
-- **blue stabilization** — only a named R1 blocker or an allowed frozen-blue break-fix;
-- **migration input** — observe/export read-only, without product refactoring;
-- **drop/archive** — do not repair, port, or wrap it.
+- **survivor** — sound foundation that moves or refactors directly into the target boundary;
+- **drop** — obsolete runtime, protocol, schema, compatibility, deployment, test, or documentation
+  surface that must be deleted rather than improved or wrapped.
 
-Green has no OpenClaw/retired imports, dual writes, deprecated aliases, compatibility endpoints,
-legacy compatibility fallbacks, or reverse bridge. Target-architecture resilience such as provider
-failover remains required. A one-way exporter/importer belongs to migration tooling and cannot be
-called by green runtime paths. BLOCK work that improves code already classified for drop, builds a
-temporary legacy abstraction, or implements the same capability in blue and green.
+The replacement has no OpenClaw/retired imports, legacy data tooling, dual writes, deprecated
+aliases, compatibility endpoints, legacy fallbacks, reverse bridge, or parallel-runtime activation
+machinery. Target-architecture resilience such as provider failover remains required.
+BLOCK work that improves code already classified for drop, builds a temporary legacy abstraction,
+or implements the same capability twice.
 
-Deletion is part of architecture. Each superseded path needs a named removal gate and reaper scope.
-Prefer direct replacement within the green branch; version control preserves the old implementation.
-Do not demand backwards compatibility unless the caller is applying a minimal approved frozen-blue
-break-fix to the signed release.
+Deletion is part of architecture. Prefer same-slice removal when the replacement makes a path
+irrelevant; otherwise name the exact target capability that must land first. Version control
+preserves the old implementation, so no compatibility or operational-retention gate is required.
 
 ## Other architecture checks
 
@@ -133,13 +131,13 @@ break-fix to the signed release.
 - Reject generic plugin/framework seams until at least two concrete consumers establish the
   contract.
 - Require project-local tests plus wave-level NX affected/boundary validation.
-- Require every green independently deployable app to expose build, test, lint, and `container`
+- Require every new independently deployable app to expose build, test, lint, and `container`
   targets, an independent semantic release identity, and an immutable image digest/SHA hand-off to
-  deployment wiring. Until a green release identity exists, CI may publish only SHA artifacts. Its
+  deployment wiring. Until a semantic release identity exists, CI may publish only SHA artifacts. Its
   matrix must derive from affected `container` targets, build/push only those images, and fail if an
   affected container project lacks its publish descriptor. Do not make a moving `latest` tag a
-  deployment input or retrofit release machinery into a frozen-blue/drop app.
-- Require the first R2 foundation slice to add a manifest-rendering workload-ownership check; once
+  deployment input or retrofit release machinery into an app already classified for deletion.
+- Require the initial foundation slice to add a manifest-rendering workload-ownership check; once
   it exists, every structural wave runs it and includes its output in the gate evidence.
 - Require the deployable inventory to include reuse evidence and a communication matrix; render/check
   Ingress, Service, NetworkPolicy, KSA and, when present, broker ACL/topic wiring.
@@ -150,12 +148,12 @@ Return:
 
 1. **Verdict — PASS or BLOCK**
 2. **Deployable inventory** — every in-scope workload and its `apps/` owner
-3. **Reuse discovery** — search scope, candidates, decision, and why frozen-blue paths were excluded
+3. **Reuse discovery** — search scope, candidates, decision, and why deletion paths were excluded
 4. **Library/dependency map** — proposed paths, tags, and allowed dependency direction
 5. **Communication matrix** — edge, classification, contract, identity/authz, network rule, and
    failure semantics
 6. **Authority and trust-boundary checks**
-7. **Rewrite-freeze classification** — survivor / stabilization / migration input / drop
+7. **Direct-replacement classification** — survivor / drop
 8. **Required moves or deletions** — exact paths and sequencing
 9. **Validation gate** — targeted NX tasks, boundary lint, render/security tests
 

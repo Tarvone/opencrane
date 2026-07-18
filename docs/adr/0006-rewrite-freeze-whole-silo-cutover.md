@@ -1,12 +1,16 @@
 # ADR 0006 — Rewrite freeze with whole-silo blue/green cutover
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR 0007](0007-direct-target-refactor.md) (2026-07-18)
 - **Date:** 2026-07-16
 - **Task:** `#245` — Phase A decision record
-- **Supersedes / superseded by:** selects the rewrite-freeze route over the proposed strangler route
+- **Supersedes / superseded by:** selects the rewrite-freeze route over the proposed strangler
+  route; superseded by [ADR 0007](0007-direct-target-refactor.md) after the `#252` R0 estate audit
 - **Related:** [ADR 0005](0005-opencrane-owned-agent-runtime.md) ·
-  [`personal-agent-platform-rewrite-freeze-plan.md`](../design/personal-agent-platform-rewrite-freeze-plan.md) ·
-  [`personal-agent-platform-simplification-plan.md`](../design/personal-agent-platform-simplification-plan.md)
+  `personal-agent-platform-rewrite-freeze-plan.md` · `personal-agent-platform-simplification-plan.md`
+  (both route documents were removed with this route; see git history)
+
+> Retained as the record of the route selected on 2026-07-16 and retired on 2026-07-18. The body
+> below is unchanged from acceptance; nothing in it remains binding.
 
 ## Context
 

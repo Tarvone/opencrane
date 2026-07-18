@@ -11,7 +11,7 @@ import { IdleChecker } from "./reconcilers/tenants/runtime/idle-checker.js";
 import type { OpenClawTenantOperatorConfig } from "./operator-config.types.js";
 import type { OpenClawTenantLifecycleOptions } from "./runtime-lifecycle.types.js";
 
-/** Owns the frozen-blue OpenClaw tenant controllers and their auxiliary heal loops. */
+/** Owns the legacy OpenClaw controllers until the target runtime slice deletes this package. */
 export class OpenClawTenantLifecycle
 {
   /** Immutable dependencies supplied by the app composition root. */
@@ -32,7 +32,7 @@ export class OpenClawTenantLifecycle
     this.options = options;
   }
 
-  /** Start every frozen-blue tenant controller, preserving fail-soft boot semantics. */
+  /** Start the legacy tenant controllers, preserving their current fail-soft boot semantics. */
   async start(): Promise<void>
   {
     const { kubeConfig, customApi, coreApi, prisma, publicPort, loadConfig, buildHostingAdapter, log } = this.options;

@@ -111,12 +111,12 @@ library units with the parent release context; shared labels and topology helper
 | `apps/litellm/helm` | LiteLLM Deployment, Service, credential Secret contract, and non-token identity |
 | `apps/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
 | `apps/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
-| `apps/opencrane-infra/templates/feat-skill-registry-*` | Exact frozen-blue skill-registry exception through R10 |
-| `apps/opencrane-infra/templates/skill-oci-store.yaml` | Exact default-off Zot exception through R10 |
+| `apps/opencrane-infra/templates/feat-skill-registry-*` | Skill-registry deletion target; remove with its direct replacement |
+| `apps/opencrane-infra/templates/skill-oci-store.yaml` | Default-off Zot deletion target; artifact bytes belong behind `ArtifactStore` |
 | `apps/opencrane-infra/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
 
 The machine-enforced inventory is `docs/agents/workload-ownership.json`; adding a pod class
-without an exact app owner or named R-gate exception fails `scripts/phase-b-topology.sh`.
+without an exact owner or direct deletion decision fails `scripts/phase-b-topology.sh`.
 
 ## The Planes, Wired
 

@@ -1,16 +1,13 @@
 # OpenClaw agent-loop investigation and replacement plan
 
-Status: **proposed for architecture review — 2026-07-16.** This document is an implementation-level
-investigation of the OpenClaw runtime pinned by this repository and a gated plan for replacing its
-agentic behavior with a smaller toolkit-backed OpenCrane runtime.
+Status: **adopted direct-refactor plan — 2026-07-18.** This document is an implementation-level
+investigation of the OpenClaw runtime pinned by this repository and the plan for replacing its
+agentic behavior directly with a smaller toolkit-backed OpenCrane runtime.
 
 It refines the runtime choice in the
-[personal-agent platform architecture](personal-agent-platform-architecture.md) and the W6/W7
-ordering in the
-[personal-agent platform simplification plan](personal-agent-platform-simplification-plan.md). The
-same loop baseline and toolkit gate apply to R1/R4 of the alternative
-[rewrite-freeze plan](personal-agent-platform-rewrite-freeze-plan.md). This document does not by
-itself accept the wider platform redesign or resequence the live GitHub backlog.
+[personal-agent platform architecture](personal-agent-platform-architecture.md). It defines the
+runtime slice's target contracts, conformance gate, reliability envelope, and same-slice deletion
+boundary.
 
 ## Executive conclusion
 
@@ -37,10 +34,10 @@ The recommended direction is:
 - choose the OpenAI Agents SDK if its LiteLLM path, resumable approvals, cancellation, and event
   semantics pass; choose AI SDK if its thinner, provider-neutral loop proves materially safer;
 - build a minimal custom loop only if both toolkits fail a hard gate;
-- migrate behind the existing frontend `ConversationGateway`, but introduce an OpenCrane-owned
-  backend run/event protocol rather than reproducing Gateway v4;
-- prove behavioral parity before switching a tenant, then delete the OpenClaw installer, config,
-  protocol, workspace, plugin, and transcript compatibility surface.
+- replace the backend behind the existing frontend `ConversationGateway`, but introduce an
+  OpenCrane-owned run/event protocol rather than reproducing Gateway v4;
+- prove the target product contract, then delete the OpenClaw installer, config, protocol,
+  workspace, plugin, and transcript paths in the same replacement slice.
 
 This investigation establishes the evidence for a **TypeScript** default and refines the wider
 architecture around a conformance-selected loop driver. Python remains appropriate for isolated
@@ -57,8 +54,9 @@ The evidence below is pinned to the exact upstream runtime selected by this repo
   [OpenCrane config](../../apps/opencrane/src/app/config.ts), and
   [infra values](../../apps/opencrane-infra/values.yaml)
 
-Current OpenClaw `main` may differ. Parity and migration fixtures must target the deployed pinned
-artifact first; any later upgrade is a separate decision.
+Current OpenClaw `main` may differ. The pinned artifact is evidence for understanding and deleting
+the current implementation only. Target conformance fixtures are authored independently from the
+product contract and must not target or derive from any OpenClaw artifact.
 
 ## How a web-chat turn really runs
 
@@ -161,7 +159,7 @@ The OpenClaw harness and embedded runner add the difficult behavior around that 
 | Concern | What the pinned runtime does | Replacement implication |
 |---|---|---|
 | Session serialization | Per-session command lane, global capacity lane, transcript file-owner guard, and process-aware write lock | Use a durable one-active-run lease per thread plus bounded global worker capacity |
-| Transcript | `sessions.json` metadata plus append-only, tree-structured `<sessionId>.jsonl` messages, tool results and compaction entries | Import/archive it, but make immutable Postgres messages/events canonical |
+| Transcript | `sessions.json` metadata plus append-only, tree-structured `<sessionId>.jsonl` messages, tool results and compaction entries | Do not carry it forward; create the immutable Postgres message/event history from the target contract |
 | Context construction | Rebuilds system prompt, active tools, workspace bootstrap, skills, provider fixups and session branch before calls | Create one versioned OpenCrane `RunInputSnapshot` and prompt compiler |
 | Persistence timing | Appends each completed message; flushes queued session mutations at turn end; emits a save point and settled event | Persist normalized events transactionally before exposing them; never trust only an in-memory stream |
 | Tool lifecycle | Resolve, validate, policy hook, execute with partial updates, result hook, append result, continue | Keep authorization and idempotency outside the toolkit adapter |
@@ -258,7 +256,8 @@ Do **not** reproduce OpenClaw implementation choices that are not product requir
   navigation unless a proven UI requirement depends on one;
 - OpenClaw's built-in memory and tool policy when Cognee and Obot are the accepted authorities.
 
-The goal is behavioral compatibility at the OpenCrane product boundary, not source-level cloning.
+The goal is the independently approved OpenCrane product contract. OpenClaw behavior is not a
+compatibility target, fixture source, oracle, or acceptance baseline.
 
 ## Current OpenCrane seam and missing contract
 
@@ -382,7 +381,7 @@ live SSE or WebSocket delivery and history are two views over the same log.
 it means OpenAI's broader AgentKit product, that product layer is not the required runtime seam; the
 relevant code-first candidate is the OpenAI Agents SDK.
 
-These packages release quickly. Gate L4 records the exact versions and lockfile used by each
+These packages release quickly. Gate L3 records the exact versions and lockfile used by each
 conformance run instead of treating an investigation-day "latest" number as an architecture fact.
 
 | Candidate | Strengths for this seam | Main risk/overlap | Decision |
@@ -392,8 +391,8 @@ conformance run instead of treating an investigation-day "latest" number as an a
 | OpenAI Agents SDK Python | Mature equivalent primitives and sessions | Adds a second language/service/runtime without a demonstrated loop advantage; Python tools are isolated Jobs anyway | Reject unless JS fails a hard gate that Python passes |
 | `@langchain/langgraph` | Excellent checkpoints, replay, interrupts and deterministic graph workflows | Its thread/checkpoint runtime competes with OpenCrane's canonical run/event authority; too much machinery for a bounded loop | Reject unless long-lived deterministic graphs become a product requirement |
 | `@mastra/core` | Broad agent, workflow, memory, storage, MCP and observability platform | High overlap with nearly every OpenCrane authority this design is trying to simplify | Reject as the loop substrate |
-| Google ADK TypeScript | Runner/session/memory abstractions and a growing ecosystem | TypeScript path is less mature and brings another runtime/session authority; LiteLLM support is stronger on Python | Reject for this cutover; re-evaluate later |
-| OpenClaw `@openclaw/agent-core` | Exact inner-loop semantics | Private, release-coupled API; vendoring/forking keeps the OpenClaw upgrade tax | Use only as a behavioral oracle |
+| Google ADK TypeScript | Runner/session/memory abstractions and a growing ecosystem | TypeScript path is less mature and brings another runtime/session authority; LiteLLM support is stronger on Python | Reject for this implementation; re-evaluate later |
+| OpenClaw `@openclaw/agent-core` | Current-implementation evidence | Private, release-coupled API; using it would preserve superseded semantics and the OpenClaw upgrade tax | Reject; do not use as a target dependency or oracle |
 | Minimal custom TypeScript loop | Complete control and direct LiteLLM fit | OpenCrane owns every malformed-stream, tool-call and provider edge case forever | Last-resort escape hatch |
 
 Primary documentation:
@@ -439,44 +438,39 @@ it:
    session, approval, context, retry and event behavior in OpenCrane.
 4. Build a minimal loop only if both candidates fail safe approval recovery or provider
    conformance. Record the failing fixtures and the exact custom surface required.
-5. Do not maintain both toolkits after selection. The loser remains a test oracle only until the
-   chosen adapter is canary-qualified.
+5. Do not maintain both toolkits after selection. Delete the losing adapter after the selected
+   driver passes the independently authored target fixture suite.
 
 ## Delivery plan
 
-### Gate L0 — freeze the behavioral baseline
+### Gate L0 — define the target and deletion boundary
 
 Deliverables:
 
-- build an immutable image containing the pinned OpenClaw runtime, prove cold start on an empty PVC
-  and rollback to the previous image, then stop installing/updating the runtime on the tenant PVC at
-  startup;
-- record the upstream tag, commit, rendered config, model aliases, enabled tools/plugins and
-  effective tenant contract for each test run;
-- extract real Gateway frames already represented in frontend specs into shared golden fixtures;
-- add an OpenClaw black-box trajectory recorder that normalizes away timestamps and private values;
-- capture fixtures for plain text, reasoning, one tool, multiple sequential/parallel tools,
-  malformed and unknown tools, denial, approval, media, abort, reconnect, compaction, restart,
-  provider/auth fallback, memory recall/capture and terminal errors;
-- classify every current OpenClaw behavior as **must preserve**, **intentional change**, or
-  **unused—delete**.
+- record the pinned OpenClaw tag, commit, rendered config, model aliases, enabled tools/plugins, and
+  effective runtime only as evidence for the behavior being replaced and the code being deleted;
+- author target conversation, tool, approval, media, abort, reconnect, compaction, restart,
+  provider/auth fallback, memory, and terminal-error fixtures independently from the product
+  contract;
+- inventory every OpenClaw installer, protocol, adapter, workspace, plugin, transcript, fixture,
+  configuration, resource, and deployment path that the replacement slice must delete;
+- prohibit translating or reusing Gateway frames, existing trajectories, data, schemas, protocols,
+  identifiers, or behavioral decisions as target fixtures or acceptance expectations.
 
-Useful existing fixtures include `openclaw-connection.spec.ts`, `chat-event.util.spec.ts`,
-`tool-results-media.spec.ts`, `history-fold.spec.ts`, `history.util.spec.ts`,
-`operation.util.spec.ts`, `reconnect.util.spec.ts`, the proxy/auth suites, and the runtime contract
-suites.
+Existing OpenClaw fixtures and runtime-contract suites are evidence about the superseded code only.
+Target test authors must not import, copy, translate, derive, or treat them as an oracle.
 
 Exit gate:
 
-- every required trajectory has deterministic normalized event and transcript expectations;
-- the pinned OpenClaw bridge passes the suite;
-- product owners accept the intentional-change and deletion inventory.
+- the independently authored fixtures trace only to the target product contract;
+- the deletion inventory names every superseded fixture, recorder, protocol, and adapter;
+- the replacement slice has no bridge, data import, dual write, or fallback to OpenClaw.
 
 ### L1 — define the canonical conversation and run plane
 
 Deliverables:
 
-- Prisma models and migrations for the canonical model above;
+- Prisma schema definitions and empty-store initialization for the canonical model above;
 - append-only event writer with unique `(runId, sequence)` and one terminal-event constraint;
 - one-active-run thread lease with fencing token and expiry/reconciliation;
 - idempotent send, abort, approval and tool-dispatch APIs;
@@ -485,7 +479,7 @@ Deliverables:
   necessary; commands remain authenticated HTTP endpoints;
 - runtime-neutral client adapter implementing the current `ConversationGateway` plus explicit
   approval/attachment/run affordances;
-- transcript export/import/archive policy for existing OpenClaw JSONL.
+- target transcript retention/deletion policy; existing OpenClaw JSONL is not imported.
 
 Exit gate:
 
@@ -494,27 +488,7 @@ Exit gate:
 - reconnect from any persisted cursor produces no duplicate or missing normalized event;
 - process death cannot leave two writers owning the same run/thread.
 
-### L2 — bridge OpenClaw into the canonical plane
-
-Deliverables:
-
-- translate the required Gateway v4 live frames and history rows into normalized `RunEvent` and
-  `Message` records before client delivery;
-- persist OpenClaw run identity, model/usage, tool lifecycle, operation and terminal state;
-- use the canonical API for the frontend while OpenClaw remains the execution backend;
-- detect divergence between OpenClaw history and the canonical projection;
-- create explicit migration/archive handling for sessions beyond the existing 1,000-row UI window.
-
-This phase prevents the toolkit decision from being entangled with the protocol, storage and UI
-rewrite. The bridge is temporary and has a deletion issue before it is merged.
-
-Exit gate:
-
-- OpenClaw still serves users through the new product protocol;
-- canonical replay matches all L0 fixtures;
-- OpenClaw JSONL is no longer the only source for a user-visible run after it begins.
-
-### L3 — extract versioned runtime inputs
+### L2 — extract versioned runtime inputs
 
 Deliverables:
 
@@ -533,7 +507,7 @@ Exit gate:
 - a contract/persona/skill change cannot alter an already-accepted run;
 - no conversational runtime needs Kubernetes API or broad provider/Obot/Cognee credentials.
 
-### L4 — toolkit conformance bake-off
+### L3 — toolkit conformance bake-off
 
 Implement `AgentLoopDriver` adapters for OpenAI Agents SDK JS and AI SDK. Do not add production
 framework abstraction beyond what the two real adapters require.
@@ -559,10 +533,10 @@ Exit gate:
 
 - apply the decision rule above and record one selected, exact-pinned toolkit;
 - remove the losing production adapter;
-- document any intentional difference from OpenClaw and update the golden expectations only after
-  approval.
+- record conformance only against the independently approved target fixtures; do not compare with or
+  update expectations from OpenClaw behavior.
 
-### L5 — build the OpenCrane reliability envelope
+### L4 — build the OpenCrane reliability envelope
 
 Deliverables:
 
@@ -592,54 +566,42 @@ Exit gate:
 - every non-terminal run is recoverable or deterministically reconciled after worker restart;
 - compaction changes only derived model context, never canonical transcript history.
 
-### L6 — shadow, canary and cut over
+### L5 — qualify the target and delete the superseded runtime
 
-Rollout order:
+In the replacement slice:
 
-1. replay L0 fixtures offline;
-2. shadow production-shaped turns with all external side effects disabled and no shadow output shown
-   to users;
-3. dogfood in an isolated silo;
-4. canary complete tenants, never individual turns within one thread;
-5. expand cohorts only after the observation window and parity/SLO report pass;
-6. switch the stable tenant service/proxy target to the new runtime;
-7. permit an OpenClaw traffic rollback only before the canary's first canonical new-runtime write;
-   after that frontier, rollback means the prior OpenCrane runtime image against the same canonical
-   store, while the OpenClaw image/data remain an archive unless a reverse migration is executed.
+1. run the independently authored target fixture suite against disposable fresh stores;
+2. qualify the exact runtime image, chart, configuration, LiteLLM matrix, and fresh-store
+   provisioning;
+3. exercise runtime-version rollback and forward recovery against target-owned state. This validates
+   product upgrades; it does not restore or read OpenClaw state.
 
-Canary gates:
-
-- no lost, duplicated, reordered or late events;
-- no duplicate external side effects across retry, crash, approval resume or reconnect;
-- p95 first-token and terminal latency within the accepted budget;
-- model/tool success, cancellation, compaction and provider fallback meet or improve the baseline;
-- memory scope, persona, skill entitlement and Obot denial remain tenant-correct;
-- usage/cost reconciliation and trace coverage are complete;
-- before the first new-runtime write, rollback restores OpenClaw without two transcript writers;
-  afterward, rollback restores the previous OpenCrane runtime version against canonical state.
-
-### L7 — delete OpenClaw compatibility
-
-After every tenant passes its rollback window, delete rather than deprecate:
+Delete rather than deprecate:
 
 - the runtime package installer and mutable PVC install/update logic;
 - OpenClaw config schema, renderer and contract polling/reload shell;
 - Gateway v4 protocol schemas, connection client, frontend adapter and event/history folds;
 - trusted-proxy behavior needed only by the OpenClaw gateway, pairing/device/admin/node/channel/cron
-  compatibility, and OpenClaw resource names;
+  paths, and OpenClaw resource names;
 - workspace marker/persona renderers, OpenClaw skill copies, plugin installation and Cognee plugin
   lifecycle;
-- JSONL session/compaction compatibility after export/retention obligations end;
-- bridge-only fields, URLs, environment variables, Helm values, tests and observability labels;
-- the losing toolkit adapter and the rollout switch.
+- every JSONL session/compaction path;
+- OpenClaw-only fields, URLs, environment variables, Helm values, tests and observability labels;
+- the losing toolkit adapter and every runtime-selection switch.
 
 Exit gate:
 
+- no lost, duplicated, reordered or late events;
+- no duplicate external side effects across retry, crash, approval resume, or reconnect;
+- p95 first-token and terminal latency are within the accepted budget;
+- model/tool success, cancellation, compaction, provider fallback, memory scope, persona, skill
+  entitlement, and Obot denial meet the target thresholds;
+- usage/cost reconciliation and trace coverage are complete;
 - repository search and rendered-chart tests find no accidental OpenClaw runtime dependency;
 - backup/restore, upgrade, conversation, approval, memory, MCP, artifact and revoke smoke tests pass;
 - the new runtime is the only supported personal-agent execution path.
 
-## Parity acceptance matrix
+## Target acceptance matrix
 
 | Scenario | Required invariant |
 |---|---|
@@ -660,21 +622,19 @@ Exit gate:
 | Obot unavailable/denies | Fail closed for governed tools; no local policy bypass |
 | Budget exhaustion | Tool/model work stops; durable classified terminal outcome and usage |
 | Child agent | Durable parent/root lineage, inherited policy, bounded depth/count/cost and idempotent completion delivery |
-| Tenant cutover/rollback | A tenant uses one runtime and one canonical writer at a time; OpenClaw rollback closes at the first new-runtime write frontier |
+| Runtime upgrade/recovery | A run uses one fenced writer; rollback uses a prior qualified target runtime version against target-owned state |
 
 ## Decisions required before implementation
 
 Gate L0 should record these explicitly:
 
-1. whether current production data requires full JSONL import or an immutable searchable archive;
-2. whether a second user message during a run queues, steers the active run, or is rejected—the
+1. whether a second user message during a run queues, steers the active run, or is rejected—the
    default recommendation is queue as the next run, with steering deferred until a proven need;
-3. which tools require durable human approval and which can ever execute in parallel;
-4. the permitted model fallback set and whether fallback after visible output is forbidden;
-5. quantitative per-run token, cost, time, tool and child-agent budgets;
-6. the Cognee failure policy for recall and capture;
-7. the tenant canary cohort, observation window and point after which rollback is data migration,
-   not a traffic switch.
+2. which tools require durable human approval and which can ever execute in parallel;
+3. the permitted model fallback set and whether fallback after visible output is forbidden;
+4. quantitative per-run token, cost, time, tool and child-agent budgets;
+5. the Cognee failure policy for recall and capture;
+6. runtime-version compatibility and rollback rules for durable target-owned approval checkpoints.
 
 None of these decisions changes the toolkit boundary: OpenCrane remains the authority and the
 selected library remains a replaceable bounded loop driver.

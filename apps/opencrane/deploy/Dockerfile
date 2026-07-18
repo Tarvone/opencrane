@@ -40,10 +40,10 @@ RUN target=$(find /app -path '*/node_modules/.prisma/client' -type d | head -1) 
     cp -r /tmp/generated-prisma "$target" && \
     rm -rf /tmp/generated-prisma
 
-COPY --from=build /app/apps/opencrane/dist apps/opencrane/dist
+COPY --from=build /app/dist/apps/opencrane dist/apps/opencrane
 
 USER node
 
 EXPOSE 8080
 
-CMD ["node", "apps/opencrane/dist/index.js"]
+CMD ["node", "dist/apps/opencrane/index.js"]

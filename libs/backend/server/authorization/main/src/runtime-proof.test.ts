@@ -368,7 +368,34 @@ describe("runtime bootstrap and capability replay", function _suite()
 		const repository = new _ReceiptRepository();
 		const executor = new _Executor();
 		const command = _command("idempotent");
-		await repository.reserve({ jti: command.expectation.capability.jti, requestFingerprint: "sha256:reserved-before-crash", replayMode: command.replayMode });
+		const capability = command.expectation.capability;
+		await repository.reserve({
+			jti: capability.jti,
+			requestFingerprint: "sha256:reserved-before-crash",
+			replayMode: command.replayMode,
+			audience: capability.audience,
+			siloId: capability.siloId,
+			subjectId: capability.subjectId,
+			serviceAccountName: capability.serviceAccountName,
+			namespace: capability.namespace,
+			workloadKind: capability.workloadKind,
+			workloadUid: capability.workloadUid,
+			podUid: capability.podUid,
+			runId: capability.runId,
+			attempt: capability.attempt,
+			agentServiceId: capability.agentServiceId,
+			agentRevisionId: capability.agentRevisionId,
+			proofKeyThumbprint: capability.proofKeyThumbprint,
+			catalogId: capability.capability.catalog.catalogId,
+			catalogRevision: capability.capability.catalog.revision,
+			catalogDigest: capability.capability.catalog.digest,
+			capabilityId: capability.capability.capabilityId,
+			effectivePolicyDigest: capability.effectiveAuthorizationDigest,
+			resourceKind: capability.resource.kind,
+			resourceId: capability.resource.id,
+			action: capability.action,
+			argumentsDigest: capability.argumentsDigest,
+		});
 
 		expect(await __ExecuteCapabilityAction(repository, command, executor)).toEqual({ outcome: "denied", reason: "jti_replay" });
 		expect(executor.count).toBe(0);

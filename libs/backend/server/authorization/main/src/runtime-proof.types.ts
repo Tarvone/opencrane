@@ -107,6 +107,50 @@ export interface CapabilityActionIntent
 	readonly requestFingerprint: string;
 	/** Explicit replay behavior for an identical request. */
 	readonly replayMode: ActionReplayMode;
+	/** Exact policy-enforcement audience. */
+	readonly audience: string;
+	/** Silo in which the capability is authoritative. */
+	readonly siloId: string;
+	/** Subject exercising the capability. */
+	readonly subjectId: string;
+	/** Projected Kubernetes service account. */
+	readonly serviceAccountName: string;
+	/** Exact Kubernetes namespace. */
+	readonly namespace: string;
+	/** Controller-owned workload kind. */
+	readonly workloadKind: "job" | "deployment";
+	/** Immutable controller workload UID. */
+	readonly workloadUid: string;
+	/** Immutable runtime Pod UID. */
+	readonly podUid: string;
+	/** Logical run identifier. */
+	readonly runId: string;
+	/** Current positive run attempt. */
+	readonly attempt: number;
+	/** Stable AgentService identifier. */
+	readonly agentServiceId: string;
+	/** Immutable AgentRevision identifier. */
+	readonly agentRevisionId: string;
+	/** RFC 7638 proof-key thumbprint registered to the workload. */
+	readonly proofKeyThumbprint: string;
+	/** Immutable capability catalog identifier. */
+	readonly catalogId: string;
+	/** Positive immutable capability catalog revision. */
+	readonly catalogRevision: number;
+	/** Digest of the immutable capability catalog. */
+	readonly catalogDigest: string;
+	/** Stable capability identifier within the catalog. */
+	readonly capabilityId: string;
+	/** Digest of the exact effective policy and grant set. */
+	readonly effectivePolicyDigest: string;
+	/** Exact resource kind being acted upon. */
+	readonly resourceKind: string;
+	/** Exact resource identifier being acted upon. */
+	readonly resourceId: string;
+	/** Exact action being performed. */
+	readonly action: string;
+	/** Digest of the RFC 8785 canonical action arguments. */
+	readonly argumentsDigest: string;
 }
 
 /** Deferred action executor invoked only after a durable JTI reservation exists. */

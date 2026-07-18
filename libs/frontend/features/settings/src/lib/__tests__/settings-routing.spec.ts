@@ -220,7 +220,8 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(harness.fixture.debugElement.query(By.directive(SkillsSectionComponent))).not.toBeNull();
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
 		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/skills");
-		expect(skills.groups()).toHaveLength(4);
+		expect(skills.sections).toHaveLength(3);
+		expect(skills.capabilities()).toHaveLength(11);
 	});
 
 	it("activates the Connectors implementation at its stable route", async function connectorsRoute(): Promise<void>

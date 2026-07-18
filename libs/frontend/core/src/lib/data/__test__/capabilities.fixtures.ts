@@ -1,42 +1,17 @@
-import { CapabilityGroup, CapabilityIcon, CapabilityIntegrationKind } from "../../models/capability.types.js";
+import { CapabilityAccessKind, CapabilityCollection, CapabilityIcon, CapabilityIntegrationKind, CapabilityItem } from "../../models/capability.types.js";
 
-/** Deterministic Workspace Skills groups copied from the authoritative App.dc.html handoff. */
-export const CAPABILITY_GROUPS_FIXTURE: readonly CapabilityGroup[] =
+/** Searchable Skills catalogue copied from the current App.dc.html handoff. */
+export const CAPABILITIES_FIXTURE: readonly CapabilityItem[] =
 [
-	{
-		id: "organisation",
-		scope: "Organisation",
-		items:
-		[
-			{ id: "develop-proposals", name: "Develop proposals", description: "Draft client proposals from briefs, past work, and rate cards.", icon: CapabilityIcon.Plane, mcpList: [], deptList: ["All departments"] },
-			{ id: "develop-department-sops", name: "Develop department SOPs", description: "Turn recurring workflows into documented standard procedures.", icon: CapabilityIcon.Diamond, mcpList: [], deptList: ["All departments"] },
-			{ id: "skill-builder", name: "Skill builder", description: "Create new skills for your agents from examples and instructions.", icon: CapabilityIcon.Pinwheel, mcpList: [], deptList: ["All departments"] }
-		]
-	},
-	{
-		id: "departments",
-		scope: "Departments",
-		items:
-		[
-			{ id: "campaign-planner", name: "Campaign planner", description: "Plan multi-channel campaigns with budget and timeline.", icon: CapabilityIcon.Boat, mcpList: [], deptList: ["Marketing"] },
-			{ id: "seo-audit", name: "SEO audit", description: "Run technical and content audits for client sites.", icon: CapabilityIcon.Fox, mcpList: [{ label: "Ahrefs MCP", kind: CapabilityIntegrationKind.Mcp }], deptList: ["Marketing", "Engineering"] },
-			{ id: "retainer-pricing", name: "Retainer pricing", description: "Build retainer scenarios from utilisation and rate data.", icon: CapabilityIcon.Star, mcpList: [{ label: "Odoo MCP", kind: CapabilityIntegrationKind.Mcp }], deptList: ["Business Development"] }
-		]
-	},
-	{
-		id: "teams",
-		scope: "Teams",
-		items:
-		[
-			{ id: "sprint-reporter", name: "Sprint reporter", description: "Summarise sprint progress and blockers for clients.", icon: CapabilityIcon.Lily, mcpList: [{ label: "Odoo MCP", kind: CapabilityIntegrationKind.Mcp }, { label: "GitHub", kind: CapabilityIntegrationKind.Tool }], deptList: ["Engineering · Frontend"] }
-		]
-	},
-	{
-		id: "personal",
-		scope: "Personal",
-		items:
-		[
-			{ id: "meeting-debriefs", name: "Meeting debriefs", description: "Turn your call notes into action items and follow-up emails.", icon: CapabilityIcon.Plane, mcpList: [], deptList: ["Only you"] }
-		]
-	}
+	{ id: "develop-proposals", collection: CapabilityCollection.Shared, name: "Develop proposals", description: "Draft client proposals from briefs, past work, and rate cards.", icon: CapabilityIcon.Plane, canManage: true, accessList: [{ label: "Org-wide", kind: CapabilityAccessKind.Organization }], integrationList: [] },
+	{ id: "develop-department-sops", collection: CapabilityCollection.Shared, name: "Develop department SOPs", description: "Turn recurring workflows into documented standard procedures.", icon: CapabilityIcon.Diamond, canManage: true, accessList: [{ label: "Org-wide", kind: CapabilityAccessKind.Organization }], integrationList: [] },
+	{ id: "skill-builder", collection: CapabilityCollection.Shared, name: "Skill builder", description: "Create new skills for your agents from examples and instructions.", icon: CapabilityIcon.Pinwheel, canManage: false, accessList: [{ label: "Org-wide", kind: CapabilityAccessKind.Organization }], integrationList: [] },
+	{ id: "campaign-planner", collection: CapabilityCollection.Shared, name: "Campaign planner", description: "Plan multi-channel campaigns with budget and timeline.", icon: CapabilityIcon.Boat, canManage: false, accessList: [{ label: "Marketing", kind: CapabilityAccessKind.Department }], integrationList: [] },
+	{ id: "seo-audit", collection: CapabilityCollection.Shared, name: "SEO audit", description: "Run technical and content audits for client sites.", icon: CapabilityIcon.Fox, canManage: true, accessList: [{ label: "Marketing", kind: CapabilityAccessKind.Department }, { label: "Engineering", kind: CapabilityAccessKind.Department }], integrationList: [{ label: "Ahrefs MCP", kind: CapabilityIntegrationKind.Mcp }] },
+	{ id: "retainer-pricing", collection: CapabilityCollection.Shared, name: "Retainer pricing", description: "Build retainer scenarios from utilisation and rate data.", icon: CapabilityIcon.Star, canManage: false, accessList: [{ label: "Business Development", kind: CapabilityAccessKind.Department }], integrationList: [{ label: "Odoo MCP", kind: CapabilityIntegrationKind.Mcp }] },
+	{ id: "sprint-reporter", collection: CapabilityCollection.Shared, name: "Sprint reporter", description: "Summarise sprint progress and blockers for clients.", icon: CapabilityIcon.Lily, canManage: true, accessList: [{ label: "Frontend", kind: CapabilityAccessKind.Team }, { label: "Customer Portal", kind: CapabilityAccessKind.Project }], integrationList: [{ label: "Odoo MCP", kind: CapabilityIntegrationKind.Mcp }, { label: "GitHub", kind: CapabilityIntegrationKind.Tool }] },
+	{ id: "meeting-debriefs", collection: CapabilityCollection.Personal, name: "Meeting debriefs", description: "Turn your call notes into action items and follow-up emails.", icon: CapabilityIcon.Plane, canManage: true, accessList: [], integrationList: [] },
+	{ id: "competitor-tracker", collection: CapabilityCollection.Available, name: "Competitor tracker", description: "Monitor competitor sites and summarise changes on a weekly cadence.", icon: CapabilityIcon.Fox, canManage: false, accessList: [], integrationList: [] },
+	{ id: "invoice-drafting", collection: CapabilityCollection.Available, name: "Invoice drafting", description: "Generate draft invoices from logged time and agreed rate cards.", icon: CapabilityIcon.Star, canManage: true, accessList: [], integrationList: [] },
+	{ id: "contract-clause-finder", collection: CapabilityCollection.Available, name: "Contract clause finder", description: "Search signed contracts for clauses, renewal dates, and obligations.", icon: CapabilityIcon.Lily, canManage: false, accessList: [], integrationList: [] }
 ];

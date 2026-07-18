@@ -568,7 +568,9 @@ metadata:
   name: opencrane-backup-marker-writer
   namespace: ${NAMESPACE}
 spec:
-  backoffLimit: 3
+  # The in-container SQL readiness loop owns the full bounded retry window.
+  # Do not let Kubernetes multiply that window with replacement Pods.
+  backoffLimit: 0
   template:
     metadata:
       labels:
@@ -581,6 +583,14 @@ spec:
           command: ["/bin/sh", "-ceu"]
           args:
             - |
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for source PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
               psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
                 "CREATE TABLE IF NOT EXISTS backup_restore_smoke (marker text PRIMARY KEY);"
               psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
@@ -643,7 +653,9 @@ metadata:
   name: opencrane-backup-restore-verifier
   namespace: ${NAMESPACE}
 spec:
-  backoffLimit: 3
+  # The in-container SQL readiness loop owns the full bounded retry window.
+  # Do not let Kubernetes multiply that window with replacement Pods.
+  backoffLimit: 0
   template:
     metadata:
       labels:
@@ -656,6 +668,14 @@ spec:
           command: ["/bin/sh", "-ceu"]
           args:
             - |
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for recovered PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
               restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT marker FROM backup_restore_smoke LIMIT 1')"
               test "\$restored_marker" = "${BACKUP_MARKER}"
           env:

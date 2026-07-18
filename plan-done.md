@@ -1346,7 +1346,7 @@ runtime behavior.
 - [x] **Every target workload has a named owner and trust boundary.** ADR 0008 records the capability
   catalog, critical journeys, API/Postgres authorities, and app→KSA→Role→network matrix, including
   explicit owners for skill-authoring, tool-runner, and fresh-provisioning Jobs.
-- [x] **The contracts are independently executable and guarded.** Fifty-six model/contract tests,
+- [x] **The contracts are independently executable and guarded.** Fifty-five model/contract tests,
   TypeScript lint, NX scope/layer/type boundaries, a deliberate rejected cross-capability import,
   style checks, Phase A/B guards, architecture/reaper gates, and severity-first review passed. The
   independent review's duplicate-identifier finding was fixed before completion.

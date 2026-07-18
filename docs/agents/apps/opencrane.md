@@ -31,7 +31,8 @@ Implementation lives with its capability:
 - HTTP domains, identity/OIDC workflows, projection repair, and API specification live under `libs/backend/*/main`.
 - the OpenClaw Tenant controller, renderers, workspace assets, and runtime lifecycle under
   `libs/backend/feat-openclaw-tenant/main` are deleted with the target controller/runtime slice;
-- auth primitives, transport security, channel proxy, and hosting adapters live under `libs/infra/{auth,http,channel-proxy,tenant-hosting}`.
+- auth primitives, transport security, channel proxy, and hosting adapters live under
+  `libs/server/_infra/{auth,http,channel-proxy,tenant-hosting}`.
 
 ## Bootstrap (`src/index.ts`)
 
@@ -59,7 +60,7 @@ CRUD + notable actions:
 
 ## Auth subsystem
 
-- **OIDC** — `libs/backend/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
+- **OIDC** — `libs/backend/server/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
 - **pod connection preflight** — `POST /api/v1/auth/pod-token` is a direct-deletion endpoint; target
   channel/session resolution uses the target authorization and capability contracts.
 - **`___AuthMiddleware` fallback chain** — OIDC and target access tokens survive only through the
@@ -100,18 +101,18 @@ A silo runs in exactly one of two topologies, resolved to a single `DEPLOYMENT_M
 
 `DEPLOYMENT_MODE` wins when set; otherwise the SAME fallback the chart itself uses applies: an empty `FLEET_INTERNAL_URL` derives `standalone`, a non-empty one derives `fleet-managed` — so a deployment that sets neither env var behaves exactly as it did before this switch existed.
 
-**Standalone quickstart** — via the chart (`apps/opencrane-infra`), no fleet checkout needed:
+**Standalone quickstart** — via the chart (`apps/_infra/deploy-k8s`), no fleet checkout needed:
 
 ```bash
-helm dep build apps/opencrane-infra
-helm install my-silo apps/opencrane-infra \
-  -f apps/opencrane-infra/values/standalone.yaml \
+helm dep build apps/_infra/deploy-k8s
+helm install my-silo apps/_infra/deploy-k8s \
+  -f apps/_infra/deploy-k8s/values/standalone.yaml \
   --set ingress.domain=example.com \
   --set clustertenantManager.standaloneSeed.ownerEmail=owner@example.com \
   --set clustertenantManager.database.existingSecret=my-db-secret
 ```
 
-This sets `deploymentMode: standalone` (which fans out `manageTenantNamespaces`/`manageOwnDomain`/`DEPLOYMENT_MODE` coherently), leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults (#151 items 2/3), and self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are NOT installed by this chart — bring your own or run them via `libs/k8s-platform/k8s-deploy.sh` first. A `helm` `fail` guard (and a `values.schema.json` check, one step earlier) rejects a contradictory combination — `deploymentMode: fleet-managed` with an empty `fleetInternalUrl`, or `deploymentMode: standalone` with a non-empty one.
+This sets `deploymentMode: standalone` (which fans out `manageTenantNamespaces`/`manageOwnDomain`/`DEPLOYMENT_MODE` coherently), leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults (#151 items 2/3), and self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are NOT installed by this chart — bring your own or run them via `apps/_infra/deploy-k8s/platform/k8s-deploy.sh` first. A `helm` `fail` guard (and a `values.schema.json` check, one step earlier) rejects a contradictory combination — `deploymentMode: fleet-managed` with an empty `fleetInternalUrl`, or `deploymentMode: standalone` with a non-empty one.
 
 To bootstrap a standalone ClusterTenant by hand instead of via `clustertenantManager.standaloneSeed`, apply a CR directly with `spec.owner.email` set — the seed is a convenience, not the only path:
 

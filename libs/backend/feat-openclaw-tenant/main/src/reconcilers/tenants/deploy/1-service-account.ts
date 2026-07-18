@@ -1,6 +1,6 @@
 import type * as k8s from "@kubernetes/client-node";
 
-import type { HostingAdapter } from "@opencrane/infra/tenant-hosting";
+import type { HostingAdapter } from "@opencrane/server/_infra/tenant-hosting";
 import type { Tenant } from "../models/tenant.types.js";
 import { _BuildTenantLabels } from "./tenant-labels.js";
 

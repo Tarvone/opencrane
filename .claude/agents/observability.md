@@ -101,9 +101,9 @@ Determine scope first: `git diff --stat HEAD` / `git diff HEAD`, or the files/PR
 
 ## Verify after applying (mandatory when you edit)
 - Run `scripts/agent-style-check.sh` — zero ERROR lines before you report done.
-- Typecheck/build the touched package(s): e.g. `pnpm --filter @opencrane/observability build`,
-  `pnpm --filter @opencrane/server exec tsc --noEmit`.
-- Run the relevant tests: `pnpm --filter <pkg> test`. If you added a lib capability
+- Typecheck/build the touched project(s), for example `npx nx run observability:build` and
+  `npx nx run opencrane:lint`.
+- Run the relevant tests with `npx nx run <project>:test`. If you added a lib capability
   (redaction path, helper), add a vitest covering it.
 - If you touched Helm, `helm template` the chart in default-off and `observability.otel.enabled=true`.
 - Report what you ran and the result. Never claim green without running it.

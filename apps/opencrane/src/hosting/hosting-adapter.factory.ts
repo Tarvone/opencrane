@@ -1,5 +1,5 @@
 import type { OpenClawTenantOperatorConfig } from "@opencrane/backend/feat-openclaw-tenant";
-import { GcpBucketClient, GcpHostingAdapter, HostingProvider, OnPremHostingAdapter, type HostingAdapter } from "@opencrane/infra/tenant-hosting";
+import { GcpBucketClient, GcpHostingAdapter, HostingProvider, OnPremHostingAdapter, type HostingAdapter } from "@opencrane/server/_infra/tenant-hosting";
 
 /**
  * Construct the hosting adapter for the configured provider.

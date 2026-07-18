@@ -1,7 +1,7 @@
 import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
-import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "@opencrane/infra/api";
+import { OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL } from "@opencrane/server/_infra/api";
 import type { Tenant } from "../models/tenant.types.js";
 import type { TenantStatus } from "../models/tenant-status.types.js";
 

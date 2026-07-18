@@ -52,7 +52,7 @@ The evidence below is pinned to the exact upstream runtime selected by this repo
 - upstream commit: `e085fa1a3ffd32d0ea6917e1e6fb4ecbffbb77d2`
 - local pins: the [runtime entrypoint](../../apps/feat-openclaw-tenant/deploy/entrypoint.sh),
   [OpenCrane config](../../apps/opencrane/src/app/config.ts), and
-  [infra values](../../apps/opencrane-infra/values.yaml)
+  [infra values](../../apps/_infra/deploy-k8s/values.yaml)
 
 Current OpenClaw `main` may differ. The pinned artifact is evidence for understanding and deleting
 the current implementation only. Target conformance fixtures are authored independently from the
@@ -66,7 +66,7 @@ For the OpenCrane web UI, the concrete path is:
 
 1. [`OpenClawConversationGateway.send()`](../../libs/frontend/state/conversation/adapter/src/lib/openclaw-conversation-gateway.ts)
    sends Gateway v4 `chat.send` with a session key and idempotency key.
-2. The trusted [gateway proxy](../../libs/infra/channel-proxy/src/gateway-proxy/proxy.ts) validates the
+2. The trusted [gateway proxy](../../libs/server/_infra/channel-proxy/src/gateway-proxy/proxy.ts) validates the
    browser origin, delegates identity and tenant resolution to the control plane, strips a forged
    identity header, injects the verified user, and forwards the WebSocket to the user's pod.
 3. OpenClaw's

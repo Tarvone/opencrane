@@ -1350,3 +1350,25 @@ runtime behavior.
   TypeScript lint, NX scope/layer/type boundaries, a deliberate rejected cross-capability import,
   style checks, Phase A/B guards, architecture/reaper gates, and severity-first review passed. The
   independent review's duplicate-identifier finding was fixed before completion.
+
+## Repository cohesion — deployment and backend ownership (complete 2026-07-18)
+
+This follow-up made the repository layout match its ownership model without changing rendered
+workloads or runtime behaviour.
+
+- [x] **Deployment-only owners are visibly separated.** Cognee, Langfuse, LiteLLM, and Obot now
+  live under `apps/_infra`; `apps/_infra/deploy-k8s` owns the installation chart and its database
+  schema deployment component.
+- [x] **Database schema deployment has one owner.** The former `opencrane-migrate` app is gone;
+  OpenCrane owns the Prisma schema and server image, while the install chart owns the pre-install
+  and pre-upgrade Job that runs `prisma migrate deploy`.
+- [x] **Backend code is grouped by responsibility.** Reusable OpenCrane server domains live under
+  `libs/backend/server`; Kubernetes API access, authentication, HTTP, channel proxy, and tenant
+  hosting support live under `libs/server/_infra`.
+- [x] **The move is direct.** Imports, Nx project roots and names, TypeScript aliases, tests,
+  deployment scripts, guards, and reader-facing documentation point only at the new locations;
+  no compatibility exports or duplicate project owners remain.
+- [x] **Behaviour and topology remain guarded.** Nx discovery, targeted typechecks and tests,
+  module-boundary lint, Phase A/B positive and adversarial guards, Helm dependency/lint/render
+  checks, documentation build, residue searches, and independent architecture/reaper reviews cover
+  the new layout.

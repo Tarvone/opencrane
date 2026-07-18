@@ -105,6 +105,11 @@ function validateExactOwner(owner, context)
   }
 }
 
+function isRegisteredAppOwner(owner)
+{
+  return /^apps\/(?:_infra\/[^/]+|[^/_][^/]*)$/.test(owner ?? "");
+}
+
 const workloadRegistry = readJson(workloadRegistryPath);
 const appSourceRegistry = readJson(appSourceRegistryPath);
 
@@ -174,7 +179,7 @@ for (const workload of workloadRegistry.workloads ?? [])
     claimIdentity(renderedPodClasses, workload.renderedPodClass, effectiveOwner, context);
   }
 
-  if (sourceIsRepositoryLocal && /^apps\/[^/]+$/.test(workload.owner ?? ""))
+  if (sourceIsRepositoryLocal && isRegisteredAppOwner(workload.owner))
   {
     const ownerRoot = workspacePath(workload.owner);
     if (!existsSync(ownerRoot) || !lstatSync(ownerRoot).isDirectory())
@@ -191,7 +196,7 @@ for (const workload of workloadRegistry.workloads ?? [])
   }
   else if (sourceIsRepositoryLocal && workload.classification !== "delete")
   {
-    fail(`${context}: repository-defined workload needs one apps/<name> owner or a direct delete classification`);
+    fail(`${context}: repository-defined workload needs one apps/<name> or apps/_infra/<name> owner, or a direct delete classification`);
   }
 
   const sourceIdentity = source.type === "file"
@@ -312,7 +317,7 @@ for (const profile of workloadRegistry.renderProfiles ?? [])
   const args = [
     "template",
     "opencrane",
-    workspacePath("apps/opencrane-infra"),
+    workspacePath("apps/_infra/deploy-k8s"),
     "--namespace",
     "opencrane-system",
   ];
@@ -379,7 +384,7 @@ function renderSilo(args, context)
   {
     return execFileSync(
       "helm",
-      ["template", "opencrane", workspacePath("apps/opencrane-infra"), "--namespace", "opencrane-system", ...args],
+      ["template", "opencrane", workspacePath("apps/_infra/deploy-k8s"), "--namespace", "opencrane-system", ...args],
       { cwd: root, encoding: "utf8" },
     );
   }
@@ -398,7 +403,7 @@ if (defaultManifest.includes(namespaceManagerName))
 }
 
 const standaloneManifest = renderSilo(
-  ["--values", workspacePath("apps/opencrane-infra/values/standalone.yaml")],
+  ["--values", workspacePath("apps/_infra/deploy-k8s/values/standalone.yaml")],
   "standalone namespace-authority contract",
 );
 const namespaceManagerDocuments = standaloneManifest.split(/^---\s*$/m).filter(function isNamespaceManager(document) {
@@ -544,7 +549,7 @@ for (const scanRoot of ["apps", "libs", "scripts"])
       const line = rawLine.trim();
       if (line.startsWith("#") || line.startsWith("//")) continue;
       const dynamicManifestKind = /^(?:kind:)\s*(?:[$][{]|{{)/.test(line);
-      const genericKubernetesCreate = rel === "libs/infra/api/src/k8s-apply.ts" && /\.create\s*\(/.test(line);
+      const genericKubernetesCreate = rel === "libs/server/_infra/api/src/k8s-apply.ts" && /\.create\s*\(/.test(line);
       if (!runtimeWorkloadLinePattern.test(rawLine) && !dynamicManifestKind && !genericKubernetesCreate) continue;
       classifyRuntimeConstruct(rel, line, line);
     }
@@ -726,7 +731,10 @@ for (const entry of appSourceRegistry.allowedFiles ?? [])
   const context = `app source '${entry.path ?? "<missing>"}'`;
   if (!entry.path || allowedSourceFiles.has(entry.path)) fail(`${context}: path is missing or duplicated`);
   allowedSourceFiles.set(entry.path, entry);
-  if (!/^apps\/[^/]+\//.test(entry.path ?? "")) fail(`${context}: path must be below one app root`);
+  if (!/^apps\/(?:_infra\/[^/]+|[^/_][^/]*)\//.test(entry.path ?? ""))
+  {
+    fail(`${context}: path must be below one apps/<name> or apps/_infra/<name> root`);
+  }
   if (typeof entry.owner !== "string" || !entry.path.startsWith(`${entry.owner}/`))
   {
     fail(`${context}: owner does not match path`);

@@ -3,7 +3,7 @@
 OpenCrane's Stage 4 architecture splits platform management into two distinct managers — the cluster-wide **fleet-manager** and the per-ClusterTenant **clustertenant-manager** — so that fleet-level administration (ClusterTenant lifecycle, billing, Zitadel IAM, platform DNS) is cleanly separated from the tenant-facing runtime that lives inside each silo.
 
 > See also:
-> [Silo deployment model](/operators/silo-deployment) — how `apps/fleet-platform/deploy.sh` and `apps/opencrane-infra/deploy.sh` stamp out the fleet and silo releases.
+> [Silo deployment model](/operators/silo-deployment) — how `apps/fleet-platform/deploy.sh` and `apps/_infra/deploy-k8s/deploy.sh` stamp out the fleet and silo releases.
 > [Authentication](/security/identity) — how fleet OIDC and per-silo OIDC differ and how each is configured.
 > [Zitadel key rotation](/security/zitadel-key-rotation) — rotating the fleet-manager's Zitadel service-account key.
 > [Networking & isolation](/operators/networking) — the NetworkPolicy floor each silo enforces.
@@ -150,7 +150,7 @@ Per-org subdomain login is **not active** until the fleet provisions that organi
 
 ### Self-service gate
 
-The ClusterTenant management API, Zitadel-admin routes, and platform-DNS RBAC on the fleet-manager are all gated by `fleetManager.clusterTenantApi.enabled` (the flag `apps/fleet-platform/deploy.sh` sets to `true`; `apps/opencrane-infra/deploy.sh` sets it to `false`):
+The ClusterTenant management API, Zitadel-admin routes, and platform-DNS RBAC on the fleet-manager are all gated by `fleetManager.clusterTenantApi.enabled` (the flag `apps/fleet-platform/deploy.sh` sets to `true`; `apps/_infra/deploy-k8s/deploy.sh` sets it to `false`):
 
 ```yaml
 fleetManager:

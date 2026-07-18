@@ -30,5 +30,5 @@ process/network boundary and avoids linking against any AGPL code:
 # Pin a specific OpenCrane release, then generate a typed client locally.
 curl -fsSL -o openapi/opencrane.json \
   https://github.com/<org>/opencrane/releases/download/<tag>/openapi.json
-pnpm exec openapi-typescript openapi/opencrane.json -o src/api/generated.ts
+npx openapi-typescript openapi/opencrane.json -o src/api/generated.ts
 ```

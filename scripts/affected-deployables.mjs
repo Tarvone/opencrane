@@ -51,7 +51,7 @@ for (const project of affected)
 const deployables = _deployables.filter(function _affected(entry) { return affected.has(entry.project); });
 const changedFiles = _run("git", ["diff", "--name-only", base, head]).split("\n").filter(Boolean);
 const platformChanged = changedFiles.some(function _platform(file) {
-  return file.startsWith("apps/opencrane-infra/") || file.startsWith("libs/k8s-platform/");
+  return file.startsWith("apps/_infra/");
 });
 const apiContractChanged = affected.has("opencrane") || affected.has("contracts");
 const e2eRequired = platformChanged || affected.has("opencrane") || affected.has("feat-skill-registry");

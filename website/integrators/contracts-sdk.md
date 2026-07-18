@@ -31,7 +31,7 @@ code:
 # Pin a specific OpenCrane release, then generate a typed client locally.
 curl -fsSL -o openapi/opencrane.json \
   https://github.com/italanta/opencrane/releases/download/<tag>/openapi.json
-pnpm exec openapi-typescript openapi/opencrane.json -o src/api/generated.ts
+npx openapi-typescript openapi/opencrane.json -o src/api/generated.ts
 ```
 
 ## The spec is the source of truth

@@ -209,10 +209,10 @@ a logical module in the OpenCrane API.
 | `apps/artifact-service` | Stage/scan/hash/stream canonical bytes, content-addressed versions, workspace leases, retention | Owns its PVC and enforces artifact capabilities; no policy store | Create; absorbs skill delivery bytes |
 | `apps/memory-gateway` | Authorize and execute online recall/capture against Cognee | Memory PEP; no business-policy store | Create as a distinct online trust and scaling boundary |
 | `apps/cognee-indexer` | Consume the artifact outbox and project canonical content into Cognee | Derived index writer; no user-facing ingress | Create as a distinct asynchronous lifecycle |
-| `apps/cognee` | Pinned upstream deployment, PVC, SA, probes, backup, and upgrade tests | Derived memory/index data only | Promote embedded Helm templates to an app-owned unit |
+| `apps/_infra/cognee` | Pinned upstream deployment, PVC, SA, probes, backup, and upgrade tests | Derived memory/index data only | Promote embedded Helm templates to an app-owned unit |
 | `apps/postgres` | Own the target CNPG Cluster resource, storage profile, backup, and readiness contract | Product database deployment owner; CNPG operator remains BYO | Create; replaces script-owned database provisioning |
-| `apps/obot` | Pinned upstream gateway/controller, credential custody, tool execution, constrained runtime namespace | MCP PEP; privileged controller isolated from callers | Promote embedded Helm templates and narrow RBAC |
-| `apps/opencrane-infra` | Per-silo umbrella composition and a small deployment profile | No feature ownership | Keep, but consume app-owned deploy units |
+| `apps/_infra/obot` | Pinned upstream gateway/controller, credential custody, tool execution, constrained runtime namespace | MCP PEP; privileged controller isolated from callers | Promote embedded Helm templates and narrow RBAC |
+| `apps/_infra/deploy-k8s` | Per-silo umbrella composition and a small deployment profile | No feature ownership | Keep, but consume app-owned deploy units |
 | LiteLLM | Model routing, provider keys, aliases, budgets, capability matrix | Model/provider PEP | Keep pinned and per silo |
 
 Logical modules that should **not** become separate applications initially:
@@ -579,7 +579,7 @@ enforcement credential, not a replacement for the OpenCrane relationship model.
 
 The memory gateway and Cognee indexer shown in the topology are OpenCrane-owned adapter deployments
 with distinct app roots because online authorization and asynchronous indexing have different
-identity, availability, scaling, and failure contracts. `apps/cognee` owns only the pinned upstream
+identity, availability, scaling, and failure contracts. `apps/_infra/cognee` owns only the pinned upstream
 Cognee deployment.
 
 ## Scheduling and workflows
@@ -722,7 +722,7 @@ capability with operational recovery and UI.
 ### Keep and strengthen
 
 - per-ClusterTenant silo boundary and ClusterTenant CRD at the fleet contract;
-- `apps/opencrane`, `apps/opencrane-ui`, and `apps/opencrane-infra` composition role;
+- `apps/opencrane`, `apps/opencrane-ui`, and `apps/_infra/deploy-k8s` composition role;
 - `ConversationGateway` and generic conversation/rendering models;
 - OIDC proxy behavior, rate limiting, tenant target resolution, and runtime-neutral routing;
 - LiteLLM model/provider/budget boundary;

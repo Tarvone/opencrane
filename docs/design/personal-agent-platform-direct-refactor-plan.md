@@ -97,9 +97,10 @@ before each slice finishes.
 
 ## Application ownership
 
-Every workload that becomes a Pod or Job has exactly one `apps/*` owner. Apps are lightweight
-deployment rollups; reusable behavior belongs in functional `libs/*` packages. Runtime instances are
-workloads of their app, not newly invented deployables.
+Every workload that becomes a Pod or Job has exactly one `apps/<name>` owner or deployment-only
+`apps/_infra/<name>` owner. Apps are lightweight deployment rollups; reusable behaviour belongs in
+functional `libs/*` packages. Runtime instances are workloads of their app, not newly invented
+deployables.
 
 | Workload class | Owning app |
 |---|---|
@@ -107,7 +108,7 @@ workloads of their app, not newly invented deployables.
 | Channel trust boundary | `apps/channel-proxy` |
 | Kubernetes mutation boundary | `apps/agent-controller` |
 | Artifact bytes and CAS API | `apps/artifact-service` |
-| Cognee, LiteLLM, Obot | `apps/cognee`, `apps/litellm`, `apps/obot` |
+| Cognee, LiteLLM, Obot | `apps/_infra/cognee`, `apps/_infra/litellm`, `apps/_infra/obot` |
 | Memory gateway and Cognee indexer | `apps/memory-gateway`, `apps/cognee-indexer` |
 | Personal agent pods | `apps/agent-runtime` |
 | OpenCrane Postgres cluster | `apps/postgres` over a BYO CNPG operator |

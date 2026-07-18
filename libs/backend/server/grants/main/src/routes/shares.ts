@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { GrantAccess, GrantPayloadType, GrantScope, GrantSubjectType, type PrismaClient } from "@prisma/client";
+import { GrantAccess, GrantScope, GrantSubjectType, type GrantPayloadType, type PrismaClient } from "@prisma/client";
 
 import { compile } from "../core/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../core/grant-compiler.types.js";
@@ -22,7 +22,7 @@ const _COMPILER_PAYLOAD_BY_API: Record<SharePayloadType, GrantCompilerPayloadTyp
 
 /** Map the API payload-type string to the Prisma enum written on the Grant row. */
 const _PRISMA_PAYLOAD_BY_API: Record<SharePayloadType, GrantPayloadType> = {
-  "mcp-server": GrantPayloadType.McpServer,
+  "mcp-server": "McpServer" as GrantPayloadType,
 };
 
 /** Map the API scope string to the Prisma GrantScope enum. */

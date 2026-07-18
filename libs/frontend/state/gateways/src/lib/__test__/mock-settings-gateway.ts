@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 
-import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
-import { DATASET_ACCESS, EGRESS_DOMAINS, SKILLS } from "@opencrane/core/testing";
+import { DatasetAccess, EgressDomain } from "@opencrane/core";
+import { DATASET_ACCESS, EGRESS_DOMAINS } from "@opencrane/core/testing";
 import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "@opencrane/state/settings/adapter";
 
 const _FIXTURE: AccountProfile = { name: "alex.oc", fullName: "Alex Kim", email: "alex.kim@acme-corp.com", department: "Product" };
@@ -31,7 +31,6 @@ export class MockSettingsGateway implements SettingsGateway
 	public getBudgetSpend(_t: string): Promise<BudgetSpend> { return Promise.resolve({ monthlyLimitUsd: 100, currentSpendUsd: 82.4, alertState: "warning" }); }
 	public getAwarenessContract(_t: string): Promise<AwarenessContractInfo> { return Promise.resolve({ contractId: "contract-acme-corp", contractVersion: "v2.3.1" }); }
 	public getDatasetAccess(_t: string): Promise<DatasetAccess[]> { return Promise.resolve(DATASET_ACCESS.map((r): DatasetAccess => ({ ...r }))); }
-	public getSkills(): Promise<SkillRow[]> { return Promise.resolve(SKILLS.map((r): SkillRow => ({ ...r }))); }
 	public getEgressDomains(): Promise<EgressDomain[]> { return Promise.resolve(EGRESS_DOMAINS.map((r): EgressDomain => ({ ...r }))); }
 
 	private _seeded(tenantName: string): AccountProfile

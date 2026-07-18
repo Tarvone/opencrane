@@ -9,8 +9,7 @@ import {
 	_MapBudgetSpend,
 	_MapDatasetAccess,
 	_MapEgressDomains,
-	_MapPodIdentity,
-	_MapSkills
+	_MapPodIdentity
 } from "../settings-mapper.util";
 
 describe("_MapAccountProfile", () =>
@@ -156,29 +155,6 @@ describe("_MapDatasetAccess", () =>
 
 		expect(rows).toHaveLength(1);
 		expect(rows[0].scope).toBe(ScopeLevel.Dept);
-	});
-});
-
-describe("_MapSkills", () =>
-{
-	it("maps catalogue rows and normalises publication status", () =>
-	{
-		const rows = _MapSkills([
-			{ name: "document-writer", scope: "org", version: "1.4.2", digest: "sha256:a3f9", status: "published" },
-			{ name: "data-summariser", scope: "personal", version: "local", digest: "—", status: "draft" }
-		]);
-
-		expect(rows).toEqual([
-			{ name: "document-writer", scope: ScopeLevel.Org, version: "1.4.2", digest: "sha256:a3f9", status: "active" },
-			{ name: "data-summariser", scope: ScopeLevel.Personal, version: "local", digest: "—", status: "pending-promotion" }
-		]);
-	});
-
-	it("defaults missing strings and passes through an unrecognised status", () =>
-	{
-		const [row] = _MapSkills([{ status: "deprecated" }]);
-
-		expect(row).toEqual({ name: "—", scope: ScopeLevel.Personal, version: "—", digest: "—", status: "deprecated" });
 	});
 });
 

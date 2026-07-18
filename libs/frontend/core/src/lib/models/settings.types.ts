@@ -9,8 +9,6 @@ export enum SettingsSection
 	Model = "model",
 	/** Awareness contract settings. */
 	Awareness = "awareness",
-	/** Skills management. */
-	Skills = "skills",
 	/** Harvest channel connectors. */
 	Channels = "channels",
 	/** Access & dataset memberships. */

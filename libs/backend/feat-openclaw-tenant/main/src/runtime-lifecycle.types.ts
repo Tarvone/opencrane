@@ -2,7 +2,7 @@ import type * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 import type { Logger } from "pino";
 
-import type { HostingAdapter } from "@opencrane/infra/tenant-hosting";
+import type { HostingAdapter } from "@opencrane/server/_infra/tenant-hosting";
 import type { OpenClawTenantOperatorConfig } from "./operator-config.types.js";
 
 /** Dependencies injected by the OpenCrane process composition root. */

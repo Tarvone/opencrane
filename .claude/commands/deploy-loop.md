@@ -10,7 +10,7 @@ knowledge.** Each phase spends the cheapest resource that can do the job.
 
 Target from the caller: **$ARGUMENTS** (env defaults to `dev`, profile to `fleet` —
 `apps/fleet-platform/deploy.sh`; `clustertenant` means
-`apps/opencrane-infra/deploy.sh`).
+`apps/_infra/deploy-k8s/deploy.sh`).
 
 ## Phase 0 — preflight (main session, no subagents)
 
@@ -25,7 +25,7 @@ Target from the caller: **$ARGUMENTS** (env defaults to `dev`, profile to `fleet
 ## Phase 1 — deploy run (the `deploy` agent)
 
 Spawn ONE `deploy` agent with: env, profile, extra flags, the relevant ledger
-lessons, and the values preset to use (`libs/k8s-platform/values/opencrane-dev.yaml`
+lessons, and the values preset to use (`apps/_infra/deploy-k8s/platform/values/opencrane-dev.yaml`
 for dev unless the caller said otherwise). It deploys via the scripts, verifies
 liveness, and returns the structured run report (RUN/OUTCOME/TIMELINE/FINDINGS/
 FRICTION/LEDGER).
@@ -97,6 +97,6 @@ already answers.
 3. Final report to the user: outcome, findings table (class → destination link),
    simplification counters that moved, docs coverage delta, and open design questions.
 
-Recurring use: run `/deploy-loop` after merges that touch `apps/*/deploy.sh`,
-`libs/k8s-platform/`, or either chart — or on a cadence via `/loop`. The ledger makes
+Recurring use: run `/deploy-loop` after merges that touch an app-owned `deploy.sh`,
+`apps/_infra/deploy-k8s/platform/`, or either chart — or on a cadence via `/loop`. The ledger makes
 each run start smarter than the last; keep it terse so that stays cheap.

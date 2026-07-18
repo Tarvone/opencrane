@@ -7,8 +7,10 @@ not team ownership or implementation history.
 
 ## Deployables live in `apps/`
 
-Every independently deployed workload in the OpenCrane release has one root under `apps/<name>` and
-is registered as an NX project. A workload counts as independently deployed when it produces or owns
+Every independently deployed workload in the OpenCrane release has one registered NX project.
+OpenCrane product entrypoints live under `apps/<name>`; deployment-only upstream products and the
+Kubernetes release composer live under the reserved `apps/_infra/<name>` group. A workload counts
+as independently deployed when it produces or owns
 one or more cluster Pods, Deployments, StatefulSets, DaemonSets, CronJobs, or Jobs. This includes
 deployment-only wrappers for upstream products such as Cognee, Obot, or LiteLLM: the app root may
 contain no product source, but it still owns the pinned dependency, configuration, identity, state,
@@ -29,10 +31,12 @@ and make the app compose them. Keep an app-local implementation only when it is 
 that process boundary and has no useful independent contract.
 
 Charts may aggregate deployables, but aggregation does not erase app ownership: every rendered
-workload must map back to its own `apps/<name>` root. An umbrella such as `apps/opencrane-infra`
-composes app-owned deployment units and release values; it does not become the anonymous owner of
-their Pods. A distinct image or process role always gets a distinct app root. A Job using the exact
-same image, entrypoint, trust boundary, and lifecycle as an existing app may remain owned by it.
+workload must map back to its own `apps/<name>` or `apps/_infra/<name>` root. An umbrella such as
+`apps/_infra/deploy-k8s` composes app-owned deployment units and release values; it does not become
+the anonymous owner of their Pods. A deploy-only component explicitly registered to the composer,
+such as its database-schema hook, remains visible as that app's owned component. A distinct image or
+process role otherwise gets a distinct app root. A Job using the exact same image, entrypoint, trust
+boundary, and lifecycle as an existing app may remain owned by it.
 
 Browser applications also live in `apps/` even though they do not create cluster Pods, because
 they are independently built/shipped entrypoints.
@@ -40,7 +44,7 @@ they are independently built/shipped entrypoints.
 ## Reuse before creation
 
 Before creating an app, library, route, event/topic, chart template, or adapter, search the live NX
-graph and public entrypoints in `apps/`, `libs/`, `libs/k8s-platform/`, `prisma/`, and generated or
+graph and public entrypoints in `apps/`, `libs/`, `apps/_infra/deploy-k8s/platform/`, `prisma/`, and generated or
 runtime contracts. Inspect existing charts, Services, NetworkPolicies, CRDs, and OpenAPI/contracts.
 Record the search terms, candidate paths, and one decision: **reuse**, **extend**, or **new**. Prefer
 the existing owner when a small coherent extension preserves one authority for the capability.
@@ -60,11 +64,11 @@ add a new one only when its dependency policy is meaningfully different.
 | `libs/utils/` or `libs/util/` | Small dependency-light helpers with no domain authority | Models/other dependency-light shared code only |
 | `libs/backend/` | Server-side domain capabilities, use cases, ports, and adapters | Models, utils, infra abstractions, and explicit backend peers allowed by tags |
 | `libs/frontend/` | UI elements, features, state, and gateways | Models/contracts, utils, and frontend peers; never backend implementations |
-| `libs/infra/` | Reusable external-I/O and platform adapters | Models/contracts and utils; no app imports |
+| `libs/server/_infra/` | Runtime, transport, auth, and external-I/O adapters owned by the OpenCrane server | Infra/runtime peers, models/contracts, and utils; no backend-domain or app imports |
 
 Within the functional root, group by bounded capability and then by technical role only when needed,
 for example `libs/backend/agents/main`, `libs/frontend/features/agents`, or
-`libs/infra/artifacts/filesystem`. Do not create a broad `shared`, `common`, or `core` dumping ground.
+`libs/server/_infra/http`. Do not create a broad `shared`, `common`, or `core` dumping ground.
 Promote code to a wider library only when at least two consumers need the same contract or the code
 is independently coherent and testable.
 

@@ -46,9 +46,11 @@ Before building the dependency DAG:
 1. Delegate the target to the `architecture` agent. For every proposed cluster workload require the
    inventory `workload/kind -> image/entrypoint -> apps/<root> -> NX project -> deployment wiring ->
    libs -> KSA/RBAC -> network boundary -> state/PVC`.
-   Any pod-bearing workload in the OpenCrane release without an `apps/<name>` root is a blocker.
+   Any pod-bearing workload in the OpenCrane release without an `apps/<name>` or deployment-only
+   `apps/_infra/<name>` root is a blocker.
 2. Place reusable logic under a functional-first library root (`libs/models`, `libs/util`,
-   `libs/backend`, `libs/frontend`, `libs/infra`) and then its bounded capability. Apps contain only
+   `libs/backend`, `libs/frontend`) and then its bounded capability. Server-only runtime adapters
+   belong under `libs/server/_infra`. Apps contain only
    entrypoint/composition/configuration/build/deployment wiring. Models remain dependency-light and
    cannot import databases, HTTP, Kubernetes, filesystems, frameworks, or apps.
 3. Require reuse discovery before adding a new app, library, route, event/topic, chart template, or

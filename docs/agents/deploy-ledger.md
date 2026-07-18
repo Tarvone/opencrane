@@ -33,7 +33,7 @@ Friction items seen across runs; bump the count, and when it hits 2, file the fi
 
 - Dependencies resolve from `Chart.lock` via `helm dep build` — never `dep update`
   during a deploy (reproducibility; see PR #97).
-- Values presets live in `libs/k8s-platform/values/` (`opencrane-dev.yaml` is the dev
+- Values presets live in `apps/_infra/deploy-k8s/platform/values/` (`opencrane-dev.yaml` is the dev
   cluster). New env knobs belong in a preset, not in one-off `--set` flags.
 - Known dev-cluster history (see auto-memory / plan.md): migrate-on-deploy
   initContainer, tenant-pod `trustNothing` config crash, `trustedProxies: []`

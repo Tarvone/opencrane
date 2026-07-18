@@ -70,7 +70,7 @@ The fleet runs its own Prisma/PostgreSQL registry (`infra/db/`) — distinct fro
 DB. It holds the fleet-owned models: `ClusterTenant`, org membership, and billing accounts. There is no
 `AccessToken` model here, so the fleet API authenticates by OIDC session or the env-var token only.
 
-## Watch Runner (`@opencrane/infra-api` `_RunWatchLoop`)
+## Watch Runner (`@opencrane/server/_infra/api` `_RunWatchLoop`)
 
 Generic loop with reconnect backoff. The K8s API closes watch streams every ~5–10 min; reconnect is
 normal. Per-event handler errors are caught and logged, never crashing the loop.

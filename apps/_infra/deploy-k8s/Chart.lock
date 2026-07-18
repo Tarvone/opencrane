@@ -1,0 +1,27 @@
+dependencies:
+- name: k8s-platform
+  repository: file://platform
+  version: 0.1.0
+- name: opencrane-server
+  repository: file://../../opencrane/helm
+  version: 0.1.0
+- name: opencrane-ui
+  repository: file://../../opencrane-ui/helm
+  version: 0.1.0
+- name: opencrane-database-schema
+  repository: file://components/database-schema
+  version: 0.1.0
+- name: opencrane-cognee
+  repository: file://../cognee/helm
+  version: 0.1.0
+- name: opencrane-litellm
+  repository: file://../litellm/helm
+  version: 0.1.0
+- name: opencrane-obot
+  repository: file://../obot/helm
+  version: 0.1.0
+- name: langfuse
+  repository: https://langfuse.github.io/langfuse-k8s
+  version: 1.5.37
+digest: sha256:be92807496662a572513b512132c9f95db6047e46e4ef3565e22cab90c85927f
+generated: "2026-07-18T14:11:17.087748+03:00"

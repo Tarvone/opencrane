@@ -37,7 +37,7 @@ access, if approved, is short-lived, IAM-backed, and audited.
 
 **Two facts that catch agents out:**
 
-- **`___AuthMiddleware` does NOT enforce per-route roles today** (`libs/infra/auth/src/auth-middleware.ts`). It's a fallback chain: public paths → OIDC cookie → env token → DB access token → dev bypass. Role/capability claims are a *planned* target — do not assume RBAC at the route layer.
+- **`___AuthMiddleware` does NOT enforce per-route roles today** (`libs/server/_infra/auth/src/auth-middleware.ts`). It's a fallback chain: public paths → OIDC cookie → env token → DB access token → dev bypass. Role/capability claims are a *planned* target — do not assume RBAC at the route layer.
 - **State is dual-written: CRD is source of truth, Postgres is a projection.** Every Tenant/AccessPolicy mutation hits both. Drift between them is expected and has explicit tooling (`GET /tenants/drift`, `POST /tenants/repair`, projection-drift metrics). Don't "fix" a divergence by writing only one side.
 
 Existing OpenClaw identity, projection, and dual-write paths are implementation residue, not input

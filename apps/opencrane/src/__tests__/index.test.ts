@@ -4,8 +4,8 @@ import type { Express } from "express";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
 
-import { ___AuthMiddleware } from "@opencrane/infra/auth";
-import { _CheckDbHealth, _RateLimit } from "@opencrane/infra/http";
+import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
+import { _CheckDbHealth, _RateLimit } from "@opencrane/server/_infra/http";
 
 /**
  * Build a minimal Express app with a mocked database health handler.

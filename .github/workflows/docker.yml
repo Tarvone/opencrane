@@ -118,8 +118,8 @@ jobs:
 
       - name: Enforce Phase A runtime contracts
         run: |
-          ./libs/k8s-platform/tests/tenant-entrypoint-contract-policy.sh
-          ./libs/k8s-platform/tests/tenant-image-immutability.sh
+          ./apps/_infra/deploy-k8s/platform/tests/tenant-entrypoint-contract-policy.sh
+          ./apps/_infra/deploy-k8s/platform/tests/tenant-image-immutability.sh
 
       - name: Restore the Nx computation cache
         uses: actions/cache@v4
@@ -165,7 +165,7 @@ jobs:
           version: v4.1.4
 
       - name: Run k3d e2e smoke test
-        run: ./libs/k8s-platform/tests/k3d-e2e.sh
+        run: ./apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
         env:
           KEEP_CLUSTER: "0"
           TIMEOUT_SECONDS: "300"

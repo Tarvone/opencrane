@@ -1,9 +1,9 @@
-import type { AccessPolicy } from "@opencrane/backend/policies";
+import type { AccessPolicy } from "@opencrane/backend/server/policies";
 import type { OpenClawTenantOperatorConfig } from "../operator-config.types.js";
 import type { Tenant } from "../reconcilers/tenants/models/tenant.types.js";
 import { TenantStatusPhase } from "../reconcilers/tenants/models/tenant-status.types.js";
-import type { ClusterTenantResource } from "@opencrane/infra/api";
-import { GcpHostingAdapter, HostingProvider, OnPremHostingAdapter, type GcsBucketOperations } from "@opencrane/infra/tenant-hosting";
+import type { ClusterTenantResource } from "@opencrane/server/_infra/api";
+import { GcpHostingAdapter, HostingProvider, OnPremHostingAdapter, type GcsBucketOperations } from "@opencrane/server/_infra/tenant-hosting";
 
 /**
  * Shared operator config fixture — on-prem baseline (no cloud fields required).

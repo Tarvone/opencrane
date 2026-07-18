@@ -90,7 +90,16 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("agents", "Agents", "Agent and messaging-surface configuration will be delivered in milestone 4."),
+	{
+		path: "agents",
+		loadComponent: function loadAgentsSection()
+		{
+			return import("./sections/agents-section/agents-section.component.js").then(function pickAgentsSection(module)
+			{
+				return module.AgentsSectionComponent;
+			});
+		}
+	},
 	{
 		path: "data-network",
 		loadComponent: function loadDataNetworkSection()

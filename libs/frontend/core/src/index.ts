@@ -8,6 +8,7 @@ export * from "./lib/models/settings-form.types.js";
 export * from "./lib/models/capability.types.js";
 export * from "./lib/models/connector.types.js";
 export * from "./lib/models/data-network.types.js";
+export * from "./lib/models/agent-settings.types.js";
 export * from "./lib/models/llm-provider.types.js";
 export * from "./lib/models/mcp.types.js";
 export * from "./lib/models/plan.types.js";

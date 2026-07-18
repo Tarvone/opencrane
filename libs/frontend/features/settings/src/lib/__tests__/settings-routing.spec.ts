@@ -28,13 +28,14 @@ import { LlmProvidersSectionComponent } from "../sections/llm-providers-section/
 import { _CanDeactivateMembersSection } from "../sections/members-section/members-section.guard.js";
 import { BudgetsSectionComponent } from "../sections/budgets-section/budgets-section.component.js";
 import { _CanDeactivateBudgetsSection } from "../sections/budgets-section/budgets-section.guard.js";
+import { AgentsSectionComponent } from "../sections/agents-section/agents-section.component.js";
 
 /** Resolve an external settings component template or stylesheet. */
 function _componentResource(resourceUrl: string): string
 {
 	const file = resourceUrl.replace(/^\.\//, "");
 	const componentFolder = file.split(".component")[0];
-	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("llm-providers-section") ? "sections/llm-providers-section" : file.startsWith("members-section") ? "sections/members-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
+	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("agents-section") ? "sections/agents-section" : file.startsWith("budgets-section") ? "sections/budgets-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("llm-providers-section") ? "sections/llm-providers-section" : file.startsWith("members-section") ? "sections/members-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
 	return readFileSync(resolve(process.cwd(), "src/lib", folder, file), "utf8");
 }
 
@@ -50,22 +51,15 @@ function _scopeChildren(scope: SettingsScope): Route[]
 	return _shellChildren().find(function findScope(route): boolean { return route.path === scope; })?.children ?? [];
 }
 
-/** Reject a test-only nested route transition to verify cancelled scope navigation. */
-function _denyNavigation(): boolean
-{
-	return false;
-}
-
 /** Replace lazy production leaves with the placeholder while preserving the real redirect tree. */
 function _testableRoutes(routes: Routes): Routes
 {
 	return routes.map(function testableRoute(route): Route
 	{
-	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." }, canDeactivate: [_denyNavigation] }] };
 	if (route.path === "members" || route.path === "budgets") return route;
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
-	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network" || route.path === "provider-keys") return route;
+	if (route.path === "skills" || route.path === "connectors" || route.path === "agents" || route.path === "data-network" || route.path === "provider-keys") return route;
 	if (route.path === "budget") return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, data: { title: "My Budget", description: "Personal budget controls." }, canDeactivate: undefined };
 	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, canDeactivate: undefined };
 	});
@@ -275,16 +269,16 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(providers.routeCategories()).toHaveLength(6);
 	});
 
-	it("keeps the owning navigation item active on a nested section route", async function nestedSectionRoute(): Promise<void>
+	it("activates Agents at its stable route", async function agentsRoute(): Promise<void>
 	{
-		const harness = await RouterTestingHarness.create("/settings/workspace/agents/edit");
-		const router = TestBed.inject(Router);
-		const activeLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
-		const nestedPlaceholder = harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent)).componentInstance as SettingsPlaceholderComponent;
+		const harness = await RouterTestingHarness.create("/settings/workspace/agents");
+		const agents = harness.fixture.debugElement.query(By.directive(AgentsSectionComponent)).componentInstance as AgentsSectionComponent;
 
-		expect(router.url).toBe("/settings/workspace/agents/edit");
-		expect(activeLink?.getAttribute("href")).toBe("/settings/workspace/agents");
-		expect(nestedPlaceholder.title).toBe("Edit agent");
+		expect(harness.fixture.debugElement.query(By.directive(AgentsSectionComponent))).not.toBeNull();
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/agents");
+		expect(agents.agents()).toHaveLength(2);
+		expect(agents.channels()).toHaveLength(2);
 	});
 
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>
@@ -431,16 +425,19 @@ describe("settings route contract", function settingsRoutesSuite(): void
 
 	it("keeps route and focus when a section guard cancels scope navigation", async function cancelledScopeSelection(): Promise<void>
 	{
-		const harness = await RouterTestingHarness.create("/settings/workspace/agents/edit");
+		const harness = await RouterTestingHarness.create("/settings/workspace/members/edit/team/fe?tab=org");
 		const router = TestBed.inject(Router);
+		const members = harness.fixture.debugElement.query(By.directive(MembersSectionComponent)).componentInstance as MembersSectionComponent;
 		const personalButton = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__scope-link")).at(1) as HTMLButtonElement | undefined;
 
 		if (!personalButton) throw new Error("Personal scope control was not rendered");
+		members.editName({ target: { value: "Unsaved Frontend team" } } as unknown as Event);
+		vi.spyOn(window, "confirm").mockReturnValue(false);
 		personalButton.focus();
 		personalButton.click();
 		await harness.fixture.whenStable();
 
-		expect(router.url).toBe("/settings/workspace/agents/edit");
+		expect(router.url).toBe("/settings/workspace/members/edit/team/fe?tab=org");
 		expect(document.activeElement).toBe(personalButton);
 	});
 

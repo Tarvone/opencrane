@@ -84,21 +84,21 @@ else if (action === "duplicate-owner")
 else if (action === "missing-owner")
 {
   const workload = registry.workloads.find(function find(candidate) {
-    return candidate.id === "cnpg-database";
+    return candidate.id === "postgres-database";
   });
   workload.owner = null;
 }
 else if (action === "invalid-classification")
 {
   const workload = registry.workloads.find(function find(candidate) {
-    return candidate.id === "skill-registry";
+    return candidate.id === "postgres-database";
   });
   workload.classification = "unknown";
 }
 else if (action === "missing-classification-reason")
 {
   const workload = registry.workloads.find(function find(candidate) {
-    return candidate.id === "cnpg-database";
+    return candidate.id === "postgres-database";
   });
   workload.reason = "";
 }

@@ -125,21 +125,6 @@ export interface CogneeDataset
 	sources: string[];
 }
 
-/** A skill row in the skills table. */
-export interface SkillRow
-{
-	/** Skill name. */
-	name: string;
-	/** Scope level. */
-	scope: ScopeLevel;
-	/** Version string. */
-	version: string;
-	/** OCI digest (or "—" for local). */
-	digest: string;
-	/** Status ("active" | "pending-promotion"). */
-	status: string;
-}
-
 /** A harvest channel connector row. */
 export interface HarvestChannel
 {

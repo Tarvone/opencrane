@@ -105,7 +105,9 @@ paths, broad secret broadcasts, obsolete topology switches, and unowned deployab
 slices. CI rejects reintroduction. [#117](https://github.com/italanta/opencrane/issues/117) supplies
 the enforcing-CNI work; [#221](https://github.com/italanta/opencrane/issues/221) generalizes the
 identity matrix; [#128](https://github.com/italanta/opencrane/issues/128) becomes the target Obot
-adapter and fresh user-authorized integration flow.
+adapter and fresh user-authorized integration flow — seeded by porting PR #241's reviewed Obot
+custody/credential/discovery slices from `main` per
+[#255](https://github.com/italanta/opencrane/issues/255).
 
 Exit: a fresh environment is created from reviewed target artifacts alone; IAM and network negative
 tests fail closed; backup/restore reconstructs target-owned stores; no legacy contract is reachable.
@@ -183,6 +185,7 @@ to create, share, schedule, observe, revoke, and delete agents and assets.
 | [#226](https://github.com/italanta/opencrane/issues/226) | Build membership management over authoritative target APIs |
 | [#227](https://github.com/italanta/opencrane/issues/227) | Delete packages and images when their replacement slice lands |
 | [#231](https://github.com/italanta/opencrane/issues/231) | Introduce final target names directly; do not preserve legacy DNS or aliases |
+| [#255](https://github.com/italanta/opencrane/issues/255) | Close pre-pivot PRs #247 (superseded by ADR 0007 and this plan) and #241; port #241's Obot custody/credential/discovery slices at Phase D |
 
 ## Deferred research
 

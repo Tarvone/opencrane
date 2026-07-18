@@ -284,20 +284,6 @@ k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME
 k3d image import "$MINIO_IMAGE" --cluster "$CLUSTER_NAME"
 k3d image import "$MINIO_CLIENT_IMAGE" --cluster "$CLUSTER_NAME"
 
-# 4c. DIAGNOSTIC (temporary): the db-migrate initContainer reported "No migration found
-#     in prisma/migrations" despite 32 committed migrations. Print what the built image
-#     actually contains so we can tell an image/COPY problem from a prisma schema-folder
-#     migrations-resolution problem. Remove once the migrate path is fixed.
-echo "[e2e] DIAGNOSTIC: prisma migrations/schema inside opencrane-server:e2e image"
-docker run --rm --entrypoint sh opencrane/opencrane-server:e2e -c '
-  echo "[img] cwd package root = apps/opencrane"
-  echo "[img] prisma/migrations dirs:"; ls apps/opencrane/prisma/migrations 2>&1 | head
-  echo "[img] migration.sql count:"; find apps/opencrane/prisma/migrations -name migration.sql 2>/dev/null | wc -l
-  echo "[img] migration_lock.toml:"; ls -l apps/opencrane/prisma/migrations/migration_lock.toml 2>&1
-  echo "[img] prisma/schema files:"; ls apps/opencrane/prisma/schema 2>&1 | head -3
-  echo "[img] any migrations INSIDE prisma/schema?:"; ls apps/opencrane/prisma/schema/migrations 2>&1 | head
-' || echo "[e2e] (diagnostic docker run failed — non-fatal)"
-
 # 5. Install the pinned external CNPG test substrate. The Barman plugin must run in
 # the same namespace as the CNPG operator and requires cert-manager for its mTLS
 # certificates. These are test-only prerequisites; production keeps all three as BYO
@@ -546,6 +532,46 @@ function _copy_cnpg_uri_secret()
     | kubectl apply -f -
 }
 
+function _migrate_opencrane_database()
+{
+  # A physical recovery must restore a bootable *fresh* application database, not
+  # merely arbitrary PostgreSQL tables. Run the immutable application's normal
+  # Prisma deploy before writing the backup marker so `_prisma_migrations` and the
+  # target schema travel with the base backup. This is first-install bootstrap,
+  # not compatibility or legacy-data migration.
+  echo "[e2e] Initializing the fresh OpenCrane schema before physical backup"
+  cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opencrane-backup-schema-migrate
+  namespace: ${NAMESPACE}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: opencrane-server-migrate
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: db-migrate
+          image: opencrane/opencrane-server:e2e
+          imagePullPolicy: IfNotPresent
+          command: ["node", "dist/apps/opencrane/scripts/migrate.js"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ${OPENCRANE_DB_RELEASE_NAME}-app
+                  key: uri
+EOF
+  kubectl wait --for=condition=Complete job/opencrane-backup-schema-migrate \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+}
+
 function _run_backup_restore_smoke()
 {
   echo "[e2e] Enabling the pinned Barman plugin on '$OPENCRANE_DB_RELEASE_NAME'"
@@ -698,6 +724,7 @@ _install_database "$OBOT_DB_RELEASE_NAME" obot "$OBOT_POSTGRES_CREDENTIALS_SECRE
 _install_database "$LITELLM_DB_RELEASE_NAME" litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" \
   '[{"matchLabels":{"app.kubernetes.io/component":"litellm"}}]'
 
+_migrate_opencrane_database
 _run_backup_restore_smoke
 
 function _assert_distinct_cnpg_app_credentials()

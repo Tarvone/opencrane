@@ -24,6 +24,9 @@ export class ConnectorsSectionComponent
 	/** Whether the route-owned marketplace sub-page is active. */
 	public readonly marketplaceOpen = signal(false);
 
+	/** Current case-insensitive main-page search draft. */
+	public readonly searchDraft = signal("");
+
 	/** Marketplace category preserved while the sub-page remains active. */
 	public readonly selectedCategory = signal<"All" | ConnectorCategory>("All");
 
@@ -54,11 +57,17 @@ export class ConnectorsSectionComponent
 	/** Mutation kinds exposed to pending labels in the external template. */
 	public readonly ConnectorMutationKind = ConnectorMutationKind;
 
-	/** Installed connectors rendered by the primary route view. */
-	public readonly installedConnectors: Signal<readonly Connector[]> = computed((): readonly Connector[] => this.connectors().filter(function installed(connector): boolean
+	/** Connected connectors matching the current main-page search. */
+	public readonly installedConnectors: Signal<readonly Connector[]> = computed((): readonly Connector[] => this._matchingConnectors(true));
+
+	/** Available connectors matching the current main-page search. */
+	public readonly availableConnectors: Signal<readonly Connector[]> = computed((): readonly Connector[] => this._matchingConnectors(false));
+
+	/** Capture the handoff search input. */
+	public updateSearch(event: Event): void
 	{
-		return connector.installed;
-	}));
+		this.searchDraft.set((event.target as HTMLInputElement).value);
+	}
 
 	/** Marketplace connectors filtered by the selected category. */
 	public readonly marketplaceConnectors: Signal<readonly Connector[]> = computed((): readonly Connector[] =>
@@ -234,5 +243,15 @@ export class ConnectorsSectionComponent
 			case ConnectorMutationKind.Install: return `${connector.name} installed and enabled.`;
 			case ConnectorMutationKind.Uninstall: return `${connector.name} uninstalled.`;
 		}
+	}
+
+	/** Filter one installation collection by connector name or category. */
+	private _matchingConnectors(installed: boolean): readonly Connector[]
+	{
+		const query = this.searchDraft().trim().toLowerCase();
+		return this.connectors().filter(function matching(connector): boolean
+		{
+			return connector.installed === installed && (query === "" || connector.name.toLowerCase().includes(query) || connector.category.toLowerCase().includes(query));
+		});
 	}
 }

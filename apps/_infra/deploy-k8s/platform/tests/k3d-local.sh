@@ -204,6 +204,8 @@ function _install_database()
     --set "networkPolicy.operatorNamespace=$NAMESPACE" \
     --set-json "networkPolicy.clientPodSelectors=$client_selectors_json"
   kubectl wait --for=condition=Ready "cluster/$release_name" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
+    "$NAMESPACE" "$credentials_secret" "${release_name}-app" "${release_name}-rw" "$database_name"
 }
 
 function _copy_cnpg_uri_secret()

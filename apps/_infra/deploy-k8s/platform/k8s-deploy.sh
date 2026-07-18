@@ -134,6 +134,11 @@ if [[ ! -f "$POSTGRES_CHART_DIR/Chart.yaml" ]]; then
   echo "[k8s-deploy] PostgreSQL chart not found at '$POSTGRES_CHART_DIR'." >&2
   exit 1
 fi
+POSTGRES_CONNECTION_PUBLISHER="$SCRIPT_DIR/../../../postgres/scripts/publish-app-connection-secret.sh"
+if [[ ! -f "$POSTGRES_CONNECTION_PUBLISHER" ]]; then
+  echo "[k8s-deploy] PostgreSQL connection Secret publisher is missing at '$POSTGRES_CONNECTION_PUBLISHER'." >&2
+  exit 1
+fi
 
 NAMESPACE="opencrane-system"
 RELEASE="opencrane"
@@ -616,10 +621,8 @@ _install_postgres_target() {
   log "Installing PostgreSQL target '$database_name' as release '$target_release'…"
   helm "${postgres_args[@]}"
   kubectl wait --for=condition=Ready "cluster/${target_release}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
-  if ! kubectl get secret "${target_release}-app" -n "$NAMESPACE" >/dev/null 2>&1; then
-    err "CloudNativePG reported Ready but did not publish application Secret '${target_release}-app'."
-    exit 1
-  fi
+  bash "$POSTGRES_CONNECTION_PUBLISHER" \
+    "$NAMESPACE" "$credentials_secret" "${target_release}-app" "${target_release}-rw" "$database_name"
 }
 
 _copy_cnpg_uri_secret() {

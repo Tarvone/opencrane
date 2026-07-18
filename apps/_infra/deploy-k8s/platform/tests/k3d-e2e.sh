@@ -529,6 +529,8 @@ function _install_database()
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set-json "networkPolicy.clientPodSelectors=$client_selectors_json"
   kubectl wait --for=condition=Ready "cluster/$release_name" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
+    "$NAMESPACE" "$credentials_secret" "${release_name}-app" "${release_name}-rw" "$database_name"
 }
 
 function _copy_cnpg_uri_secret()
@@ -630,6 +632,8 @@ EOF
   kubectl wait --for=condition=Ready "cluster/$RESTORE_DB_RELEASE_NAME" \
     -n "$NAMESPACE" \
     --timeout="${TIMEOUT_SECONDS}s"
+  bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
+    "$NAMESPACE" "$POSTGRES_CREDENTIALS_SECRET" "${RESTORE_DB_RELEASE_NAME}-app" "${RESTORE_DB_RELEASE_NAME}-rw" opencrane
 
   echo "[e2e] Verifying the restored marker through the recovered application Secret"
   cat <<EOF | kubectl apply -f -

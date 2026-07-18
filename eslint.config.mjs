@@ -50,6 +50,9 @@ export default [
               sourceTag: "scope:shared",
               onlyDependOnLibsWithTags: [
                 "scope:shared",
+                "scope:agents",
+                "scope:artifacts",
+                "scope:authorization",
                 "scope:auth",
                 "scope:channel-proxy",
                 "scope:http",
@@ -77,6 +80,9 @@ export default [
             },
             { sourceTag: "scope:web", onlyDependOnLibsWithTags: ["scope:web", "scope:shared"] },
             { sourceTag: "scope:app", onlyDependOnLibsWithTags: ["*"] },
+            { sourceTag: "scope:agents", onlyDependOnLibsWithTags: ["scope:agents", "scope:shared"] },
+            { sourceTag: "scope:artifacts", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:shared"] },
+            { sourceTag: "scope:authorization", onlyDependOnLibsWithTags: ["scope:authorization", "scope:shared"] },
             { sourceTag: "type:app", notDependOnLibsWithTags: ["type:app"] },
             { sourceTag: "type:lib", notDependOnLibsWithTags: ["type:app"] },
             {

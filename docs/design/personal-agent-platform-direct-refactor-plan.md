@@ -112,7 +112,7 @@ workloads of their app, not newly invented deployables.
 | Personal agent pods | `apps/agent-runtime` |
 | OpenCrane Postgres cluster | `apps/postgres` over a BYO CNPG operator |
 | First-party and user-created managed-agent pods | `apps/managed-agent-runtime`; individual agents are AgentService records, not app roots |
-| Authoring/tool/provisioning Jobs | One explicit app per Job class |
+| Skill authoring, sandboxed tool, and fresh provisioning Jobs | `apps/skill-authoring`, `apps/tool-runner`, and `apps/silo-provisioner` respectively |
 
 Ingress, DNS, certificate, CNI, and CNPG controllers are cluster prerequisites, not product-release
 workloads. Existing installer-script ownership and its transient database-auth Pod are deleted as

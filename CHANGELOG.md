@@ -15,6 +15,27 @@ follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 
 ### Added
 
+- **Platform developers can now build the personal-agent data model, APIs, and policies from one
+  canonical target contract.** Pure packages define personal and managed AgentServices, immutable
+  revisions and runs, ordered transcripts and events, content-addressed artifacts and skills, and
+  proof-bound runtime assignments; the public contracts barrel exposes the same types without a
+  second domain authority.
+
+- **Authorization implementations can now evaluate grants and signed fleet membership with
+  deterministic fail-closed rules.** Project is independent of department and team, deny wins at
+  equal priority, and membership trust is bounded by verified issuer evidence, silo and subject,
+  monotonic revision, maximum staleness, and hard expiry.
+
+- **Personal-agent onboarding now has an executable persona contract before UI and runtime work
+  begins.** Versioned interviews select reviewed `SOUL.md` templates, produce three to five explicit
+  provenance-linked insights, and block the first session until the user previews and approves the
+  compiled PersonaRevision; runtime cannot mutate durable persona content.
+
+- **Storage and update implementations now share enforceable product invariants.** Canonical data is
+  retained until authorized deletion on mounted, backed-up, online-expandable storage; runtime
+  workspaces are mounted non-authoritative scratch; and future application updates must return ready
+  target Pods in strictly less than five minutes while remounting existing canonical volumes.
+
 - **Platform developers can now work on one functional domain in isolation, with module boundaries
   enforced by lint.** Each of 20 functional domains (tenants, policies, grants, skills, model-routing,
   providers, awareness, spend, groups, MCP, sessions, company-docs, audit, access-tokens, metrics,

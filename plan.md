@@ -61,38 +61,11 @@ the phase that replaces their responsibility.
 Every deployable or Job class must have one `apps/*` owner; reusable behavior belongs in functional
 `libs/*` packages with enforced dependency direction.
 
-### Phase C — target contracts and app ownership
+### Phase C — target contracts and app ownership — ✅ COMPLETE (see `plan-done.md`)
 
-Finalize only the decisions required to write code: capability catalog, grant deny/priority rules,
-project scope as a dimension separate from department/team, signed membership revisions and
-freshness, onboarding interview and `SOUL.md` persona generation, indefinite retention on expandable
-mounted storage, target schemas, runtime protocol, artifact contract, and app→KSA→network identity
-matrix. Record the architecture
-ADRs with [#245](https://github.com/italanta/opencrane/issues/245).
-
-The runtime app is **`apps/agent-runtime`**. There is no separate target skill-registry app:
-the skill catalog is an OpenCrane API module and skill bytes live behind the artifact service.
-Every pod or Job class has exactly one owning app:
-
-| Pod or Job class | Owning app |
-|---|---|
-| Control API, UI, channel proxy, agent controller, artifact service | `apps/opencrane`, `apps/opencrane-ui`, `apps/channel-proxy`, `apps/agent-controller`, `apps/artifact-service` |
-| Cognee, LiteLLM, Obot | `apps/cognee`, `apps/litellm`, `apps/obot` ([#249](https://github.com/italanta/opencrane/issues/249)) |
-| Memory gateway and Cognee indexer | `apps/memory-gateway`, `apps/cognee-indexer` |
-| Personal agent pods | `apps/agent-runtime` |
-| OpenCrane Postgres cluster | `apps/postgres` over a BYO CNPG operator |
-| First-party and tenant-created managed agents | `apps/managed-agent-runtime`; individual agents are AgentService records, not app roots |
-| Skill authoring, sandboxed tool, and fresh provisioning Jobs | `apps/skill-authoring`, `apps/tool-runner`, and `apps/silo-provisioner` respectively |
-
-Ingress, DNS, certificate, CNI, and CNPG controllers are cluster prerequisites, not workloads
-installed by the OpenCrane product release. The current script-installed controllers and transient
-database-auth Pod are deletion targets.
-
-The binding target-contract and app→KSA→role→network decisions are recorded in
+Canonical agent, transcript, authorization, membership, persona, artifact, storage, update, and
+workload-identity contracts now define the Phase D implementation boundary. The binding decision is
 [ADR 0008](docs/adr/0008-target-agent-contracts-and-workload-identity.md).
-
-Exit: the contracts are specific enough to generate schemas, APIs, policies, and independent tests;
-no production-transition approval or estate analysis is required.
 
 ### Phase D — foundations, identity, and fresh provisioning
 

@@ -43,61 +43,61 @@ export function ___IsSha256ContentAddress(value: unknown): value is string
 export function ___IsArtifactContentReference(value: unknown): value is ArtifactContentReference
 {
 	return _isRecord(value)
-		&& ___IsSha256ContentAddress(value.contentAddress)
-		&& Number.isSafeInteger(value.byteLength)
-		&& typeof value.byteLength === "number"
-		&& value.byteLength >= 0
-		&& _isNonBlank(value.mediaType)
-		&& value.mediaType.includes("/");
+		&& ___IsSha256ContentAddress(value["contentAddress"])
+		&& Number.isSafeInteger(value["byteLength"])
+		&& typeof value["byteLength"] === "number"
+		&& value["byteLength"] >= 0
+		&& _isNonBlank(value["mediaType"])
+		&& value["mediaType"].includes("/");
 }
 
 /** Determine whether a logical artifact satisfies the target model invariants. */
 export function ___IsArtifact(value: unknown): value is Artifact
 {
 	return _isRecord(value)
-		&& _isNonBlank(value.id)
-		&& _isNonBlank(value.ownerPrincipalId)
-		&& _isArtifactKind(value.kind)
-		&& (value.currentRevision === null || (___IsArtifactRevisionReference(value.currentRevision) && value.currentRevision.artifactId === value.id))
-		&& _isCanonicalTimestamp(value.createdAt);
+		&& _isNonBlank(value["id"])
+		&& _isNonBlank(value["ownerPrincipalId"])
+		&& _isArtifactKind(value["kind"])
+		&& (value["currentRevision"] === null || (___IsArtifactRevisionReference(value["currentRevision"]) && value["currentRevision"].artifactId === value["id"]))
+		&& _isCanonicalTimestamp(value["createdAt"]);
 }
 
 /** Determine whether a storage-neutral artifact revision reference pins immutable content. */
 export function ___IsArtifactRevisionReference(value: unknown): value is ArtifactRevisionReference
 {
 	return _isRecord(value)
-		&& _isNonBlank(value.artifactId)
-		&& _isNonBlank(value.revisionId)
-		&& ___IsSha256ContentAddress(value.contentAddress);
+		&& _isNonBlank(value["artifactId"])
+		&& _isNonBlank(value["revisionId"])
+		&& ___IsSha256ContentAddress(value["contentAddress"]);
 }
 
 /** Determine whether an immutable artifact revision is content-addressed and well formed. */
 export function ___IsArtifactRevision(value: unknown): value is ArtifactRevision
 {
-	if (!_isRecord(value) || !Array.isArray(value.parentRevisionIds))
+	if (!_isRecord(value) || !Array.isArray(value["parentRevisionIds"]))
 	{
 		return false;
 	}
 
-	const uniqueParents = new Set(value.parentRevisionIds);
-	return _isNonBlank(value.id)
-		&& _isNonBlank(value.artifactId)
-		&& ___IsArtifactContentReference(value.content)
-		&& value.parentRevisionIds.every(_isNonBlank)
-		&& uniqueParents.size === value.parentRevisionIds.length
-		&& !uniqueParents.has(value.id)
-		&& _isCanonicalTimestamp(value.createdAt);
+	const uniqueParents = new Set(value["parentRevisionIds"]);
+	return _isNonBlank(value["id"])
+		&& _isNonBlank(value["artifactId"])
+		&& ___IsArtifactContentReference(value["content"])
+		&& value["parentRevisionIds"].every(_isNonBlank)
+		&& uniqueParents.size === value["parentRevisionIds"].length
+		&& !uniqueParents.has(value["id"])
+		&& _isCanonicalTimestamp(value["createdAt"]);
 }
 
 /** Determine whether an immutable skill revision pins one content-addressed bundle revision. */
 export function ___IsSkillRevision(value: unknown): value is SkillRevision
 {
 	return _isRecord(value)
-		&& _isRecord(value.bundle)
-		&& _isNonBlank(value.id)
-		&& _isNonBlank(value.skillId)
-		&& ___IsArtifactRevisionReference(value.bundle)
-		&& _isCanonicalTimestamp(value.createdAt);
+		&& _isRecord(value["bundle"])
+		&& _isNonBlank(value["id"])
+		&& _isNonBlank(value["skillId"])
+		&& ___IsArtifactRevisionReference(value["bundle"])
+		&& _isCanonicalTimestamp(value["createdAt"]);
 }
 
 /** Determine whether a skill bundle reference matches the canonical artifact revision exactly. */

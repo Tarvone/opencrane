@@ -43,28 +43,28 @@ function _isRecord(value: unknown): value is Record<string, unknown>
 export function ___IsDurableStatePolicy(value: unknown): value is DurableStatePolicy
 {
 	return _isRecord(value)
-		&& value.retention === "until-authorized-deletion"
-		&& value.storage === "persistent"
-		&& value.expansion === "online"
-		&& value.alertBeforeExhaustion === true
-		&& value.expandBeforeExhaustion === true
-		&& value.backup === "required";
+		&& value["retention"] === "until-authorized-deletion"
+		&& value["storage"] === "persistent"
+		&& value["expansion"] === "online"
+		&& value["alertBeforeExhaustion"] === true
+		&& value["expandBeforeExhaustion"] === true
+		&& value["backup"] === "required";
 }
 
 /** Determine whether a scratch-workspace policy contains every required clearing event exactly once. */
 export function ___IsRuntimeFilesystemPolicy(value: unknown): value is RuntimeFilesystemPolicy
 {
-	if (!_isRecord(value) || !Array.isArray(value.clearWorkspaceOn))
+	if (!_isRecord(value) || !Array.isArray(value["clearWorkspaceOn"]))
 	{
 		return false;
 	}
 
-	const clearEvents = new Set(value.clearWorkspaceOn);
-	return value.rootAuthority === "non-authoritative"
-		&& value.rootAccess === "read-only-when-supported"
-		&& value.workspaceAuthority === "non-authoritative-scratch"
-		&& value.workspaceLifetime === "lease-scoped"
-		&& value.workspaceBackup === "never"
+	const clearEvents = new Set(value["clearWorkspaceOn"]);
+	return value["rootAuthority"] === "non-authoritative"
+		&& value["rootAccess"] === "read-only-when-supported"
+		&& value["workspaceAuthority"] === "non-authoritative-scratch"
+		&& value["workspaceLifetime"] === "lease-scoped"
+		&& value["workspaceBackup"] === "never"
 		&& clearEvents.size === ___RUNTIME_WORKSPACE_CLEAR_EVENTS.length
 		&& ___RUNTIME_WORKSPACE_CLEAR_EVENTS.every(function _hasRequiredEvent(event)
 		{
@@ -76,20 +76,20 @@ export function ___IsRuntimeFilesystemPolicy(value: unknown): value is RuntimeFi
 export function ___IsSiloUpdatePolicy(value: unknown): value is SiloUpdatePolicy
 {
 	return _isRecord(value)
-		&& value.maximumDurationExclusiveMs === ___MAXIMUM_SILO_UPDATE_DURATION_MS
-		&& value.volumeHandling === "remount-existing"
-		&& value.stateHandling === "resume-canonical"
-		&& value.predecessorRuntime === "forbidden"
-		&& value.predecessorDataTransformation === "forbidden";
+		&& value["maximumDurationExclusiveMs"] === ___MAXIMUM_SILO_UPDATE_DURATION_MS
+		&& value["volumeHandling"] === "remount-existing"
+		&& value["stateHandling"] === "resume-canonical"
+		&& value["predecessorRuntime"] === "forbidden"
+		&& value["predecessorDataTransformation"] === "forbidden";
 }
 
 /** Determine whether a complete platform policy satisfies every adopted target invariant. */
 export function ___IsPlatformPolicy(value: unknown): value is PlatformPolicy
 {
 	return _isRecord(value)
-		&& ___IsDurableStatePolicy(value.durableState)
-		&& ___IsRuntimeFilesystemPolicy(value.runtimeFilesystem)
-		&& ___IsSiloUpdatePolicy(value.siloUpdate);
+		&& ___IsDurableStatePolicy(value["durableState"])
+		&& ___IsRuntimeFilesystemPolicy(value["runtimeFilesystem"])
+		&& ___IsSiloUpdatePolicy(value["siloUpdate"]);
 }
 
 /** Determine whether one silo update finishes strictly within the five-minute product bound. */

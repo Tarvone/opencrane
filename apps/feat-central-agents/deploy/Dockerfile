@@ -23,10 +23,10 @@ COPY apps/feat-central-agents/package.json apps/feat-central-agents/
 # Install only the app workspace's runtime dependencies
 RUN npm ci --omit=dev --workspace=apps/feat-central-agents
 
-COPY --from=build /app/apps/feat-central-agents/dist apps/feat-central-agents/dist
+COPY --from=build /app/dist/apps/feat-central-agents dist/apps/feat-central-agents
 
 USER node
 
 EXPOSE 9090
 
-CMD ["node", "apps/feat-central-agents/dist/index.js"]
+CMD ["node", "dist/apps/feat-central-agents/index.js"]

@@ -5,10 +5,10 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "build": "rm -rf dist && prisma generate && esbuild src/index.ts src/scripts/migrate.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outdir=dist && cp -r ../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/workspace dist/workspace && tsx scripts/emit-openapi.mts",
+    "build": "rm -rf ../../dist/apps/opencrane && prisma generate && esbuild src/index.ts src/scripts/migrate.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outdir=../../dist/apps/opencrane && cp -r ../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/workspace ../../dist/apps/opencrane/workspace && tsx scripts/emit-openapi.mts",
     "emit-openapi": "tsx scripts/emit-openapi.mts",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node ../../dist/apps/opencrane/index.js",
     "test": "vitest run",
     "lint": "tsc --noEmit",
     "db:migrate": "prisma migrate deploy",
@@ -64,8 +64,7 @@
       },
       "build": {
         "outputs": [
-          "{projectRoot}/dist",
-          "{workspaceRoot}/dist/apps/opencrane/openapi.json"
+          "{workspaceRoot}/dist/apps/opencrane"
         ]
       },
       "emit-openapi": {

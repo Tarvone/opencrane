@@ -23,10 +23,10 @@ COPY apps/feat-skill-registry/package.json apps/feat-skill-registry/
 # Install only the app workspace's runtime dependencies
 RUN npm ci --omit=dev --workspace=apps/feat-skill-registry
 
-COPY --from=build /app/apps/feat-skill-registry/dist apps/feat-skill-registry/dist
+COPY --from=build /app/dist/apps/feat-skill-registry dist/apps/feat-skill-registry
 
 USER node
 
 EXPOSE 5000
 
-CMD ["node", "apps/feat-skill-registry/dist/index.js"]
+CMD ["node", "dist/apps/feat-skill-registry/index.js"]

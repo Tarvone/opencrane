@@ -82,6 +82,18 @@
       "@opencrane/contracts": [
         "./libs/contracts/src/index.ts"
       ],
+      "@opencrane/models/agents": [
+        "./libs/models/agents/main/src/index.ts"
+      ],
+      "@opencrane/models/artifacts": [
+        "./libs/models/artifacts/main/src/index.ts"
+      ],
+      "@opencrane/models/authorization": [
+        "./libs/models/authorization/main/src/index.ts"
+      ],
+      "@opencrane/models/platform-policy": [
+        "./libs/models/platform-policy/main/src/index.ts"
+      ],
       "@opencrane/observability": [
         "./libs/observability/src/index.ts"
       ],

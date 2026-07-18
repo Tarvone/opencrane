@@ -82,11 +82,14 @@ Every pod or Job class has exactly one owning app:
 | Personal agent pods | `apps/agent-runtime` |
 | OpenCrane Postgres cluster | `apps/postgres` over a BYO CNPG operator |
 | First-party and tenant-created managed agents | `apps/managed-agent-runtime`; individual agents are AgentService records, not app roots |
-| Authoring/tool/provisioning Jobs | One named owning app per Job class, enumerated in the identity matrix |
+| Skill authoring, sandboxed tool, and fresh provisioning Jobs | `apps/skill-authoring`, `apps/tool-runner`, and `apps/silo-provisioner` respectively |
 
 Ingress, DNS, certificate, CNI, and CNPG controllers are cluster prerequisites, not workloads
 installed by the OpenCrane product release. The current script-installed controllers and transient
 database-auth Pod are deletion targets.
+
+The binding target-contract and app→KSA→role→network decisions are recorded in
+[ADR 0008](docs/adr/0008-target-agent-contracts-and-workload-identity.md).
 
 Exit: the contracts are specific enough to generate schemas, APIs, policies, and independent tests;
 no production-transition approval or estate analysis is required.

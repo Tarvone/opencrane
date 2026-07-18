@@ -4,6 +4,8 @@
   "projectType": "library",
   "sourceRoot": "libs/contracts/src",
   "tags": [
+    "type:lib",
+    "layer:contract",
     "scope:shared"
   ],
   "targets": {

@@ -39,7 +39,7 @@ spec:
         - name: db-migrate
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
           imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
-          command: ["node", "apps/opencrane/dist/scripts/migrate.js"]
+          command: ["node", "dist/apps/opencrane/scripts/migrate.js"]
           env:
             {{- include "opencrane.clustertenantManagerDatabaseEnv" . | nindent 12 }}
 {{- end }}

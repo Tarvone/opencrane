@@ -208,7 +208,7 @@
       "localOwner": true,
       "source": { "type": "file", "path": "apps/opencrane-migrate/helm/templates/_job.tpl", "anchor": "kind: Job", "coversLocalTemplate": true },
       "composition": { "path": "apps/opencrane-infra/templates/app-rollups.yaml", "anchor": "include \"opencrane.migrate.job\"" },
-      "sharedImageContract": "Runs apps/opencrane/dist/scripts/migrate.js from the immutable server image; apps/opencrane remains the only Prisma schema and migration owner."
+      "sharedImageContract": "Runs dist/apps/opencrane/scripts/migrate.js from the immutable server image; apps/opencrane remains the only Prisma schema and migration owner."
     },
     {
       "id": "opencrane-ui",

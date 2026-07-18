@@ -21,7 +21,7 @@
 
 How the operator actually shapes the cluster (verified June 2026):
 
-- **Three CRDs** in `apps/opencrane-infra/templates/crds/`: `Tenant`, `ClusterTenant`
+- **Three CRDs** in `apps/_infra/deploy-k8s/templates/crds/`: `Tenant`, `ClusterTenant`
   (cluster-scoped), and `AccessPolicy`. CRDs use `spec`/`status` subresources — spec is
   user/opencrane-api-owned and status is operator-owned (patched via `*StatusWriter` /
   `patchNamespacedCustomObjectStatus`). MCP servers, skills, and schedules are API/Postgres domains,
@@ -80,7 +80,7 @@ When a route is intentionally excluded from `___AuthMiddleware` and relies on Ku
  *
  * @see apps/opencrane/helm/templates/_networkpolicy.tpl — policy restricting
  *   which pods can reach the opencrane-api service.
- * @see apps/opencrane-infra/templates/feat-skill-registry-deployment.yaml — current caller
+ * @see apps/_infra/deploy-k8s/templates/feat-skill-registry-deployment.yaml — current caller
  *   that sets the control-plane internal URL.
  */
 export function _RegisterInternalWidgets(prisma: PrismaClient): Router { ... }
@@ -90,14 +90,14 @@ export function _RegisterInternalWidgets(prisma: PrismaClient): Router { ... }
 > [OpenCrane-Specific Direction](./architecture.md#opencrane-specific-direction).
 
 The plane-to-plane boundary is split by owner: `apps/opencrane/helm/templates/_networkpolicy.tpl`
-protects the server's public and internal listeners; `apps/obot/helm/templates/_networkpolicy.tpl`
+protects the server's public and internal listeners; `apps/_infra/obot/helm/templates/_networkpolicy.tpl`
 protects the MCP gateway; the current skill-registry and Zot rules remain in
-`apps/opencrane-infra/templates/networkpolicy-planes.yaml`. Because `/api/internal/*` has no auth
+`apps/_infra/deploy-k8s/templates/networkpolicy-planes.yaml`. Because `/api/internal/*` has no auth
 middleware, the server NetworkPolicy is the **only** boundary protecting it — path-based filtering
 is impossible, so never widen these selectors casually.
 
 ## Workload Identity & Projected Tokens
 
-- **Cloud identity (GKE):** the current tenant operator stamps the KSA annotation `iam.gke.io/gcp-service-account: openclaw-{tenant}@{project}.iam.gserviceaccount.com`; the reusable hosting adapter lives under `libs/infra/tenant-hosting/src/adapters/gcp/`. The GSA↔KSA IAM binding is set up outside the operator (Terraform). On-prem the annotation is empty and storage provisioning is a no-op. The replacement runtime must use its target identity model directly rather than preserve this OpenClaw-shaped identity.
+- **Cloud identity (GKE):** the current tenant operator stamps the KSA annotation `iam.gke.io/gcp-service-account: openclaw-{tenant}@{project}.iam.gserviceaccount.com`; the reusable hosting adapter lives under `libs/server/_infra/tenant-hosting/src/adapters/gcp/`. The GSA↔KSA IAM binding is set up outside the operator (Terraform). On-prem the annotation is empty and storage provisioning is a no-op. The replacement runtime must use its target identity model directly rather than preserve this OpenClaw-shaped identity.
 - **In-cluster identity:** UserTenant (OpenClaw) pods mount up to three audience-bound projected SA tokens read-only under `/var/run/opencrane/tokens/` — `obot-gateway.token`, `feat-skill-registry.token`, `opencrane-server.token`. TTL is `projectedTokenTtlSeconds` (env-driven); kubelet rotates them with no pod restart. These are real and actively consumed, not aspirational.
 - **`WATCH_NAMESPACE` fail-closed:** with `multiInstance.requireWatchNamespace=true` the operator refuses to start if `WATCH_NAMESPACE` is unset — prevents one instance from reconciling another's UserTenants. Empty means watch-all (legacy single-install only).

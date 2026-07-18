@@ -2,24 +2,24 @@ import type { Express } from "express";
 import * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 
-import { accessTokensRouter } from "@opencrane/backend/access-tokens";
-import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backend/spend";
-import { auditRouter } from "@opencrane/backend/audit";
-import { groupsRouter } from "@opencrane/backend/groups";
-import { _RegisterInternalBundles, skillCatalogRouter, skillModelPostureRouter, OciBundleStore } from "@opencrane/backend/skills";
-import { _RegisterInternalTenantContract } from "@opencrane/backend/contract";
-import { _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingRecommendationsRouter, modelRoutingMetricsRouter, routingEvalCasesRouter, routingMeasurementsRouter, routingProposalsRouter, _BuildShadowSeams } from "@opencrane/backend/model-routing";
-import { _RegisterInternalParticipation, awarenessRolloutRouter, awarenessParticipationRouter } from "@opencrane/backend/awareness";
-import { mcpOperatorRouter, mcpServersRouter } from "@opencrane/backend/mcp";
-import { metricsRouter, prometheusMetricsRouter } from "@opencrane/backend/metrics";
-import { policiesRouter } from "@opencrane/backend/policies";
-import { providerKeysRouter, providerCredentialsRouter, providerByokRouter, modelRegistryRouter } from "@opencrane/backend/providers";
-import { resourceSharesRouter, sharesRouter } from "@opencrane/backend/grants";
-import { tenantsRouter } from "@opencrane/backend/tenants";
-import { thirdPartySourcesRouter } from "@opencrane/backend/retrieval";
-import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/company-docs";
-import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/infra/http";
-import { spec } from "@opencrane/backend/api-spec";
+import { accessTokensRouter } from "@opencrane/backend/server/access-tokens";
+import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backend/server/spend";
+import { auditRouter } from "@opencrane/backend/server/audit";
+import { groupsRouter } from "@opencrane/backend/server/groups";
+import { _RegisterInternalBundles, skillCatalogRouter, skillModelPostureRouter, OciBundleStore } from "@opencrane/backend/server/skills";
+import { _RegisterInternalTenantContract } from "@opencrane/backend/server/contract";
+import { _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingRecommendationsRouter, modelRoutingMetricsRouter, routingEvalCasesRouter, routingMeasurementsRouter, routingProposalsRouter, _BuildShadowSeams } from "@opencrane/backend/server/model-routing";
+import { _RegisterInternalParticipation, awarenessRolloutRouter, awarenessParticipationRouter } from "@opencrane/backend/server/awareness";
+import { mcpOperatorRouter, mcpServersRouter } from "@opencrane/backend/server/mcp";
+import { metricsRouter, prometheusMetricsRouter } from "@opencrane/backend/server/metrics";
+import { policiesRouter } from "@opencrane/backend/server/policies";
+import { providerKeysRouter, providerCredentialsRouter, providerByokRouter, modelRegistryRouter } from "@opencrane/backend/server/providers";
+import { resourceSharesRouter, sharesRouter } from "@opencrane/backend/server/grants";
+import { tenantsRouter } from "@opencrane/backend/server/tenants";
+import { thirdPartySourcesRouter } from "@opencrane/backend/server/retrieval";
+import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/company-docs";
+import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
+import { spec } from "@opencrane/backend/server/api-spec";
 
 /**
  * Build the optional OCI (Zot) skill-bundle store from the environment.

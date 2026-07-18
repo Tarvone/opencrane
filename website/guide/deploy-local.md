@@ -14,7 +14,7 @@ installs the full stack:
 k3d cluster create opencrane --agents 1 --port "8080:80@loadbalancer"
 
 # 2. Bootstrap the full local stack
-libs/k8s-platform/tests/k3d-local.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-local.sh
 ```
 
 That's enough to create assistants through the UI or management API. Tear it down anytime;
@@ -35,7 +35,7 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 apps/fleet-platform/deploy.sh --base-domain <your-domain>
 
 # 3. Install a silo release for your organisation
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
   --base-domain <your-domain> \
   --cluster-tenant <org-name>
 ```
@@ -48,7 +48,7 @@ For a server running exactly one organisation you can use the single-tenant
 orchestrator, which runs the fleet pass then the silo pass for you:
 
 ```bash
-libs/k8s-platform/deploy-single-tenant.sh \
+apps/_infra/deploy-k8s/platform/deploy-single-tenant.sh \
   --base-domain <your-domain> \
   --org-name <org> --org-owner-email owner@example.com
 ```

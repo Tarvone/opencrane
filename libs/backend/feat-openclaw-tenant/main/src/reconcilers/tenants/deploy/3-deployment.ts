@@ -1,9 +1,9 @@
 import type * as k8s from "@kubernetes/client-node";
 
-import type { TenantStateVolume } from "@opencrane/infra/tenant-hosting";
+import type { TenantStateVolume } from "@opencrane/server/_infra/tenant-hosting";
 import type { OpenClawTenantOperatorConfig } from "../../../operator-config.types.js";
 import type { Tenant } from "../models/tenant.types.js";
-import type { ClusterTenantComputeView } from "@opencrane/infra/api";
+import type { ClusterTenantComputeView } from "@opencrane/server/_infra/api";
 import { _BuildTenantLabels } from "./tenant-labels.js";
 import { _BuildClusterTenantScheduling } from "./cluster-tenant-scheduling.js";
 import { _CredentialsSecretName } from "../internal/cognee-tenant-identity.js";

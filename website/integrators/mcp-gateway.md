@@ -52,7 +52,7 @@ access workflows:
 | Org admin | `/api/v1/policies` | Manage AccessPolicies, including MCP allow/deny sets |
 
 The routes are mounted in
-[`libs/backend/mcp/main/src/routes`](https://github.com/italanta/opencrane/blob/main/libs/backend/mcp/main/src/routes)
+[`libs/backend/server/mcp/main/src/routes`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/mcp/main/src/routes)
 and use the same authentication and authorisation gates as the OpenCrane UI. Custom
 integrations should use these routes or the generated contracts client rather than
 writing control-plane tables directly.
@@ -78,8 +78,8 @@ halves of one change.
 ## Deployment and network posture
 
 - The Obot app owns its Deployment and Service templates under
-  `apps/obot/helm/templates/`; the silo chart composes that app-owned unit from
-  `apps/opencrane-infra/templates/app-rollups.yaml`.
+  `apps/_infra/obot/helm/templates/`; the silo chart composes that app-owned unit from
+  `apps/_infra/deploy-k8s/templates/app-rollups.yaml`.
 - `OBOT_SERVER_MCPRUNTIME_BACKEND=kubernetes` makes Obot start MCP servers as pods in
   the silo namespace.
 - There is no external Obot ingress. NetworkPolicy admits the gateway only from the

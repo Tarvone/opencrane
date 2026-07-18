@@ -39,7 +39,7 @@ fleet-namespace plane endpoint into every tenant) — a silo-local controller in
    This slice is therefore NOT cleanly additive — it lands together with S5.2 (the controllers depend
    on these), so treat S5.1+S5.2 as one atomic relocation.
 2. **S5.2** `git mv` the 6 controller dirs fleet→silo; fix imports (config/watch/k8s from S5.1 lib;
-   `log` from the silo; contracts/infra-api unchanged).
+   `log` from the silo; contracts and backend server API unchanged).
 3. **S5.3** Silo bootstrap: start the controllers over its own ns (`WATCH_NAMESPACE`=silo ns;
    internal-API base = self); seed its own default Tenant; graceful stop.
 4. **S5.4** Trim fleet `index.ts` to ClusterTenantOperator + API only; revert step-5; drop the fleet

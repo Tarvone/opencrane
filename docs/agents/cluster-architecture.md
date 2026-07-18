@@ -92,28 +92,28 @@ UserTenant pods are **not** exposed on their own public host.
 
 ## Physical Cluster
 
-- **Cloud target: GKE Autopilot** (`libs/k8s-platform/terraform/cloud/gcp/`) — Google-managed nodes, pay-per-pod, private nodes, VPC-native with secondary IP ranges for pods/services, Cloud NAT egress, an install-time Cloud DNS wildcard (`*.<base>`, covering org hosts `<org>.<base>`) pointing at a reserved static global IP. Per-org `<org>.<base>` A records are emitted at runtime by the operator as external-dns `DNSEndpoint` CRs. Provisioned in phases: networking → cluster → Artifact Registry → in-cluster Bitnami PostgreSQL + the chart → DNS.
-- **Cloud-agnostic target** (`libs/k8s-platform/terraform/core/`) — assumes a ready kubeconfig and applies only the chart; works on k3d (local dev/e2e), EKS, AKS, on-prem. `hosting.provider: onprem` makes cloud storage/identity no-ops.
+- **Cloud target: GKE Autopilot** (`apps/_infra/deploy-k8s/platform/terraform/cloud/gcp/`) — Google-managed nodes, pay-per-pod, private nodes, VPC-native with secondary IP ranges for pods/services, Cloud NAT egress, an install-time Cloud DNS wildcard (`*.<base>`, covering org hosts `<org>.<base>`) pointing at a reserved static global IP. Per-org `<org>.<base>` A records are emitted at runtime by the operator as external-dns `DNSEndpoint` CRs. Provisioned in phases: networking → cluster → Artifact Registry → in-cluster Bitnami PostgreSQL + the chart → DNS.
+- **Cloud-agnostic target** (`apps/_infra/deploy-k8s/platform/terraform/core/`) — assumes a ready kubeconfig and applies only the chart; works on k3d (local dev/e2e), EKS, AKS, on-prem. `hosting.provider: onprem` makes cloud storage/identity no-ops.
 
 ## Helm Template Inventory
 
-The per-silo `opencrane-silo` chart at `apps/opencrane-infra` is a composer, not the
+The per-silo `opencrane-silo` chart at `apps/_infra/deploy-k8s` is a composer, not the
 anonymous owner of its workloads. `templates/app-rollups.yaml` includes app-owned Helm
 library units with the parent release context; shared labels and topology helpers remain in
-`libs/k8s-platform/templates/_helpers.tpl`.
+`apps/_infra/deploy-k8s/platform/templates/_helpers.tpl`.
 
 | Owner | Creates |
 |-------|---------|
 | `apps/opencrane/helm` | Control-plane Deployment, Service, Ingress/certificate, SA/RBAC, gateway-proxy Service, and server NetworkPolicy |
-| `apps/opencrane-migrate/helm` | DB-only Prisma migration Job using the exact server image, with no mounted ServiceAccount token |
+| `apps/_infra/deploy-k8s/components/database-schema` | DB-only Prisma migration Job using the exact server image, with no mounted ServiceAccount token |
 | `apps/opencrane-ui/helm` | Optional administration SPA Deployment and Service |
-| `apps/cognee/helm` | Cognee Deployment, Service, PVC, identity, probes, and NetworkPolicy |
-| `apps/litellm/helm` | LiteLLM Deployment, Service, credential Secret contract, and non-token identity |
-| `apps/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
-| `apps/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
-| `apps/opencrane-infra/templates/feat-skill-registry-*` | Skill-registry deletion target; remove with its direct replacement |
-| `apps/opencrane-infra/templates/skill-oci-store.yaml` | Default-off Zot deletion target; artifact bytes belong behind `ArtifactStore` |
-| `apps/opencrane-infra/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
+| `apps/_infra/cognee/helm` | Cognee Deployment, Service, PVC, identity, probes, and NetworkPolicy |
+| `apps/_infra/litellm/helm` | LiteLLM Deployment, Service, credential Secret contract, and non-token identity |
+| `apps/_infra/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
+| `apps/_infra/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
+| `apps/_infra/deploy-k8s/templates/feat-skill-registry-*` | Skill-registry deletion target; remove with its direct replacement |
+| `apps/_infra/deploy-k8s/templates/skill-oci-store.yaml` | Default-off Zot deletion target; artifact bytes belong behind `ArtifactStore` |
+| `apps/_infra/deploy-k8s/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
 
 The machine-enforced inventory is `docs/agents/workload-ownership.json`; adding a pod class
 without an exact owner or direct deletion decision fails `scripts/phase-b-topology.sh`.
@@ -186,11 +186,11 @@ reconciler (in the operator) does (fail-closed, API-first).
 | `dedicatedNodes` | Namespace + a tainted node pool; operator stamps `nodeSelector`+`tolerations` (from `compute.mode=dedicated`, `compute.nodePool`). | ✅ Built |
 | `dedicatedCluster` | Customer gets its own kube-apiserver via an **external provisioner** (webhook seam, AGPL-clean; Kamaji-shaped). | ⏸️ **Parked** — opencrane-api validates and rejects with `422 TIER_UNAVAILABLE` unless a provisioner is registered. |
 
-The provisioner seam is a registry (`libs/backend/cluster-tenants/main/src/core/`) with a built-in shared provisioner plus an optional external webhook (`CLUSTER_TENANT_PROVISIONER_WEBHOOK_*`).
+The provisioner seam is a registry (`libs/backend/server/cluster-tenants/main/src/core/`) with a built-in shared provisioner plus an optional external webhook (`CLUSTER_TENANT_PROVISIONER_WEBHOOK_*`).
 
 ## Multi-Instance Cluster Shape
 
-`multiInstance.enabled` flips these safety defaults (conformance-tested statically by `libs/k8s-platform/tests/multi-instance-conformance.sh`):
+`multiInstance.enabled` flips these safety defaults (conformance-tested statically by `apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh`):
 
 | Concern | Single-install | Multi-instance |
 |---------|---------------|----------------|
@@ -207,7 +207,7 @@ The provisioner seam is a registry (`libs/backend/cluster-tenants/main/src/core/
 
 ## CRDs
 
-Three CRDs are rendered from `apps/opencrane-infra/templates/crds/`, all in `opencrane.io`:
+Three CRDs are rendered from `apps/_infra/deploy-k8s/templates/crds/`, all in `opencrane.io`:
 
 | CRD | Group | Scope |
 |-----|-------|-------|

@@ -12,17 +12,17 @@ import express, { type Express } from "express";
 import type { PrismaClient } from "@prisma/client";
 
 import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry } from "@opencrane/observability";
-import { ___AuthMiddleware } from "@opencrane/infra/auth";
-import { _ErrorHandler, _RateLimit, _TransportSecurity } from "@opencrane/infra/http";
+import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
+import { _ErrorHandler, _RateLimit, _TransportSecurity } from "@opencrane/server/_infra/http";
 
-import { ___AuthRouter, ___CreateOidcAuthService } from "@opencrane/backend/identity";
+import { ___AuthRouter, ___CreateOidcAuthService } from "@opencrane/backend/server/identity";
 import { ___CreatePrismaClient } from "./infra/db/db.js";
 import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
-import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/projection";
+import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/server/projection";
 import { OpenClawTenantLifecycle } from "@opencrane/backend/feat-openclaw-tenant";
-import { _CutTenant } from "@opencrane/backend/connections";
-import { _SetTenantSuspended } from "@opencrane/backend/tenants";
+import { _CutTenant } from "@opencrane/backend/server/connections";
+import { _SetTenantSuspended } from "@opencrane/backend/server/tenants";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped

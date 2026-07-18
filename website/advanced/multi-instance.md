@@ -116,7 +116,7 @@ helm install oc-acme-fleet apps/fleet-platform \
   --set operator.watchNamespace=oc-acme-system
 
 # Silo for the acme fleet instance.
-helm install oc-acme apps/opencrane-infra \
+helm install oc-acme apps/_infra/deploy-k8s \
   --namespace oc-acme --create-namespace \
   --skip-crds \
   --set multiInstance.enabled=true \
@@ -241,8 +241,8 @@ helm install oc-acme-fleet apps/fleet-platform \
 
 Two ready-to-use instance value files demonstrate strict isolation in one cluster:
 
-- `libs/k8s-platform/values/multi-instance/oc-acme.yaml`
-- `libs/k8s-platform/values/multi-instance/oc-globex.yaml`
+- `apps/_infra/deploy-k8s/platform/values/multi-instance/oc-acme.yaml`
+- `apps/_infra/deploy-k8s/platform/values/multi-instance/oc-globex.yaml`
 
 Each enables `multiInstance` with namespaced RBAC, fail-closed watch scoping, and a
 per-instance cert Issuer + SecretStore, scoped to its own namespace.
@@ -250,7 +250,7 @@ per-instance cert Issuer + SecretStore, scoped to its own namespace.
 Validate the static isolation guarantees (no cluster — uses `helm template`):
 
 ```bash
-libs/k8s-platform/tests/multi-instance-conformance.sh
+apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh
 ```
 
 It asserts, per instance: fail-closed watch scope, namespaced RBAC with no
@@ -363,5 +363,5 @@ plaintext.
 `ClusterTenant` CRD but **no** provisioner env on the opencrane-api Deployment; setting
 `clusterTenant.provisionerWebhook.url` renders the env block. The per-`ClusterTenant` namespace,
 quota, and scheduling are reconciled at runtime by the operator (the live-infra seam), and the
-conformance script (`libs/k8s-platform/tests/multi-instance-conformance.sh`) carries the in-cluster
+conformance script (`apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh`) carries the in-cluster
 assertions for them (CT.5a–CT.5d).

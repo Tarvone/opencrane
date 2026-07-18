@@ -58,14 +58,22 @@ the phase that replaces their responsibility.
 
 ### Phase B — monorepo topology: apps are lightweight rollups — ✅ COMPLETE (see `plan-done.md`)
 
-Every deployable or Job class must have one `apps/*` owner; reusable behavior belongs in functional
-`libs/*` packages with enforced dependency direction.
+Every deployable or Job class must have one `apps/<name>` owner or a deployment-only
+`apps/_infra/<name>` owner; reusable behaviour belongs in functional `libs/*` packages with
+enforced dependency direction.
 
 ### Phase C — target contracts and app ownership — ✅ COMPLETE (see `plan-done.md`)
 
 Canonical agent, transcript, authorization, membership, persona, artifact, storage, update, and
 workload-identity contracts now define the Phase D implementation boundary. The binding decision is
 [ADR 0008](docs/adr/0008-target-agent-contracts-and-workload-identity.md).
+
+### Repository cohesion — ✅ COMPLETE (see `plan-done.md`)
+
+Deployment-only app owners now live under `apps/_infra`, OpenCrane's installation chart is
+`apps/_infra/deploy-k8s`, reusable server domains are grouped under `libs/backend/server`, and
+process-supporting server internals are isolated under `libs/server/_infra`. This is a direct
+path and ownership refactor; it adds no compatibility aliases and changes no runtime behaviour.
 
 ### Phase D — foundations, identity, and fresh provisioning
 

@@ -1,4 +1,4 @@
-import type { HostingProvider, GcpHostingConfig } from "@opencrane/infra/tenant-hosting";
+import type { HostingProvider, GcpHostingConfig } from "@opencrane/server/_infra/tenant-hosting";
 
 /** Frozen-blue configuration consumed by the OpenClaw tenant reconcilers. */
 export interface OpenClawTenantOperatorConfig

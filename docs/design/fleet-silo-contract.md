@@ -61,7 +61,7 @@ Current CRD fields (`spec`), each grounded in the CRD YAML and the `ClusterTenan
 **Contract gap — `spec.zitadel` (see surface 3).** The shared TypeScript type
 (`ClusterTenantZitadel` in `libs/contracts/src/cluster-tenant.types.ts`), the fleet writer
 (`_BuildSpecPatch` in `cr-bridge.ts`), and the silo reader (`_ResolvePerOrgClient` in
-`libs/infra/auth/src/per-org-client.ts`) **all already reference
+`libs/server/_infra/auth/src/per-org-client.ts`) **all already reference
 `spec.zitadel.{clientId, orgId, redirectUri}`** — but the CRD YAML
 (`opencrane.io_clustertenants.yaml`) does **not declare it**. On an API server pruning unknown fields
 (the default under structural schemas), the block is silently dropped on write, so the silo reads nothing
@@ -219,7 +219,7 @@ The delegation payload is delivered on the `ClusterTenant` CR `spec.zitadel` blo
 API call. This is Option A from the [silo read-model projection design](silo-readmodel-projection-design.md):
 the fleet writes the ids onto the CR after `provisionOrg` (`_BuildSpecPatch` in `cr-bridge.ts`), and the silo
 reads them straight off the CR at login (`_ResolvePerOrgClient` in
-`libs/infra/auth/src/per-org-client.ts`). Chosen over the alternatives because it:
+`libs/server/_infra/auth/src/per-org-client.ts`). Chosen over the alternatives because it:
 
 - keeps the **CR as the single source of truth** (consistent with the desired-state pattern);
 - removes the silo's `ClusterTenant` read-model table rather than adding a sync path;
@@ -334,9 +334,9 @@ hand-off list; none of it is done by this design doc.
      `OidcAuthService.resolveLoginClient` (`oidc.service.ts`) falls through to the masters client for.
    - The masters client itself has zero fleet dependency: it is configured entirely from `OIDC_ISSUER_URL` /
      `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_REDIRECT_URI` / `OIDC_SESSION_SECRET` env vars (read in
-     `libs/infra/auth/src/oidc-config.ts`), which the chart already exposes as
+     `libs/server/_infra/auth/src/oidc-config.ts`), which the chart already exposes as
      `clustertenantManager.oidc.{issuerUrl,clientId,redirectUri,existingSecret,clientSecret,sessionSecret}`
-     in `apps/opencrane-infra/values.yaml` — a standalone operator sets these to their own,
+     in `apps/_infra/deploy-k8s/values.yaml` — a standalone operator sets these to their own,
      independently-provisioned OIDC client (Option A in `#151`'s bootstrap note) with no fleet involved.
    - First-login adoption follows the same rule: `fleetWriter` is `null` when `FLEET_INTERNAL_URL` is unset,
      and `_AdoptMemberOnLogin` (`adopt-member.ts`) then upserts `OrgMembership` locally instead of writing

@@ -350,7 +350,7 @@ The builders (`_BuildServiceAccount`, `_BuildDeployment`, `_BuildIngress`) take 
 
 The on-prem default must not depend on any cloud SDK — at install time or at runtime. If `@google-cloud/storage` (and later the Azure/AWS SDKs) were ordinary `dependencies`, every on-prem install would drag in all of them, defeating the adapter pattern's whole purpose. Two mechanisms enforce the separation:
 
-1. **`optionalDependencies`** — each cloud SDK is declared under `optionalDependencies` in `apps/fleet-operator/package.json`, never `dependencies`. A normal `pnpm install` fetches them for development and cloud images; an on-prem image built with `pnpm install --no-optional` omits them entirely and still runs.
+1. **`optionalDependencies`** — each cloud SDK is declared under `optionalDependencies` in `apps/fleet-operator/package.json`, never `dependencies`. A normal `npm install` fetches them for development and cloud images; an on-prem image built with `npm install --omit=optional` omits them entirely and still runs.
 2. **Lazy `import()` at the SDK boundary** — the SDK is loaded with a dynamic `await import("@google-cloud/storage")` inside the client method that uses it, not with a top-level import. The only compile-time reference is a TypeScript `import type`, which is erased and produces zero runtime code. So the static chain `factory → GcpHostingAdapter → GcpBucketClient` loads with the SDK absent; the SDK is `require`d only when a GCP bucket operation actually executes.
 
 ```typescript
@@ -404,7 +404,7 @@ The same on-prem-default / cloud-override split applies to deployment, in mirror
 ### 6.1 Terraform
 
 ```
-libs/k8s-platform/terraform/
+apps/_infra/deploy-k8s/platform/terraform/
 ├── core/                      # cloud-agnostic: namespace, opencrane Helm release, CRDs,
 │                              #   optional in-cluster PostgreSQL. Runs against ANY cluster.
 ├── modules/                   # reusable building blocks
@@ -432,12 +432,12 @@ apps/fleet-platform/      # chart: opencrane-fleet
 └── values.yaml           # ON-PREM DEFAULTS: hosting.provider=onprem, storage.mode=pvc,
                           #   ingress.className=nginx, certManager.enabled=false.
 
-apps/opencrane-infra/   # chart: opencrane-silo
+apps/_infra/deploy-k8s/   # chart: opencrane-silo
 ├── Chart.yaml                 # per-org opencrane-api + runtime planes (Obot, feat-skill-registry,
 │                              #   LiteLLM, Cognee) + per-silo CNPG Cluster CR
 └── values.yaml
 
-libs/k8s-platform/values/      # shared value overlays
+apps/_infra/deploy-k8s/platform/values/      # shared value overlays
     ├── gcp.yaml               # hosting.provider=gcp, gcsfuse CSI, gce ingress, workloadIdentity
     ├── azure.yaml             # (future)
     └── aws.yaml               # (future)
@@ -449,13 +449,13 @@ Install examples:
 apps/fleet-platform/deploy.sh --base-domain <your-domain>
 
 # On-prem — silo release per org
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
   --base-domain <your-domain> --cluster-tenant <org-name>
 
 # GCP — fleet release with GCP value overlay
 apps/fleet-platform/deploy.sh \
   --base-domain <your-domain> \
-  --values libs/k8s-platform/values/gcp.yaml
+  --values apps/_infra/deploy-k8s/platform/values/gcp.yaml
 ```
 
 The chart's `hosting` block maps 1:1 onto the operator's `hostingProvider` + per-cloud config, so the Helm value selects the adapter.
@@ -536,10 +536,11 @@ Per the prior investigation, Crossplane never actually provisioned buckets (no C
 - The `BucketClaim` builder, `crossplaneEnabled` flag, `crossplane-provider.yaml`, and the Terraform `crossplane` module are deleted from the core path.
 - Crossplane remains *available* as an optional, GCP-scoped component under `cloud/gcp/` for teams that prefer a Composition-based model — but it is never installed for on-prem and never on the critical path.
 
-## 9. Migration Plan (completed in Phase 5)
+## 9. Implementation record (completed in Phase 5)
 
-Executed additive-first, cutover-last, so the build stayed green throughout. Steps 1–5
-are **done**; step 6 (Azure/AWS) remains a future extension that needs no core change.
+Implemented in small build-green slices. Steps 1–5 are **done**; step 6 (Azure/AWS) remains a
+future extension that needs no core change. This is code history, not a production data migration
+or compatibility contract.
 
 1. ✅ **Introduce the seam (additive).** Add `hosting/` with the interface, DTOs, `OnPremHostingAdapter`, and the factory. Add `hostingProvider` to config defaulting to `onprem`. Nothing consumes it yet. Build + tests stay green.
 2. ✅ **Route the on-prem path through the adapter.** `operator.ts` and the deploy builders consume `HostingAdapter` for SA identity, state volume, and ingress; with the default adapter this reproduces the PVC/local behaviour exactly. Operator unit tests assert against the adapter output.

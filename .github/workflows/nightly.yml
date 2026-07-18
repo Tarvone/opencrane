@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [main, feat/agent-platform-v2]
+        branch: [main, own-personal-ai-agent-setup]
     steps:
       - uses: actions/checkout@v6
         with:

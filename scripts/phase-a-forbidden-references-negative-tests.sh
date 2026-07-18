@@ -41,4 +41,14 @@ if [[ "$output" != *"TRANSITION-PROGRAM"* ]]; then
 	exit 1
 fi
 
+git -C "$TMP_DIR" rm -qf docs/design/probe.md
+mkdir -p "$TMP_DIR/apps/opencrane/prisma/schema"
+printf '%s\n' 'model SessionScope {' '  id String @id' '}' >"$TMP_DIR/apps/opencrane/prisma/schema/probe.prisma"
+git -C "$TMP_DIR" add apps/opencrane/prisma/schema/probe.prisma
+output="$(cd "$TMP_DIR" && "$GUARD" 2>&1 || true)"
+if [[ "$output" != *"SESSION-SCOPE"* ]]; then
+	printf 'Expected SessionScope schema rejection, got:\n%s\n' "$output" >&2
+	exit 1
+fi
+
 printf 'Phase A forbidden-reference negative test passed.\n'

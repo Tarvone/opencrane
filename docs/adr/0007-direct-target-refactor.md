@@ -46,7 +46,7 @@ work) was served; its option list was not exhaustive.
   conformance baseline; runtime fixtures are authored from the accepted product contract. (This
   amends ADR 0005, whose accepted consequences made the frozen image a behavioral oracle and its
   trajectories the bake-off fixtures.)
-- Delivery is sequential phase gates C–G on protected `feat/agent-platform-v2`, with independent
+- Delivery is sequential phase gates C–G on `own-personal-ai-agent-setup`, with independent
   lanes parallelized inside the active phase (plan.md is the working sequence).
 
 ## Alternatives considered

@@ -25,7 +25,8 @@ the target, refined by the
 3. **Sequencing:** Phase A deletion debt and Phase B monorepo normalization are complete. Build the
    target foundations and fresh provisioning next; then the runtime and AgentService planes; then
    product surfaces; finally qualify the complete product and verify zero legacy residue.
-   Phase gates and their PRs land sequentially on protected `feat/agent-platform-v2`; independent
+   Phase gates and their PRs land sequentially on the root workstream branch
+   `own-personal-ai-agent-setup`; independent
    work lanes inside the active phase run in parallel where their dependency graph allows.
 4. **Architecture:** Postgres is product authority; artifacts live behind `ArtifactStore` on PVC;
    authorization is per silo with proof-bound run/action capabilities; runtimes receive no

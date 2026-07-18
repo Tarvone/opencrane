@@ -60,6 +60,10 @@ export default [
             },
             { sourceTag: "scope:access-tokens", onlyDependOnLibsWithTags: ["scope:access-tokens", "scope:shared"] },
             {
+              sourceTag: "scope:agent-services",
+              onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:authorization", "scope:shared"],
+            },
+            {
               sourceTag: "scope:api-spec",
               onlyDependOnLibsWithTags: [
                 "scope:api-spec",
@@ -82,6 +86,7 @@ export default [
               ],
             },
             { sourceTag: "scope:audit", onlyDependOnLibsWithTags: ["scope:audit", "scope:shared"] },
+            { sourceTag: "scope:authorization", onlyDependOnLibsWithTags: ["scope:authorization", "scope:shared"] },
             { sourceTag: "scope:awareness", onlyDependOnLibsWithTags: ["scope:awareness", "scope:shared"] },
             { sourceTag: "scope:auth", onlyDependOnLibsWithTags: ["scope:auth", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:channel-proxy", onlyDependOnLibsWithTags: ["scope:channel-proxy", "scope:shared"] },
@@ -116,11 +121,13 @@ export default [
             },
             { sourceTag: "scope:mcp", onlyDependOnLibsWithTags: ["scope:auth", "scope:mcp", "scope:shared"] },
             { sourceTag: "scope:metrics", onlyDependOnLibsWithTags: ["scope:awareness", "scope:metrics", "scope:projection", "scope:shared"] },
+            { sourceTag: "scope:membership", onlyDependOnLibsWithTags: ["scope:authorization", "scope:membership", "scope:shared"] },
             { sourceTag: "scope:model-routing", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:shared"] },
             { sourceTag: "scope:policies", onlyDependOnLibsWithTags: ["scope:grants", "scope:k8s-api", "scope:policies", "scope:projection", "scope:shared"] },
             { sourceTag: "scope:projection", onlyDependOnLibsWithTags: ["scope:cluster-tenants", "scope:k8s-api", "scope:projection", "scope:shared"] },
             { sourceTag: "scope:providers", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:providers", "scope:shared"] },
             { sourceTag: "scope:retrieval", onlyDependOnLibsWithTags: ["scope:retrieval", "scope:shared"] },
+            { sourceTag: "scope:runs", onlyDependOnLibsWithTags: ["scope:agents", "scope:authorization", "scope:runs", "scope:shared"] },
             { sourceTag: "scope:skills", onlyDependOnLibsWithTags: ["scope:cluster-tenants", "scope:grants", "scope:shared", "scope:skills"] },
             { sourceTag: "scope:spend", onlyDependOnLibsWithTags: ["scope:shared", "scope:spend"] },
             { sourceTag: "scope:tenant-hosting", onlyDependOnLibsWithTags: ["scope:shared", "scope:tenant-hosting"] },
@@ -141,7 +148,6 @@ export default [
             { sourceTag: "scope:app", onlyDependOnLibsWithTags: ["*"] },
             { sourceTag: "scope:agents", onlyDependOnLibsWithTags: ["scope:agents", "scope:shared"] },
             { sourceTag: "scope:artifacts", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:shared"] },
-            { sourceTag: "scope:authorization", onlyDependOnLibsWithTags: ["scope:authorization", "scope:shared"] },
             { sourceTag: "type:app", notDependOnLibsWithTags: ["type:app"] },
             { sourceTag: "type:lib", notDependOnLibsWithTags: ["type:app"] },
             {

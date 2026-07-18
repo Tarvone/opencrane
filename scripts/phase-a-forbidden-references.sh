@@ -164,7 +164,7 @@ _check_pattern "POD-TOKEN-DELETION-BOUNDARY" '(/api/v1/auth/pod-token|["`]/?pod-
 
 # SessionScope is retired product state. All runtime CRUD/client/package references are forbidden
 # outside the exact old schema, applied Prisma schema history, and decision records.
-SESSION_SCOPE_RETENTION="($TARGET_RECORDS|$APPLIED_SCHEMA_HISTORY|$HISTORICAL_RECORDS|^apps/opencrane/prisma/schema/sessions\.prisma$|^docs/agents/apps/opencrane\.md$)"
+SESSION_SCOPE_RETENTION="($TARGET_RECORDS|$APPLIED_SCHEMA_HISTORY|$HISTORICAL_RECORDS|^docs/agents/apps/opencrane\.md$)"
 _check_pattern "SESSION-SCOPE" '(SessionScope|session-scope([^[:alnum:]]|$)|@opencrane/backend-sessions|/sessions/[^[:space:]`"]*/scope)' "$SESSION_SCOPE_RETENTION"
 
 # The Obot registry poll was a no-op. The spec is retained only as evidence explaining its removal.

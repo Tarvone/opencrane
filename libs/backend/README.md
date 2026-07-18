@@ -27,6 +27,8 @@ flattening unrelated responsibilities together.
 
 ## Current functional domains
 
+- Target agent authority: agent services and immutable revisions, logical runs and workload
+  assignments, proof-bound authorization, and verified fleet membership.
 - Identity and access: access tokens, identity, grants, groups, policies, and cluster membership.
 - Tenant and runtime lifecycle: tenants, connections, effective contracts, and projection repair.
 - Models and economics: providers, model routing, spend, and budgets.

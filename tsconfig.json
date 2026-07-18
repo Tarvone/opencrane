@@ -13,11 +13,17 @@
       "@opencrane/backend/server/access-tokens": [
         "./libs/backend/server/access-tokens/main/src/index.ts"
       ],
+      "@opencrane/backend/server/agent-services": [
+        "./libs/backend/server/agent-services/main/src/index.ts"
+      ],
       "@opencrane/backend/server/api-spec": [
         "./libs/backend/server/api-spec/main/src/index.ts"
       ],
       "@opencrane/backend/server/audit": [
         "./libs/backend/server/audit/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/authorization": [
+        "./libs/backend/server/authorization/main/src/index.ts"
       ],
       "@opencrane/backend/server/awareness": [
         "./libs/backend/server/awareness/main/src/index.ts"
@@ -52,6 +58,9 @@
       "@opencrane/backend/server/metrics": [
         "./libs/backend/server/metrics/main/src/index.ts"
       ],
+      "@opencrane/backend/server/membership": [
+        "./libs/backend/server/membership/main/src/index.ts"
+      ],
       "@opencrane/backend/server/model-routing": [
         "./libs/backend/server/model-routing/main/src/index.ts"
       ],
@@ -66,6 +75,9 @@
       ],
       "@opencrane/backend/server/retrieval": [
         "./libs/backend/server/retrieval/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/runs": [
+        "./libs/backend/server/runs/main/src/index.ts"
       ],
       "@opencrane/backend/server/skills": [
         "./libs/backend/server/skills/main/src/index.ts"

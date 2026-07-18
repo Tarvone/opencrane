@@ -90,7 +90,16 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			});
 		}
 	},
-	_placeholderRoute("provider-keys", "LLM Providers", "Workspace model-provider configuration will be delivered in milestone 4."),
+	{
+		path: "provider-keys",
+		loadComponent: function loadLlmProvidersSection()
+		{
+			return import("./sections/llm-providers-section/llm-providers-section.component.js").then(function pickLlmProvidersSection(module)
+			{
+				return module.LlmProvidersSectionComponent;
+			});
+		}
+	},
 	{ path: "**", redirectTo: "pod" }
 ];
 

@@ -24,6 +24,7 @@ import { ConnectorsSectionComponent } from "../sections/connectors-section/conne
 import { DataNetworkSectionComponent } from "../sections/data-network-section/data-network-section.component.js";
 import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component.js";
 import { MembersSectionComponent } from "../sections/members-section/members-section.component.js";
+import { LlmProvidersSectionComponent } from "../sections/llm-providers-section/llm-providers-section.component.js";
 import { _CanDeactivateMembersSection } from "../sections/members-section/members-section.guard.js";
 
 /** Resolve an external settings component template or stylesheet. */
@@ -31,7 +32,7 @@ function _componentResource(resourceUrl: string): string
 {
 	const file = resourceUrl.replace(/^\.\//, "");
 	const componentFolder = file.split(".component")[0];
-	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("members-section") ? "sections/members-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
+	const folder = file.startsWith("settings-page") ? "settings-page" : file.startsWith("skills-section") ? "sections/skills-section" : file.startsWith("connectors-section") ? "sections/connectors-section" : file.startsWith("data-network-section") ? "sections/data-network-section" : file.startsWith("llm-providers-section") ? "sections/llm-providers-section" : file.startsWith("members-section") ? "sections/members-section" : file.startsWith("settings-placeholder") ? "settings-placeholder" : `../../../../elements/ui/src/lib/components/${componentFolder}`;
 	return readFileSync(resolve(process.cwd(), "src/lib", folder, file), "utf8");
 }
 
@@ -62,7 +63,7 @@ function _testableRoutes(routes: Routes): Routes
 	if (route.path === "members") return route;
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
-	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network") return route;
+	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network" || route.path === "provider-keys") return route;
 	if (route.path === "budget") return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, data: { title: "My Budget", description: "Personal budget controls." }, canDeactivate: undefined };
 	return { ...route, loadComponent: undefined, component: SettingsPlaceholderComponent, canDeactivate: undefined };
 	});
@@ -245,6 +246,18 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
 		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/data-network");
 		expect(dataNetwork.domains()).toHaveLength(3);
+	});
+
+	it("activates LLM Providers at its stable route", async function llmProvidersRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/provider-keys");
+		const providers = harness.fixture.debugElement.query(By.directive(LlmProvidersSectionComponent)).componentInstance as LlmProvidersSectionComponent;
+
+		expect(harness.fixture.debugElement.query(By.directive(LlmProvidersSectionComponent))).not.toBeNull();
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/provider-keys");
+		expect(providers.providers()).toHaveLength(3);
+		expect(providers.routeCategories()).toHaveLength(6);
 	});
 
 	it("keeps the owning navigation item active on a nested section route", async function nestedSectionRoute(): Promise<void>

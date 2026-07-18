@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - main
-      - feat/agent-platform-v2
+      - "feat/agent-platform-v2*"
 
 permissions:
   actions: read
@@ -73,8 +73,21 @@ jobs:
       - name: Generate the database client
         run: npm run db:generate -w @opencrane/server
 
+      - name: Install Helm for topology render validation
+        uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
+
       - name: Enforce Phase A retired-reference and frozen-blue guards
         run: ./scripts/phase-a-forbidden-references.sh
+
+      - name: Enforce Phase B workload ownership and thin app roots
+        run: npm run check:phase-b-topology
+
+      - name: Prove Phase B topology guard rejects drift
+        run: npm run test:phase-b-topology
 
       - name: Enforce Phase A runtime contracts
         run: |
@@ -109,6 +122,10 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
 
       - name: Run k3d e2e smoke test
         run: ./libs/k8s-platform/tests/k3d-e2e.sh

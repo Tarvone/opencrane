@@ -19,7 +19,7 @@ import { tenantsRouter } from "@opencrane/backend/tenants";
 import { thirdPartySourcesRouter } from "@opencrane/backend/retrieval";
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/infra/http";
-import { spec } from "../openapi/spec.js";
+import { spec } from "@opencrane/backend/api-spec";
 
 /**
  * Build the optional OCI (Zot) skill-bundle store from the environment.
@@ -59,7 +59,7 @@ function _BuildOciBundleStore(): OciBundleStore | null
  *     set is always null → replace-mode pods brick with an empty allowlist.
  *   - pod-identity routes (`contract`, `participation`) run their OWN TokenReview over a
  *     projected pod token, which the browser-session middleware cannot satisfy.
- * @see apps/opencrane-infra/templates/networkpolicy-planes.yaml — the runtime-plane policies.
+ * @see apps/opencrane/helm/templates/_networkpolicy.tpl — the runtime-plane policies.
  */
 export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, authApi: k8s.AuthenticationV1Api): void
 {

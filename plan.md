@@ -78,17 +78,7 @@ still apply where noted, re-read through the freeze route.
 Adjacent: [#135](https://github.com/italanta/opencrane/issues/135) stays blocked (external half);
 [#227](https://github.com/italanta/opencrane/issues/227) fires after Phase A + rollback windows.
 
-### Phase B — monorepo topology: apps are lightweight rollups
-
-| Issue | Scope | Exit |
-|-------|-------|------|
-| [#249](https://github.com/italanta/opencrane/issues/249) — **Every deployed unit under `/apps`; logic in `/libs`** | Promote cognee/litellm/obot from embedded opencrane-infra templates to app-owned deploy units (render-parity gated) · extract `apps/opencrane`'s ~20.5k lines (reconcilers, gateways, infra, openapi) into libs · opencrane-infra narrows to umbrella composition · Nx module-boundary guardrail. Apps scheduled to die (feat-openclaw-tenant, feat-central-agents, feat-skill-registry) are **not** churned. | Every deployed pod traces to an `apps/*` rollup; `apps/opencrane` is composition+bootstrap; CI blocks logic under `apps/*`. |
-
-Under the freeze route this phase has a second purpose: it **carves the reuse seam**. Green may
-only import clean libs (never legacy domain packages), so extracting the sound foundations —
-workload builders, observability, generic k8s utilities, frontend state — into libs before the
-freeze is what lets green reuse them instead of rewriting them. Trust-boundary *extraction*
-(channel-proxy, agent-controller as processes) is built fresh in green at R2, into this structure.
+### Phase B — monorepo topology: apps are lightweight rollups — ✅ COMPLETE (see `plan-done.md`)
 
 ### R0 — estate audit and irreversible decisions (opens with Phase A)
 

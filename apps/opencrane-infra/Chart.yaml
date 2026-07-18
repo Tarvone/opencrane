@@ -22,7 +22,28 @@ dependencies:
   - name: k8s-platform
     version: 0.1.0
     repository: "file://../../libs/k8s-platform"
-  # Langfuse LLM observability — a per-silo plane, deployed when langfuse.inCluster.enabled.
+  # App-owned workload units export named templates; this umbrella only includes them
+  # with the unchanged parent release context.
+  - name: opencrane-server
+    version: 0.1.0
+    repository: "file://../opencrane/helm"
+  - name: opencrane-ui
+    version: 0.1.0
+    repository: "file://../opencrane-ui/helm"
+  - name: opencrane-migrate
+    version: 0.1.0
+    repository: "file://../opencrane-migrate/helm"
+  - name: opencrane-cognee
+    version: 0.1.0
+    repository: "file://../cognee/helm"
+  - name: opencrane-litellm
+    version: 0.1.0
+    repository: "file://../litellm/helm"
+  - name: opencrane-obot
+    version: 0.1.0
+    repository: "file://../obot/helm"
+  # apps/langfuse owns this pinned upstream wrapper. Keep the dependency direct so
+  # parent values, release names, and every rendered upstream object remain unchanged.
   # PINNED to an exact version (not a ">=" range): the deploy engine resolves deps from Chart.lock
   # via `helm dep build`, so an open range would let every deploy silently ship whatever langfuse
   # is newest at that moment — an untested version drift. Bump this deliberately + regenerate the lock.

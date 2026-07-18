@@ -29,7 +29,7 @@ clustertenantManager:
   # -- No external fleet anywhere: membership is owned locally, adoption never write-throughs.
   fleetInternalUrl: ""
   # -- This silo creates its own per-ClusterTenant namespace (there is no fleet-manager to do
-  #    it) — renders the gated namespace-management ClusterRole (clustertenant-manager-rbac.yaml).
+  #    it) — the app-owned OpenCrane Helm unit renders the gated namespace-management ClusterRole.
   manageTenantNamespaces: true
   # -- This silo owns its own per-org DNSEndpoint/vanity Certificate (#151 item 2) — left
   #    explicit here for clarity; `null` (the chart default) would derive the SAME true from

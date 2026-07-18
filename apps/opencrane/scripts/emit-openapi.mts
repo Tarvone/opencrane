@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 // tsx resolves .js → .ts, so this import works both in tsx (dev) and
 // after tsc (when importing from dist/).
-import { spec } from "../src/openapi/spec.js";
+import { spec } from "@opencrane/backend/api-spec";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outputPath = resolve(__dirname, "../../../dist/apps/opencrane/openapi.json");

@@ -97,25 +97,26 @@ UserTenant pods are **not** exposed on their own public host.
 
 ## Helm Template Inventory
 
-The deployable templates are split across two charts: the central **fleet** chart `apps/fleet-platform/templates/` (`opencrane-fleet` — operator, opencrane-api, CRDs, cert issuer, external-secrets) and the per-silo **silo** chart `apps/opencrane-infra/templates/` (`opencrane-silo` — litellm, obot gateway, feat-skill-registry, OCI store, plane NetworkPolicies). Both pull shared named-templates from the `k8s-platform` Helm **library** chart `libs/k8s-platform/templates/` (`_helpers.tpl` holds the scope-resolution logic):
+The per-silo `opencrane-silo` chart at `apps/opencrane-infra` is a composer, not the
+anonymous owner of its workloads. `templates/app-rollups.yaml` includes app-owned Helm
+library units with the parent release context; shared labels and topology helpers remain in
+`libs/k8s-platform/templates/_helpers.tpl`.
 
-| Template | Creates |
-|----------|---------|
-| `operator-deployment.yaml` / `operator-rbac.yaml` | Operator Deployment + SA + (Cluster)Role/Binding |
-| `opencrane-api-deployment.yaml` / `-service.yaml` / `-rbac.yaml` | Control-plane Deployment, ClusterIP `:8080`, SA + RBAC (incl. TokenRequest mint, pod kill-switch) |
-| `litellm-deployment.yaml` / `-service.yaml` / `-secret.yaml` | LiteLLM Deployment, ClusterIP `:4000`, master-key Secret |
-| `obot-mcp-gateway-deployment.yaml` / `mcp-gateway-service.yaml` | Obot gateway Deployment, ClusterIP `:8080` |
-| `feat-skill-registry-deployment.yaml` / `-service.yaml` | Skill-registry Deployment (+ ClusterRole for TokenReview), ClusterIP `:5000` |
-| `skill-oci-store.yaml` | Optional Zot OCI registry Deployment + Service + PVC `:5000` |
-| `networkpolicy-planes.yaml` | Per-plane ingress allow-lists (the auth-less `/api/internal` boundary) |
-| `networkpolicy.yaml` | Baseline tenant egress policy |
-| `networkpolicy-multi-instance.yaml` | Cross-instance default-deny (rendered only when `multiInstance.enabled`) |
-| `cluster-issuer.yaml` | cert-manager `ClusterIssuer` (or namespaced `Issuer` in MI) — selfSigned dev / ACME DNS-01 prod |
-| `external-secrets-store.yaml` / `external-secrets.yaml` | `ClusterSecretStore`/`SecretStore` + `ExternalSecret` (GCP/Azure/AWS secret managers) |
-| `awareness-prometheusrule.yaml` / `awareness-grafana-dashboard.yaml` | Awareness SLO alerts + Grafana dashboard ConfigMap |
-| `validate-config.yaml` | Pre-install validation hook (rejects unsafe non-dev config) |
+| Owner | Creates |
+|-------|---------|
+| `apps/opencrane/helm` | Control-plane Deployment, Service, Ingress/certificate, SA/RBAC, gateway-proxy Service, and server NetworkPolicy |
+| `apps/opencrane-migrate/helm` | DB-only Prisma migration Job using the exact server image, with no mounted ServiceAccount token |
+| `apps/opencrane-ui/helm` | Optional administration SPA Deployment and Service |
+| `apps/cognee/helm` | Cognee Deployment, Service, PVC, identity, probes, and NetworkPolicy |
+| `apps/litellm/helm` | LiteLLM Deployment, Service, credential Secret contract, and non-token identity |
+| `apps/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
+| `apps/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
+| `apps/opencrane-infra/templates/feat-skill-registry-*` | Exact frozen-blue skill-registry exception through R10 |
+| `apps/opencrane-infra/templates/skill-oci-store.yaml` | Exact default-off Zot exception through R10 |
+| `apps/opencrane-infra/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
 
-CRDs are shipped separately under `apps/fleet-platform/crds/` (see below), not in `templates/`.
+The machine-enforced inventory is `docs/agents/workload-ownership.json`; adding a pod class
+without an exact app owner or named R-gate exception fails `scripts/phase-b-topology.sh`.
 
 ## The Planes, Wired
 

@@ -18,7 +18,7 @@ ADOPTED_RECORDS='^(plan\.md|docs/design/(personal-agent-platform-architecture|pe
 MIGRATION_HISTORY='^apps/opencrane/prisma/migrations/'
 RESEARCH_HISTORY='^(docs/research/litellm-byok-byom-research\.md|docs/specs/mcp-catalog-credential-spec\.md)$'
 HISTORICAL_RECORDS='^(plan-done\.md|CHANGELOG\.md|silo-multi-tenant-plan\.md|docs/briefs/mcp-skills-platform-brief\.md|docs/design/stage5-silo-autonomous-controllers-plan\.md|docs/agents/deploy-ledger\.md)$'
-RUNTIME_CONTRACT_TESTS='^(\.github/workflows/docker\.yml|libs/k8s-platform/tests/tenant-image-immutability\.sh|apps/opencrane/src/__tests__/tenants/tenant-resource-builder\.test\.ts)$'
+RUNTIME_CONTRACT_TESTS='^(\.github/workflows/docker\.yml|libs/k8s-platform/tests/tenant-image-immutability\.sh|libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/tenant-resource-builder\.test\.ts)$'
 
 _search_repo_lines()
 {
@@ -152,12 +152,12 @@ _check_pattern "OPENCLAW-RUNTIME-VERSION" '(openclawVersion|OPENCLAW_VERSION|DEF
 _check_pattern "OPENCLAW-CANARY" '(TenantUpdateWithCanaryStrategyController|tenant-update-with-canary-strategy|OPENCRANE_TENANT_ROLLOUT|OPENCRANE_CANARY_TIMEOUT)' "($ADOPTED_RECORDS|$HISTORICAL_RECORDS)"
 _check_pattern "OPENCLAW-OBOT-HEALTH" '(Obot health checker|Obot health)' "($ADOPTED_RECORDS|$HISTORICAL_RECORDS)"
 _check_file_absent "TENANT-CRD-RETIRED-FIELD" "apps/opencrane-infra/templates/crds/tenant.opencrane.io_tenants.yaml" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion):'
-_check_file_absent "TENANT-SPEC-RETIRED-FIELD" "apps/opencrane/src/reconcilers/tenants/models/tenant-spec.types.ts" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion)\??:'
+_check_file_absent "TENANT-SPEC-RETIRED-FIELD" "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/models/tenant-spec.types.ts" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion)\??:'
 
 # Pairing/device state is retired. The no-token /auth/pod-token preflight is separately constrained
 # to its R9-expiring implementation, tests, and decision documentation.
 _check_pattern "PAIRING-DEVICE" '(BrokeredDevice|brokered-device|openclaw-pairing|/pod-token/cut|/:name/pairing)' "($ADOPTED_RECORDS|$MIGRATION_HISTORY|$HISTORICAL_RECORDS)"
-POD_TOKEN_R9="^(apps/opencrane/src/infra/auth/auth\.router\.ts|apps/opencrane/src/__tests__/routes/auth-pod-token\.test\.ts|libs/backend/connections/main/src/core/gateway-resolve\.ts|website/security/connection-security\.md|docs/agents/(architecture|apps/opencrane)\.md|CHANGELOG\.md|plan\.md|plan-done\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-rewrite-freeze-plan|personal-agent-platform-simplification-plan|openclaw-agent-loop-replacement-plan)\.md)$"
+POD_TOKEN_R9="^(libs/backend/identity/main/src/auth\.router\.ts|libs/backend/connections/main/src/(core/gateway-resolve|routes/auth-connections|__tests__/auth-connections\.test)\.ts|website/security/connection-security\.md|docs/agents/(architecture|apps/opencrane)\.md|CHANGELOG\.md|plan\.md|plan-done\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-rewrite-freeze-plan|personal-agent-platform-simplification-plan|openclaw-agent-loop-replacement-plan)\.md)$"
 _check_pattern "POD-TOKEN-R9-BOUNDARY" '(/api/v1/auth/pod-token|["`]/?pod-token(/cut)?["`])' "$POD_TOKEN_R9"
 
 # SessionScope rows are retained read-only as migration evidence. All runtime CRUD/client/package

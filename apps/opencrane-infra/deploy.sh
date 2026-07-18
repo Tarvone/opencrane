@@ -109,7 +109,7 @@ PROFILE_SET=(
   # NOTE: same-origin org hosting is now the chart's only mode (the legacy `*.<domain>` wildcard
   # gateway-ingress was removed) — no --set needed here to select it.
   --set "ingress.tls.enabled=true"
-  # Issue the silo's OWN TLS cert (clustertenant-manager-certificate.yaml) via the cluster-wide
+  # Issue the silo's OWN TLS cert (the app-owned OpenCrane certificate template) via the cluster-wide
   # ClusterIssuer the central release created. A k8s Ingress can only reference a TLS secret in its
   # OWN namespace, so each silo provisions its cert here rather than borrowing the fleet's wildcard
   # secret. No per-silo Issuer is created — only the Certificate, pointed at certManager.issuerName.

@@ -4,7 +4,9 @@
   "projectType": "library",
   "sourceRoot": "libs/infra/http/src",
   "tags": [
-    "scope:shared"
+    "type:lib",
+    "layer:infra",
+    "scope:http"
   ],
   "targets": {
     "lint": {

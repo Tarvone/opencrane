@@ -1289,3 +1289,32 @@ bounded for later per-silo replacement.
 - [x] **Deletion remains deleted.** `scripts/phase-a-forbidden-references.sh`, wired into CI,
   rejects the retired runtime, session, pairing, Obot-poll, and command-line surfaces while
   allowing only exact decision history, migration evidence, tests, and named R9 blue contracts.
+
+## Personal-agent program Phase B — lightweight app rollups (complete 2026-07-17)
+
+Phase B completed [#249](https://github.com/italanta/opencrane/issues/249) before the rewrite
+freeze. Deployable ownership now lives under `apps/*`, reusable implementation lives under
+`libs/*`, and the frozen blue behaviour remains render-compatible while later green phases get a
+clean import seam.
+
+- [x] **Every rendered workload has an explicit app owner.** OpenCrane server, UI, migration,
+  Cognee, LiteLLM, Obot, and Langfuse workloads are owned by their app packages. The
+  `apps/opencrane-infra` chart is an umbrella composition layer instead of the implementation home
+  for those workloads.
+- [x] **The server app is composition and process lifecycle.** Tenant/OpenClaw reconciliation,
+  policy reconciliation, identity, projection, connection auth, channel proxying, tenant hosting,
+  transport security, and OpenAPI ownership moved to canonical backend and infrastructure
+  libraries with their tests. Prisma composition stays app-owned by an explicit exception.
+- [x] **The reusable seam is mechanically enforced.** All Phase B packages carry the exact
+  `scope:*`, `type:*`, and `layer:*` Nx tags; ESLint enforces dependency direction; the topology
+  guard rejects unregistered app implementation, workload constructors, Helm templates, upstream
+  archive workloads, duplicate ownership, stale anchors, expired exceptions, and generated-output
+  false positives.
+- [x] **Blue deployment output remains stable.** App-owned Helm libraries preserve the existing
+  normalized render, apart from the migration Job disabling ServiceAccount token automount. The
+  shared profile removes only its six registered orphans, and the full standalone/shared pod-class
+  inventories are exact.
+- [x] **The complete workspace remains healthy.** All 119 affected build, test, and lint tasks
+  passed across 59 projects; 447 targeted moved-library tests passed; Helm lint/render checks,
+  OpenAPI and contract regeneration, Phase A guards, the VitePress build, style checks, and 14
+  adversarial topology mutations passed.

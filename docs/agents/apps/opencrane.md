@@ -1,7 +1,7 @@
 # App: opencrane (`@opencrane/server`)
 
 > Deep-dive for `apps/opencrane`. Index: [`../app-specific.md`](../app-specific.md). Identity model:
-> [`../architecture.md`](../architecture.md). Verified June 2026 (post fleet/silo split, v0.6.0).
+> [`../architecture.md`](../architecture.md). Verified July 2026 (Phase B topology cutover).
 
 The **per-silo control plane** — one instance per **ClusterTenant**, running in that org's own
 namespace and served at the org host `<org>.<base>`. **Express 5 + Prisma (PostgreSQL) +
@@ -18,10 +18,17 @@ the org-scoped management surface below; it READS the cluster-scoped `ClusterTen
 
 ## Layout
 
-- `infra/` — cross-cutting: `auth/` (OIDC service and pod connection preflight), `middleware/` (`___AuthMiddleware`, transport security), `db/` (Prisma client + healthcheck).
-- `core/` — domain logic (non-HTTP): `grants/` (grant compiler + Cognee sync), `awareness/` (rollout, participation, metrics), `cluster-tenants/` (own `<org>-default` Tenant seed — read-model only, no provisioner registry; that's fleet), `connections/` (full-tenant pod cut), `oci/` (Zot bundle store + backfill), `personalisation/`, `scanning/`, `ai-budget/`.
-- `features/` — higher-level workflows: `mcp-servers/`, `groups/`, `company-docs/`.
-- `routes/` — HTTP handlers (each a `*.ts` + `*.types.ts` pair); `routes/internal/` are the auth-less, NetworkPolicy-gated endpoints.
+`apps/opencrane/src` is deliberately small and closed by
+`docs/agents/app-source-allowlist.json`: process entrypoint/lifecycle composition, environment
+configuration, route assembly, instrumentation/logging, Prisma construction and migration, and the
+hosting-adapter factory. The app also owns Prisma schema/migrations and its Helm unit under
+`apps/opencrane/helm`.
+
+Implementation lives with its capability:
+
+- HTTP domains, identity/OIDC workflows, projection repair, and API specification live under `libs/backend/*/main`.
+- the frozen OpenClaw Tenant controller, renderers, workspace assets, and runtime lifecycle live under `libs/backend/feat-openclaw-tenant/main`;
+- auth primitives, transport security, channel proxy, and hosting adapters live under `libs/infra/{auth,http,channel-proxy,tenant-hosting}`.
 
 ## Bootstrap (`src/index.ts`)
 
@@ -43,24 +50,24 @@ CRUD + notable actions:
 
 **Internal (`/api/internal`, no `___AuthMiddleware`):** `bundles/:digest/content` (feat-skill-registry proxies, entitlement-gated), `contract/:name` (pod re-pull, TokenReview), and `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
 
-## Auth Subsystem (`infra/auth/`)
+## Auth subsystem
 
-- **OIDC** — PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
+- **OIDC** — `libs/backend/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
 - **pod connection preflight** — `POST /api/v1/auth/pod-token` resolves the tenant **solely from the verified session email** (fail-closed `409 AMBIGUOUS_TENANT`) and returns `{ gatewayUrl, tenant, ingressHost }`. It returns no pod/gateway token, records no device, and expires at that silo's R9 cutover.
-- **`___AuthMiddleware` fallback chain** — public paths → OIDC session → `OPENCRANE_API_TOKEN` env → DB access token → dev bypass. **No per-route role enforcement yet** (roles are a planned target).
+- **`___AuthMiddleware` fallback chain** — `libs/infra/auth`: public paths → OIDC session → `OPENCRANE_API_TOKEN` env → DB access token → dev bypass. **No per-route role enforcement yet** (roles are a planned target).
 - **TokenReview** — internal endpoints validate projected tokens with `aud=opencrane-server`, parsing the tenant from `system:serviceaccount:<ns>:<name>`.
 
 ## Dual-Write & Grant Compiler
 
-Tenant/AccessPolicy mutations write both the CRD (operator's source of truth) and the Postgres row (API/UI projection). Drift is expected; `/drift` detects and `/repair` (dry-run by default) fixes CRD→DB. The **grant compiler** (`core/grants/`) resolves `(principal, payloadType ∈ Awareness|McpServer|SkillBundle)` over group membership with precedence `priority` > Deny-over-Allow > newest. It powers `effective-contract` and internal bundle gating (404 existence-hiding).
+Tenant/AccessPolicy mutations write both the CRD (operator's source of truth) and the Postgres row (API/UI projection). Drift is expected; `/drift` detects and `/repair` (dry-run by default) fixes CRD→DB. The **grant compiler** (`libs/backend/grants/main`) resolves `(principal, payloadType ∈ Awareness|McpServer|SkillBundle)` over group membership with precedence `priority` > Deny-over-Allow > newest. It powers `effective-contract` and internal bundle gating (404 existence-hiding).
 
 ## Cognee Memory Wiring
 
-Boot-time (the `index.ts` in-silo IIFE) provisions Cognee's dependencies, all best-effort/idempotent: a **dedicated LiteLLM virtual key** (`cognee-litellm-key.ts` — Cognee's LLM+embedding spend is a separate budget identity, never a tenant's), a per-silo **Cognee owner account + Cognee Tenant** (`cognee-silo-tenant.ts`), and — per openclaw Tenant, in the reconcile loop — a **real per-tenant Cognee login** keyed to the tenant's owner email (`cognee-tenant-identity.ts`), which is registered, joined to the silo Cognee Tenant, and `tenants/select`-ed so the plugin's `company` scope is genuinely shared silo-wide (not a private dataset per tenant). The tenant pod authenticates as itself via `COGNEE_USERNAME`/`COGNEE_PASSWORD` (never Cognee's `default_user` fallback).
+The composed frozen runtime lifecycle provisions Cognee's dependencies, all best-effort/idempotent: a **dedicated LiteLLM virtual key** (`cognee-litellm-key.ts` — Cognee's LLM+embedding spend is a separate budget identity, never a tenant's), a per-silo **Cognee owner account + Cognee Tenant** (`cognee-silo-tenant.ts`), and — per openclaw Tenant, in the reconcile loop — a **real per-tenant Cognee login** keyed to the tenant's owner email (`cognee-tenant-identity.ts`), which is registered, joined to the silo Cognee Tenant, and `tenants/select`-ed so the plugin's `company` scope is genuinely shared silo-wide (not a private dataset per tenant). These files are under `libs/backend/feat-openclaw-tenant/main`. The tenant pod authenticates as itself via `COGNEE_USERNAME`/`COGNEE_PASSWORD` (never Cognee's `default_user` fallback).
 
 **Embeddings** run through LiteLLM via the stable `auto-embedding` alias — the embedding-side mirror of the chat `auto` selection, registered by the BYOK bootstrap (`provision-byok-key.ts` `_ensureProviderEmbeddingModel`, `mode:"embedding"`, and deliberately **no `ModelDefinition` row** so it never surfaces as a tenant-selectable chat model). It only exists when a provider with a catalogued `embeddingModel` is set (`byok-default-models.ts` — today `openai` only). Cognee uses `EMBEDDING_PROVIDER=openai_compatible` (values.yaml `clustertenantManager.cognee.embedding`) so the model name reaches the proxy **verbatim**; the older `custom` value routed through Cognee's litellm engine, which strips the provider prefix and 400s. A fleet-level shared self-hosted embedding model is planned (issue #185).
 
-## Prisma Schema (`prisma/schema.prisma`)
+## Prisma schema (`prisma/schema/`)
 
 PostgreSQL. Models include `Tenant`, `ClusterTenant`, `AccessPolicy`, `Group`, `Grant`/`McpServerGrant`/`SkillEntitlement`, `McpServer`/`McpServerCredential`, `SkillBundle`/`SkillPromotion`, `ThirdPartySource(+Item)`, `AccessToken`, `ProviderApiKey`, `AuditEntry`, `AwarenessRollout`, `ParticipationEvent`/`TenantParticipation`, `CompanyDoc(+Version)`/`TenantWorkspaceDoc`/`DocMergeProposal`, `OrgDocument`/`HarvestingCursor`, `TenantDatasetMembership`, and budget/usage snapshots. The retained `SessionScope` table is read-only migration evidence until R0/R3 disposition; it is not a live API or security control. Enums mirror `@opencrane/contracts` (GrantAccess/Scope/SubjectType, McpServer*, SkillBundle*, ClusterTenant*, etc.).
 
@@ -73,7 +80,7 @@ PostgreSQL. Models include `Tenant`, `ClusterTenant`, `AccessPolicy`, `Group`, `
 A silo runs in exactly one of two topologies, resolved to a single `DEPLOYMENT_MODE` value (`config.ts`'s `deploymentMode`) that every other standalone-vs-fleet-managed default in this app derives from:
 
 - **`fleet-managed`** — an external fleet-manager (the WeOwnAI control plane, italanta/opencrane#150) owns `ClusterTenant` lifecycle: it creates the CR, seeds `spec.owner`, creates/owns the org namespace, and this silo's `MembershipProjectionRepairer` mirrors membership from `FLEET_INTERNAL_URL`. The silo never creates or binds a `ClusterTenant` itself in this mode.
-- **`standalone`** — no fleet anywhere. This silo is the sole authority: it self-seeds its own cluster-scoped `ClusterTenant` CR on boot (`_SeedOwnClusterTenant`, gated on `deploymentMode === "standalone"` in `index.ts`), binds it to its own namespace, owns per-org namespace creation (`MANAGE_TENANT_NAMESPACES`) and domain provisioning (`MANAGE_OWN_DOMAIN`), and then seeds its own `<org>-default` workspace Tenant from that CR's owner (`_SeedOwnDefaultTenant`) — both boot seeds are best-effort/idempotent and run only in this mode (see the `if (config.deploymentMode === "standalone")` gate in `index.ts`, `~line 290`).
+- **`standalone`** — no fleet anywhere. This silo is the sole authority: the composed runtime lifecycle self-seeds its own cluster-scoped `ClusterTenant` CR (`_SeedOwnClusterTenant`, gated on `deploymentMode === "standalone"`), binds it to its own namespace, owns per-org namespace creation (`MANAGE_TENANT_NAMESPACES`) and domain provisioning (`MANAGE_OWN_DOMAIN`), and then seeds its own `<org>-default` workspace Tenant from that CR's owner (`_SeedOwnDefaultTenant`) — both boot seeds are best-effort/idempotent and run only in this mode.
 
 `DEPLOYMENT_MODE` wins when set; otherwise the SAME fallback the chart itself uses applies: an empty `FLEET_INTERNAL_URL` derives `standalone`, a non-empty one derives `fleet-managed` — so a deployment that sets neither env var behaves exactly as it did before this switch existed.
 

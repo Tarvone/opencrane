@@ -12,12 +12,15 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 
 | Package | Deep-dive | One-liner |
 |---------|-----------|-----------|
-| `@opencrane/server` | [apps/opencrane.md](./apps/opencrane.md) | API-first hub (**Express 5** + Prisma + K8s client). Since #153 the app is **composition + reconciler wiring only** — every HTTP domain lives in `libs/backend/*` (below); the app mounts routers (`src/routes.ts`), brokers OIDC, owns the Prisma schema + reconcilers. Listens `:8080`. |
+| `@opencrane/server` | [apps/opencrane.md](./apps/opencrane.md) | API-first hub (**Express 5** + Prisma + K8s client). The app owns process bootstrap, configuration, route/lifecycle composition, Prisma, and its Helm unit; HTTP capabilities and reconcilers live in libraries. Listens `:8080`. |
 | `@opencrane/feat-skill-registry` | [apps/feat-skill-registry.md](./apps/feat-skill-registry.md) | Entitlement-gated skill delivery (`:5000`). TokenReview (`aud=feat-skill-registry`) → proxy to opencrane-api; non-entitled **and** non-existent → `404` (existence-hiding). |
 | `@opencrane/feat-central-agents` | [apps/feat-central-agents.md](./apps/feat-central-agents.md) | Background ingestion worker (not API-first). Slack → normalise → Cognee; cursor in Postgres. `/healthz`, `/metrics`. |
 | _(apps/opencrane-ui)_ | — | Org-admin Angular SPA, ported in from WeOwnAI (#152). PrimeNG, zoneless/signals, standalone components — see [`angular.md`](./angular.md). Just another client of the opencrane-api (API-First Rule below). `npx nx build\|serve opencrane-ui`. |
-| _(apps/opencrane-infra)_ | — | Current silo umbrella Helm chart and deploy entrypoint. Under the rewrite-freeze target it composes app-owned deployment units; it must not become the anonymous owner of independent green workloads. |
-| _(apps/feat-openclaw-tenant)_ | — | Tenant-side assets / templates (not a workspace package). |
+| `cognee`, `litellm`, `obot` | Local `README.md` | Deployment-only Nx apps. Each owns its pinned image contract, identity, service, policy, and Helm templates under `apps/<name>/helm`; the upstream product source remains external. |
+| `langfuse` | [`apps/langfuse/README.md`](../../apps/langfuse/README.md) | Pinned upstream deployment wrapper with all six bundled workload classes registered explicitly. |
+| `opencrane-migrate` | [`apps/opencrane-migrate/README.md`](../../apps/opencrane-migrate/README.md) | Deploy-only Prisma migration Job owner. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
+| _(apps/opencrane-infra)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, CRDs, issuers, external-secret wiring, and cross-plane defaults; it owns no anonymous workload. |
+| _(apps/feat-openclaw-tenant)_ | — | Frozen-blue tenant image/build rollup. Its controller and renderer logic is isolated in `libs/backend/feat-openclaw-tenant/main` until R10. |
 
 ## Libs (`libs/`)
 
@@ -25,14 +28,17 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 |---------|-----------|-----------|
 | `@opencrane/contracts` | [libs/contracts.md](./libs/contracts.md) | **The keystone** — shared CRD enums/DTOs + the generated typed opencrane-api client (`___CreateControlPlaneClient`, `paths`). Import from the barrel; never redefine types per app. |
 | `@opencrane/util` | [libs/util/README.md](../../libs/util/README.md) | Dependency-free pure helpers shared across domain packages (`scope:shared`). |
+| `@opencrane/infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport for the in-process identity-routing proxy. |
+| `@opencrane/infra/tenant-hosting` | — | GCP and on-prem tenant storage adapters; the server app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not in `pnpm-workspace.yaml`, no code yet. |
 
 ## Domain packages (`libs/backend/*/main`)
 
-The control plane's HTTP surface is split into 20 NX packages, one per functional domain
+The control plane and extracted runtime capabilities are split into 22 NX packages
 (`@opencrane/backend-<d>` at `libs/backend/<d>/main`): tenants, policies, grants, skills,
-model-routing, providers, awareness, spend, groups, mcp, sessions, company-docs, audit,
-access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection.
+model-routing, providers, awareness, spend, groups, mcp, company-docs, audit,
+access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection,
+identity, api-spec, and the frozen-blue `feat-openclaw-tenant` boundary.
 Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, boundary rules (`scope:backend`), and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);
@@ -60,5 +66,5 @@ are peers over the same management API, never privileged paths.
 ## Nested AGENTS.md
 
 Some subdirectories carry their own `AGENTS.md` (e.g. tenant workspace templates under
-`apps/opencrane-api/src/tenants/deploy/workspace/`). Those are scoped to that directory's generated
+`libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/workspace/`). Those are scoped to that directory's generated
 artifacts and do not override this guidance for platform source.

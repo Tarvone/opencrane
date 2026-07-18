@@ -190,4 +190,11 @@ export default [
       ],
     },
   },
+  {
+    // Vitest configs are build tooling, not product modules: every one imports the
+    // root vitest.cache.js helper by relative path (the ROOT-CACHE style rule requires
+    // it), which the boundaries rule would misread as an unregistered external import.
+    files: ["**/vitest.config.ts"],
+    rules: { "@nx/enforce-module-boundaries": "off" },
+  },
 ];

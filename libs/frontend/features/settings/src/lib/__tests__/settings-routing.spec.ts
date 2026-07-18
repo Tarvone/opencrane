@@ -26,6 +26,8 @@ import { SkillsSectionComponent } from "../sections/skills-section/skills-sectio
 import { MembersSectionComponent } from "../sections/members-section/members-section.component.js";
 import { LlmProvidersSectionComponent } from "../sections/llm-providers-section/llm-providers-section.component.js";
 import { _CanDeactivateMembersSection } from "../sections/members-section/members-section.guard.js";
+import { BudgetsSectionComponent } from "../sections/budgets-section/budgets-section.component.js";
+import { _CanDeactivateBudgetsSection } from "../sections/budgets-section/budgets-section.guard.js";
 
 /** Resolve an external settings component template or stylesheet. */
 function _componentResource(resourceUrl: string): string
@@ -60,7 +62,7 @@ function _testableRoutes(routes: Routes): Routes
 	return routes.map(function testableRoute(route): Route
 	{
 	if (route.path === "agents" && route.component) return { ...route, component: undefined, children: [{ path: "", pathMatch: "full", component: route.component, data: route.data }, { path: "edit", component: route.component, data: { title: "Edit agent", description: "Nested agent configuration." }, canDeactivate: [_denyNavigation] }] };
-	if (route.path === "members") return route;
+	if (route.path === "members" || route.path === "budgets") return route;
 	if (route.children) return { ...route, children: _testableRoutes(route.children) };
 	if (route.redirectTo !== undefined || route.component) return route;
 	if (route.path === "skills" || route.path === "connectors" || route.path === "data-network" || route.path === "provider-keys") return route;
@@ -194,6 +196,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		]);
 		expect(workspaceRoutes.find(function pod(route): boolean { return route.path === "pod"; })?.canDeactivate).toEqual([_CanDeactivatePodSection]);
 		expect(workspaceRoutes.find(function members(route): boolean { return route.path === "members"; })?.children?.filter(function editor(route): boolean { return route.path?.startsWith("edit/") ?? false; }).every(function guarded(route): boolean { return route.canDeactivate?.includes(_CanDeactivateMembersSection) ?? false; })).toBe(true);
+		expect(workspaceRoutes.find(function budgets(route): boolean { return route.path === "budgets"; })?.canDeactivate).toEqual([_CanDeactivateBudgetsSection]);
 		expect(_scopeChildren(SettingsScope.Personal).slice(1, -1).map(function path(route): string | undefined { return route.path; })).toEqual([
 			"account", "awareness", "budget", "api-keys"
 		]);
@@ -235,6 +238,18 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
 		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/connectors");
 		expect(connectors.installedConnectors()).toHaveLength(5);
+	});
+
+	it("activates Workspace Budgets at its stable route", async function budgetsRoute(): Promise<void>
+	{
+		const harness = await RouterTestingHarness.create("/settings/workspace/budgets");
+		const budgets = harness.fixture.debugElement.query(By.directive(BudgetsSectionComponent)).componentInstance as BudgetsSectionComponent;
+
+		expect(harness.fixture.debugElement.query(By.directive(BudgetsSectionComponent))).not.toBeNull();
+		expect(harness.fixture.debugElement.query(By.directive(SettingsPlaceholderComponent))).toBeNull();
+		expect((harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null)?.getAttribute("href")).toBe("/settings/workspace/budgets");
+		expect(budgets.totals()).toEqual({ spent: 273, allocated: 350 });
+		expect(harness.fixture.nativeElement.querySelectorAll(".wo-budgets__row:not(.wo-budgets__row--heading)")).toHaveLength(5);
 	});
 
 	it("activates Data & Network at its stable route", async function dataNetworkRoute(): Promise<void>

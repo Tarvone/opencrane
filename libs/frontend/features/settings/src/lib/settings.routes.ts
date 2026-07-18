@@ -4,6 +4,7 @@ import { SettingsPageComponent } from "./settings-page/settings-page.component.j
 import { SettingsPlaceholderComponent } from "./settings-placeholder/settings-placeholder.component.js";
 import { _CanDeactivatePodSection } from "./sections/pod-section/pod-section.guard.js";
 import { _CanDeactivateMembersSection } from "./sections/members-section/members-section.guard.js";
+import { _CanDeactivateBudgetsSection } from "./sections/budgets-section/budgets-section.guard.js";
 
 /** Create a leaf route for a later-milestone settings section. */
 function _placeholderRoute(path: string, title: string, description: string): Route
@@ -58,7 +59,17 @@ const WORKSPACE_SETTINGS_ROUTES: Routes =
 			})
 		]
 	},
-	_placeholderRoute("budgets", "Budgets", "Workspace allocations and member spend controls will be delivered in milestone 4."),
+	{
+		path: "budgets",
+		canDeactivate: [_CanDeactivateBudgetsSection],
+		loadComponent: function loadBudgetsSection()
+		{
+			return import("./sections/budgets-section/budgets-section.component.js").then(function pickBudgetsSection(module)
+			{
+				return module.BudgetsSectionComponent;
+			});
+		}
+	},
 	{
 		path: "skills",
 		loadComponent: function loadSkillsSection()

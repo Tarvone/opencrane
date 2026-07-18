@@ -34,7 +34,7 @@ prisma/
 ```
 
 Business capabilities live under `libs/backend/*`; reusable infrastructure lives under
-`libs/infra/*` and `libs/k8s-platform`. This app is the composition and deployment root.
+`libs/server/_infra/*` and `apps/_infra/deploy-k8s/platform`. This app is the composition and deployment root.
 
 ## Development
 

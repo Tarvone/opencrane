@@ -29,7 +29,7 @@ This document covers the essential operational procedures for deploying, verifyi
 | `kubectl` | ≥ cluster version | Cluster management |
 | PostgreSQL | 14+ | Control-plane state |
 | Node.js | 22 LTS | Image builds |
-| pnpm | 9+ | Workspace builds |
+| npm | 10+ | Workspace builds |
 
 ### Local Installation (k3d)
 
@@ -38,13 +38,13 @@ This document covers the essential operational procedures for deploying, verifyi
 k3d cluster create opencrane --agents 1 --port "8080:80@loadbalancer"
 
 # 2. Bootstrap the full local stack (PostgreSQL + LiteLLM + opencrane-api + operator)
-libs/k8s-platform/tests/k3d-local.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-local.sh
 
 # 3. Verify all pods are running
 kubectl get pods -n opencrane
 
 # 4. Run smoke tests
-libs/k8s-platform/tests/k3d-e2e.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
 ```
 
 ### Production installation (fleet + silos)
@@ -59,7 +59,7 @@ apps/fleet-platform/deploy.sh \
     --cert-manager --acme-email ops@example.com --dns01-provider clouddns
 
 # Step 2: install one silo per ClusterTenant
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
     --base-domain prod.example.com \
     --cluster-tenant acme
 ```
@@ -75,7 +75,7 @@ export GOOGLE_CLOUD_PROJECT=your-project-id
 export GOOGLE_CLOUD_REGION=us-central1
 
 # 3. Apply Terraform infrastructure
-cd libs/k8s-platform/terraform
+cd apps/_infra/deploy-k8s/platform/terraform
 terraform init
 terraform apply -var-file environments/prod/terraform.tfvars
 
@@ -145,13 +145,13 @@ kubectl describe tenant acme -n opencrane-<ct>
 
 ```bash
 # Run the full k3d e2e smoke test
-libs/k8s-platform/tests/k3d-e2e.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
 
 # Run workspace unit tests
-pnpm test
+npm test
 
 # Build all packages
-pnpm build
+npm run build
 ```
 
 ### Cognee health check
@@ -195,7 +195,7 @@ apps/fleet-platform/deploy.sh \
     --reuse-values
 
 # Upgrade a silo release
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
     --base-domain prod.example.com \
     --cluster-tenant acme \
     --reuse-values
@@ -235,7 +235,7 @@ kubectl rollout status deployment/opencrane-fleet-manager -n opencrane-system --
 
 ```bash
 # Upgrade the immutable OpenClaw + Cognee runtime pair for one silo.
-helm upgrade opencrane-<ct> apps/opencrane-infra \
+helm upgrade opencrane-<ct> apps/_infra/deploy-k8s \
   --namespace opencrane-<ct> \
   --reuse-values \
   --set tenant.defaultImage.tag=<tested-runtime-tag> \
@@ -353,7 +353,7 @@ restores OpenClaw and the Cognee plugin together.
 4. Check database connectivity from LiteLLM
 5. If LiteLLM is permanently unavailable, disable it for recovery on the affected silo:
    ```bash
-   helm upgrade opencrane-<ct> apps/opencrane-infra/ \
+   helm upgrade opencrane-<ct> apps/_infra/deploy-k8s/ \
      --namespace opencrane-<ct> \
      --reuse-values \
      --set litellm.enabled=false \

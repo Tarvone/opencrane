@@ -37,7 +37,7 @@ fresh context — do not assume the author's intent was correct.
   (via `@opencrane/observability`, correct level, structured fields, no secrets)
   is a finding. Expected/benign early returns need no log.
 - Tests exist for changed behaviour and for the regression being fixed. When in
-  doubt run them: `pnpm --filter <pkg> test`.
+  doubt run them: `npx nx run <project>:test`.
 - **Operational correctness** (these cost real live-deploy iterations when missed —
   flag them at PR time):
   - *Persistence.* A workload that stores state it must not lose (database, vector/graph

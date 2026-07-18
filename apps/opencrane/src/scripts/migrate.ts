@@ -2,8 +2,8 @@ import { execSync } from "node:child_process";
 
 import { ___CreateLogger } from "@opencrane/observability";
 
-/** Structured logger for the migration init container — JSON to stdout for central scraping. */
-const _log = ___CreateLogger("opencrane-ui-migrate");
+/** Structured logger for the database-schema runner — JSON to stdout for central scraping. */
+const _log = ___CreateLogger("opencrane-database-schema");
 
 /**
  * Standalone migration runner for the control plane database.
@@ -18,7 +18,7 @@ function _runMigrations(): void
   {
     execSync("npx prisma migrate deploy", {
       stdio: "inherit",
-      // dist/scripts/migrate.js → up two levels to the opencrane-ui package root,
+      // dist/scripts/migrate.js → up two levels to the OpenCrane server package root,
       // where the per-domain `prisma/schema/` directory lives (the cwd `prisma migrate deploy` expects).
       cwd: new URL("../../", import.meta.url).pathname,
     });

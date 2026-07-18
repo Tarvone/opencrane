@@ -70,7 +70,7 @@ If you can't verify a claim in the repo, don't assert it — soften to intent or
 4. **Build to validate** — `ignoreDeadLinks: false`, so the build is your link checker:
 
    ```bash
-   cd website && pnpm build 2>&1 | tail -20
+   npm run build -w @opencrane/website 2>&1 | tail -20
    ```
 
    A broken cross-link or bad sidebar path fails the build. The pre-existing

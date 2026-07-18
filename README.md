@@ -141,8 +141,8 @@ Legend:   [live] live today      [partial] partial / gated      [desired] desire
 | Component | Path | Description |
 |-----------|------|-------------|
 | Silo operator | `apps/opencrane/` | Per-silo control plane: headless Express REST API (`/api/v1`) + in-silo controllers; emits `openapi.json` at build time |
-| Silo chart | `apps/opencrane-infra/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/opencrane-infra/deploy.sh`. |
-| Platform library | `libs/k8s-platform/` | Helm library chart (shared named templates), shared deploy engine (`k8s-deploy.sh`, `configure-oidc.sh`) + cluster provisioning (`provision.sh`, behind `--provision`), Terraform, migrations, tests, and `deploy-single-tenant.sh` |
+| Silo chart | `apps/_infra/deploy-k8s/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/_infra/deploy-k8s/deploy.sh`. |
+| Deployment platform | `apps/_infra/deploy-k8s/platform/` | Internal Helm helper chart, deploy engine (`k8s-deploy.sh`, `configure-oidc.sh`), cluster provisioning (`provision.sh`, behind `--provision`), Terraform, value profiles, tests, and `deploy-single-tenant.sh` |
 | Contracts | `libs/contracts/` | Generated TypeScript client + DTOs from `openapi.json`; used by the OpenCrane UI and external surfaces |
 | Docker | `apps/*/deploy/Dockerfile` | Per-app Dockerfiles (silo operator, tenant runtime, skill registry), built and published by `.github/workflows/docker.yml` |
 | Skills | `skills/shared/` | Org/team shared skill library |
@@ -198,10 +198,10 @@ The deploy scripts can provision the cluster too — `--provision local|gke|vps`
 # check that out first, e.g.: ../weownai/apps/fleet-platform/deploy.sh --provision local --base-domain opencrane.local
 
 # Add an organisation (silo) once the fleet is up:
-apps/opencrane-infra/deploy.sh --cluster-tenant acme --base-domain opencrane.local
+apps/_infra/deploy-k8s/deploy.sh --cluster-tenant acme --base-domain opencrane.local
 ```
 
-For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k3d-local.sh` harness (k3d + local images; `LOCAL_PROFILE=strict` for prod-style Helm validation) remains available. The `strict` profile does not emulate GCP-only capabilities (Workload Identity, GCS, External Secrets, GCE ingress, Cloud DNS) — it validates the same core wiring with stricter chart inputs locally.
+For fast dev iteration with locally-built images, the `apps/_infra/deploy-k8s/platform/tests/k3d-local.sh` harness (k3d + local images; `LOCAL_PROFILE=strict` for prod-style Helm validation) remains available. The `strict` profile does not emulate GCP-only capabilities (Workload Identity, GCS, External Secrets, GCE ingress, Cloud DNS) — it validates the same core wiring with stricter chart inputs locally.
 
 ### GCP Deployment
 
@@ -212,18 +212,18 @@ For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k
 #   --project-id my-project --base-domain opencrane.ai
 
 # Add a silo for an organisation (once per org)
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
   --cluster-tenant acme --base-domain opencrane.ai
 
 # Or provision + deploy the fleet AND one seeded org in a single pass (FLEET_CHART_DIR must
 # point at a checked-out copy of WeOwnAI's apps/fleet-platform — see italanta/opencrane#150)
 FLEET_CHART_DIR=../weownai/apps/fleet-platform \
-libs/k8s-platform/deploy-single-tenant.sh --provision gke \
+apps/_infra/deploy-k8s/platform/deploy-single-tenant.sh --provision gke \
   --project-id my-project --base-domain opencrane.ai \
   --org-name acme --org-owner-email owner@acme.example
 
 # Prefer to manage infra yourself? Provision with Terraform
-# (libs/k8s-platform/terraform/environments/dev) and run the deploy scripts WITHOUT
+# (apps/_infra/deploy-k8s/platform/terraform/environments/dev) and run the deploy scripts WITHOUT
 # --provision against the resulting cluster.
 
 # 3. Create a tenant through the authenticated REST API

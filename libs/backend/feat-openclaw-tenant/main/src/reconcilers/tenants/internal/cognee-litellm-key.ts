@@ -4,14 +4,14 @@ import * as k8s from "@kubernetes/client-node";
 import type { Logger } from "pino";
 
 import type { OpenClawTenantOperatorConfig } from "../../../operator-config.types.js";
-import { __K8sApplyResource } from "@opencrane/infra/api";
+import { __K8sApplyResource } from "@opencrane/server/_infra/api";
 
 /**
  * The Secret name the Cognee Deployment's Helm template expects this key under. Fixed
  * (not release-prefixed) because it is a per-silo/per-namespace singleton — exactly one
  * Cognee Deployment exists per release/namespace — and the operator (which mints this
  * key at runtime) has no way to compute the chart's `opencrane.fullname` release prefix.
- * `apps/cognee/helm/templates/_resources.tpl` MUST reference this
+ * `apps/_infra/cognee/helm/templates/_resources.tpl` MUST reference this
  * exact literal name.
  */
 export const COGNEE_LITELLM_KEY_SECRET_NAME = "cognee-litellm-key";

@@ -41,21 +41,21 @@ follows [Keep a Changelog](https://keepachangelog.com/); the project uses
   providers, awareness, spend, groups, MCP, sessions, company-docs, audit, access-tokens, metrics,
   connections, cluster-tenants, retrieval, contract, projection) is now an NX package at
   `libs/domain/<domain>/main`, owning its routes, services, types, tests, and Prisma schema slice.
-  A module-boundary lint rule (`pnpm lint:boundaries`) enforces that imports flow domain → domain + shared
+  A module-boundary lint rule (`npm run lint:boundaries`) enforces that imports flow domain → domain + shared
   only — no cross-domain hard coupling. The stepping stone for multi-tenant customisation and Wave 5
   plugin ownership.
 
-- **The workspace now builds, tests, and lints with NX caching — `pnpm build/test/lint` runs once per
-  input change across all 20 domains.** NX derives the project graph from the pnpm workspace
-  `package.json` dependencies, so a new package or dependency edge updates cache invalidation without
-  manual configuration. The developer experience remains `pnpm build && pnpm test` and the
+- **The workspace now builds, tests, and lints with NX caching — `npm run build/test/lint` runs once per
+  input change across all 20 domains.** NX derives the project graph from project metadata and source
+  imports, so a new package or dependency edge updates cache invalidation without manual
+  configuration. The developer experience remains `npm run build && npm test` and the
   CI cost drops as unchanged domains are skipped.
 
 - **Adding a new domain package requires no Dockerfile or CI edits — the image builds the app's
-  workspace dependency closure automatically.** The Dockerfile copies `libs` wholesale and
-  builds the operator's transitive workspace deps topologically (`pnpm --filter "app^..." build`);
-  each new domain is included on the next build without touching the build definition. The `pnpm install` → `docker build` → app-start
-  pipeline stays identical.
+  dependency closure automatically.** The Dockerfile copies `libs` wholesale and runs the
+  OpenCrane server's npm workspace build, which lets Nx build the required dependency graph; each
+  new domain is included on the next build without touching the build definition. The `npm ci` →
+  `docker build` → app-start pipeline stays identical.
 
 - **Database models are now owned per domain, with clear migration ownership.** The single
   `schema.prisma` is replaced by per-domain files under `prisma/schema/<domain>.prisma` (e.g.
@@ -86,10 +86,17 @@ follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 
 ### Changed
 
+- **Maintainers can now navigate deployment and server ownership directly from the directory
+  structure.** Deployment-only applications live under `apps/_infra`, the installation chart and
+  database-schema Job live under `apps/_infra/deploy-k8s`, reusable OpenCrane server domains live
+  under `libs/backend/server`, and server-process support lives under `libs/server/_infra`.
+  Rendered workloads and runtime behaviour are unchanged.
+
 - **Operators can now identify and release every deployed workload from its owning app package.**
-  OpenCrane server, UI, migration, Cognee, LiteLLM, Obot, and Langfuse deployment definitions now
-  live with their app rollups; `opencrane-infra` composes those app-owned charts as the platform
-  umbrella while preserving the frozen blue render.
+  OpenCrane server and UI definitions stay with their product apps; Cognee, LiteLLM, Obot, and
+  Langfuse live under `apps/_infra`; and `apps/_infra/deploy-k8s` composes those charts with its
+  database-schema deployment component. The reorganized chart preserves the rendered workload
+  behaviour.
 
 - **Platform developers can reuse functional server capabilities without importing an app root.**
   Tenant reconciliation, identity, projection, connection auth, policy reconciliation, channel
@@ -235,9 +242,9 @@ Stage 4 "strong-siloes" fleet/silo architecture split plus earlier silo-program 
   now ships two typed clients — `___CreateFleetClient` and the existing silo client — so
   integrators can depend on exactly the surface they need and get compile-time safety for both.
 
-- **Shared infrastructure code is extracted into two workspace libs usable by both managers.**
-  `@opencrane/infra-api` provides CRD constants and typed Kubernetes error helpers.
-  `@opencrane/infra-auth` provides the shared OIDC login/auth substrate — `OidcAuthServiceBase`,
+- **Shared server infrastructure code is extracted into two workspace libs usable by both managers.**
+  `@opencrane/server/_infra/api` provides CRD constants and typed Kubernetes error helpers.
+  `@opencrane/server/_infra/auth` provides the shared OIDC login/auth substrate — `OidcAuthServiceBase`,
   auth middleware, org-membership helpers, and the gating primitives — parametrised over each
   manager's Prisma client so neither app ships a duplicate copy of the auth stack.
 

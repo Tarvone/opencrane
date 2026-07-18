@@ -6,15 +6,15 @@ GUARD="$ROOT/scripts/phase-b-topology.sh"
 WORKLOAD_REGISTRY="$ROOT/docs/agents/workload-ownership.json"
 APP_SOURCE_REGISTRY="$ROOT/docs/agents/app-source-allowlist.json"
 TMP_DIR="$(mktemp -d)"
-RENDER_PROBE="$ROOT/apps/opencrane-infra/templates/phase-b-guard-probe.yaml"
-COMPUTED_KIND_PROBE="$ROOT/apps/opencrane-infra/templates/phase-b-computed-kind-probe.yaml"
-RUNTIME_PROBE="$ROOT/libs/infra/http/src/phase-b-runtime-guard-probe.ts"
+RENDER_PROBE="$ROOT/apps/_infra/deploy-k8s/templates/phase-b-guard-probe.yaml"
+COMPUTED_KIND_PROBE="$ROOT/apps/_infra/deploy-k8s/templates/phase-b-computed-kind-probe.yaml"
+RUNTIME_PROBE="$ROOT/libs/server/_infra/http/src/phase-b-runtime-guard-probe.ts"
 RUNTIME_COMMAND_PROBE="$ROOT/scripts/phase-b-runtime-command-guard-probe.sh"
-RUNTIME_DUPLICATE_PROBE="$ROOT/libs/infra/http/src/phase-b-runtime-duplicate-guard-probe.ts"
-RUNTIME_NONPRODUCING_DUPLICATE_PROBE="$ROOT/libs/infra/http/src/phase-b-runtime-nonproducing-duplicate-guard-probe.ts"
+RUNTIME_DUPLICATE_PROBE="$ROOT/libs/server/_infra/http/src/phase-b-runtime-duplicate-guard-probe.ts"
+RUNTIME_NONPRODUCING_DUPLICATE_PROBE="$ROOT/libs/server/_infra/http/src/phase-b-runtime-nonproducing-duplicate-guard-probe.ts"
 APP_SOURCE_PROBE="$ROOT/apps/opencrane/src/phase-b-app-guard-probe.py"
 BUILD_SOURCE_PROBE="$ROOT/apps/opencrane/src/build/phase-b-build-source-guard-probe.py"
-ARCHIVE_PROBE="$ROOT/apps/opencrane-infra/charts/.phase-b-langfuse-probe.tgz"
+ARCHIVE_PROBE="$ROOT/apps/_infra/deploy-k8s/charts/.phase-b-langfuse-probe.tgz"
 GENERATED_DIST_PROBE="$ROOT/apps/opencrane/dist/phase-b-generated-guard-probe.js"
 GENERATED_CACHE_PROBE="$ROOT/apps/opencrane/node_modules/.cache/phase-b-generated-guard-probe.mjs"
 
@@ -109,9 +109,16 @@ else if (action === "spoof-local-owner")
   });
   workload.localOwner = true;
 }
+else if (action === "invalid-nested-owner")
+{
+  const workload = registry.workloads.find(function find(candidate) {
+    return candidate.id === "cognee";
+  });
+  workload.owner = "apps/product/group";
+}
 else if (action === "archive")
 {
-  registry.archiveWorkloadInventory.archive = "apps/opencrane-infra/charts/.phase-b-langfuse-probe.tgz";
+  registry.archiveWorkloadInventory.archive = "apps/_infra/deploy-k8s/charts/.phase-b-langfuse-probe.tgz";
 }
 else if (action === "empty-runtime")
 {
@@ -120,7 +127,7 @@ else if (action === "empty-runtime")
 else if (action === "duplicate-runtime-anchor")
 {
   registry.runtimeConstructs.push({
-    path: "libs/infra/http/src/phase-b-runtime-duplicate-guard-probe.ts",
+    path: "libs/server/_infra/http/src/phase-b-runtime-duplicate-guard-probe.ts",
     anchor: "kind: \"Deployment\"",
     workloadIds: ["openclaw-tenant-runtime"],
   });
@@ -128,7 +135,7 @@ else if (action === "duplicate-runtime-anchor")
 else if (action === "duplicate-nonproducing-anchor")
 {
   registry.nonProducingRuntimeMatches.push({
-    path: "libs/infra/http/src/phase-b-runtime-nonproducing-duplicate-guard-probe.ts",
+    path: "libs/server/_infra/http/src/phase-b-runtime-nonproducing-duplicate-guard-probe.ts",
     anchor: "kind: \"Deployment\"",
     reason: "Mutation probe: duplicate delete selectors must not share one exemption.",
   });
@@ -258,6 +265,10 @@ registry="$(mutate_registry spoof-local-owner)"
 expect_failure "localOwner must be derived from the source type" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
+registry="$(mutate_registry invalid-nested-owner)"
+expect_failure "repository-defined workload needs one apps/<name> or apps/_infra/<name> owner" \
+  env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
+
 app_source_registry="$(mutate_app_source_registry)"
 expect_failure "classification is not an exact direct-refactor class" \
   env PHASE_B_APP_SOURCE_REGISTRY="$app_source_registry" "$GUARD"
@@ -267,7 +278,7 @@ expect_failure "workloadIds must map the construct to at least one exact owner" 
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
 mkdir -p "$TMP_DIR/archive"
-tar -xzf "$ROOT/apps/opencrane-infra/charts/langfuse-1.5.37.tgz" -C "$TMP_DIR/archive"
+tar -xzf "$ROOT/apps/_infra/deploy-k8s/charts/langfuse-1.5.37.tgz" -C "$TMP_DIR/archive"
 mkdir -p "$TMP_DIR/archive/langfuse/templates/phase-b-probe"
 printf '%s\n' 'apiVersion: batch/v1' 'kind: Job' 'metadata:' '  name: phase-b-archive-probe' \
   >"$TMP_DIR/archive/langfuse/templates/phase-b-probe/job.yaml"
@@ -276,4 +287,4 @@ registry="$(mutate_registry archive)"
 expect_failure "unregistered upstream archive workload template: langfuse/templates/phase-b-probe/job.yaml" \
   env PHASE_B_WORKLOAD_REGISTRY="$registry" "$GUARD"
 
-printf 'Phase B topology negative tests passed (17 rejection paths plus generated-output regression).\n'
+printf 'Phase B topology negative tests passed (18 rejection paths plus generated-output regression).\n'

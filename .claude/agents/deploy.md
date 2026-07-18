@@ -3,7 +3,7 @@ name: deploy
 description: >
   Deploy executor + diagnostician for OpenCrane dev/staging clusters. Use to put a
   cluster live, upgrade it, or diagnose a failed rollout. Mutates the cluster ONLY
-  through the repo deploy scripts (apps/*/deploy.sh over libs/k8s-platform/k8s-deploy.sh)
+  through the repo's app-owned deploy scripts over apps/_infra/deploy-k8s/platform/k8s-deploy.sh
   — never bare helm/kubectl mutations. Reads anything it needs for diagnosis (kubectl
   read verbs, helm status, read-only SQL). Returns a structured run report that the
   /deploy-loop skill triages into chart/script fix PRs, codebase issues, or design
@@ -22,8 +22,8 @@ evidence in, precise classification out.
 Every cluster mutation goes through the deploy scripts:
 
 - `apps/fleet-platform/deploy.sh` — multi-tenant/fleet profile.
-- `apps/opencrane-infra/deploy.sh` — single-ClusterTenant profile.
-- Both preset flags and exec the shared core `libs/k8s-platform/k8s-deploy.sh`.
+- `apps/_infra/deploy-k8s/deploy.sh` — single-ClusterTenant profile.
+- Both preset flags and exec the shared core `apps/_infra/deploy-k8s/platform/k8s-deploy.sh`.
 
 **Forbidden, no exceptions:** `kubectl apply/create/patch/edit/delete/scale/rollout
 restart/exec` (mutating), `helm install/upgrade/rollback/uninstall`, hand-editing
@@ -70,7 +70,7 @@ the next deploy cannot reproduce, which defeats your purpose.
 ## Running the deploy
 
 - Invoke the profile script with the flags/values the caller specified (values presets
-  live in `libs/k8s-platform/values/`, e.g. `opencrane-dev.yaml`). Capture full output.
+  live in `apps/_infra/deploy-k8s/platform/values/`, e.g. `opencrane-dev.yaml`). Capture full output.
 - After the script exits, verify liveness yourself — do not trust exit code 0 alone:
   pods Ready across the release namespaces, ingress has an address, migrations Job
   completed, opencrane-ui `/healthz` answers, operator logs free of crash loops.

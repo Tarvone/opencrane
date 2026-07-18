@@ -6,7 +6,7 @@
 # deleted in the same slice that establishes the enforcing Cilium replacement.
 
 apps/opencrane/helm/templates/_deployment.tpl
-apps/opencrane-infra/values.yaml
+apps/_infra/deploy-k8s/values.yaml
 apps/opencrane/src/app/config.ts
 libs/backend/feat-openclaw-tenant/main/src/__tests__/fixtures.ts
 libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/linkerd-identity.client.test.ts
@@ -24,11 +24,11 @@ docs/adr/0003-cilium-spiffe-identity-substrate.md
 docs/design/personal-agent-platform-architecture.md
 docs/design/personal-agent-platform-direct-refactor-plan.md
 docs/optimalisation-plan.md
-libs/infra/api/src/cluster-tenant-namespace.ts
-libs/infra/api/src/custom-object-apply.ts
-libs/infra/api/src/index.ts
-libs/infra/api/src/linkerd.ts
-libs/k8s-platform/templates/_helpers.tpl
+libs/server/_infra/api/src/cluster-tenant-namespace.ts
+libs/server/_infra/api/src/custom-object-apply.ts
+libs/server/_infra/api/src/index.ts
+libs/server/_infra/api/src/linkerd.ts
+apps/_infra/deploy-k8s/platform/templates/_helpers.tpl
 silo-multi-tenant-plan.md
 website/operators/cilium-spiffe-identity.md
 website/operators/networking.md

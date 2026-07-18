@@ -89,9 +89,9 @@ omitted from the network column for brevity.
 | `apps/cognee-indexer` | Artifact-to-memory indexing Job | `cognee-indexer` | none | artifact-service, memory-gateway, Cognee |
 | `apps/agent-runtime` | Personal agent Pods | per-workload projected `agent-runtime` identity | none | channel-proxy, artifact-service, memory-gateway, LiteLLM, Obot |
 | `apps/managed-agent-runtime` | Managed-agent Pods | per-workload projected `managed-agent-runtime` identity | none | channel-proxy, declared artifact inputs, memory-gateway, LiteLLM, Obot |
-| `apps/cognee` | Durable memory engine | `cognee` | none | its mounted stores, LiteLLM |
-| `apps/litellm` | Model gateway | `litellm` | none | approved model providers and its mounted store |
-| `apps/obot` | Integration gateway | `obot` | none | approved external integrations and its mounted store |
+| `apps/_infra/cognee` | Durable memory engine | `cognee` | none | its mounted stores, LiteLLM |
+| `apps/_infra/litellm` | Model gateway | `litellm` | none | approved model providers and its mounted store |
+| `apps/_infra/obot` | Integration gateway | `obot` | none | approved external integrations and its mounted store |
 | `apps/postgres` | OpenCrane CNPG database Pods | `postgres` | none | in-silo database replication and approved backup destination |
 | `apps/skill-authoring` | Skill authoring Job | `skill-authoring` | none | artifact-service, LiteLLM |
 | `apps/tool-runner` | Sandboxed non-Obot tool Job | per-job projected `tool-runner` identity | none | only capability-declared destinations |

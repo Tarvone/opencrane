@@ -61,7 +61,7 @@ Exactly two host classes ever receive external traffic. Everything else is Clust
 | Control-plane host | `dev.opencrane.ai` | LoadBalancer IP | opencrane-api Service :8080 |
 | Per-org host | `acme.dev.opencrane.ai` | LoadBalancer IP | org control-UI SPA (`/`) + gateway-proxy :8090 (`/gateway` WebSocket) + opencrane-api :8080 (`/api/*`) |
 
-The opencrane-api host is either the apex (`<base>`) or a dedicated `platform.<base>`, controlled by the chart value `ingress.controlPlaneHost`. The dev cluster uses the apex directly (`dev.opencrane.ai`). The wildcard Ingress is rendered only when both `ingress.enabled` and `gatewayProxy.enabled` are true (see [`apps/opencrane-infra/templates/gateway-ingress.yaml`](https://github.com/italanta/opencrane/blob/main/apps/opencrane-infra/templates/gateway-ingress.yaml)).
+The opencrane-api host is either the apex (`<base>`) or a dedicated `platform.<base>`, controlled by the chart value `ingress.controlPlaneHost`. The dev cluster uses the apex directly (`dev.opencrane.ai`). The wildcard Ingress is rendered only when both `ingress.enabled` and `gatewayProxy.enabled` are true (see [`apps/_infra/deploy-k8s/templates/gateway-ingress.yaml`](https://github.com/italanta/opencrane/blob/main/apps/_infra/deploy-k8s/templates/gateway-ingress.yaml)).
 
 There are **no per-user subdomains**. Every user in an org connects through one org host; the identity-routing proxy resolves each session to its own pod. All three surfaces are served **same-origin** under that one host: the org control-UI owns `/`, opencrane-api owns `/api/*`, and the gateway WebSocket is routed at `/gateway`.
 
@@ -151,7 +151,7 @@ The security argument for this three-layer seam is detailed in [connection secur
 
 ### Plane ingress NetworkPolicies
 
-The silo chart renders per-plane ingress NetworkPolicies when `networkPolicy.enabled` is true (see [`apps/opencrane-infra/templates/networkpolicy-planes.yaml`](https://github.com/italanta/opencrane/blob/main/apps/opencrane-infra/templates/networkpolicy-planes.yaml)).
+The silo chart renders per-plane ingress NetworkPolicies when `networkPolicy.enabled` is true (see [`apps/_infra/deploy-k8s/templates/networkpolicy-planes.yaml`](https://github.com/italanta/opencrane/blob/main/apps/_infra/deploy-k8s/templates/networkpolicy-planes.yaml)).
 
 | Policy | Protects | Admits ingress from |
 |--------|----------|---------------------|

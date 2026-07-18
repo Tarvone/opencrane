@@ -32,6 +32,8 @@ export interface Connector
 	readonly installed: boolean;
 	/** Whether an installed connector may currently be called. */
 	readonly enabled: boolean;
+	/** Whether the current user may manage this connector. */
+	readonly canManage: boolean;
 }
 
 /** Mutations supported by the mock-only connector lifecycle. */

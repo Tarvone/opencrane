@@ -53,16 +53,55 @@ afterAll(function releaseAngularConnectors(): void
 
 describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 {
-	it("renders the App.dc.html installed connector grid and accessible switches", function installedFixtures(): void
+	it("renders the handoff Connected and Available collections with rights and switches", function installedFixtures(): void
 	{
 		const root = _render().nativeElement as HTMLElement;
-		const names = Array.from(root.querySelectorAll(".wo-connectors__copy h3")).map(function text(element): string { return element.textContent?.trim() ?? ""; });
+		const connectedNames = Array.from(root.querySelectorAll(".wo-connectors__connected-row .wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; });
+		const availableNames = Array.from(root.querySelectorAll(".wo-connectors__available-row .wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; });
+		const adminNames = Array.from(root.querySelectorAll(".wo-connectors__connected-row, .wo-connectors__available-row")).filter(function manageable(row): boolean { return row.querySelector(".wo-connectors__admin") !== null; }).map(function name(row): string { return row.querySelector("h4")?.textContent?.trim() ?? ""; });
 		const switches = Array.from(root.querySelectorAll("[role='switch']"));
 
 		expect(root.querySelector("h2")?.textContent?.trim()).toBe("Connectors");
-		expect(root.querySelector(".wo-connectors__subtitle")?.textContent?.trim()).toBe("External tools and data sources your agents can call.");
-		expect(names).toEqual(["Cognee Search", "GitHub", "Google Calendar", "Slack", "Web Browser"]);
+		expect(root.querySelector(".wo-connectors__subtitle")?.textContent?.trim()).toBe("External tools and data sources your agents can call. The Admin badge means you can manage the connector.");
+		expect(Array.from(root.querySelectorAll(".wo-connectors__collection > h3")).map(function text(element): string { return element.textContent?.trim() ?? ""; })).toEqual(["Connected", "Available"]);
+		expect(connectedNames).toEqual(["Cognee Search", "GitHub", "Google Calendar", "Slack", "Web Browser"]);
+		expect(availableNames).toEqual(["GitLab", "Linear", "Notion", "Perplexity", "SQL Query"]);
+		expect(adminNames).toEqual(["Cognee Search", "GitHub", "Google Calendar", "GitLab", "Linear", "Notion"]);
 		expect(switches.map(function checked(control): string | null { return control.getAttribute("aria-checked"); })).toEqual(["true", "true", "true", "false", "true"]);
+	});
+
+	it("filters both collections by category and renders their exact empty states", function searchesCollections(): void
+	{
+		const fixture = _render();
+		const root = fixture.nativeElement as HTMLElement;
+		const input = root.querySelector("input[type='search']") as HTMLInputElement;
+		input.value = "DEV";
+		input.dispatchEvent(new Event("input"));
+		fixture.detectChanges();
+
+		expect(Array.from(root.querySelectorAll(".wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; })).toEqual(["GitHub", "GitLab", "Linear"]);
+
+		input.value = "calendar";
+		input.dispatchEvent(new Event("input"));
+		fixture.detectChanges();
+		expect(Array.from(root.querySelectorAll(".wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; })).toEqual(["Google Calendar"]);
+
+		input.value = "no matching connector";
+		input.dispatchEvent(new Event("input"));
+		fixture.detectChanges();
+
+		expect(Array.from(root.querySelectorAll(".wo-connectors__empty")).map(function text(element): string { return element.textContent?.trim() ?? ""; })).toEqual(["No connected tools match your search.", "No available connectors match your search."]);
+		expect(root.querySelectorAll(".wo-connectors__card")).toHaveLength(0);
+	});
+
+	it("opens the marketplace from an Available connector action", function availableConnectAction(): void
+	{
+		const fixture = _render();
+		_rootButton(fixture, ".wo-connectors__available-row .wo-connectors__row-button").click();
+		fixture.detectChanges();
+
+		expect(fixture.componentInstance.marketplaceOpen()).toBe(true);
+		expect((fixture.nativeElement as HTMLElement).querySelector("h2")?.textContent?.trim()).toBe("Connector Marketplace");
 	});
 
 	it("opens the owned marketplace, filters all seven categories, and preserves selection on return", function marketplaceNavigation(): void

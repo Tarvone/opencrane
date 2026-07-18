@@ -3,16 +3,16 @@ import { Connector, ConnectorCategory, ConnectorMutation, ConnectorMutationFixtu
 /** Complete connector catalogue shown by the installed list and marketplace. */
 export const CONNECTORS_FIXTURE: readonly Connector[] =
 [
-	{ id: "cognee", name: "Cognee Search", category: ConnectorCategory.Memory, description: "Search workspace memory and connected knowledge graphs.", version: "2.4.1", installed: true, enabled: true },
-	{ id: "github", name: "GitHub", category: ConnectorCategory.Dev, description: "Read repositories, issues, pull requests, and actions.", version: "1.2.0", installed: true, enabled: true },
-	{ id: "gcal", name: "Google Calendar", category: ConnectorCategory.Productivity, description: "Read calendars and coordinate workspace events.", version: "3.0.0", installed: true, enabled: true },
-	{ id: "slack", name: "Slack", category: ConnectorCategory.Comms, description: "Read channels and collaborate with workspace teams.", version: "2.1.0", installed: true, enabled: false },
-	{ id: "browser", name: "Web Browser", category: ConnectorCategory.Research, description: "Research public web pages and retrieve source material.", version: "1.5.2", installed: true, enabled: true },
-	{ id: "gl", name: "GitLab", category: ConnectorCategory.Dev, description: "Read repos, open MRs, trigger CI pipelines.", version: "1.0.0", installed: false, enabled: false },
-	{ id: "linear", name: "Linear", category: ConnectorCategory.Dev, description: "Manage issues, projects, and cycles.", version: "0.9.2", installed: false, enabled: false },
-	{ id: "notion", name: "Notion", category: ConnectorCategory.Productivity, description: "Read and write Notion pages and databases.", version: "2.0.1", installed: false, enabled: false },
-	{ id: "perplexity", name: "Perplexity", category: ConnectorCategory.Research, description: "Real-time web research with citations.", version: "1.1.0", installed: false, enabled: false },
-	{ id: "sql", name: "SQL Query", category: ConnectorCategory.Data, description: "Run read-only queries against connected databases.", version: "1.3.0", installed: false, enabled: false }
+	{ id: "cognee", name: "Cognee Search", category: ConnectorCategory.Memory, description: "Search workspace memory and connected knowledge graphs.", version: "2.4.1", installed: true, enabled: true, canManage: true },
+	{ id: "github", name: "GitHub", category: ConnectorCategory.Dev, description: "Read repositories, issues, pull requests, and actions.", version: "1.2.0", installed: true, enabled: true, canManage: true },
+	{ id: "gcal", name: "Google Calendar", category: ConnectorCategory.Productivity, description: "Read calendars and coordinate workspace events.", version: "3.0.0", installed: true, enabled: true, canManage: true },
+	{ id: "slack", name: "Slack", category: ConnectorCategory.Comms, description: "Read channels and collaborate with workspace teams.", version: "2.1.0", installed: true, enabled: false, canManage: false },
+	{ id: "browser", name: "Web Browser", category: ConnectorCategory.Research, description: "Research public web pages and retrieve source material.", version: "1.5.2", installed: true, enabled: true, canManage: false },
+	{ id: "gl", name: "GitLab", category: ConnectorCategory.Dev, description: "Read repos, open MRs, trigger CI pipelines.", version: "1.0.0", installed: false, enabled: false, canManage: true },
+	{ id: "linear", name: "Linear", category: ConnectorCategory.Dev, description: "Manage issues, projects, and cycles.", version: "0.9.2", installed: false, enabled: false, canManage: true },
+	{ id: "notion", name: "Notion", category: ConnectorCategory.Productivity, description: "Read and write Notion pages and databases.", version: "2.0.1", installed: false, enabled: false, canManage: true },
+	{ id: "perplexity", name: "Perplexity", category: ConnectorCategory.Research, description: "Real-time web research with citations.", version: "1.1.0", installed: false, enabled: false, canManage: false },
+	{ id: "sql", name: "SQL Query", category: ConnectorCategory.Data, description: "Run read-only queries against connected databases.", version: "1.3.0", installed: false, enabled: false, canManage: false }
 ];
 
 /** Marketplace categories in the authoritative handoff order. */

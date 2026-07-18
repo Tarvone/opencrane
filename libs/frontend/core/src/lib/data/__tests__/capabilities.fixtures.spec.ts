@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { CapabilityIntegrationKind } from "../../models/capability.types.js";
-import { CAPABILITY_GROUPS_FIXTURE } from "../__test__/capabilities.fixtures.js";
+import { CapabilityAccessKind, CapabilityCollection, CapabilityIntegrationKind } from "../../models/capability.types.js";
+import { CAPABILITIES_FIXTURE } from "../__test__/capabilities.fixtures.js";
 
 describe("Workspace Skills capability fixtures", function capabilityFixturesSuite(): void
 {
-	it("preserves the authoritative scope and capability order", function fixtureOrder(): void
+	it("preserves the authoritative collection and capability order", function fixtureOrder(): void
 	{
-		expect(CAPABILITY_GROUPS_FIXTURE.map(function scope(group): string { return group.scope; })).toEqual(["Organisation", "Departments", "Teams", "Personal"]);
-		expect(CAPABILITY_GROUPS_FIXTURE.flatMap(function names(group): string[] { return group.items.map(function name(item): string { return item.name; }); })).toEqual([
+		expect(CAPABILITIES_FIXTURE.map(function collection(item): CapabilityCollection { return item.collection; })).toEqual([
+			...Array<CapabilityCollection>(7).fill(CapabilityCollection.Shared),
+			CapabilityCollection.Personal,
+			...Array<CapabilityCollection>(3).fill(CapabilityCollection.Available)
+		]);
+		expect(CAPABILITIES_FIXTURE.map(function names(item): string { return item.name; })).toEqual([
 			"Develop proposals",
 			"Develop department SOPs",
 			"Skill builder",
@@ -16,18 +20,21 @@ describe("Workspace Skills capability fixtures", function capabilityFixturesSuit
 			"SEO audit",
 			"Retainer pricing",
 			"Sprint reporter",
-			"Meeting debriefs"
+			"Meeting debriefs",
+			"Competitor tracker",
+			"Invoice drafting",
+			"Contract clause finder"
 		]);
 	});
 
-	it("keeps MCP and direct-tool integrations distinct from department tags", function fixtureTags(): void
+	it("keeps access scopes and integrations as distinct typed badges", function fixtureTags(): void
 	{
-		const integrations = CAPABILITY_GROUPS_FIXTURE.flatMap(function groups(group) { return group.items.flatMap(function items(item) { return item.mcpList; }); });
-		const departments = CAPABILITY_GROUPS_FIXTURE.flatMap(function groups(group) { return group.items.flatMap(function items(item) { return item.deptList; }); });
+		const integrations = CAPABILITIES_FIXTURE.flatMap(function items(item) { return item.integrationList; });
+		const access = CAPABILITIES_FIXTURE.flatMap(function items(item) { return item.accessList; });
 
 		expect(integrations.filter(function mcps(tag): boolean { return tag.kind === CapabilityIntegrationKind.Mcp; }).map(function labels(tag): string { return tag.label; })).toEqual(["Ahrefs MCP", "Odoo MCP", "Odoo MCP"]);
 		expect(integrations.filter(function tools(tag): boolean { return tag.kind === CapabilityIntegrationKind.Tool; }).map(function labels(tag): string { return tag.label; })).toEqual(["GitHub"]);
-		expect(departments).toContain("Engineering · Frontend");
-		expect(departments).toContain("Only you");
+		expect(access.filter(function departments(tag): boolean { return tag.kind === CapabilityAccessKind.Department; }).map(function labels(tag): string { return tag.label; })).toEqual(["Marketing", "Marketing", "Engineering", "Business Development"]);
+		expect(access.filter(function teams(tag): boolean { return tag.kind === CapabilityAccessKind.Team; }).map(function labels(tag): string { return tag.label; })).toEqual(["Frontend"]);
 	});
 });

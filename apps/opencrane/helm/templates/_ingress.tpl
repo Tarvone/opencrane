@@ -42,9 +42,9 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
-          # Same-origin hosting (DOMAIN.T4): the opencrane-ui API under /api
-          # (auth = /api/v1/auth/*), the gateway WS under /gateway, and the org-admin SPA
-          # owns /. One origin → first-party session cookies, no CORS. Helm OWNS these rules,
+          # Same-origin hosting: the OpenCrane API under /api, the bounded channel HTTP/SSE
+          # endpoints under /v1, and the org-admin SPA under /. One origin gives the channel
+          # proxy first-party session cookies without CORS. Helm OWNS these rules,
           # so the frontend layer never has to kubectl-patch the Ingress out-of-band (that
           # patch fought `helm upgrade` via an SSA field-manager conflict and reverted on
           # every reconcile — see docs/optimalisation-plan.md §5).
@@ -55,6 +55,22 @@ spec:
                 name: {{ include "opencrane.fullname" . }}-opencrane-server
                 port:
                   number: {{ .Values.clustertenantManager.service.port }}
+          {{- if .Values.channelProxy.enabled }}
+          - path: /v1/commands
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "opencrane.fullname" . }}-channel-proxy
+                port:
+                  number: {{ .Values.channelProxy.service.port }}
+          - path: /v1/events
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "opencrane.fullname" . }}-channel-proxy
+                port:
+                  number: {{ .Values.channelProxy.service.port }}
+          {{- end }}
           {{- if .Values.gatewayProxy.enabled }}
           - path: /gateway
             pathType: Prefix

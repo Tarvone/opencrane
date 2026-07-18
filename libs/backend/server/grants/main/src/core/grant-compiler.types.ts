@@ -3,7 +3,6 @@ export enum GrantCompilerPayloadType
 {
   Awareness = "awareness",
   McpServer = "mcp-server",
-  SkillBundle = "skill-bundle",
 }
 
 /** Allow/deny access result returned by the compiler. */

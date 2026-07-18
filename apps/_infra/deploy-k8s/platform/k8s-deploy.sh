@@ -3,8 +3,8 @@
 # OpenCrane — install onto ANY Kubernetes cluster
 #
 # Installs OpenCrane onto the cluster your current kubectl context points at:
-# CloudNativePG (in-cluster PostgreSQL) → secrets → the OpenCrane Helm chart →
-# DB migrations. Uses the published ghcr.io/opencrane images and the cluster's
+# the app-owned PostgreSQL chart → the OpenCrane Helm chart → DB migrations.
+# Uses the published ghcr.io/opencrane images and the cluster's
 # default StorageClass — pure, provider-agnostic Kubernetes.
 #
 # This is the shared core. the deploy scripts' --provision (provision.sh) provisions a cluster
@@ -23,6 +23,12 @@
 #                            [--platform-operator-seed-email EMAIL]
 #                            [--platform-operator-groups CSV]
 #                            [--preflight] [--multi-ct]
+#                            --postgres-credentials-secret NAME
+#                            [--postgres-owner OWNER]
+#                            [--fleet-postgres-credentials-secret NAME] [--fleet-postgres-owner OWNER]
+#                            --obot-postgres-credentials-secret NAME [--obot-postgres-owner OWNER]
+#                            --litellm-postgres-credentials-secret NAME [--litellm-postgres-owner OWNER]
+#                            [--postgres-values FILE]
 #                            [--no-ingress-nginx]
 #                            [--no-external-dns]
 #                            [--cert-manager] [--acme-email EMAIL]
@@ -107,7 +113,8 @@
 # patch creates a `kubectl-*` field manager that owns the image field on the live
 # object and makes every later `helm upgrade` fail with a field-ownership conflict.
 #
-# Prereqs: kubectl (pointed at the target cluster) and helm.
+# Prereqs: kubectl (pointed at the target cluster), helm, an externally installed
+# CloudNativePG operator, and a pre-created PostgreSQL basic-auth Secret.
 # =============================================================================
 set -euo pipefail
 
@@ -120,6 +127,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHART_DIR="${OPENCRANE_CHART_DIR:-}"
 if [[ -z "$CHART_DIR" ]]; then
   echo "[k8s-deploy] OPENCRANE_CHART_DIR is unset. Run a role wrapper deploy.sh — the fleet-platform chart's deploy.sh (now in WeOwnAI) or apps/_infra/deploy-k8s/deploy.sh — not k8s-deploy.sh directly." >&2
+  exit 1
+fi
+POSTGRES_CHART_DIR="${OPENCRANE_POSTGRES_CHART_DIR:-$SCRIPT_DIR/../../../postgres/helm}"
+if [[ ! -f "$POSTGRES_CHART_DIR/Chart.yaml" ]]; then
+  echo "[k8s-deploy] PostgreSQL chart not found at '$POSTGRES_CHART_DIR'." >&2
   exit 1
 fi
 
@@ -209,13 +221,22 @@ INGRESS_NGINX_NAMESPACE="ingress-nginx"
 # bundled in acme/clouddns mode, which is where the shared zone + WI binding are set up.
 INSTALL_EXTERNAL_DNS="${OPENCRANE_INSTALL_EXTERNAL_DNS:-1}"
 EXTERNAL_DNS_NAMESPACE="external-dns"
-# The CloudNativePG operator is a CLUSTER-WIDE singleton (one deployment watches every
-# namespace). The central install brings it up once; a per-silo install (apps/_infra/deploy-k8s/deploy.sh) must
-# NOT re-install it — a second cluster-wide operator would fight the first over the same CRs.
-# `--no-db-operator` (or OPENCRANE_INSTALL_DB_OPERATOR=0) skips the operator install while STILL
-# applying this release's own per-namespace CNPG `Cluster` CR + secrets (reconciled by the
-# already-present cluster-wide operator).
-INSTALL_DB_OPERATOR="${OPENCRANE_INSTALL_DB_OPERATOR:-1}"
+# CloudNativePG is an external cluster prerequisite. OpenCrane never installs or upgrades
+# the operator. The credentials Secret is also external: this deploy flow only validates and
+# references it, so database passwords never pass through shell generation or repair paths.
+POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_POSTGRES_CREDENTIALS_SECRET:-}"
+POSTGRES_VALUES_FILE="${OPENCRANE_POSTGRES_VALUES:-}"
+POSTGRES_OWNER="${OPENCRANE_POSTGRES_OWNER:-opencrane}"
+FLEET_POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_FLEET_POSTGRES_CREDENTIALS_SECRET:-}"
+FLEET_POSTGRES_OWNER="${OPENCRANE_FLEET_POSTGRES_OWNER:-opencrane_fleet}"
+OBOT_POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_OBOT_POSTGRES_CREDENTIALS_SECRET:-}"
+OBOT_POSTGRES_OWNER="${OPENCRANE_OBOT_POSTGRES_OWNER:-obot}"
+LITELLM_POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_LITELLM_POSTGRES_CREDENTIALS_SECRET:-}"
+LITELLM_POSTGRES_OWNER="${OPENCRANE_LITELLM_POSTGRES_OWNER:-litellm}"
+# The central fleet profile owns a separate registry database. Silo wrappers disable
+# it through fleetManager.enabled=false; an explicit environment override exists for
+# other thin profiles that do not render the fleet manager.
+INSTALL_FLEET_DATABASE="${OPENCRANE_INSTALL_FLEET_DATABASE:-1}"
 # The shared DNS-writer Google service account (Terraform `dns` module output
 # dns_writer_service_account_email) external-dns + the cert-manager DNS-01 solver impersonate
 # via Workload Identity. On GKE the controller's KSA must carry the annotation
@@ -250,10 +271,7 @@ AUTO_INGRESS_IP="${OPENCRANE_AUTO_INGRESS_IP:-0}"
 # error-free, opencrane-ui host resolves). Never fails the install. Also via OPENCRANE_VERIFY=1.
 VERIFY="${OPENCRANE_VERIFY:-0}"
 
-DB_CLUSTER="opencrane-db"
-DB_SECRET="opencrane-db"
-DB_USER="opencrane"
-DB_NAME="opencrane"
+POSTGRES_RELEASE=""
 TIMEOUT="${TIMEOUT_SECONDS:-300}"
 
 log()  { echo -e "\033[0;32m[k8s-deploy]\033[0m $1"; }
@@ -285,7 +303,15 @@ while [[ $# -gt 0 ]]; do
     --verify)           VERIFY="1"; shift ;;
     --no-ingress-nginx) INSTALL_INGRESS_NGINX="0"; shift ;;
     --no-external-dns)  INSTALL_EXTERNAL_DNS="0"; shift ;;
-    --no-db-operator)   INSTALL_DB_OPERATOR="0"; shift ;;
+    --postgres-credentials-secret) POSTGRES_CREDENTIALS_SECRET="$2"; shift 2 ;;
+    --postgres-owner) POSTGRES_OWNER="$2"; shift 2 ;;
+    --fleet-postgres-credentials-secret) FLEET_POSTGRES_CREDENTIALS_SECRET="$2"; shift 2 ;;
+    --fleet-postgres-owner) FLEET_POSTGRES_OWNER="$2"; shift 2 ;;
+    --obot-postgres-credentials-secret) OBOT_POSTGRES_CREDENTIALS_SECRET="$2"; shift 2 ;;
+    --obot-postgres-owner) OBOT_POSTGRES_OWNER="$2"; shift 2 ;;
+    --litellm-postgres-credentials-secret) LITELLM_POSTGRES_CREDENTIALS_SECRET="$2"; shift 2 ;;
+    --litellm-postgres-owner) LITELLM_POSTGRES_OWNER="$2"; shift 2 ;;
+    --postgres-values) POSTGRES_VALUES_FILE="$2"; shift 2 ;;
     --dns-writer-gsa)   DNS_WRITER_GSA="$2"; shift 2 ;;
     --cert-manager)  CERT_MANAGER="on"; shift ;;
     --acme-email)    ACME_EMAIL="$2"; shift 2 ;;
@@ -295,7 +321,10 @@ while [[ $# -gt 0 ]]; do
     --values)        VALUES_FILE="$2"; shift 2 ;;
     --reuse-values)  REUSE_VALUES="1"; shift ;;
     --reset-values)  RESET_VALUES="1"; shift ;;
-    --set)           EXTRA_SET+=(--set "$2"); shift 2 ;;
+    --set)
+      [[ "$2" == "fleetManager.enabled=false" ]] && INSTALL_FLEET_DATABASE="0"
+      EXTRA_SET+=(--set "$2"); shift 2
+      ;;
     --helm-arg)      EXTRA_HELM_ARGS+=("$2"); shift 2 ;;
     -h|--help)       grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)               err "Unknown flag: $1"; exit 1 ;;
@@ -337,6 +366,40 @@ _run_preflight() {
   else
     kubectl get storageclass "$STORAGE_CLASS" >/dev/null 2>&1 || PF_FAILS+=("--storage-class '$STORAGE_CLASS' does not exist on the cluster.")
   fi
+
+  # 1b. PostgreSQL is app-owned, while its operator and bootstrap credentials are external
+  # prerequisites. Validate both without installing, generating, rotating, or repairing them.
+  kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || PF_FAILS+=("CloudNativePG operator is absent (clusters.postgresql.cnpg.io CRD not found). Install it before OpenCrane.")
+  _preflight_postgres_bootstrap() {
+    local authority="$1"
+    local credentials_secret="$2"
+    local database_owner="$3"
+    local postgres_key
+    local postgres_username
+    if [[ -z "$credentials_secret" ]]; then
+      PF_FAILS+=("$authority PostgreSQL requires its own pre-created kubernetes.io/basic-auth credentials Secret.")
+      return
+    elif ! kubectl get secret "$credentials_secret" -n "$NAMESPACE" >/dev/null 2>&1; then
+      PF_FAILS+=("$authority PostgreSQL credentials Secret '$credentials_secret' does not exist in namespace '$NAMESPACE'.")
+      return
+    elif [[ "$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o jsonpath='{.type}')" != "kubernetes.io/basic-auth" ]]; then
+      PF_FAILS+=("$authority PostgreSQL credentials Secret '$credentials_secret' must have type kubernetes.io/basic-auth.")
+      return
+    fi
+    for postgres_key in username password; do
+      if [[ -z "$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o "jsonpath={.data.${postgres_key}}" 2>/dev/null)" ]]; then
+        PF_FAILS+=("$authority PostgreSQL credentials Secret '$credentials_secret' is missing the '$postgres_key' key.")
+      fi
+    done
+    postgres_username="$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o jsonpath='{.data.username}' 2>/dev/null | base64 -d)"
+    if [[ "$postgres_username" != "$database_owner" ]]; then
+      PF_FAILS+=("$authority PostgreSQL credentials Secret '$credentials_secret' has username '$postgres_username', but database.owner is '$database_owner'.")
+    fi
+  }
+  _preflight_postgres_bootstrap opencrane "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER"
+  [[ "$INSTALL_FLEET_DATABASE" == "0" ]] || _preflight_postgres_bootstrap fleet "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_OWNER"
+  _preflight_postgres_bootstrap obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER"
+  _preflight_postgres_bootstrap litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER"
 
   # 2. NetworkPolicy-enforcing CNI — the platform's isolation model is built on
   #    NetworkPolicy; a CNI that silently ignores them (e.g. stock kindnet/flannel) makes
@@ -446,14 +509,7 @@ if [[ "$PREFLIGHT" == "1" ]]; then
 fi
 
 _gen_secret() { openssl rand -hex 16 2>/dev/null || head -c 24 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32; }
-# Re-use existing passwords when secrets already exist so that re-runs don't
-# rotate credentials without also updating postgres (which only reads the
-# bootstrap secret once at initdb time).
 _read_secret() { kubectl get secret "$1" -n "$NAMESPACE" -o jsonpath="{.data.$2}" 2>/dev/null | base64 -d || true; }
-if [[ -z "${DB_PASSWORD:-}" ]]; then
-  DB_PASSWORD="$(_read_secret "${DB_CLUSTER}-creds" password)"
-  DB_PASSWORD="${DB_PASSWORD:-$(_gen_secret)}"
-fi
 if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
   LITELLM_MASTER_KEY="$(_read_secret opencrane-litellm LITELLM_MASTER_KEY)"
   LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-sk-$(_gen_secret)}"
@@ -497,104 +553,139 @@ LANGFUSE_REDIS_PASSWORD="${LANGFUSE_REDIS_PASSWORD:-$(_gen_secret)}"
 log "Target cluster: $(kubectl config current-context)"
 log "Namespace: $NAMESPACE   Release: $RELEASE   Image tag: $IMAGE_TAG"
 
-# 1. In-cluster PostgreSQL via the CloudNativePG operator.
-# If the CNPG cluster already exists but authentication fails (password rotated
-# out of sync with the bootstrap secret), wipe and re-bootstrap so all secrets
-# and the live DB stay consistent. Runs a throwaway psql pod inside the cluster.
-_db_auth_ok() {
-  local url="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_CLUSTER}-rw.${NAMESPACE}.svc.cluster.local:5432/${DB_NAME}"
-  kubectl run "db-auth-check-$$" --image=postgres:16 --restart=Never --rm -i \
-    -n "$NAMESPACE" --quiet -- psql "$url" -c '\q' >/dev/null 2>&1
-}
-if kubectl get cluster "$DB_CLUSTER" -n "$NAMESPACE" >/dev/null 2>&1; then
-  if ! _db_auth_ok; then
-    warn "DB credential mismatch detected (password drifted from bootstrap). Resetting PostgreSQL cluster…"
-    kubectl delete cluster "$DB_CLUSTER" -n "$NAMESPACE" --wait=true
-    kubectl delete pvc -n "$NAMESPACE" -l cnpg.io/cluster="$DB_CLUSTER" --ignore-not-found
-    kubectl delete secret "${DB_CLUSTER}" "opencrane-obot" "opencrane-litellm-db" "opencrane-litellm" "opencrane-langfuse" \
-      -n "$NAMESPACE" --ignore-not-found
-    # Fresh secrets — regenerate so cluster + secrets are in sync from scratch.
-    # The litellm DB is wiped with the PVCs, so a fresh salt is correct (no stored
-    # provider keys survive to be decrypted). Langfuse keys are also reset here since
-    # the DB (and all stored traces) are wiped along with the CNPG cluster.
-    DB_PASSWORD="$(_gen_secret)"
-    LITELLM_MASTER_KEY="sk-$(_gen_secret)"
-    LITELLM_SALT_KEY="sk-$(_gen_secret)"
-    LANGFUSE_NEXTAUTH_SECRET="$(_gen_secret)"
-    LANGFUSE_SALT="$(_gen_secret)"
-    LANGFUSE_ENCRYPTION_KEY="$(_gen_secret_256)"
-    LANGFUSE_PUBLIC_KEY="pk-lf-$(_gen_secret | head -c 24)"
-    LANGFUSE_SECRET_KEY="sk-lf-$(_gen_secret | head -c 24)"
-    LANGFUSE_ADMIN_PASSWORD="$(_gen_secret)"
-    LANGFUSE_CH_PASSWORD="$(_gen_secret)"
+# 1. Install app-owned PostgreSQL releases. Each authority gets its own CNPG Cluster,
+# application Secret, PVC lifecycle, and migration history. This is a clean target layout:
+# no shared sibling databases, dual writes, or legacy database import.
+if ! kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1; then
+  err "CloudNativePG is required (clusters.postgresql.cnpg.io is absent). Install the operator before OpenCrane."
+  exit 1
+fi
+_require_postgres_bootstrap() {
+  local authority="$1"
+  local credentials_secret="$2"
+  local database_owner="$3"
+  local postgres_key
+  local postgres_username
+  if [[ -z "$credentials_secret" ]]; then
+    err "$authority PostgreSQL requires its own pre-created kubernetes.io/basic-auth credentials Secret."
+    exit 1
   fi
-fi
+  if ! kubectl get secret "$credentials_secret" -n "$NAMESPACE" >/dev/null 2>&1; then
+    err "$authority PostgreSQL credentials Secret '$credentials_secret' does not exist in namespace '$NAMESPACE'."
+    exit 1
+  fi
+  if [[ "$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o jsonpath='{.type}')" != "kubernetes.io/basic-auth" ]]; then
+    err "$authority PostgreSQL credentials Secret '$credentials_secret' must have type kubernetes.io/basic-auth."
+    exit 1
+  fi
+  for postgres_key in username password; do
+    if [[ -z "$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o "jsonpath={.data.${postgres_key}}" 2>/dev/null)" ]]; then
+      err "$authority PostgreSQL credentials Secret '$credentials_secret' is missing the '$postgres_key' key."
+      exit 1
+    fi
+  done
+  postgres_username="$(kubectl get secret "$credentials_secret" -n "$NAMESPACE" -o jsonpath='{.data.username}' | base64 -d)"
+  if [[ "$postgres_username" != "$database_owner" ]]; then
+    err "$authority PostgreSQL credentials Secret '$credentials_secret' has username '$postgres_username', but database.owner is '$database_owner'."
+    exit 1
+  fi
+}
+_require_postgres_bootstrap opencrane "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER"
+[[ "$INSTALL_FLEET_DATABASE" == "0" ]] || _require_postgres_bootstrap fleet "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_OWNER"
+_require_postgres_bootstrap obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER"
+_require_postgres_bootstrap litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER"
 
-if [[ "$INSTALL_DB_OPERATOR" == "1" ]]; then
-  log "Installing CloudNativePG operator…"
-  helm repo add cnpg https://cloudnative-pg.github.io/charts --force-update >/dev/null
-  helm upgrade --install cnpg cnpg/cloudnative-pg \
-    --namespace "$NAMESPACE" --create-namespace --wait \
-    --set-string monitoring.podMonitor.enabled=false
+_install_postgres_target() {
+  local target_release="$1"
+  local database_name="$2"
+  local credentials_secret="$3"
+  local database_owner="$4"
+  local client_selectors_json="$5"
+  local postgres_args=(upgrade --install "$target_release" "$POSTGRES_CHART_DIR"
+    --namespace "$NAMESPACE"
+    --set-string "credentials.existingSecret=$credentials_secret"
+    --set-string "database.name=$database_name"
+    --set-string "database.owner=$database_owner"
+    --set-json "networkPolicy.clientPodSelectors=$client_selectors_json")
+  [[ -n "$POSTGRES_VALUES_FILE" ]] && postgres_args+=(--values "$POSTGRES_VALUES_FILE")
+  [[ -n "$STORAGE_CLASS" ]] && postgres_args+=(--set-string "storage.storageClass=$STORAGE_CLASS")
+  if helm status "$target_release" -n "$NAMESPACE" >/dev/null 2>&1; then
+    postgres_args+=(--reset-then-reuse-values)
+  fi
+
+  log "Installing PostgreSQL target '$database_name' as release '$target_release'…"
+  helm "${postgres_args[@]}"
+  kubectl wait --for=condition=Ready "cluster/${target_release}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
+  if ! kubectl get secret "${target_release}-app" -n "$NAMESPACE" >/dev/null 2>&1; then
+    err "CloudNativePG reported Ready but did not publish application Secret '${target_release}-app'."
+    exit 1
+  fi
+}
+
+_copy_cnpg_uri_secret() {
+  local source_secret="$1"
+  local target_secret="$2"
+  local target_key="$3"
+  # Stream the encoded CNPG URI directly into kubectl. Credentials never enter a shell
+  # variable, command argument, log line, or generated repository file.
+  kubectl get secret "$source_secret" -n "$NAMESPACE" -o jsonpath='{.data.uri}' \
+    | base64 -d \
+    | kubectl create secret generic "$target_secret" -n "$NAMESPACE" \
+        --from-file="${target_key}=/dev/stdin" --dry-run=client -o yaml \
+    | kubectl apply -f -
+}
+
+POSTGRES_RELEASE="${RELEASE}-postgres"
+FLEET_POSTGRES_RELEASE="${RELEASE}-fleet-postgres"
+OBOT_POSTGRES_RELEASE="${RELEASE}-obot-postgres"
+LITELLM_POSTGRES_RELEASE="${RELEASE}-litellm-postgres"
+
+_install_postgres_target "$POSTGRES_RELEASE" "opencrane" "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}}]'
+if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
+  _install_postgres_target "$FLEET_POSTGRES_RELEASE" "fleet" "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_OWNER" \
+    '[{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager-migrate"}}]'
+fi
+_install_postgres_target "$OBOT_POSTGRES_RELEASE" "obot" "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}}]'
+_install_postgres_target "$LITELLM_POSTGRES_RELEASE" "litellm" "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"litellm"}}]'
+
+_assert_distinct_cnpg_app_credentials() {
+  local app_secrets=("$@")
+  local i
+  local j
+  local left_username
+  local left_password
+  local right_username
+  local right_password
+  for ((i = 0; i < ${#app_secrets[@]}; i++)); do
+    left_username="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+    left_password="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+    for ((j = i + 1; j < ${#app_secrets[@]}; j++)); do
+      right_username="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+      right_password="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+      if [[ "$left_username" == "$right_username" || "$left_password" == "$right_password" ]]; then
+        err "CNPG authorities '${app_secrets[$i]}' and '${app_secrets[$j]}' must not share usernames or passwords."
+        exit 1
+      fi
+    done
+  done
+}
+if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
+  _assert_distinct_cnpg_app_credentials "${POSTGRES_RELEASE}-app" "${FLEET_POSTGRES_RELEASE}-app" "${OBOT_POSTGRES_RELEASE}-app" "${LITELLM_POSTGRES_RELEASE}-app"
 else
-  log "CloudNativePG operator: install skipped (--no-db-operator) — ASSUMING a cluster-wide operator is already running (installed by the central release). This release's per-namespace Cluster CR is applied and only reconciles if that operator exists; apps/_infra/deploy-k8s/deploy.sh preflights for it."
+  _assert_distinct_cnpg_app_credentials "${POSTGRES_RELEASE}-app" "${OBOT_POSTGRES_RELEASE}-app" "${LITELLM_POSTGRES_RELEASE}-app"
 fi
 
-log "Creating database credentials…"
-kubectl create secret generic "${DB_CLUSTER}-creds" -n "$NAMESPACE" \
-  --from-literal=username="$DB_USER" --from-literal=password="$DB_PASSWORD" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-log "Provisioning the PostgreSQL cluster…"
-kubectl apply -f - <<EOF
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: ${DB_CLUSTER}
-  namespace: ${NAMESPACE}
-spec:
-  instances: 1
-  enablePDB: false
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
-  # CNPG manages instance pods as bare Pods (not a Deployment/StatefulSet), so the
-  # GKE cluster-autoscaler treats them as "not backed by a controller" and refuses to
-  # drain the node — blocking scale-down of underutilised nodes (wasted spend on dev).
-  # safe-to-evict lets the autoscaler evict the pod; CNPG reschedules it and the
-  # operator-managed PodDisruptionBudget still prevents evicting too many instances at
-  # once. inheritedMetadata propagates the annotation onto the managed pods.
-  inheritedMetadata:
-    annotations:
-      cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
-  storage:
-    size: 10Gi$( [[ -n "$STORAGE_CLASS" ]] && printf '\n    storageClass: %s' "$STORAGE_CLASS" )
-  bootstrap:
-    initdb:
-      database: ${DB_NAME}
-      secret:
-        name: ${DB_CLUSTER}-creds
-      postInitApplicationSQL:
-        - CREATE DATABASE obot OWNER ${DB_USER};
-        - CREATE DATABASE litellm OWNER ${DB_USER};
-        - CREATE DATABASE langfuse OWNER ${DB_USER};
-EOF
-
-log "Waiting for the database to become ready…"
-kubectl wait --for=condition=Ready "cluster/${DB_CLUSTER}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
-
-# 2. Connection + LiteLLM secrets the chart expects.
-DB_HOST="${DB_CLUSTER}-rw.${NAMESPACE}.svc.cluster.local:5432"
-
-kubectl create secret generic "$DB_SECRET" -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/${DB_NAME}" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create secret generic opencrane-obot -n "$NAMESPACE" \
-  --from-literal=dsn="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/obot" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create secret generic opencrane-litellm-db -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}/litellm" \
-  --dry-run=client -o yaml | kubectl apply -f -
+# CNPG's `<cluster>-app` Secret is canonical. Adapt only the key/name required by
+# third-party charts, without creating databases inside another authority's Cluster.
+POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-app"
+FLEET_POSTGRES_APP_SECRET="${FLEET_POSTGRES_RELEASE}-app"
+OBOT_DSN_SECRET="${RELEASE}-obot"
+LITELLM_DATABASE_SECRET="${RELEASE}-litellm-db"
+_copy_cnpg_uri_secret "${OBOT_POSTGRES_RELEASE}-app" "$OBOT_DSN_SECRET" dsn
+_copy_cnpg_uri_secret "${LITELLM_POSTGRES_RELEASE}-app" "$LITELLM_DATABASE_SECRET" DATABASE_URL
 
 kubectl create secret generic opencrane-litellm -n "$NAMESPACE" \
   --from-literal=LITELLM_MASTER_KEY="$LITELLM_MASTER_KEY" \
@@ -602,9 +693,7 @@ kubectl create secret generic opencrane-litellm -n "$NAMESPACE" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Langfuse secret. Contains stable credentials for the in-cluster Langfuse subchart.
-# SALT, ENCRYPTION_KEY, and API keys MUST be stable once set (changing them orphans
-# existing traces). PostgreSQL password is reused from the CNPG cluster creds secret
-# (langfuse.postgresql.auth.existingSecret = <cluster>-creds) so it is NOT duplicated here.
+# SALT, ENCRYPTION_KEY, and API keys MUST be stable once set.
 kubectl create secret generic opencrane-langfuse -n "$NAMESPACE" \
   --from-literal=NEXTAUTH_SECRET="$LANGFUSE_NEXTAUTH_SECRET" \
   --from-literal=SALT="$LANGFUSE_SALT" \
@@ -785,8 +874,8 @@ _resolve_cert_mode() {
   exit 1
 }
 
-# Install the cert-manager controller + CRDs (mirrors the CloudNativePG install shape:
-# upstream chart, crds.enabled, --wait). Idempotent: helm upgrade --install no-ops when
+# Install the cert-manager controller + CRDs from its upstream chart. Idempotent:
+# helm upgrade --install no-ops when
 # cert-manager is already present, so bundling it can never clobber an existing one. In the
 # acme/Workload-Identity path the controller SA is annotated with the SHARED DNS-writer GSA
 # (same one external-dns uses) so the DNS-01 solver can write to the zone; Terraform creates
@@ -916,10 +1005,6 @@ log "Fetching chart dependencies (from Chart.lock)…"
 helm dep build "$CHART_DIR"
 
 log "Installing the OpenCrane Helm release '$RELEASE'…"
-# LiteLLM is wired to its own `litellm` database (DATABASE_URL via opencrane-litellm-db) with
-# STORE_MODEL_IN_DB on, so models/keys are stored and seeded at runtime via the admin API. The
-# Prisma query-engine crash on the Chainguard/wolfi base is fixed by the non_root image variant
-# (pre-baked engine binaries), set in the chart — see values.yaml litellm.image.
 # --force-conflicts: Helm 4 applies server-side, so any out-of-band actor that has
 # claimed field ownership of a chart-rendered field (e.g. a `kubectl patch`/`kubectl set
 # image` leaving a `kubectl-*` manager, or a now-removed operator drift-repairer whose
@@ -931,11 +1016,16 @@ log "Installing the OpenCrane Helm release '$RELEASE'…"
 # are untouched). Without it a single stray imperative patch wedges every future upgrade.
 helm_args=(upgrade --install "$RELEASE" "$CHART_DIR" --namespace "$NAMESPACE" --create-namespace
   --force-conflicts
-  --set "clustertenantManager.database.existingSecret=$DB_SECRET"
-  --set "fleetManager.database.existingSecret=$DB_SECRET"
-  --set "litellm.existingDatabaseSecret=opencrane-litellm-db"
-  --set "litellm.existingSecret=opencrane-litellm"
-  --set "litellm.storeModelInDb=true")
+  --set-string "clustertenantManager.database.existingSecret=$POSTGRES_APP_SECRET"
+  --set-string "clustertenantManager.database.secretKey=uri"
+  --set-string "litellm.existingDatabaseSecret=$LITELLM_DATABASE_SECRET"
+  --set-string "litellm.databaseSecretKey=DATABASE_URL"
+  --set "litellm.existingSecret=opencrane-litellm")
+if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
+  helm_args+=(
+    --set-string "fleetManager.database.existingSecret=$FLEET_POSTGRES_APP_SECRET"
+    --set-string "fleetManager.database.secretKey=uri")
+fi
 
 # Pinned-tag float guard: detect if the prior release pinned component images to a specific
 # tag. If this invocation does not restate them (no --opencrane-server-tag/--operator-tag/--tenant-tag),
@@ -1005,11 +1095,8 @@ TN_TAG="${TENANT_TAG:-$IMAGE_TAG}"
 # controlPlaneHost) are derived from it. Setting it explicitly here keeps a single
 # source of truth across the chart, the issuer, and the operator's per-org provisioning.
 [[ -n "$BASE_DOMAIN" ]] && helm_args+=(--set "ingress.domain=$BASE_DOMAIN")
-# Langfuse in-cluster wiring: PostgreSQL host (CNPG read-write service) and NEXTAUTH_URL.
-# Both are injected here because they depend on runtime values (namespace, base-domain)
-# not known at values.yaml authoring time. Harmless when langfuse.inCluster.enabled=false
-# (the subchart is disabled by condition so these values are never rendered).
-helm_args+=(--set "langfuse.postgresql.host=${DB_CLUSTER}-rw.${NAMESPACE}.svc.cluster.local")
+# Langfuse endpoint wiring is independent from PostgreSQL. Its storage must be supplied by
+# its own deployable contract when enabled; the OpenCrane database is not a shared SQL host.
 helm_args+=(--set "langfuse.s3.auth.rootPassword=$LANGFUSE_S3_ROOT_PASSWORD")
 helm_args+=(--set "global.valkey.password=$LANGFUSE_REDIS_PASSWORD")
 helm_args+=(--set "langfuse.clickhouse.auth.password=$LANGFUSE_CH_PASSWORD")
@@ -1051,13 +1138,6 @@ fi
 # external-dns wiring resolved above (empty unless a controller is in place). Placed before
 # --set overrides so an operator can still override externalDns.* on the CLI.
 [ ${#EXTERNAL_DNS_HELM_FLAGS[@]} -gt 0 ] && helm_args+=("${EXTERNAL_DNS_HELM_FLAGS[@]}")
-# DB-checksum annotation: a short hash of the DB password injected into the
-# litellm (and mcp-gateway/obot) pod templates. When the password rotates the
-# annotation changes → Kubernetes triggers an automatic rollout so pods never
-# hold stale credentials across a deploy.
-_DB_CKSUM="$(printf '%s' "$DB_PASSWORD" | sha256sum | cut -c1-8)"
-helm_args+=(--set "litellm.podAnnotations.db-checksum=$_DB_CKSUM")
-helm_args+=(--set "mcpGateway.podAnnotations.db-checksum=$_DB_CKSUM")
 helm_args+=("${EXTRA_SET[@]}")
 # Raw helm-arg passthrough for sanctioned one-time fixes (e.g. --take-ownership).
 [[ ${#EXTRA_HELM_ARGS[@]} -gt 0 ]] && helm_args+=("${EXTRA_HELM_ARGS[@]}")

@@ -81,26 +81,22 @@ const _ORG_MEMORY_SECTION = [
 ].join("\n");
 
 /**
- * Render the tenant's `TOOLS.md` workspace doc from its entitled MCP servers and
- * skills. Pure and deterministic: identical inputs always produce identical output
+ * Render the tenant's `TOOLS.md` workspace doc from its entitled MCP servers.
+ * Pure and deterministic: identical inputs always produce identical output
  * so the in-pod content diff only fires on a real entitlement change.
  *
  * @param servers - Entitled MCP servers (allow-decided by the grant compiler).
- * @param skills  - Entitled skill bundles (allow-decided by the grant compiler).
  * @param options - Optional sections (e.g. org memory when Cognee is wired).
  * @returns The full `TOOLS.md` markdown document.
  */
-export function _RenderToolsMarkdown(servers: ToolEntry[], skills: ToolEntry[], options: RenderToolsOptions = {}): string
+export function _RenderToolsMarkdown(servers: ToolEntry[], options: RenderToolsOptions = {}): string
 {
   // 1. MCP servers the agent may reach through the Obot gateway (allow-decided).
   const mcpSection = _renderSection("MCP servers", servers, "No MCP servers are currently entitled.");
 
-  // 2. Skills mounted into the agent workspace.
-  const skillsSection = _renderSection("Skills", skills, "No skills are currently entitled.");
-
-  // 3. Org memory (Cognee memory plugin) — only when Cognee is wired for the fleet.
+  // 2. Org memory (Cognee memory plugin) — only when Cognee is wired for the fleet.
   const orgMemorySection = options.orgMemory ? `\n\n${_ORG_MEMORY_SECTION}` : "";
 
-  // 4. Assemble with a trailing newline so POSIX tools (and git) treat it as a text file.
-  return `${_PREAMBLE}\n\n${mcpSection}\n\n${skillsSection}${orgMemorySection}\n`;
+  // 3. Assemble with a trailing newline so POSIX tools (and git) treat it as a text file.
+  return `${_PREAMBLE}\n\n${mcpSection}${orgMemorySection}\n`;
 }

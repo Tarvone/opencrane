@@ -8,7 +8,6 @@ model Group {
   updatedAt   DateTime        @updatedAt @map("updated_at")
   grants      Grant[]
   mcpGrants   McpServerGrant[]
-  entitlements SkillEntitlement[]
 
   @@index([scope])
   @@map("groups")

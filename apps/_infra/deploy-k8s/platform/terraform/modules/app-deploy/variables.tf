@@ -62,3 +62,28 @@ variable "fleet_chart_path"
   description = "Path to the fleet-platform Helm chart (now maintained in the WeOwnAI repo)"
   type        = string
 }
+
+variable "database_secret_name"
+{
+  description = "Name of an existing Secret containing the fleet database URI. The database is provisioned separately through apps/postgres."
+  type        = string
+
+  validation
+  {
+    condition     = length(trimspace(var.database_secret_name)) > 0
+    error_message = "database_secret_name is required; enable_app_deploy never creates or imports PostgreSQL."
+  }
+}
+
+variable "database_secret_key"
+{
+  description = "Key in database_secret_name containing the fleet database URI."
+  type        = string
+  default     = "uri"
+
+  validation
+  {
+    condition     = length(trimspace(var.database_secret_key)) > 0
+    error_message = "database_secret_key must not be empty."
+  }
+}

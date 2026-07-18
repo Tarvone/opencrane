@@ -237,7 +237,7 @@ function _MapThirdPartySource(source: Record<string, unknown>): ThirdPartySource
     {
       return {
         id: typeof item.id === "string" ? item.id : undefined,
-        kind: String(item.kind).replace("McpServer", "mcp-server").replace("SkillBundle", "skill-bundle").toLowerCase() as ThirdPartySourceItem["kind"],
+        kind: String(item.kind).replace("McpServer", "mcp-server").toLowerCase() as ThirdPartySourceItem["kind"],
         name: String(item.name),
         upstreamId: String(item.upstreamId),
         version: typeof item.version === "string" ? item.version : undefined,

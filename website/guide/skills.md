@@ -1,41 +1,35 @@
 # Share skills across teams
 
+OpenCrane is building **versioned, reviewed skills** that can be shared without trusting mutable
+runtime-local files.
+
 ::: tip What's a skill?
-A **reusable ability** you give to assistants — like installing an app. "Draft a
-sales follow-up," "review a pull request," "summarise a support ticket" — build it
-once, then share it with whoever should have it.
+A **reusable ability** you give to assistants — such as drafting a sales follow-up, reviewing a
+pull request, or summarising a support ticket.
 :::
 
-Skills live in your own catalog. OpenCrane keeps each one **versioned** and
-**security-scanned**, and only delivers it to assistants you've allowed.
+::: info Foundation in progress
+The ArtifactStore-backed publication authority is implemented, but the end-user catalogue,
+authoring, and sharing API and UI are not mounted yet. The retired bundle-registry endpoints are not
+a supported path.
+:::
 
-## See the catalog and add a skill
+## What publication enforces
 
-Browse what's already there, or add a new one by name, version, and starting scope.
-A skill is added in **draft** and must pass a **security scan** before it can go live —
-so an unsafe skill never reaches an assistant.
+The current publication service accepts only an exact `SkillRevision` and `ArtifactRevision` pair.
+It requires successful test and scan evidence, a signature and signer key, and a revision already in
+review. It then publishes the revision and advances the skill's current pointer atomically.
 
-Use `GET /api/v1/skills/catalog` to browse the catalogue and
-`POST /api/v1/skills/catalog` to publish a bundle. Both require authentication; the
-[interactive API reference](/reference/api) carries the current payload schemas.
+The implementation lives in
+[`libs/backend/server/skills/main`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/skills/main).
+The public product workflow will build on that authority rather than restoring an OCI bundle
+registry or compatibility route.
 
-## Share it more widely (promotion)
+## What comes next
 
-This is the heart of skill sharing. Every skill has a **scope** — its reach — and you
-**promote** it to wider scopes as it proves useful:
+The product surface still needs catalogue browsing, isolated authoring jobs, review and publication,
+and governed sharing across personal, project, department and organisation scopes. Until those
+surfaces are mounted, there is no supported end-user skill-publishing workflow.
 
-```
-personal  ▸  project  ▸  department  ▸  org
- you build it   your team    your division   everyone
-```
-
-Promoting a skill to `department` means everyone in that department's assistants can
-use it; promoting to `org` shares it company-wide. You can also pull it back
-(demote) just as easily. Who actually receives a promoted skill is still governed by
-[access grants](/guide/permissions), so you stay in control.
-
-## Going deeper
-
-Publishing, scanning, version pinning, and the exact promotion payloads are covered
-in the [Skill registry deep dive](/integrators/skill-registry). For day-to-day use,
-the create-and-promote idea above is all you need.
+> See also: [Control access](/guide/permissions) (how governed sharing is expressed) and
+> [Architecture](/advanced/architecture) (where skills fit in the platform).

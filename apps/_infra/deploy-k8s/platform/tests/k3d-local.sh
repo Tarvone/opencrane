@@ -9,9 +9,23 @@ KEEP_CLUSTER="${KEEP_CLUSTER:-1}"
 LOCAL_PROFILE="${LOCAL_PROFILE:-default}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-300}"
 MIN_FREE_GB="${MIN_FREE_GB:-12}"
-DB_RELEASE_NAME="${DB_RELEASE_NAME:-opencrane-db}"
-DB_SECRET_NAME="${DB_SECRET_NAME:-opencrane-db}"
+SILO_DB_RELEASE_NAME="${SILO_DB_RELEASE_NAME:-opencrane-silo-postgres}"
+FLEET_DB_RELEASE_NAME="${FLEET_DB_RELEASE_NAME:-opencrane-fleet-postgres}"
+OBOT_DB_RELEASE_NAME="${OBOT_DB_RELEASE_NAME:-opencrane-obot-postgres}"
+LITELLM_DB_RELEASE_NAME="${LITELLM_DB_RELEASE_NAME:-opencrane-litellm-postgres}"
+POSTGRES_CREDENTIALS_SECRET="${POSTGRES_CREDENTIALS_SECRET:-opencrane-postgres-credentials}"
+FLEET_POSTGRES_CREDENTIALS_SECRET="${FLEET_POSTGRES_CREDENTIALS_SECRET:-opencrane-fleet-postgres-credentials}"
+OBOT_POSTGRES_CREDENTIALS_SECRET="${OBOT_POSTGRES_CREDENTIALS_SECRET:-opencrane-obot-postgres-credentials}"
+LITELLM_POSTGRES_CREDENTIALS_SECRET="${LITELLM_POSTGRES_CREDENTIALS_SECRET:-opencrane-litellm-postgres-credentials}"
+SILO_POSTGRES_OWNER="${SILO_POSTGRES_OWNER:-opencrane_local}"
+FLEET_POSTGRES_OWNER="${FLEET_POSTGRES_OWNER:-opencrane_fleet_local}"
+OBOT_POSTGRES_OWNER="${OBOT_POSTGRES_OWNER:-obot_local}"
+LITELLM_POSTGRES_OWNER="${LITELLM_POSTGRES_OWNER:-litellm_local}"
 DB_PASSWORD="${DB_PASSWORD:-opencrane-local-password}"
+FLEET_DB_PASSWORD="${FLEET_DB_PASSWORD:-opencrane-fleet-local-password}"
+OBOT_DB_PASSWORD="${OBOT_DB_PASSWORD:-obot-local-password}"
+LITELLM_DB_PASSWORD="${LITELLM_DB_PASSWORD:-litellm-local-password}"
+CNPG_CHART_VERSION="${CNPG_CHART_VERSION:-0.29.0}"
 LITELLM_SECRET_NAME="${LITELLM_SECRET_NAME:-opencrane-litellm}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-opencrane-local-master-key}"
 # The fleet-operator app and fleet-platform chart moved to the WeOwnAI repo
@@ -129,96 +143,118 @@ k3d cluster create "$CLUSTER_NAME" --agents 1
 
 # 4a. Pre-pulling the official CloudNativePG database image.
 echo "[local] Pre-pulling official CloudNativePG database image"
-docker pull ghcr.io/cloudnative-pg/postgresql:16
+docker pull ghcr.io/cloudnative-pg/postgresql:17.5
 
 # 4b. Import locally built images into the k3d runtime.
 echo "[local] Importing images into k3d"
 k3d image import opencrane/operator:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/opencrane-server:local --cluster "$CLUSTER_NAME"
-k3d image import ghcr.io/cloudnative-pg/postgresql:16 --cluster "$CLUSTER_NAME"
+k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
 
 echo "[local] Using profile '$LOCAL_PROFILE' with values '$VALUES_FILE'"
 
-# 5. Install in-cluster PostgreSQL and publish the DATABASE_URL secret expected by the chart.
+# 5. Install the pinned external CNPG test substrate, then one app-owned Cluster per
+# database authority. Fleet and silo deliberately never share a Prisma migration history.
 echo "[local] Installing CloudNativePG Engine Operator into control plane"
 helm repo add cnpg https://cloudnative-pg.github.io/charts --force-update >/dev/null
 helm upgrade --install cnpg cnpg/cloudnative-pg \
   --namespace "$NAMESPACE" \
   --create-namespace \
+  --version "$CNPG_CHART_VERSION" \
   --wait \
   --set-string monitoring.podMonitor.enabled=false
 
-echo "[local] Bootstrapping credentials secret for PostgreSQL"
-kubectl create secret generic "${DB_RELEASE_NAME}-creds" \
-  -n "$NAMESPACE" \
-  --from-literal=username=opencrane \
-  --from-literal=password="$DB_PASSWORD" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+function _create_database_credentials()
+{
+  local credentials_secret="$1"
+  local database_owner="$2"
+  local database_password="$3"
 
-echo "[local] Applying CloudNativePG configuration layer"
-cat <<EOF | kubectl apply -f -
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: ${DB_RELEASE_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  instances: 1
-  enablePDB: false
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
-  storage:
-    size: 10Gi
-    storageClass: local-path
-  resources:
-    requests:
-      cpu: 250m
-      memory: 256Mi
-  bootstrap:
-    initdb:
-      database: opencrane
-      secret:
-        name: ${DB_RELEASE_NAME}-creds
-      postInitApplicationSQL:
-        - CREATE DATABASE obot OWNER opencrane;
-        - CREATE DATABASE litellm OWNER opencrane;
-        # The silo (clustertenant) opencrane-ui is a SEPARATE Prisma client from the fleet
-        # registry — they cannot share a database (each owns its own _prisma_migrations).
-        - CREATE DATABASE silo OWNER opencrane;
-EOF
+  kubectl create secret generic "$credentials_secret" \
+    -n "$NAMESPACE" \
+    --type=kubernetes.io/basic-auth \
+    --from-literal=username="$database_owner" \
+    --from-literal=password="$database_password" \
+    --dry-run=client \
+    -o yaml | kubectl apply -f -
+}
 
-echo "[local] Waiting for Control-Plane Database Engine to stabilize..."
-kubectl wait --for=condition=Ready cluster/"${DB_RELEASE_NAME}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+echo "[local] Bootstrapping one credentials Secret per PostgreSQL authority"
+_create_database_credentials "$POSTGRES_CREDENTIALS_SECRET" "$SILO_POSTGRES_OWNER" "$DB_PASSWORD"
+_create_database_credentials "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_OWNER" "$FLEET_DB_PASSWORD"
+_create_database_credentials "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" "$OBOT_DB_PASSWORD"
+_create_database_credentials "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" "$LITELLM_DB_PASSWORD"
 
-# Note: CNPG creates a service structured as [cluster-name]-rw for write/read routes
-kubectl create secret generic "$DB_SECRET_NAME" \
-  -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/opencrane" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+function _install_database()
+{
+  local release_name="$1"
+  local database_name="$2"
+  local credentials_secret="$3"
+  local database_owner="$4"
+  local client_selectors_json="$5"
 
-# Silo opencrane-ui DB secret (separate database; see CREATE DATABASE silo above).
-kubectl create secret generic "opencrane-silo-db" \
-  -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/silo" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+  echo "[local] Installing PostgreSQL target '$database_name' as '$release_name'"
+  helm upgrade --install "$release_name" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --set "credentials.existingSecret=$credentials_secret" \
+    --set-string "database.name=$database_name" \
+    --set-string "database.owner=$database_owner" \
+    --set "storage.storageClass=local-path" \
+    --set "networkPolicy.operatorNamespace=$NAMESPACE" \
+    --set-json "networkPolicy.clientPodSelectors=$client_selectors_json"
+  kubectl wait --for=condition=Ready "cluster/$release_name" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+}
 
-echo "[local] Bootstrapping credentials secret for Obot MCP Gateway"
-kubectl create secret generic "opencrane-obot" \
-  -n "$NAMESPACE" \
-  --from-literal=dsn="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/obot" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+function _copy_cnpg_uri_secret()
+{
+  local source_secret="$1"
+  local target_secret="$2"
+  local target_key="$3"
 
-echo "[local] Bootstrapping credentials secret for LiteLLM database"
-kubectl create secret generic "opencrane-litellm-db" \
-  -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/litellm" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+  kubectl get secret "$source_secret" -n "$NAMESPACE" -o jsonpath='{.data.uri}' \
+    | base64 -d \
+    | kubectl create secret generic "$target_secret" -n "$NAMESPACE" \
+        --from-file="${target_key}=/dev/stdin" --dry-run=client -o yaml \
+    | kubectl apply -f -
+}
 
+_install_database "$SILO_DB_RELEASE_NAME" opencrane "$POSTGRES_CREDENTIALS_SECRET" "$SILO_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}}]'
+_install_database "$FLEET_DB_RELEASE_NAME" fleet "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager-migrate"}}]'
+_install_database "$OBOT_DB_RELEASE_NAME" obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}}]'
+_install_database "$LITELLM_DB_RELEASE_NAME" litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"litellm"}}]'
+
+function _assert_distinct_cnpg_app_credentials()
+{
+  local app_secrets=("$@")
+  local i
+  local j
+  local left_username
+  local left_password
+  local right_username
+  local right_password
+  for ((i = 0; i < ${#app_secrets[@]}; i++)); do
+    left_username="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+    left_password="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+    for ((j = i + 1; j < ${#app_secrets[@]}; j++)); do
+      right_username="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+      right_password="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+      if [[ "$left_username" == "$right_username" || "$left_password" == "$right_password" ]]; then
+        echo "[local] CNPG authorities '${app_secrets[$i]}' and '${app_secrets[$j]}' share generated credentials"
+        exit 1
+      fi
+    done
+  done
+}
+_assert_distinct_cnpg_app_credentials "${SILO_DB_RELEASE_NAME}-app" "${FLEET_DB_RELEASE_NAME}-app" "${OBOT_DB_RELEASE_NAME}-app" "${LITELLM_DB_RELEASE_NAME}-app"
+
+_copy_cnpg_uri_secret "${OBOT_DB_RELEASE_NAME}-app" "${RELEASE_NAME}-obot" dsn
+_copy_cnpg_uri_secret "${OBOT_DB_RELEASE_NAME}-app" opencrane-silo-obot dsn
+_copy_cnpg_uri_secret "${LITELLM_DB_RELEASE_NAME}-app" opencrane-litellm-db DATABASE_URL
 
 if [[ "$LOCAL_PROFILE" == "strict" ]]; then
   kubectl create secret generic "$LITELLM_SECRET_NAME" \
@@ -252,11 +288,15 @@ helm_args=(
   --values
   "$VALUES_FILE"
   --set
-  "fleetManager.database.existingSecret=$DB_SECRET_NAME"
+  "fleetManager.database.existingSecret=${FLEET_DB_RELEASE_NAME}-app"
+  --set
+  "fleetManager.database.secretKey=uri"
   --set
   "fleetManager.clusterTenantApi.enabled=false"
   --set
   "litellm.existingDatabaseSecret=opencrane-litellm-db"
+  --set
+  "litellm.databaseSecretKey=DATABASE_URL"
 )
 
 if [[ "$LOCAL_PROFILE" == "strict" ]]; then
@@ -275,10 +315,7 @@ fi
 
 helm "${helm_args[@]}"
 
-# 6b. Install the SILO chart (opencrane-server + the in-silo TenantOperator + planes) into the
-#     SAME namespace for this single-machine full stack. The two charts' resource sets are disjoint,
-#     so co-installing them in one namespace is safe; each self-migrates its own DB via its db-migrate
-#     initContainer (fleet → registry DB, silo → the separate `silo` DB) — no manual migration Job.
+# 6b. Install the SILO chart into the same local test namespace.
 echo "[local] Installing silo release 'opencrane-silo'"
 silo_args=(
   upgrade
@@ -290,9 +327,13 @@ silo_args=(
   --values
   "$VALUES_FILE"
   --set
-  "clustertenantManager.database.existingSecret=opencrane-silo-db"
+  "clustertenantManager.database.existingSecret=${SILO_DB_RELEASE_NAME}-app"
+  --set
+  "clustertenantManager.database.secretKey=uri"
   --set
   "litellm.existingDatabaseSecret=opencrane-litellm-db"
+  --set
+  "litellm.databaseSecretKey=DATABASE_URL"
 )
 if [[ "$LOCAL_PROFILE" == "strict" ]]; then
   silo_args+=(--set "litellm.existingSecret=$LITELLM_SECRET_NAME")

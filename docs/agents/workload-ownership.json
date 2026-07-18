@@ -5,16 +5,13 @@
     "opencrane-server",
     "database-schema",
     "opencrane-ui",
+    "channel-proxy",
     "cognee",
     "litellm",
     "obot-gateway-controller",
-    "skill-registry",
-    "skill-oci-zot",
     "openclaw-tenant-runtime",
     "obot-dynamic-mcp-child",
-    "cnpg-database",
-    "database-auth-check",
-    "cnpg-operator",
+    "postgres-database",
     "ingress-nginx-controller",
     "ingress-nginx-admission-create",
     "ingress-nginx-admission-patch",
@@ -37,10 +34,10 @@
       "setValues": [],
       "expectedRenderedPodClasses": [
         "Deployment/opencrane-opencrane-server",
+        "Deployment/opencrane-channel-proxy",
         "Deployment/opencrane-cognee",
         "Deployment/opencrane-litellm",
         "Deployment/opencrane-mcp-gateway",
-        "Deployment/opencrane-feat-skill-registry",
         "Job/opencrane-opencrane-server-migrate"
       ]
     },
@@ -49,7 +46,7 @@
       "setValues": [
         "langfuse.inCluster.enabled=true",
         "controlPlaneSpa.enabled=true",
-        "skillRegistry.ociStore.enabled=true"
+        "channelProxy.enabled=true"
       ],
       "expectedRenderedPodClasses": [
         "Deployment/opencrane-s3",
@@ -57,11 +54,10 @@
         "Deployment/opencrane-langfuse-worker",
         "Deployment/opencrane-opencrane-server",
         "Deployment/opencrane-opencrane-ui-spa",
+        "Deployment/opencrane-channel-proxy",
         "Deployment/opencrane-cognee",
         "Deployment/opencrane-litellm",
         "Deployment/opencrane-mcp-gateway",
-        "Deployment/opencrane-feat-skill-registry",
-        "Deployment/opencrane-skill-oci",
         "StatefulSet/opencrane-zookeeper",
         "StatefulSet/opencrane-clickhouse-shard0",
         "StatefulSet/opencrane-redis-primary",
@@ -87,18 +83,8 @@
     },
     {
       "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
-      "anchor": "kubectl run \"db-auth-check-$$\" --image=postgres:16",
-      "workloadIds": ["database-auth-check"]
-    },
-    {
-      "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
-      "anchor": "kind: Cluster",
-      "workloadIds": ["cnpg-database"]
-    },
-    {
-      "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
-      "anchor": "helm upgrade --install cnpg cnpg/cloudnative-pg",
-      "workloadIds": ["cnpg-operator"]
+      "anchor": "local postgres_args=(upgrade --install \"$target_release\" \"$POSTGRES_CHART_DIR\"",
+      "workloadIds": ["postgres-database"]
     },
     {
       "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
@@ -122,11 +108,10 @@
         "opencrane-server",
         "database-schema",
         "opencrane-ui",
+        "channel-proxy",
         "cognee",
         "litellm",
         "obot-gateway-controller",
-        "skill-registry",
-        "skill-oci-zot",
         "langfuse-web",
         "langfuse-worker",
         "langfuse-clickhouse",
@@ -221,6 +206,16 @@
       "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.ui.deployment\"" }
     },
     {
+      "id": "channel-proxy",
+      "podClass": "Deployment/channel-proxy",
+      "renderedPodClass": "Deployment/opencrane-channel-proxy",
+      "image": "ghcr.io/italanta/opencrane-channel-proxy:<release-tag>",
+      "owner": "apps/channel-proxy",
+      "localOwner": true,
+      "source": { "type": "file", "path": "apps/channel-proxy/helm/templates/_resources.tpl", "anchor": "kind: Deployment", "coversLocalTemplate": true },
+      "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.channelProxy.resources\"" }
+    },
+    {
       "id": "cognee",
       "podClass": "Deployment/cognee",
       "renderedPodClass": "Deployment/opencrane-cognee",
@@ -251,28 +246,6 @@
       "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.obot.deployment\"" }
     },
     {
-      "id": "skill-registry",
-      "podClass": "Deployment/feat-skill-registry",
-      "renderedPodClass": "Deployment/opencrane-feat-skill-registry",
-      "image": "ghcr.io/italanta/opencrane-skills-registry:<immutable-tag>",
-      "owner": "apps/feat-skill-registry",
-      "localOwner": true,
-      "source": { "type": "file", "path": "apps/_infra/deploy-k8s/templates/feat-skill-registry-deployment.yaml", "anchor": "kind: Deployment", "coversLocalTemplate": true },
-      "classification": "delete",
-      "reason": "Delete this registry when the catalog module and ArtifactStore-backed bytes land."
-    },
-    {
-      "id": "skill-oci-zot",
-      "podClass": "Deployment/skill-oci-store",
-      "renderedPodClass": "Deployment/opencrane-skill-oci",
-      "image": "ghcr.io/project-zot/zot-linux-amd64:latest",
-      "owner": "apps/feat-skill-registry",
-      "localOwner": true,
-      "source": { "type": "file", "path": "apps/_infra/deploy-k8s/templates/skill-oci-store.yaml", "anchor": "kind: Deployment", "coversLocalTemplate": true },
-      "classification": "delete",
-      "reason": "Delete this default-off Zot path; it is not part of the target product."
-    },
-    {
       "id": "openclaw-tenant-runtime",
       "podClass": "Deployment/openclaw-tenant-per-user",
       "image": "ghcr.io/italanta/opencrane-openclaw-tenant:<immutable-tag>",
@@ -293,34 +266,14 @@
       "reason": "Refactor this capability directly to the confined Obot contract; do not preserve privileged controller behavior."
     },
     {
-      "id": "cnpg-database",
+      "id": "postgres-database",
       "podClass": "Pod/CNPG-postgresql-instance",
-      "image": "ghcr.io/cloudnative-pg/postgresql:16",
-      "owner": "external-substrate/cnpg",
+      "image": "ghcr.io/cloudnative-pg/postgresql:17.5",
+      "owner": "apps/postgres",
       "localOwner": true,
-      "source": { "type": "file", "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh", "anchor": "imageName: ghcr.io/cloudnative-pg/postgresql:16" },
-      "classification": "delete",
-      "reason": "Delete this script-owned database construct when apps/postgres owns the target CNPG Cluster resource."
-    },
-    {
-      "id": "database-auth-check",
-      "podClass": "Pod/db-auth-check",
-      "image": "postgres:16",
-      "owner": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
-      "localOwner": true,
-      "source": { "type": "file", "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh", "anchor": "kubectl run \"db-auth-check-$$\" --image=postgres:16" },
-      "classification": "delete",
-      "reason": "Delete this unowned transient diagnostic; the target database app owns its readiness contract without a free-standing Pod."
-    },
-    {
-      "id": "cnpg-operator",
-      "podClass": "Deployment/CNPG-operator-controller",
-      "image": "unpinned cnpg/cloudnative-pg chart output",
-      "owner": "external-substrate/cnpg",
-      "localOwner": true,
-      "source": { "type": "file", "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh", "anchor": "helm upgrade --install cnpg cnpg/cloudnative-pg" },
-      "classification": "delete",
-      "reason": "Delete this repository installer; the target product requires a BYO CNPG operator."
+      "source": { "type": "file", "path": "apps/postgres/helm/templates/cluster.yaml", "anchor": "kind: Cluster" },
+      "classification": "survivor",
+      "reason": "apps/postgres owns the durable CNPG Cluster contract over a separately supplied CNPG operator."
     },
     {
       "id": "ingress-nginx-controller",

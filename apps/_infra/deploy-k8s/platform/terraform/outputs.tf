@@ -51,13 +51,6 @@ output "dns_writer_service_account_email"
   value       = length(module.dns) > 0 ? module.dns[0].dns_writer_service_account_email : ""
 }
 
-output "database_url"
-{
-  description = "PostgreSQL connection string (null until the app is deployed)"
-  value       = try("postgresql://opencrane:${module.app_deploy[0].database_password}@${module.app_deploy[0].database_host}:5432/opencrane", null)
-  sensitive   = true
-}
-
 output "kubeconfig_command"
 {
   description = "Command to configure kubectl"

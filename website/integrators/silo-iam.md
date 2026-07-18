@@ -122,7 +122,7 @@ Request body for `POST`:
 }
 ```
 
-`payloadType` must be `mcp-server` or `skill-bundle`. `recipientType` must be `user`
+`payloadType` must be `mcp-server`. `recipientType` must be `user`
 or `group`. `scope` must be one of `org`, `department`, `project`, or `personal`
 (defaults to `personal`).
 

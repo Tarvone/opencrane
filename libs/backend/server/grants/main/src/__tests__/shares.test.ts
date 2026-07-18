@@ -20,7 +20,6 @@ let _lastCreate: Record<string, unknown> | null = null;
 /** Build a Prisma stub for the shares route. */
 function _prisma(opts: {
   mcpServerIds?: string[];
-  skillBundleIds?: string[];
   groupIds?: string[];
   existingShare?: Record<string, unknown> | null;
   myShares?: Array<Record<string, unknown>>;
@@ -30,7 +29,6 @@ function _prisma(opts: {
   const deleted: string[] = [];
   const prisma = {
     mcpServer: { findUnique: vi.fn(async (a: { where: { id: string } }) => (opts.mcpServerIds ?? []).includes(a.where.id) ? { id: a.where.id } : null) },
-    skillBundle: { findUnique: vi.fn(async (a: { where: { id: string } }) => (opts.skillBundleIds ?? []).includes(a.where.id) ? { id: a.where.id } : null) },
     group: { findUnique: vi.fn(async (a: { where: { id: string } }) => (opts.groupIds ?? []).includes(a.where.id) ? { id: a.where.id } : null) },
     grant: {
       findFirst: vi.fn(async () => opts.existingShare ?? null),

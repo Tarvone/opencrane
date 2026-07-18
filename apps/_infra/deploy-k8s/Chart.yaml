@@ -2,9 +2,9 @@ apiVersion: v2
 name: opencrane-silo
 description: >-
   OpenCrane SILO install — one per ClusterTenant, into the org's own namespace: the
-  opencrane-server (per-silo control plane + in-silo controllers) plus its dedicated
-  runtime planes (Cognee, LiteLLM, Obot/MCP gateway, feat-skill-registry, Langfuse), per-silo
-  NetworkPolicies, and the identity-routing gateway. Installed with apps/_infra/deploy-k8s/deploy.sh,
+  opencrane-server (per-silo control plane + in-silo controllers), the channel trust boundary,
+  and its dedicated runtime planes (Cognee, LiteLLM, Obot/MCP gateway, Langfuse), per-silo
+  NetworkPolicies, and identity routing. Installed with apps/_infra/deploy-k8s/deploy.sh,
   either after the fleet (fleet-managed: set crds.install=false to avoid contending with the
   fleet's own CRD install) or standalone (crds.install defaults true — this chart installs its
   own ClusterTenant/Tenant/AccessPolicy CRDs). Still depends on the cert-manager issuer.
@@ -30,6 +30,9 @@ dependencies:
   - name: opencrane-ui
     version: 0.1.0
     repository: "file://../../opencrane-ui/helm"
+  - name: opencrane-channel-proxy
+    version: 0.1.0
+    repository: "file://../../channel-proxy/helm"
   - name: opencrane-database-schema
     version: 0.1.0
     repository: "file://components/database-schema"

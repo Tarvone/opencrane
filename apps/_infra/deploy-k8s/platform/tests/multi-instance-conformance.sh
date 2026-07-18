@@ -8,9 +8,7 @@
 #
 #   1. Each operator watches only its own namespace, fail-closed (B2).
 #   2. Operator + opencrane-ui RBAC are namespaced Role/RoleBinding scoped to the
-#      instance's own namespace — no cross-instance ClusterRole grant (B1). The only
-#      ClusterRole permitted is the feat-skill-registry TokenReview (legitimately
-#      cluster-scoped; grants no cross-namespace data).
+#      instance's own namespace — no cross-instance ClusterRole grant (B1).
 #   3. No cluster-singleton ClusterIssuer / ClusterSecretStore (B4).
 #   4. A cross-instance default-deny NetworkPolicy is rendered, allowing only the
 #      instance's own namespace (B6).
@@ -83,13 +81,13 @@ check_instance()
     fail "operator is not fail-closed"
   fi
 
-  # 2. RBAC is namespaced; the only ClusterRole is the TokenReview one.
+  # 2. RBAC is namespaced; no app-owned ClusterRole may be rendered.
   local clusterroles
   clusterroles="$(grep -c '^kind: ClusterRole$' "$manifest" || true)"
-  if [ "$clusterroles" -le 1 ]; then
-    pass "no cross-instance ClusterRole (count=$clusterroles; ≤1 TokenReview allowed)"
+  if [ "$clusterroles" -eq 0 ]; then
+    pass "no cross-instance ClusterRole"
   else
-    fail "found $clusterroles ClusterRoles (expected ≤1 TokenReview)"
+    fail "found $clusterroles app-owned ClusterRoles (expected 0)"
   fi
   if grep -q "name: $name-opencrane-clustertenant-manager" "$manifest" && grep -B2 "name: $name-opencrane-clustertenant-manager" "$manifest" | grep -q 'kind: Role'; then
     pass "silo opencrane-ui RBAC is a namespaced Role"

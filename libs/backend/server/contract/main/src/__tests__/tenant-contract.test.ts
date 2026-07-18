@@ -6,7 +6,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { _RegisterInternalTenantContract } from "../index.js";
-import { compileForPrincipals, GrantCompilerAccess } from "@opencrane/backend/server/grants";
+import { compileForPrincipals } from "@opencrane/backend/server/grants";
 
 // Mock the grant compiler at the module boundary so tests can drive Allow/Deny
 // decisions directly without constructing grant rows. Default: no entitlements,
@@ -15,14 +15,6 @@ vi.mock("@opencrane/backend/server/grants", async function _mockGrants(importOri
 {
   const actual = await importOriginal<typeof import("@opencrane/backend/server/grants")>();
   return { ...actual, compile: vi.fn().mockResolvedValue([]), compileForPrincipals: vi.fn().mockResolvedValue([]) };
-});
-
-// Per-skill model resolution is exercised by its own suite; stub it to [] here so
-// the contract-shaping assertions stay focused on entitlement enrichment.
-vi.mock("@opencrane/backend/server/model-routing", async function _mockModelRouting(importOriginal)
-{
-  const actual = await importOriginal<typeof import("@opencrane/backend/server/model-routing")>();
-  return { ...actual, _ResolveContractSkillModels: vi.fn().mockResolvedValue([]) };
 });
 
 /** Build a mock AuthenticationV1Api that returns a controlled TokenReview response. */
@@ -65,9 +57,6 @@ function _buildPrismaStub(overrides: {
       findMany: vi.fn().mockResolvedValue([]),
     },
     mcpServer: {
-      findMany: vi.fn().mockResolvedValue([]),
-    },
-    skillBundle: {
       findMany: vi.fn().mockResolvedValue([]),
     },
     tenantWorkspaceDoc: {
@@ -161,7 +150,7 @@ describe("_RegisterInternalTenantContract GET /:name", () =>
     expect(res.body.tenant.name).toBe("team-alpha");
     expect(res.body.tenant.team).toBe("alpha");
     expect(res.body.policy.mcpServers).toBeDefined();
-    expect(res.body.skills.entitled).toBeInstanceOf(Array);
+    expect(res.body.skills).toBeUndefined();
     // P4B.3: awareness contract version delivered on every pull. With no rollout
     // defined and an unassigned tenant, it resolves to the pinned version, no shadow,
     // and the final (most-conservative) wave.
@@ -219,32 +208,6 @@ describe("_RegisterInternalTenantContract GET /:name", () =>
     expect(tools).toContain("# TOOLS");
     // With no entitlements the section renders an explicit "none" note rather than vanishing.
     expect(tools).toContain("No MCP servers are currently entitled.");
-  });
-
-  it("enriches skills.entitled with the name + digest the pod needs to pull each bundle", async () =>
-  {
-    const prisma = _buildPrismaStub({ tenant: { name: "team-alpha", team: null } });
-    // The route compiles MCP grants first, then skill grants. Allow one skill bundle.
-    // The route only reads `payloadId` + `access`, so cast a minimal decision rather
-    // than fabricate every CompiledGrantDecision field.
-    const _allowBundle1 = [{ payloadId: "bundle-1", access: GrantCompilerAccess.Allow }] as unknown as Awaited<ReturnType<typeof compileForPrincipals>>;
-    vi.mocked(compileForPrincipals)
-      .mockResolvedValueOnce([]) // McpServer decisions
-      .mockResolvedValueOnce(_allowBundle1); // SkillBundle decisions
-    // The entitled-bundle metadata the contract must surface (digest is what addresses the registry).
-    (prisma.skillBundle.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: "bundle-1", name: "company-policy", description: "Org policy", digest: "sha256:abc123" },
-    ]);
-    const app = _buildApp(prisma, _validAuthApi);
-
-    const res = await request(app)
-      .get("/api/internal/contract/team-alpha")
-      .set("Authorization", "Bearer valid");
-
-    expect(res.status).toBe(200);
-    expect(res.body.skills.entitled).toEqual([
-      { id: "bundle-1", name: "company-policy", digest: "sha256:abc123" },
-    ]);
   });
 
   it("compiles the contract over the tenant's principal SET {name, subject} when bound (S4 inheritance)", async () =>

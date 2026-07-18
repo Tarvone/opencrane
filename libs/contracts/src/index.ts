@@ -40,7 +40,6 @@ export {
   AutoRoutingObjective,
   ByokProvider,
   ModelRoutingScope,
-  RoutingProposalStatus,
   SkillModelMode,
   type AutoRoutingConfig,
   type ModelDefinition,
@@ -51,16 +50,10 @@ export {
   type ProviderCredentialWrite,
   type ProviderKeySetRequest,
   type ProviderKeyStatus,
-  type RoutingEvalCase,
-  type RoutingEvalCaseWrite,
-  type RoutingMeasurement,
-  type RoutingProposal,
-  type SavingsRecommendation,
 } from "./model-routing.types.js";
 export { type DurableStatePolicy, type PlatformPolicy, type RuntimeFilesystemPolicy, type SiloUpdatePolicy } from "@opencrane/models/platform-policy";
 export { type RunInputSnapshot } from "./run-input-snapshot.types.js";
 export { type RuntimeAssignment } from "./runtime-assignment.types.js";
-export { SkillBundleStatus, SkillPromotionStatus, type SkillBundle, type SkillPromotion } from "./skill-bundle.types.js";
 export { type TenantModelSet } from "./tenant-models.types.js";
 export {
   ThirdPartySourceItemKind,

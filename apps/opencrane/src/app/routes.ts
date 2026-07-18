@@ -6,9 +6,8 @@ import { accessTokensRouter } from "@opencrane/backend/server/access-tokens";
 import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backend/server/spend";
 import { auditRouter } from "@opencrane/backend/server/audit";
 import { groupsRouter } from "@opencrane/backend/server/groups";
-import { _RegisterInternalBundles, skillCatalogRouter, skillModelPostureRouter, OciBundleStore } from "@opencrane/backend/server/skills";
 import { _RegisterInternalTenantContract } from "@opencrane/backend/server/contract";
-import { _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingRecommendationsRouter, modelRoutingMetricsRouter, routingEvalCasesRouter, routingMeasurementsRouter, routingProposalsRouter, _BuildShadowSeams } from "@opencrane/backend/server/model-routing";
+import { _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingMetricsRouter } from "@opencrane/backend/server/model-routing";
 import { _RegisterInternalParticipation, awarenessRolloutRouter, awarenessParticipationRouter } from "@opencrane/backend/server/awareness";
 import { mcpOperatorRouter, mcpServersRouter } from "@opencrane/backend/server/mcp";
 import { metricsRouter, prometheusMetricsRouter } from "@opencrane/backend/server/metrics";
@@ -20,23 +19,6 @@ import { thirdPartySourcesRouter } from "@opencrane/backend/server/retrieval";
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { spec } from "@opencrane/backend/server/api-spec";
-
-/**
- * Build the optional OCI (Zot) skill-bundle store from the environment.
- *
- * Returns null when `SKILL_OCI_REGISTRY_URL` is unset, in which case skill delivery
- * serves DB `content` only (today's behaviour). When set, publish dual-writes to the
- * store and delivery reads from it first, falling back to DB content (P4D.2 cutover).
- */
-function _BuildOciBundleStore(): OciBundleStore | null
-{
-  const registryUrl = process.env.SKILL_OCI_REGISTRY_URL?.trim();
-  if (!registryUrl)
-  {
-    return null;
-  }
-  return new OciBundleStore({ registryUrl, repository: process.env.SKILL_OCI_REPOSITORY?.trim() || "skills" });
-}
 
 /**
  * Registers all API routes on the given Express application instance.
@@ -53,7 +35,7 @@ function _BuildOciBundleStore(): OciBundleStore | null
 /**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
- *   - NetworkPolicy-only routes (`bundles`, `tenant-models`) take NO token; access is
+ *   - The NetworkPolicy-only `tenant-models` route takes no token; access is
  *     enforced at the network layer. The operator fetches `tenant-models` on its own
  *     reconcile hot path with no credential, so behind session auth it 401s → the model
  *     set is always null → replace-mode pods brick with an empty allowlist.
@@ -63,9 +45,6 @@ function _BuildOciBundleStore(): OciBundleStore | null
  */
 export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, authApi: k8s.AuthenticationV1Api): void
 {
-  // Optional OCI store for skill-bundle content (P4D.2); null → DB-only delivery.
-  const ociBundleStore = _BuildOciBundleStore();
-  app.use("/api/internal/bundles", _RegisterInternalBundles(prisma, ociBundleStore));
   // NetworkPolicy-only (no auth/TokenReview): the operator fetches a tenant's
   // allowed model set + effective default at reconcile. Best-effort — never 404/500.
   app.use("/api/internal/tenant-models", _RegisterInternalTenantModels(prisma));
@@ -90,9 +69,6 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   // `_RegisterInternalRoutes`, which index.ts calls BEFORE `___AuthMiddleware` so the
   // operator's tokenless reconcile fetch + the pod-identity TokenReview routes are not
   // gated by the browser-session auth. Do NOT re-mount them here.
-  // Optional OCI store for skill-bundle content (P4D.2); null → DB-only delivery.
-  const ociBundleStore = _BuildOciBundleStore();
-
   app.use("/api/v1/metrics", metricsRouter(customApi, prisma));
   app.use("/api/v1/audit", auditRouter(prisma));
   app.use("/api/v1/tenants", tenantsRouter(customApi, prisma, coreApi));
@@ -104,13 +80,7 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/mcp", mcpOperatorRouter(prisma));
   app.use("/api/v1/shares", sharesRouter(prisma));
   app.use("/api/v1/resource-shares", resourceSharesRouter(prisma));
-  app.use("/api/v1/skills/catalog", skillCatalogRouter(prisma, ociBundleStore));
-  app.use("/api/v1/skills/posture", skillModelPostureRouter(prisma));
   app.use("/api/v1/model-routing/defaults", modelRoutingDefaultsRouter(prisma));
-  app.use("/api/v1/model-routing/eval-cases", routingEvalCasesRouter(prisma));
-  app.use("/api/v1/model-routing/measurements", routingMeasurementsRouter(prisma, _BuildShadowSeams));
-  app.use("/api/v1/model-routing/proposals", routingProposalsRouter(prisma));
-  app.use("/api/v1/model-routing/recommendations", modelRoutingRecommendationsRouter(prisma));
   app.use("/api/v1/model-routing/metrics", modelRoutingMetricsRouter(prisma));
   app.use("/api/v1/third-party-sources", thirdPartySourcesRouter(prisma));
   app.use("/api/v1/org/workspace-docs", companyDocsRouter(prisma, _BuildDocMergeReconciler()));

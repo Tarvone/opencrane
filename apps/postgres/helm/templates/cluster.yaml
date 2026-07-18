@@ -1,0 +1,85 @@
+{{- if not .Values.credentials.existingSecret -}}
+{{- fail "credentials.existingSecret is required; OpenCrane never generates database credentials" -}}
+{{- end -}}
+{{- if and .Values.backup.enabled (not .Values.backup.plugin.name) -}}
+{{- fail "backup.plugin.name is required when backup.enabled=true" -}}
+{{- end -}}
+{{- if and .Values.restore.enabled (not .Values.restore.plugin.name) -}}
+{{- fail "restore.plugin.name is required when restore.enabled=true" -}}
+{{- end -}}
+{{- if and .Values.networkPolicy.enabled (empty .Values.networkPolicy.clientPodSelectors) -}}
+{{- fail "networkPolicy.clientPodSelectors must not be empty when NetworkPolicy is enabled" -}}
+{{- end -}}
+{{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.operatorNamespace) -}}
+{{- fail "networkPolicy.operatorNamespace is required when NetworkPolicy is enabled" -}}
+{{- end -}}
+{{- if and .Values.networkPolicy.enabled (empty .Values.networkPolicy.operatorPodLabels) -}}
+{{- fail "networkPolicy.operatorPodLabels must not be empty when NetworkPolicy is enabled" -}}
+{{- end -}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "opencrane.postgres.fullname" . }}
+  annotations:
+    helm.sh/resource-policy: keep
+    # CloudNativePG creates the instance-manager ServiceAccount and names it after
+    # this Cluster. Publishing the expected name makes that external-controller
+    # identity contract deterministic and auditable without pretending Helm owns it.
+    opencrane.ai/cnpg-service-account: {{ include "opencrane.postgres.fullname" . | quote }}
+  labels:
+    {{- include "opencrane.postgres.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.instances }}
+  imageName: {{ .Values.image | quote }}
+  enableSuperuserAccess: false
+  inheritedMetadata:
+    labels:
+      {{- include "opencrane.postgres.labels" . | nindent 6 }}
+  storage:
+    size: {{ .Values.storage.size | quote }}
+    resizeInUseVolumes: {{ .Values.storage.resizeInUseVolumes }}
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+    {{- with .Values.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  {{- if .Values.restore.enabled }}
+  bootstrap:
+    recovery:
+      source: {{ .Values.restore.sourceName | quote }}
+      database: {{ .Values.database.name | quote }}
+      owner: {{ .Values.database.owner | quote }}
+      secret:
+        name: {{ .Values.credentials.existingSecret | quote }}
+      {{- with .Values.restore.targetTime }}
+      recoveryTarget:
+        targetTime: {{ . | quote }}
+      {{- end }}
+  externalClusters:
+    - name: {{ .Values.restore.sourceName | quote }}
+      plugin:
+        name: {{ .Values.restore.plugin.name | quote }}
+        {{- with .Values.restore.plugin.parameters }}
+        parameters:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+  {{- else }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.database.name | quote }}
+      owner: {{ .Values.database.owner | quote }}
+      secret:
+        name: {{ .Values.credentials.existingSecret | quote }}
+  {{- end }}
+  {{- if .Values.backup.enabled }}
+  plugins:
+    - name: {{ .Values.backup.plugin.name | quote }}
+      isWALArchiver: true
+      {{- with .Values.backup.plugin.parameters }}
+      parameters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}

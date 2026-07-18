@@ -5,7 +5,6 @@ import type { PrismaClient } from "@prisma/client";
 import { compileForPrincipals, GrantCompilerAccess, GrantCompilerPayloadType } from "@opencrane/backend/server/grants";
 import { _RenderToolsMarkdown } from "../../core/tools-markdown.js";
 import { _LoadAwarenessRollout, _ResolveAwarenessVersion } from "@opencrane/backend/server/awareness";
-import { _ResolveContractSkillModels } from "@opencrane/backend/server/model-routing";
 import { _SyncDerivedDatasetMembership } from "@opencrane/backend/server/tenants";
 import { _log } from "../../log.js";
 
@@ -138,14 +137,13 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
       void _SyncDerivedDatasetMembership(prisma, name, tenant.subject ?? null)
         .catch(function _syncFailed(err) { _log.warn({ err, tenant: name }, "derived dataset membership sync failed on contract poll; will retry next poll"); });
 
-      // 5. Compile MCP server and skill grants over the tenant's principal SET (S4 inheritance):
+      // 5. Compile MCP server grants over the tenant's principal SET (S4 inheritance):
       //    the openclaw Tenant inherits the rights of its 1:1 ClusterTenant user, so we compile
       //    over { tenant-name, bound subject } — the union of both principals' direct + group
       //    grants. A user-level Deny still beats a tenant-level Allow (Deny>Allow precedence).
       //    The subject is absent for legacy/unbound tenants, which collapses to tenant-only.
       const principals = [name, ...(tenant.subject ? [tenant.subject] : [])];
       const mcpDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.McpServer, prisma);
-      const skillDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.SkillBundle, prisma);
 
       const allowedMcp = mcpDecisions
         .filter(function _isAllow(d) { return d.access === GrantCompilerAccess.Allow; })
@@ -155,34 +153,19 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
         .filter(function _isDeny(d) { return d.access === GrantCompilerAccess.Deny; })
         .map(function _id(d) { return d.payloadId; });
 
-      const allowedSkills = skillDecisions
-        .filter(function _isAllow(d) { return d.access === GrantCompilerAccess.Allow; })
-        .map(function _id(d) { return d.payloadId; });
-
       // 6. Resolve display metadata for the entitled tools so the rendered TOOLS.md is
       //    human-readable (the grant compiler only yields opaque ids). Skip the query
       //    entirely when nothing is entitled to avoid a pointless empty-IN lookup.
       const mcpServers = allowedMcp.length > 0
         ? await prisma.mcpServer.findMany({ where: { id: { in: allowedMcp } }, select: { id: true, name: true, description: true } })
         : [];
-      const skillBundles = allowedSkills.length > 0
-        ? await prisma.skillBundle.findMany({ where: { id: { in: allowedSkills } }, select: { id: true, name: true, description: true, digest: true } })
-        : [];
-
-      // 6b. Resolve the effective model for each entitled skill by the locked precedence chain
-      //     (AIR.2): explicit-request (honoured at runtime, not here) > skill-pinned > skill-auto >
-      //     scope default (this tenant's ClusterTenant default, else Global). Pure resolution over
-      //     DB rows — no LiteLLM call. Skills with no resolvable model are returned with model null
-      //     so the pod falls back to its own configured default.
-      const resolvedSkillModels = await _ResolveContractSkillModels(prisma, skillBundles, tenant.clusterTenantRef ?? null);
-
       // 7. Render the contract-derived TOOLS.md (L1 workspace doc). The entrypoint
       //    poll loop writes this over the workspace file and SIGHUPs OpenClaw, so a
       //    grant/deny reflects in the agent's tool list within one poll interval.
       //    The org-memory section is included when Cognee is wired for the fleet, so the
       //    regenerated doc keeps the agent aware of its Cognee memory (auto-recall + the
       //    `cognee_memories` tool from the memory plugin).
-      const toolsMarkdown = _RenderToolsMarkdown(mcpServers, skillBundles, { orgMemory: Boolean(process.env.COGNEE_ENDPOINT?.trim()) });
+      const toolsMarkdown = _RenderToolsMarkdown(mcpServers, { orgMemory: Boolean(process.env.COGNEE_ENDPOINT?.trim()) });
 
       // 7b. Resolve approved L2 personalisation docs (P4C.5). Unlike TOOLS.md
       //     (platform-owned, re-applied every poll), these are tenant-editable, so
@@ -219,20 +202,6 @@ export function _RegisterInternalTenantContract(prisma: PrismaClient, authApi: k
             allow: allowedMcp,
             deny: deniedMcp,
           },
-        },
-        skills: {
-          // Entitled bundles carry the digest + name the pod needs to PULL each skill
-          // from the feat-skill-registry (`GET /bundles/:digest`) and lay it down on disk as
-          // `<skills-dir>/<name>/SKILL.md` (see apps/feat-openclaw-tenant/deploy/entrypoint.sh).
-          // Bundles whose row no longer exists are dropped here — they cannot be pulled.
-          entitled: skillBundles.map(function _toEntitledSkill(bundle)
-          {
-            return { id: bundle.id, name: bundle.name, digest: bundle.digest };
-          }),
-          // Per-skill resolved model (AIR.2). One entry per entitled skill: `{ skillId, model, auto }`.
-          // `model` is null when nothing in the precedence chain resolves, in which case the pod
-          // falls back to its own configured default. `auto` flags an auto-routing posture.
-          models: resolvedSkillModels,
         },
         capabilities: {
           mcpPolicyEnforced: allowedMcp.length > 0 || deniedMcp.length > 0,

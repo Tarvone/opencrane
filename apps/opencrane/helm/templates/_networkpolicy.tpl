@@ -6,10 +6,10 @@
 #   - PUBLIC port (service.port): /api/v1/* + /auth, session-authed. Reachable from the
 #     cluster ingress controller (external API traffic) and the fleet-manager.
 #   - INTERNAL port (service.internalPort): /api/internal/* only, NO auth middleware — it
-#     relies EXCLUSIVELY on this policy. Crucially the ingress controller is NOT permitted
+#     is workload-authenticated at each target route. Crucially the ingress controller is NOT permitted
 #     to this port, so the internal routes are unreachable from the internet even though the
 #     org ingress forwards `/api`. Permitted to the internal port:
-#       - Skill-registry pod: /api/internal/bundles (skill content delivery).
+#       - Channel proxy: /api/internal/channel-targets:resolve (TokenReview + delegated session).
 #       - Tenant pods: /api/internal/contract/:name (runtime-contract re-pull; TokenReview
 #         inside the handler is the identity check, this is defence-in-depth).
 #   The operator's own /api/internal/tenant-models fetch is a localhost call within the
@@ -40,12 +40,12 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.port }}
-    # Allow the feat-skill-registry to call /api/internal/bundles on the INTERNAL port.
+    # Allow the channel trust boundary to request one workload-authenticated target decision.
     - from:
         - podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: feat-skill-registry
+              app.kubernetes.io/component: channel-proxy
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}

@@ -18,12 +18,6 @@ tenant:
     tag: e2e
     pullPolicy: IfNotPresent
 
-skillRegistry:
-  image:
-    repository: opencrane/skills-registry
-    tag: e2e
-    pullPolicy: IfNotPresent
-
 ingress:
   enabled: true
   className: nginx

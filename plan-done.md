@@ -1318,3 +1318,35 @@ clean import seam.
   passed across 59 projects; 447 targeted moved-library tests passed; Helm lint/render checks,
   OpenAPI and contract regeneration, Phase A guards, the VitePress build, style checks, and 14
   adversarial topology mutations passed.
+
+## Personal-agent program Phase C — target contracts and app ownership (complete 2026-07-18)
+
+Phase C completed [#245](https://github.com/italanta/opencrane/issues/245) by defining the target
+product vocabulary and workload boundaries needed to implement Phase D without consulting obsolete
+runtime behavior.
+
+- [x] **Agent and transcript state has one canonical model.** AgentService, immutable AgentRevision,
+  AgentRun, Thread, Message, and ordered RunEvent types and legal transitions live in the pure
+  `models-agents` package and are re-exported through the public contracts barrel.
+- [x] **Authorization is deterministic and fail closed.** Organization, department, team, project,
+  personal, and direct-user scopes are independent; project membership can span departments and
+  teams; higher grant priority wins and deny wins at equal priority. Missing or invalid grants deny.
+- [x] **A silo can bound trust in fleet membership.** The pure membership evaluator verifies
+  explicit signature evidence, issuer/key, silo, subject, assertion, monotonic revision, issuance,
+  maximum staleness, and hard expiry; replayed, stale, mismatched, or expired evidence denies.
+- [x] **A user's first personal-agent session is gated by reviewed persona onboarding.** A versioned
+  interview selects a reviewed `SOUL.md` template, infuses exactly three to five provenance-linked
+  insights, and requires preview plus explicit approval. Runtime receives compiled revision input
+  and cannot mutate durable persona content.
+- [x] **Artifacts, persistence, scratch, and future updates have executable invariants.** Artifact
+  and SkillRevision models use storage-neutral SHA-256 references behind ArtifactStore. Durable
+  state remains on mounted, online-expandable, alerted, backed-up storage until authorized deletion;
+  runtime scratch is lease-scoped and non-authoritative; application updates must reach ready target
+  Pods in strictly less than five minutes while remounting canonical volumes.
+- [x] **Every target workload has a named owner and trust boundary.** ADR 0008 records the capability
+  catalog, critical journeys, API/Postgres authorities, and app→KSA→Role→network matrix, including
+  explicit owners for skill-authoring, tool-runner, and fresh-provisioning Jobs.
+- [x] **The contracts are independently executable and guarded.** Fifty-five model/contract tests,
+  TypeScript lint, NX scope/layer/type boundaries, a deliberate rejected cross-capability import,
+  style checks, Phase A/B guards, architecture/reaper gates, and severity-first review passed. The
+  independent review's duplicate-identifier finding was fixed before completion.

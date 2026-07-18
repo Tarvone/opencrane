@@ -1,7 +1,6 @@
 {
   "version": 1,
-  "policy": "Every pod class has one exact app owner or a named, expiring program-gate exception. Entries are exact; no wildcard legacy or substrate exemptions are permitted.",
-  "currentProgramGate": "PRE_FREEZE",
+  "policy": "Every pod class has one exact owner. Paths slated for direct removal use classification delete; compatibility and time-boxed ownership exceptions are forbidden.",
   "requiredWorkloadIds": [
     "opencrane-server",
     "opencrane-migrate",
@@ -255,11 +254,12 @@
       "id": "skill-registry",
       "podClass": "Deployment/feat-skill-registry",
       "renderedPodClass": "Deployment/opencrane-feat-skill-registry",
-      "image": "ghcr.io/italanta/opencrane-skills-registry:<frozen-blue-tag>",
+      "image": "ghcr.io/italanta/opencrane-skills-registry:<immutable-tag>",
       "owner": "apps/feat-skill-registry",
       "localOwner": true,
       "source": { "type": "file", "path": "apps/opencrane-infra/templates/feat-skill-registry-deployment.yaml", "anchor": "kind: Deployment", "coversLocalTemplate": true },
-      "exception": { "currentOwner": "apps/feat-skill-registry", "expiresAt": "R10", "disposition": "delete", "reason": "Frozen-blue registry; green catalog is an OpenCrane module and bytes move to artifact storage." }
+      "classification": "delete",
+      "reason": "Delete this registry when the catalog module and ArtifactStore-backed bytes land."
     },
     {
       "id": "skill-oci-zot",
@@ -269,16 +269,18 @@
       "owner": "apps/feat-skill-registry",
       "localOwner": true,
       "source": { "type": "file", "path": "apps/opencrane-infra/templates/skill-oci-store.yaml", "anchor": "kind: Deployment", "coversLocalTemplate": true },
-      "exception": { "currentOwner": "apps/feat-skill-registry", "expiresAt": "R10", "disposition": "delete", "reason": "Exact default-off Zot path; never reusable by green." }
+      "classification": "delete",
+      "reason": "Delete this default-off Zot path; it is not part of the target product."
     },
     {
       "id": "openclaw-tenant-runtime",
       "podClass": "Deployment/openclaw-tenant-per-user",
-      "image": "ghcr.io/italanta/opencrane-openclaw-tenant:<frozen-blue-tag>",
+      "image": "ghcr.io/italanta/opencrane-openclaw-tenant:<immutable-tag>",
       "owner": "apps/feat-openclaw-tenant",
       "localOwner": true,
       "source": { "type": "file", "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/3-deployment.ts", "anchor": "kind: \"Deployment\"" },
-      "exception": { "currentOwner": "apps/feat-openclaw-tenant", "expiresAt": "R9/R10", "disposition": "replace-then-delete", "reason": "Frozen-blue per-user runtime, replaced at each silo cutover and deleted after retention." }
+      "classification": "delete",
+      "reason": "Delete this OpenClaw runtime in the personal-agent runtime replacement slice."
     },
     {
       "id": "obot-dynamic-mcp-child",
@@ -287,115 +289,128 @@
       "owner": "apps/obot",
       "localOwner": true,
       "source": { "type": "file", "path": "apps/obot/helm/templates/_rbac.tpl", "anchor": "resources: [\"deployments\", \"replicasets\"]" },
-      "exception": { "currentOwner": "apps/obot", "expiresAt": "R10", "disposition": "replace-with-green-confined-obot-contract", "reason": "Exact frozen-blue descendants of Obot's privileged controller; not green-reusable." }
+      "classification": "survivor",
+      "reason": "Refactor this capability directly to the confined Obot contract; do not preserve privileged controller behavior."
     },
     {
       "id": "cnpg-database",
       "podClass": "Pod/CNPG-postgresql-instance",
       "image": "ghcr.io/cloudnative-pg/postgresql:16",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cnpg",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "imageName: ghcr.io/cloudnative-pg/postgresql:16" },
-      "exception": { "currentOwner": "libs/k8s-platform/k8s-deploy.sh CNPG Cluster builder", "expiresAt": "R2", "disposition": "register-named-postgres-cnpg-app", "reason": "Exact blue installer-managed database pod class." }
+      "classification": "delete",
+      "reason": "Delete this script-owned database construct when apps/postgres owns the target CNPG Cluster resource."
     },
     {
       "id": "database-auth-check",
       "podClass": "Pod/db-auth-check",
       "image": "postgres:16",
-      "owner": null,
-      "localOwner": false,
+      "owner": "libs/k8s-platform/k8s-deploy.sh",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "kubectl run \"db-auth-check-$$\" --image=postgres:16" },
-      "exception": { "currentOwner": "libs/k8s-platform/k8s-deploy.sh _db_auth_ok", "expiresAt": "R2", "disposition": "register-named-auth-check-app", "reason": "Exact transient blue database diagnostic pod class." }
+      "classification": "delete",
+      "reason": "Delete this unowned transient diagnostic; the target database app owns its readiness contract without a free-standing Pod."
     },
     {
       "id": "cnpg-operator",
       "podClass": "Deployment/CNPG-operator-controller",
       "image": "unpinned cnpg/cloudnative-pg chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cnpg",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "helm upgrade --install cnpg cnpg/cloudnative-pg" },
-      "exception": { "currentOwner": "external-substrate/cnpg", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "R1 inventories the exact blue chart; green must use a registered controller app or BYO contract." }
+      "classification": "delete",
+      "reason": "Delete this repository installer; the target product requires a BYO CNPG operator."
     },
     {
       "id": "ingress-nginx-controller",
       "podClass": "Deployment/ingress-nginx-controller",
       "image": "unpinned ingress-nginx chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/ingress-nginx",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx" },
-      "exception": { "currentOwner": "external-substrate/ingress-nginx", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact bundled ingress controller class." }
+      "classification": "delete",
+      "reason": "Delete this repository installer; the target product requires BYO ingress."
     },
     {
       "id": "ingress-nginx-admission-create",
       "podClass": "Job/ingress-nginx-admission-create",
       "image": "unpinned ingress-nginx chart hook image",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/ingress-nginx",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx" },
-      "exception": { "currentOwner": "external-substrate/ingress-nginx", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact known bundled admission-create hook class." }
+      "classification": "delete",
+      "reason": "Delete this repository-installed ingress hook with the bundled ingress installer."
     },
     {
       "id": "ingress-nginx-admission-patch",
       "podClass": "Job/ingress-nginx-admission-patch",
       "image": "unpinned ingress-nginx chart hook image",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/ingress-nginx",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx" },
-      "exception": { "currentOwner": "external-substrate/ingress-nginx", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact known bundled admission-patch hook class." }
+      "classification": "delete",
+      "reason": "Delete this repository-installed ingress hook with the bundled ingress installer."
     },
     {
       "id": "external-dns-controller",
       "podClass": "Deployment/external-dns",
       "image": "unpinned external-dns chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/external-dns",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "upgrade --install external-dns external-dns/external-dns" },
-      "exception": { "currentOwner": "external-substrate/external-dns", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact bundled DNS controller class." }
+      "classification": "delete",
+      "reason": "Delete this repository installer; the target product requires BYO DNS management."
     },
     {
       "id": "cert-manager-controller",
       "podClass": "Deployment/cert-manager-controller",
       "image": "unpinned jetstack/cert-manager chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cert-manager",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "upgrade --install cert-manager jetstack/cert-manager" },
-      "exception": { "currentOwner": "external-substrate/cert-manager", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact bundled certificate controller class." }
+      "classification": "delete",
+      "reason": "Delete this repository installer; the target product requires BYO certificate management."
     },
     {
       "id": "cert-manager-cainjector",
       "podClass": "Deployment/cert-manager-cainjector",
       "image": "unpinned jetstack/cert-manager chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cert-manager",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "upgrade --install cert-manager jetstack/cert-manager" },
-      "exception": { "currentOwner": "external-substrate/cert-manager", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact bundled CA injector class." }
+      "classification": "delete",
+      "reason": "Delete this repository-installed CA injector with the bundled certificate installer."
     },
     {
       "id": "cert-manager-webhook",
       "podClass": "Deployment/cert-manager-webhook",
       "image": "unpinned jetstack/cert-manager chart output",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cert-manager",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "upgrade --install cert-manager jetstack/cert-manager" },
-      "exception": { "currentOwner": "external-substrate/cert-manager", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact bundled webhook class." }
+      "classification": "delete",
+      "reason": "Delete this repository-installed webhook with the bundled certificate installer."
     },
     {
       "id": "cert-manager-startup-api-check",
       "podClass": "Job/cert-manager-startupapicheck",
       "image": "unpinned jetstack/cert-manager chart hook image",
-      "owner": null,
-      "localOwner": false,
+      "owner": "external-substrate/cert-manager",
+      "localOwner": true,
       "source": { "type": "file", "path": "libs/k8s-platform/k8s-deploy.sh", "anchor": "upgrade --install cert-manager jetstack/cert-manager" },
-      "exception": { "currentOwner": "external-substrate/cert-manager", "expiresAt": "R1/R2", "disposition": "pin-in-blue-manifest-then-register-or-byo", "reason": "Exact known bundled startup API check class." }
+      "classification": "delete",
+      "reason": "Delete this repository-installed startup check with the bundled certificate installer."
     },
     {
       "id": "fleet-platform-external",
       "podClass": "Deployment/fleet-platform",
       "image": "WeOwnAI-owned fleet release image",
-      "owner": null,
+      "owner": "external-repository/italanta-WeOwnAI",
       "localOwner": false,
       "source": { "type": "external", "repository": "italanta/WeOwnAI", "contract": "fleet-platform release", "localEvidence": "docs/agents/cluster-architecture.md", "anchor": "fleet" },
-      "exception": { "currentOwner": "external-repository/italanta-WeOwnAI", "expiresAt": "R1", "disposition": "record-in-signed-external-frozen-manifest", "reason": "The fleet app is intentionally absent from this repository; local render coverage is not claimed." }
+      "classification": "survivor",
+      "reason": "The fleet app is intentionally absent from this repository; local render coverage is not claimed."
     },
     {
       "id": "langfuse-web",

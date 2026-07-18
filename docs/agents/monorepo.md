@@ -45,8 +45,8 @@ runtime contracts. Inspect existing charts, Services, NetworkPolicies, CRDs, and
 Record the search terms, candidate paths, and one decision: **reuse**, **extend**, or **new**. Prefer
 the existing owner when a small coherent extension preserves one authority for the capability.
 
-Do not count frozen-blue or drop/archive code as reusable green functionality. Reusing a retired
-mechanism through an adapter recreates the compatibility layer this rewrite removes.
+Do not count code classified for deletion as reusable functionality. Reusing a retired mechanism
+through an adapter recreates the compatibility layer this refactor removes.
 
 ## Libraries use a functional first pass
 
@@ -87,16 +87,15 @@ create `libs/utils/` beside it just to satisfy this document.
   not enforcement. Apps cannot depend on apps. `layer:model` is the bottom layer; every other layer
   lists its allowed lower/peer layers explicitly. A capability may use its own scope and explicitly
   approved shared/cross-capability contracts, not every project that happens to share a layer.
-- Migrate the current layer-shaped `scope:backend|web|shared|app` tags in the first R2 structure gate;
-  they are not evidence of bounded-capability ownership.
+- Replace the current layer-shaped `scope:backend|web|shared|app` tags as the relevant packages are
+  refactored; they are not evidence of bounded-capability ownership.
 - Register build, test, lint, and deploy-relevant targets per project so `nx affected` can validate
   only the impacted graph without losing isolation.
-- CI now selects affected `container` targets from the NX graph and publishes their immutable SHA
-  artifacts. The frozen-blue estate may retain `latest` as a non-deployment alias. Each green
-  independently deployable app must then gain an app-owned semantic version and a promotion step that
-  selects an explicit version from that immutable artifact. Helm values must resolve a digest or
-  immutable version tag, never a moving `latest` tag. Do not retrofit semantic release machinery into
-  frozen-blue/drop apps: establish this metadata with each green deployment root in R2.
+- CI selects affected `container` targets from the NX graph and publishes immutable SHA artifacts.
+  Each independently deployable target app must have an app-owned semantic version and a promotion
+  step that selects an explicit version from that immutable artifact. Helm values must resolve a
+  digest or immutable version tag, never a moving `latest` tag. Do not retrofit release machinery
+  into apps being deleted; establish it on their direct replacements.
 - Delete replaced projects with their exports, tags, path aliases, targets, chart values, tests, and
   docs. Git history is the compatibility archive.
 
@@ -109,24 +108,21 @@ npx nx affected -t build test lint --base="$WAVE_BASE"
 ```
 
 Use targeted project tasks during a slice; use the affected graph at a wave gate.
-The first R2 foundation slice must add a deterministic workload-ownership check that renders the
-green manifests and verifies every workload's owning app root. Until that check exists, the
+The foundation slice must add a deterministic workload-ownership check that renders the target
+manifests and verifies every workload's owning app root. Until that check exists, the
 architecture agent's explicit deployable inventory is a blocking gate, not optional documentation.
 
-## Rewrite-freeze rule
+## Direct-replacement rule
 
-Green is a clean target, not a migration layer. It must not import blue/OpenClaw packages, add
-compatibility shims, dual-write, retain deprecated aliases, or repair a blue component that the
-accepted data disposition says will be dropped. One-way read-only exporters and idempotent green
-importers are migration tools, not runtime compatibility. Frozen-blue changes are limited to the
-approved stabilization or break-fix contract in the rewrite-freeze plan.
+The target is a clean product, not a compatibility layer. It must not import superseded OpenClaw
+packages, add compatibility shims, dual-write, retain deprecated aliases, copy old data, or repair a
+component being removed. Git history is sufficient historical evidence.
 
-Before editing a legacy path, classify it as one of:
+Before editing an existing path, classify it as one of:
 
-- **green survivor** — refactor directly into the target package boundary;
-- **blue stabilization** — make only the minimum R1/freeze-contract change;
-- **migration input** — observe/export read-only; do not improve its product design;
-- **drop/archive** — do not fix or port it; schedule its complete removal.
+- **survivor** — refactor the capability directly into the target package boundary;
+- **delete** — do not fix or port it; remove it, its callers, and its wiring in the replacement
+  slice.
 
 ## Research basis
 

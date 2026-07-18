@@ -20,7 +20,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `langfuse` | [`apps/langfuse/README.md`](../../apps/langfuse/README.md) | Pinned upstream deployment wrapper with all six bundled workload classes registered explicitly. |
 | `opencrane-migrate` | [`apps/opencrane-migrate/README.md`](../../apps/opencrane-migrate/README.md) | Deploy-only Prisma migration Job owner. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
 | _(apps/opencrane-infra)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, CRDs, issuers, external-secret wiring, and cross-plane defaults; it owns no anonymous workload. |
-| _(apps/feat-openclaw-tenant)_ | — | Frozen-blue tenant image/build rollup. Its controller and renderer logic is isolated in `libs/backend/feat-openclaw-tenant/main` until R10. |
+| _(apps/feat-openclaw-tenant)_ | — | Deletion target: remove this OpenClaw tenant image/build rollup with its controller and renderer when the personal-agent runtime replacement lands. |
 
 ## Libs (`libs/`)
 
@@ -38,7 +38,7 @@ The control plane and extracted runtime capabilities are split into 22 NX packag
 (`@opencrane/backend-<d>` at `libs/backend/<d>/main`): tenants, policies, grants, skills,
 model-routing, providers, awareness, spend, groups, mcp, company-docs, audit,
 access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection,
-identity, api-spec, and the frozen-blue `feat-openclaw-tenant` boundary.
+identity, api-spec, and the `feat-openclaw-tenant` deletion boundary.
 Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, boundary rules (`scope:backend`), and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);

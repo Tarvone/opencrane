@@ -143,8 +143,8 @@ them does not block this ADR.
 
 ## Consequences
 
-- **Unblocks S8/S9/S10.** Obot OBO brokering (S8), Zot skill storage (S9), and the
-  provider-secret cutover (S10) all target a **per-CT plane** now (uniform across tiers), so
+- **Unblocks S8/S9/S10.** Obot OBO brokering (S8), Zot skill storage (S9), and
+  provider-secret custody (S10) all target a **per-CT plane** now (uniform across tiers), so
   they no longer need a placement caveat — the plane is always the tenant's own.
 - **Footprint is per-CT instance stacks bin-packed on shared nodes, not multiplexed.** Every
   tenant runs its own Obot + skills + Cognee + LiteLLM + operator + DB pods; the lever is
@@ -153,9 +153,8 @@ them does not block this ADR.
   requests/limits is essential to keep density viable (and is the input to the future cost model).
 - **N of everything** (N operators, plane stacks, DBs — N = tenant count) on shared nodes.
   Monitoring, upgrades, and resource governance must become **fleet-aware** from day one.
-- **A whole-fleet migration.** Existing shared-singleton tenants must each be re-provisioned
-  into their own instance — not left as-is. Sequence carefully (per-CT DB data migration;
-  ingress cutover fail-closed) and stage behind the provisioner.
+- **Fresh per-tenant provisioning.** The product creates each tenant directly in its own instance.
+  No shared-singleton tenant state or data-transfer path is retained.
 - **Isolation boundary stated honestly: *separate instances, shared nodes*** (+ S2/S5
   network/identity) — stronger than "one plane, many tenants, trust the ACL", and upgradeable
   later to dedicated nodes/cluster without changing the per-CT topology.

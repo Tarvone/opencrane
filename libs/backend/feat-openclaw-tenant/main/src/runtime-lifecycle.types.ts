@@ -18,7 +18,7 @@ export interface OpenClawTenantLifecycleOptions
   prisma: PrismaClient;
   /** Public control-plane port used by the local channel proxy delegate-auth call. */
   publicPort: number;
-  /** Parse the app environment into the frozen-blue runtime contract. */
+  /** Parse the app environment into the legacy runtime contract pending package deletion. */
   loadConfig(): OpenClawTenantOperatorConfig;
   /** Select the concrete tenant hosting provider at the app composition boundary. */
   buildHostingAdapter(config: OpenClawTenantOperatorConfig): HostingAdapter;

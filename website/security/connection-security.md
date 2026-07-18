@@ -101,11 +101,11 @@ tenant, result, and optional reason.
 Suspending a tenant is different: it persists desired state so the reconciler keeps the runtime
 scaled down. A cut terminates the current process; a suspend prevents it from returning.
 
-## Temporary blue preflight
+## Legacy preflight deletion target
 
-`POST /api/v1/auth/pod-token` remains through R9 as a compatibility-named, no-token connection
-preflight for the frozen blue browser. It validates the same session, silo, tenant, membership,
-and ingress-readiness rules, then returns only:
+`POST /api/v1/auth/pod-token` is a legacy compatibility-named, no-token connection preflight. The
+target channel/session contract does not adopt it. The current route validates session, silo,
+tenant, membership, and ingress readiness, then returns only:
 
 ```json
 {
@@ -115,8 +115,8 @@ and ingress-readiness rules, then returns only:
 }
 ```
 
-Despite the route name, the response contains no token. Green surfaces must not adopt this route;
-it expires when each silo moves to the new connection contract at R9.
+Despite the route name, the response contains no token. Delete the route, its generated contract,
+and its tests in the channel/session replacement slice.
 
 ## Trust-boundary checklist
 

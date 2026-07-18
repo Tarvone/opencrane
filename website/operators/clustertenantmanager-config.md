@@ -1,6 +1,6 @@
 # ClusterTenant manager configuration reference
 
-**The opencrane-api (clustertenant-manager) runs in each silo and serves the tenant-facing API, auth, permissions, and organization data.** This reference documents every Helm configuration key under `clustertenantManager`, with defaults from `apps/opencrane-infra/values.yaml`.
+**The opencrane-api (clustertenant-manager) runs in each silo and serves the tenant-facing API, auth, permissions, and organization data.** This reference documents every Helm configuration key under `clustertenantManager`, with defaults from `apps/_infra/deploy-k8s/values.yaml`.
 
 > See also:
 > [Silo deployment model](/operators/silo-deployment) — fleet vs silo topology and the deploy sequence.

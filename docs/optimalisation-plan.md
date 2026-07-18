@@ -105,7 +105,7 @@ choice at the policy/encryption/identity layer, where Cilium is sufficient for c
 
 ### D3 — Right-size resource requests (dev DONE; prod TODO)
 
-Shipped: a `--dev-resources` deploy flag + `apps/opencrane-infra/values-dev.yaml` overlay
+Shipped: a `--dev-resources` deploy flag + `apps/_infra/deploy-k8s/values-dev.yaml` overlay
 (**PR #109**) that cuts plane CPU requests and raises memory requests to observed usage.
 
 | Plane | CPU req | Mem req |

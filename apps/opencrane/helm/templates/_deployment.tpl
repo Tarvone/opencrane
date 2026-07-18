@@ -26,7 +26,7 @@ spec:
         # no-op when the DB is already at the latest migration. This is a
         # belt-and-suspenders guard for pod (re)creation BETWEEN deploys: the
         # deploy-time migration authority is the pre-upgrade hook Job
-        # (opencrane-ui-migration-job.yaml), which an unchanged `helm upgrade`
+        # (`opencrane-database-schema` component), which an unchanged `helm upgrade`
         # cannot skip the way it skips an unchanged pod template.
         - name: db-migrate
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"

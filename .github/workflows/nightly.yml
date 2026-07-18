@@ -86,7 +86,14 @@ jobs:
 
       - name: Run k3d e2e smoke test
         if: steps.fresh.outputs.changed == 'true'
-        run: ./libs/k8s-platform/tests/k3d-e2e.sh
+        # Branch-agnostic: the matrix spans branches on both sides of the apps/_infra
+        # reorganization, so resolve whichever test location the checked-out branch ships.
+        run: |
+          for candidate in apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh libs/k8s-platform/tests/k3d-e2e.sh; do
+            if [ -x "$candidate" ]; then exec "./$candidate"; fi
+          done
+          echo "no k3d e2e script found on this branch" >&2
+          exit 1
         env:
           KEEP_CLUSTER: "0"
           TIMEOUT_SECONDS: "300"

@@ -166,7 +166,7 @@ The `_RequireOrgManager` middleware is applied to every route mounted under `/ap
 
 The gate never leaks which specific check failed — every rejection returns the same `FORBIDDEN_ORG_SCOPE` code. A platform operator (identified by the `isPlatformOperator` session flag) bypasses the membership check and can manage every org.
 
-Source: [`libs/infra-auth/src/cluster-tenant-org-admin.ts`](https://github.com/italanta/opencrane/blob/main/libs/infra-auth/src/cluster-tenant-org-admin.ts)
+Source: [`cluster-tenant-org-admin.ts`](https://github.com/italanta/opencrane/blob/main/libs/server/_infra/auth/src/cluster-tenant-org-admin.ts)
 
 ---
 

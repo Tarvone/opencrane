@@ -56,8 +56,7 @@ const changedFiles = _run("git", ["diff", "--name-only", base, head]).split("\n"
 // k3d e2e on pull requests — pushes to the integration branches always run it, and the nightly
 // workflow covers everything else.
 const platformChanged = changedFiles.some(function _platform(file) {
-  return file.startsWith("apps/opencrane-infra/")
-    || file.startsWith("libs/k8s-platform/")
+  return file.startsWith("apps/_infra/")
     || (file.startsWith("apps/") && (file.includes("/helm/") || file.includes("/deploy/")))
     || file === ".github/workflows/docker.yml";
 });

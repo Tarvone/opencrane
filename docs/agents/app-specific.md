@@ -16,10 +16,10 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `@opencrane/feat-skill-registry` | [apps/feat-skill-registry.md](./apps/feat-skill-registry.md) | Entitlement-gated skill delivery (`:5000`). TokenReview (`aud=feat-skill-registry`) → proxy to opencrane-api; non-entitled **and** non-existent → `404` (existence-hiding). |
 | `@opencrane/feat-central-agents` | [apps/feat-central-agents.md](./apps/feat-central-agents.md) | Background ingestion worker (not API-first). Slack → normalise → Cognee; cursor in Postgres. `/healthz`, `/metrics`. |
 | _(apps/opencrane-ui)_ | — | Org-admin Angular SPA, ported in from WeOwnAI (#152). PrimeNG, zoneless/signals, standalone components — see [`angular.md`](./angular.md). Just another client of the opencrane-api (API-First Rule below). `npx nx build\|serve opencrane-ui`. |
-| `cognee`, `litellm`, `obot` | Local `README.md` | Deployment-only Nx apps. Each owns its pinned image contract, identity, service, policy, and Helm templates under `apps/<name>/helm`; the upstream product source remains external. |
-| `langfuse` | [`apps/langfuse/README.md`](../../apps/langfuse/README.md) | Pinned upstream deployment wrapper with all six bundled workload classes registered explicitly. |
-| `opencrane-migrate` | [`apps/opencrane-migrate/README.md`](../../apps/opencrane-migrate/README.md) | Deploy-only Prisma migration Job owner. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
-| _(apps/opencrane-infra)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, CRDs, issuers, external-secret wiring, and cross-plane defaults; it owns no anonymous workload. |
+| `cognee`, `litellm`, `obot` | Local `README.md` | Deployment-only Nx apps under `apps/_infra/<name>`. Each owns its pinned image contract, identity, service, policy, and Helm templates; the upstream product source remains external. |
+| `langfuse` | [`apps/_infra/langfuse/README.md`](../../apps/_infra/langfuse/README.md) | Pinned upstream deployment wrapper with all six bundled workload classes registered explicitly. |
+| `database-schema` | [`apps/_infra/deploy-k8s/components/database-schema/README.md`](../../apps/_infra/deploy-k8s/components/database-schema/README.md) | Deploy-k8s-owned Prisma migration Job component. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
+| _(apps/_infra/deploy-k8s)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, owns deploy-only components such as the schema Job, and carries CRDs, issuers, external-secret wiring, and cross-plane defaults. |
 | _(apps/feat-openclaw-tenant)_ | — | Deletion target: remove this OpenClaw tenant image/build rollup with its controller and renderer when the personal-agent runtime replacement lands. |
 
 ## Libs (`libs/`)
@@ -28,19 +28,21 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 |---------|-----------|-----------|
 | `@opencrane/contracts` | [libs/contracts.md](./libs/contracts.md) | **The keystone** — shared CRD enums/DTOs + the generated typed opencrane-api client (`___CreateControlPlaneClient`, `paths`). Import from the barrel; never redefine types per app. |
 | `@opencrane/util` | [libs/util/README.md](../../libs/util/README.md) | Dependency-free pure helpers shared across domain packages (`scope:shared`). |
-| `@opencrane/infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport for the in-process identity-routing proxy. |
-| `@opencrane/infra/tenant-hosting` | — | GCP and on-prem tenant storage adapters; the server app retains only factory composition. |
-| _(libs/onboarding)_ | — | **Empty placeholder** — not in `pnpm-workspace.yaml`, no code yet. |
+| `libs/server/_infra/{api,auth,http}` | — | Kubernetes, authentication, and HTTP runtime seams owned by the OpenCrane server. |
+| `libs/server/_infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport owned by the OpenCrane server runtime. |
+| `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
+| _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 
-## Domain packages (`libs/backend/*/main`)
+## OpenCrane server domains (`libs/backend/server/*/main`)
 
-The control plane and extracted runtime capabilities are split into 22 NX packages
-(`@opencrane/backend-<d>` at `libs/backend/<d>/main`): tenants, policies, grants, skills,
+The control plane and extracted runtime capabilities are split into 21 NX packages
+(`backend-server-<d>` at `libs/backend/server/<d>/main`): tenants, policies, grants, skills,
 model-routing, providers, awareness, spend, groups, mcp, company-docs, audit,
 access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection,
-identity, api-spec, and the `feat-openclaw-tenant` deletion boundary.
+identity, and api-spec. The separate `libs/backend/feat-openclaw-tenant/main` package remains a
+deletion boundary until the personal-agent runtime replacement lands.
 Each owns its routes, core services, API types, tests, and (where applicable) a
-`prisma/schema/<d>.prisma` slice. Layout, boundary rules (`scope:backend`), and the
+`prisma/schema/<d>.prisma` slice. Layout, bounded `scope:<capability>` rules, and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);
 schema/migration ownership in [`prisma.md`](./prisma.md).
 

@@ -8,8 +8,8 @@
 #
 # Usage:
 #   scripts/config-docs-coverage.sh                  # all in-repo charts vs website/
-#   scripts/config-docs-coverage.sh --chart apps/opencrane-infra
-#   scripts/config-docs-coverage.sh --keys-only apps/opencrane-infra   # dump inventory
+#   scripts/config-docs-coverage.sh --chart apps/_infra/deploy-k8s
+#   scripts/config-docs-coverage.sh --keys-only apps/_infra/deploy-k8s   # dump inventory
 #   scripts/config-docs-coverage.sh --strict         # exit 1 when gaps exist
 #
 # The fleet-platform chart moved to the WeOwnAI repo (italanta/opencrane#150) — pass
@@ -26,7 +26,7 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-CHARTS=("apps/opencrane-infra")
+CHARTS=("apps/_infra/deploy-k8s")
 DOCS_DIRS=("website/operators" "website/guide" "website/advanced")
 STRICT=0
 KEYS_ONLY=""

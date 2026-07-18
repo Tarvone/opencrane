@@ -3,13 +3,12 @@
  *
  * Mechanical TypeScript style stays in `scripts/agent-style-check.sh` and per-package
  * `tsc --noEmit`; this config exists solely so the NX project graph can enforce the
- * legacy scope tags and the dimensional tags declared in each package.json
- * (`nx.tags`):
+ * capability scopes and dimensional tags declared in each project:
  *
- *   - `scope:shared`  (libs/* infra + contracts) may only depend on other shared libs.
- *   - `scope:backend` (libs/backend/*)           may depend on backend + shared libs.
- *   - `scope:web`     (libs/frontend/*)          may depend on web + shared libs.
- *   - `scope:app`     (apps/*)                   may depend on anything.
+ *   - `scope:<capability>` backend packages may use only their explicit graph edges.
+ *   - `scope:shared` dependency-light packages may use approved shared/model contracts.
+ *   - `scope:web` frontend packages may depend on web and shared packages.
+ *   - `scope:app` entrypoints may compose libraries but cannot import another app.
  *
  * Phase B started dimensional tags on every new or touched project. Untagged legacy targets are
  * direct-deletion/refactor debt, while newly tagged projects are prevented from introducing
@@ -59,22 +58,82 @@ export default [
                 "scope:tenant-hosting",
               ],
             },
+            { sourceTag: "scope:access-tokens", onlyDependOnLibsWithTags: ["scope:access-tokens", "scope:shared"] },
             {
-              sourceTag: "scope:backend",
+              sourceTag: "scope:api-spec",
               onlyDependOnLibsWithTags: [
-                "scope:backend",
-                "scope:shared",
                 "scope:api-spec",
-                "scope:auth",
-                "scope:channel-proxy",
-                "scope:connections",
-                "scope:contract",
-                "scope:feat-openclaw-tenant",
-                "scope:http",
-                "scope:identity",
+                "scope:access-tokens",
+                "scope:audit",
+                "scope:awareness",
+                "scope:grants",
+                "scope:groups",
+                "scope:mcp",
+                "scope:metrics",
+                "scope:model-routing",
                 "scope:policies",
                 "scope:projection",
-                "scope:tenant-hosting",
+                "scope:providers",
+                "scope:retrieval",
+                "scope:shared",
+                "scope:skills",
+                "scope:spend",
+                "scope:tenants",
+              ],
+            },
+            { sourceTag: "scope:audit", onlyDependOnLibsWithTags: ["scope:audit", "scope:shared"] },
+            { sourceTag: "scope:awareness", onlyDependOnLibsWithTags: ["scope:awareness", "scope:shared"] },
+            { sourceTag: "scope:auth", onlyDependOnLibsWithTags: ["scope:auth", "scope:k8s-api", "scope:shared"] },
+            { sourceTag: "scope:channel-proxy", onlyDependOnLibsWithTags: ["scope:channel-proxy", "scope:shared"] },
+            { sourceTag: "scope:cluster-tenants", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:k8s-api", "scope:shared"] },
+            { sourceTag: "scope:company-docs", onlyDependOnLibsWithTags: ["scope:auth", "scope:company-docs", "scope:shared"] },
+            { sourceTag: "scope:connections", onlyDependOnLibsWithTags: ["scope:auth", "scope:connections", "scope:shared"] },
+            {
+              sourceTag: "scope:contract",
+              onlyDependOnLibsWithTags: [
+                "scope:awareness",
+                "scope:contract",
+                "scope:grants",
+                "scope:model-routing",
+                "scope:shared",
+                "scope:tenants",
+              ],
+            },
+            { sourceTag: "scope:grants", onlyDependOnLibsWithTags: ["scope:auth", "scope:grants", "scope:retrieval", "scope:shared"] },
+            { sourceTag: "scope:groups", onlyDependOnLibsWithTags: ["scope:groups", "scope:shared"] },
+            { sourceTag: "scope:http", onlyDependOnLibsWithTags: ["scope:http", "scope:shared"] },
+            { sourceTag: "scope:k8s-api", onlyDependOnLibsWithTags: ["scope:k8s-api", "scope:shared"] },
+            {
+              sourceTag: "scope:identity",
+              onlyDependOnLibsWithTags: [
+                "scope:auth",
+                "scope:cluster-tenants",
+                "scope:connections",
+                "scope:identity",
+                "scope:projection",
+                "scope:shared",
+              ],
+            },
+            { sourceTag: "scope:mcp", onlyDependOnLibsWithTags: ["scope:auth", "scope:mcp", "scope:shared"] },
+            { sourceTag: "scope:metrics", onlyDependOnLibsWithTags: ["scope:awareness", "scope:metrics", "scope:projection", "scope:shared"] },
+            { sourceTag: "scope:model-routing", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:shared"] },
+            { sourceTag: "scope:policies", onlyDependOnLibsWithTags: ["scope:grants", "scope:k8s-api", "scope:policies", "scope:projection", "scope:shared"] },
+            { sourceTag: "scope:projection", onlyDependOnLibsWithTags: ["scope:cluster-tenants", "scope:k8s-api", "scope:projection", "scope:shared"] },
+            { sourceTag: "scope:providers", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:providers", "scope:shared"] },
+            { sourceTag: "scope:retrieval", onlyDependOnLibsWithTags: ["scope:retrieval", "scope:shared"] },
+            { sourceTag: "scope:skills", onlyDependOnLibsWithTags: ["scope:cluster-tenants", "scope:grants", "scope:shared", "scope:skills"] },
+            { sourceTag: "scope:spend", onlyDependOnLibsWithTags: ["scope:shared", "scope:spend"] },
+            { sourceTag: "scope:tenant-hosting", onlyDependOnLibsWithTags: ["scope:shared", "scope:tenant-hosting"] },
+            {
+              sourceTag: "scope:tenants",
+              onlyDependOnLibsWithTags: [
+                "scope:connections",
+                "scope:grants",
+                "scope:k8s-api",
+                "scope:projection",
+                "scope:retrieval",
+                "scope:shared",
+                "scope:spend",
                 "scope:tenants",
               ],
             },

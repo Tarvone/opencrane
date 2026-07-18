@@ -38,11 +38,14 @@ used -> exposure (public ingress | internal request/response | asynchronous bus)
 and callees/consumers -> authn/authz + KSA/RBAC -> NetworkPolicy -> state/PVC`
 
 BLOCK when any rendered Pod, Deployment, StatefulSet, DaemonSet, CronJob, or Job has no
-`apps/<name>` owner. An aggregating chart does not count as ownership. Upstream products deployed by
+`apps/<name>` owner, or an `apps/_infra/<name>` owner for deployment-only infrastructure. An
+aggregating chart does not count as ownership by itself. Upstream products deployed by
 the release still get deployment-only app roots owning their pin, configuration, identity, state,
-network policy, wiring, and smoke contract. A distinct image/process role needs a distinct root; a
-Job may share an owner only when it uses that app's exact image, entrypoint, trust boundary, and
-lifecycle. Browser entrypoints also remain apps; the retired command-line product has no app root.
+network policy, wiring, and smoke contract. A deploy-only component explicitly registered to the
+composer, such as its database-schema hook, remains visible as that app's owned component. A
+distinct image/process role otherwise needs a distinct root; a Job may share an owner only when it
+uses that app's exact image, entrypoint, trust boundary, and lifecycle. Browser entrypoints also
+remain apps; the retired command-line product has no app root.
 
 Apps are thin composition/deployment roots. BLOCK business rules, reusable adapters, calculations,
 domain models, shared UI components, or generic Kubernetes builders added under an app. Require them
@@ -54,7 +57,7 @@ under the functional-first library tree:
 - `libs/util/*`: dependency-light helpers without domain authority;
 - `libs/backend/*`: server-side capabilities/use cases/ports/adapters;
 - `libs/frontend/*`: UI, state, features, and client gateways;
-- `libs/infra/*`: reusable external-I/O and platform adapters.
+- `libs/server/_infra/*`: OpenCrane-server runtime and external-I/O adapters.
 
 Within that first functional pass, group by bounded capability and then technical role. Do not create
 new `shared`, `common`, or `core` dumping grounds. Libraries never import apps; frontend never imports
@@ -75,7 +78,7 @@ and endpoint apps stay small while libraries carry coherent reusable behavior.
 
 Before proposing a new app, library, HTTP/RPC route, event/topic, chart template, or external
 adapter, search the live NX graph and public entrypoints under `apps/`, `libs/`,
-`libs/k8s-platform/`, `prisma/`, and generated/runtime contracts. Inspect existing charts, Services,
+`apps/_infra/deploy-k8s/platform/`, `prisma/`, and generated/runtime contracts. Inspect existing charts, Services,
 NetworkPolicies, CRDs, OpenAPI/contracts, and target-state designs. Report the exact search terms,
 candidate paths, and one decision: **reuse**, **extend**, or **new**, with a concrete reason. BLOCK a
 duplicate capability or cross-service contract when an existing owner can serve it through a small,

@@ -1,10 +1,10 @@
 import { type OpenClawTenantOperatorConfig } from "@opencrane/backend/feat-openclaw-tenant";
-import { HostingProvider, type GcpHostingConfig } from "@opencrane/infra/tenant-hosting";
-import { _ParseTrustedProxies, _DeriveTrustedProxyCidr, _AUTO_TRUSTED_PROXY_TOKEN, _DEFAULT_AUTO_TRUSTED_PROXY_MASK } from "@opencrane/infra/http";
+import { HostingProvider, type GcpHostingConfig } from "@opencrane/server/_infra/tenant-hosting";
+import { _ParseTrustedProxies, _DeriveTrustedProxyCidr, _AUTO_TRUSTED_PROXY_TOKEN, _DEFAULT_AUTO_TRUSTED_PROXY_MASK } from "@opencrane/server/_infra/http";
 import { _log } from "./log.js";
 
 export type { OpenClawTenantOperatorConfig } from "@opencrane/backend/feat-openclaw-tenant";
-export type { GcpHostingConfig } from "@opencrane/infra/tenant-hosting";
+export type { GcpHostingConfig } from "@opencrane/server/_infra/tenant-hosting";
 export { HostingProvider };
 
 /**

@@ -18,7 +18,7 @@ TARGET_RECORDS='^(plan\.md|docs/design/(personal-agent-platform-architecture|per
 APPLIED_SCHEMA_HISTORY='^apps/opencrane/prisma/migrations/'
 RESEARCH_HISTORY='^(docs/research/litellm-byok-byom-research\.md|docs/specs/mcp-catalog-credential-spec\.md)$'
 HISTORICAL_RECORDS='^(plan-done\.md|CHANGELOG\.md|silo-multi-tenant-plan\.md|docs/briefs/mcp-skills-platform-brief\.md|docs/design/stage5-silo-autonomous-controllers-plan\.md|docs/agents/deploy-ledger\.md)$'
-RUNTIME_CONTRACT_TESTS='^(\.github/workflows/docker\.yml|libs/k8s-platform/tests/tenant-image-immutability\.sh|libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/tenant-resource-builder\.test\.ts)$'
+RUNTIME_CONTRACT_TESTS='^(\.github/workflows/docker\.yml|apps/_infra/deploy-k8s/platform/tests/tenant-image-immutability\.sh|libs/backend/feat-openclaw-tenant/main/src/__tests__/tenants/tenant-resource-builder\.test\.ts)$'
 
 _search_repo_lines()
 {
@@ -153,13 +153,13 @@ _check_pattern "TENANT-MCP-POLICY" '(^|[^[:alnum:]_])mcpPolicy([^[:alnum:]_]|$)'
 _check_pattern "OPENCLAW-RUNTIME-VERSION" '(openclawVersion|OPENCLAW_VERSION|DEFAULT_OPENCLAW_VERSION)' "($TARGET_RECORDS|$HISTORICAL_RECORDS|$RUNTIME_CONTRACT_TESTS|^apps/feat-openclaw-tenant/deploy/Dockerfile$)"
 _check_pattern "OPENCLAW-CANARY" '(TenantUpdateWithCanaryStrategyController|tenant-update-with-canary-strategy|OPENCRANE_TENANT_ROLLOUT|OPENCRANE_CANARY_TIMEOUT)' "($TARGET_RECORDS|$HISTORICAL_RECORDS)"
 _check_pattern "OPENCLAW-OBOT-HEALTH" '(Obot health checker|Obot health)' "($TARGET_RECORDS|$HISTORICAL_RECORDS)"
-_check_file_absent "TENANT-CRD-RETIRED-FIELD" "apps/opencrane-infra/templates/crds/tenant.opencrane.io_tenants.yaml" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion):'
+_check_file_absent "TENANT-CRD-RETIRED-FIELD" "apps/_infra/deploy-k8s/templates/crds/tenant.opencrane.io_tenants.yaml" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion):'
 _check_file_absent "TENANT-SPEC-RETIRED-FIELD" "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/models/tenant-spec.types.ts" '^[[:space:]]+(mcpPolicy|channels|configOverrides|openclawVersion)\??:'
 
 # Pairing/device state and the no-token pod-token route are direct-deletion targets. Constrain the
 # remaining implementation and documentation so no new dependency can grow before removal.
 _check_pattern "PAIRING-DEVICE" '(BrokeredDevice|brokered-device|openclaw-pairing|/pod-token/cut|/:name/pairing)' "($TARGET_RECORDS|$APPLIED_SCHEMA_HISTORY|$HISTORICAL_RECORDS)"
-POD_TOKEN_DELETION_SCOPE="^(libs/backend/identity/main/src/auth\.router\.ts|libs/backend/connections/main/src/(core/gateway-resolve|routes/auth-connections|__tests__/auth-connections\.test)\.ts|website/security/connection-security\.md|docs/agents/(architecture|apps/opencrane)\.md|CHANGELOG\.md|plan\.md|plan-done\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-direct-refactor-plan|openclaw-agent-loop-replacement-plan)\.md)$"
+POD_TOKEN_DELETION_SCOPE="^(libs/backend/server/identity/main/src/auth\.router\.ts|libs/backend/server/connections/main/src/(core/gateway-resolve|routes/auth-connections|__tests__/auth-connections\.test)\.ts|website/security/connection-security\.md|docs/agents/(architecture|apps/opencrane)\.md|CHANGELOG\.md|plan\.md|plan-done\.md|docs/design/(personal-agent-platform-architecture|personal-agent-platform-direct-refactor-plan|openclaw-agent-loop-replacement-plan)\.md)$"
 _check_pattern "POD-TOKEN-DELETION-BOUNDARY" '(/api/v1/auth/pod-token|["`]/?pod-token(/cut)?["`])' "$POD_TOKEN_DELETION_SCOPE"
 
 # SessionScope is retired product state. All runtime CRUD/client/package references are forbidden

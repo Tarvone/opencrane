@@ -15,6 +15,9 @@ export class SaveButtonComponent
 	/** External form state; the component never manufactures mutation success. */
 	public readonly state = input<SettingsFormState<unknown> | undefined>(undefined);
 
+	/** Whether the owning handoff exposes a secondary baseline-reset action. */
+	public readonly showReset = input(true);
+
 	/** Emitted when a valid dirty draft should be submitted. */
 	public readonly submitIntent = output<void>();
 
@@ -54,7 +57,7 @@ export class SaveButtonComponent
 	public readonly canReset: Signal<boolean> = computed((): boolean =>
 	{
 		const phase = this.state()?.phase;
-		return phase === SettingsFormPhase.Dirty || phase === SettingsFormPhase.Invalid || phase === SettingsFormPhase.RecoverableError;
+		return this.showReset() && (phase === SettingsFormPhase.Dirty || phase === SettingsFormPhase.Invalid || phase === SettingsFormPhase.RecoverableError);
 	});
 
 	/** Emit submit intent only when the external contract permits it. */

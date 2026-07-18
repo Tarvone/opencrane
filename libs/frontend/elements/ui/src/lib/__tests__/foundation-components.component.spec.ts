@@ -458,10 +458,23 @@ describe("SaveButtonComponent", function saveButtonSuite(): void
 		const styles = _resource("save-button/save-button.component.scss");
 
 		expect(styles).toContain("padding: 10px 20px");
-		expect(styles).toContain("border-radius: 7px");
+		expect(styles).toContain("border-radius: var(--oc-radius-button)");
 		expect(styles).toContain("background: var(--oc-teal)");
 		expect(styles).toContain("box-shadow: var(--paper-button-primary-shadow)");
 		expect(styles).toContain("background: var(--paper-button-primary-gradient)");
+	});
+
+	it("can suppress reset when the authoritative handoff has one action", function resetVisibility(): void
+	{
+		const reference = _render(SaveButtonComponent);
+		const dirty = _EditSettingsForm(_CreateSettingsFormState(SETTINGS_PROFILE_BASELINE_FIXTURE), { displayName: "Dirty", notificationsEnabled: true });
+		_setInput(reference.instance.state, dirty);
+		_setInput(reference.instance.showReset, false);
+		_detect(reference);
+
+		expect(reference.location.nativeElement.querySelector(".wo-save__secondary")).toBeNull();
+		expect(reference.location.nativeElement.querySelector(".wo-save__button")).not.toBeNull();
+		reference.destroy();
 	});
 
 	it("keeps save disabled until external state permits submission", function controlledSubmission(): void

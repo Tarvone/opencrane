@@ -75,6 +75,10 @@ jobs:
 
       - name: Install Helm for topology render validation
         uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
 
       - name: Enforce Phase A retired-reference and legacy-residue guards
         run: ./scripts/phase-a-forbidden-references.sh
@@ -121,6 +125,10 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
 
       - name: Run k3d e2e smoke test
         run: ./libs/k8s-platform/tests/k3d-e2e.sh

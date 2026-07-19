@@ -4,7 +4,6 @@ import { SETTINGS_NAV, SettingsNavItem, SettingsSection } from "@opencrane/core"
 import { PodSectionComponent } from "../sections/pod-section/pod-section.component";
 import { ModelBudgetSectionComponent } from "../sections/model-budget-section/model-budget-section.component";
 import { AwarenessSectionComponent } from "../sections/awareness-section/awareness-section.component";
-import { SkillsSectionComponent } from "../sections/skills-section/skills-section.component";
 import { ChannelsSectionComponent } from "../sections/channels-section/channels-section.component";
 import { AccessSectionComponent } from "../sections/access-section/access-section.component";
 import { NetworkSectionComponent } from "../sections/network-section/network-section.component";
@@ -19,7 +18,6 @@ import { AccountSectionComponent } from "../sections/account-section/account-sec
 		PodSectionComponent,
 		ModelBudgetSectionComponent,
 		AwarenessSectionComponent,
-		SkillsSectionComponent,
 		ChannelsSectionComponent,
 		AccessSectionComponent,
 		NetworkSectionComponent,

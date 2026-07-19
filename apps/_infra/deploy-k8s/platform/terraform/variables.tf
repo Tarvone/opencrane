@@ -103,6 +103,20 @@ variable "fleet_chart_path"
   default     = ""
 }
 
+variable "app_database_secret_name"
+{
+  description = "Existing Kubernetes Secret containing the fleet database URI. Required when enable_app_deploy=true; Terraform never creates or imports the database."
+  type        = string
+  default     = ""
+}
+
+variable "app_database_secret_key"
+{
+  description = "Key in app_database_secret_name containing the fleet database URI."
+  type        = string
+  default     = "uri"
+}
+
 # GKE
 variable "cluster_name"
 {

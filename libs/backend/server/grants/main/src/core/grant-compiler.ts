@@ -33,7 +33,6 @@ const _GRANT_ROW_SELECT = {
 const _PRISMA_GRANT_PAYLOAD_TYPE = {
   Awareness: "Awareness",
   McpServer: "McpServer",
-  SkillBundle: "SkillBundle",
 } as const;
 
 /** Typed Prisma access values used during runtime lookups. */
@@ -71,7 +70,6 @@ const _COMPILER_ACCESS_BY_PRISMA_ACCESS = {
 const _COMPILER_PAYLOAD_BY_PRISMA_PAYLOAD = {
   [_PRISMA_GRANT_PAYLOAD_TYPE.Awareness]: GrantCompilerPayloadType.Awareness,
   [_PRISMA_GRANT_PAYLOAD_TYPE.McpServer]: GrantCompilerPayloadType.McpServer,
-  [_PRISMA_GRANT_PAYLOAD_TYPE.SkillBundle]: GrantCompilerPayloadType.SkillBundle,
 };
 
 /** Compiler-facing scope enum lookup keyed by Prisma enum values. */
@@ -386,7 +384,5 @@ function _ToPrismaPayloadType(payloadType: GrantCompilerPayloadType): _PrismaGra
       return _PRISMA_GRANT_PAYLOAD_TYPE.Awareness;
     case GrantCompilerPayloadType.McpServer:
       return _PRISMA_GRANT_PAYLOAD_TYPE.McpServer;
-    case GrantCompilerPayloadType.SkillBundle:
-      return _PRISMA_GRANT_PAYLOAD_TYPE.SkillBundle;
   }
 }

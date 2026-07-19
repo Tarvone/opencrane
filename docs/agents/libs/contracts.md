@@ -11,7 +11,7 @@ from the barrel only.
 - **`index.ts`** — the one barrel; re-exports everything below + the client.
 - **`client.ts`** — `___CreateControlPlaneClient(baseUrl, token?)` builds an `openapi-fetch` client typed by `paths`; injects `Authorization: Bearer` when a token is given. Exports `paths`; `ControlPlaneClient` lives in `client.types.ts`.
 - **`generated/api.ts`** — **auto-generated**, do not hand-edit. The `paths` type map.
-- Domain type files (CRD-mirroring enums + DTOs): `cluster-tenant.types.ts` (the **ClusterTenant** customer/isolation unit), `grant.types.ts`, `group.types.ts`, `mcp-server.types.ts`, `skill-bundle.types.ts`, `third-party-source.types.ts`. The per-user **UserTenant** gateway is the `Tenant` CRD (kind still `Tenant`); for the two-concept model see [`cluster-architecture.md` → Tenancy Model](../cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
+- Domain type files (CRD-mirroring enums + DTOs): `cluster-tenant.types.ts` (the **ClusterTenant** customer/isolation unit), `grant.types.ts`, `group.types.ts`, `mcp-server.types.ts`, and `third-party-source.types.ts`. The per-user **UserTenant** gateway is the `Tenant` CRD (kind still `Tenant`); for the two-concept model see [`cluster-architecture.md` → Tenancy Model](../cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
 
 ## The type-generation pipeline
 

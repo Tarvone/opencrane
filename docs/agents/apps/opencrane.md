@@ -50,13 +50,12 @@ CRUD + notable actions:
 - **tenants** and **policies** — current OpenClaw/CRD mutation, drift, and projection routes are
   deleted when AgentService and target authorization APIs land; do not preserve dual writes.
 - **mcp-servers** — `+ credentials` (static-fallback vs per-user OBO brokering).
-- **skills/catalog** — retain target catalog/review intent; delete OCI backfill and DB/OCI fallback
-  when ArtifactStore-backed SkillRevision lands.
+- **skills** — ArtifactStore-backed SkillRevision publication authority.
 - **groups**, **third-party-sources**, **provider-keys**, **access-tokens**, **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**.
 
 **Not served here (fleet-only since the split):** `cluster-tenants` lifecycle CRUD + provisioning, org membership, billing, `platform/dns`, and Zitadel administration moved to the [`fleet-operator`](./fleet-operator.md). The silo keeps `ClusterTenant` + `OrgMembership` as local **read-models** (per-org login + the org-admin gate) but does not mount their management routers.
 
-**Internal (`/api/internal`, no `___AuthMiddleware`):** `bundles/:digest/content` (feat-skill-registry proxies, entitlement-gated), `contract/:name` (pod re-pull, TokenReview), and `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
+**Internal (`/api/internal`, no `___AuthMiddleware`):** `contract/:name` (pod re-pull, TokenReview) and `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
 
 ## Auth subsystem
 
@@ -82,7 +81,7 @@ The composed frozen runtime lifecycle provisions Cognee's dependencies, all best
 
 ## Prisma schema (`prisma/schema/`)
 
-The current schema contains legacy Tenant, AccessPolicy, awareness, workspace, skill-bundle,
+The current schema contains legacy Tenant, AccessPolicy, awareness, workspace,
 projection, and `SessionScope` state. These are deletion targets. The first target persistence slice
 replaces the migration history with a fresh target initializer for AgentService/Revision/Run,
 Thread/Message/RunEvent, Approval, Persona, Artifact, SkillRevision, grants, audit, and membership

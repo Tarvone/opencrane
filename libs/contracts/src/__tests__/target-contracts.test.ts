@@ -11,9 +11,13 @@ describe("canonical model exports", function ()
       siloId: "silo-1",
       subjectId: "user-1",
       scope: { kind: "project", organizationId: "org-1", projectId: "project-cross-functional" },
-      capability: { catalog: { catalogId: "target-capabilities", revision: 1, digest: "sha256:catalog" }, capabilityId: "artifact.read" },
+      capability: { catalog: { catalogId: "target-capabilities", revision: 1, digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }, capabilityId: "artifact.read" },
+      resource: { kind: "artifact", id: "artifact-project-brief" },
       effect: "allow",
       priority: 50,
+      validFromEpochMs: 1784365200000,
+      expiresAtEpochMs: null,
+      revokedAtEpochMs: null,
     };
 
     expect(projectGrant.scope).toEqual({ kind: "project", organizationId: "org-1", projectId: "project-cross-functional" });

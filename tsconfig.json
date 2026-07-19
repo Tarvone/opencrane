@@ -13,11 +13,20 @@
       "@opencrane/backend/server/access-tokens": [
         "./libs/backend/server/access-tokens/main/src/index.ts"
       ],
+      "@opencrane/backend/server/agent-services": [
+        "./libs/backend/server/agent-services/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/artifacts": [
+        "./libs/backend/server/artifacts/main/src/index.ts"
+      ],
       "@opencrane/backend/server/api-spec": [
         "./libs/backend/server/api-spec/main/src/index.ts"
       ],
       "@opencrane/backend/server/audit": [
         "./libs/backend/server/audit/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/authorization": [
+        "./libs/backend/server/authorization/main/src/index.ts"
       ],
       "@opencrane/backend/server/awareness": [
         "./libs/backend/server/awareness/main/src/index.ts"
@@ -30,6 +39,9 @@
       ],
       "@opencrane/backend/server/connections": [
         "./libs/backend/server/connections/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/conversations": [
+        "./libs/backend/server/conversations/main/src/index.ts"
       ],
       "@opencrane/backend/server/contract": [
         "./libs/backend/server/contract/main/src/index.ts"
@@ -52,11 +64,20 @@
       "@opencrane/backend/server/metrics": [
         "./libs/backend/server/metrics/main/src/index.ts"
       ],
+      "@opencrane/backend/server/membership": [
+        "./libs/backend/server/membership/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/memory": [
+        "./libs/backend/server/memory/main/src/index.ts"
+      ],
       "@opencrane/backend/server/model-routing": [
         "./libs/backend/server/model-routing/main/src/index.ts"
       ],
       "@opencrane/backend/server/policies": [
         "./libs/backend/server/policies/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/personas": [
+        "./libs/backend/server/personas/main/src/index.ts"
       ],
       "@opencrane/backend/server/projection": [
         "./libs/backend/server/projection/main/src/index.ts"
@@ -67,6 +88,9 @@
       "@opencrane/backend/server/retrieval": [
         "./libs/backend/server/retrieval/main/src/index.ts"
       ],
+      "@opencrane/backend/server/runs": [
+        "./libs/backend/server/runs/main/src/index.ts"
+      ],
       "@opencrane/backend/server/skills": [
         "./libs/backend/server/skills/main/src/index.ts"
       ],
@@ -75,6 +99,9 @@
       ],
       "@opencrane/backend/server/tenants": [
         "./libs/backend/server/tenants/main/src/index.ts"
+      ],
+      "@opencrane/backend/channel-proxy": [
+        "./libs/backend/channel-proxy/main/src/index.ts"
       ],
       "@opencrane/util": [
         "./libs/util/src/index.ts"

@@ -225,20 +225,12 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
     });
     const awarenessMemberships = _BuildTenantDatasetMembershipResponse(memberships);
     // Awareness is a fleet-participation property of the tenant itself, so it stays keyed on
-    // the tenant name. MCP + skills are user ENTITLEMENTS, so they compile over the tenant's
-    // principal set { tenant-name, bound subject } (S4 inheritance) — the openclaw Tenant
-    // inherits its 1:1 user's tool/skill rights; Deny>Allow keeps it least-privilege-capable.
+    // the tenant name. MCP is a user entitlement, so it compiles over the tenant's principal
+    // set { tenant-name, bound subject } with Deny>Allow precedence.
     const principals = [req.params.name, ...(tenant.subject ? [tenant.subject] : [])];
     const awarenessDecisions = await compile(req.params.name, GrantCompilerPayloadType.Awareness, prisma);
     const mcpDecisions = await compileForPrincipals(principals, GrantCompilerPayloadType.McpServer, prisma);
     const allowedMcpIds = mcpDecisions.filter(function _isAllowed(decision)
-    {
-      return decision.access === GrantCompilerAccess.Allow;
-    }).map(function _mapDecision(decision)
-    {
-      return decision.payloadId;
-    });
-    const allowedSkillIds = (await compileForPrincipals(principals, GrantCompilerPayloadType.SkillBundle, prisma)).filter(function _isAllowed(decision)
     {
       return decision.access === GrantCompilerAccess.Allow;
     }).map(function _mapDecision(decision)
@@ -257,22 +249,6 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
           };
         }).mcpServer.findMany({
           where: { id: { in: allowedMcpIds } },
-          orderBy: { name: "asc" },
-        })
-      : [];
-    const skillBundles = allowedSkillIds.length > 0
-      ? await (prisma as unknown as {
-          skillBundle: {
-            findMany: (args: { where: { id: { in: string[] } }; orderBy: { name: "asc" } }) => Promise<Array<{
-              id: string;
-              name: string;
-              scope: string;
-              version: string;
-              digest: string;
-            }>>;
-          };
-        }).skillBundle.findMany({
-          where: { id: { in: allowedSkillIds } },
           orderBy: { name: "asc" },
         })
       : [];
@@ -303,19 +279,6 @@ export function tenantsRouter(customApi: k8s.CustomObjectsApi, prisma: PrismaCli
             name: server.name,
             transport: _NormalizeTransport(server.transport),
             endpoint: server.endpoint,
-          };
-        }),
-      },
-      skills: {
-        registry: process.env.SKILL_REGISTRY_URL ?? "http://feat-skill-registry.opencrane-system.svc:5000",
-        entitled: skillBundles.map(function _mapBundle(bundle)
-        {
-          return {
-            id: bundle.id,
-            name: bundle.name,
-            scope: String(bundle.scope).toLowerCase(),
-            version: bundle.version,
-            digest: bundle.digest,
           };
         }),
       },

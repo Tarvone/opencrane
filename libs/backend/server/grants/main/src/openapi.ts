@@ -122,7 +122,7 @@ export const _GrantsOpenapiPaths = {
           type: "object",
           required: ["payloadType", "payloadId", "recipientType", "recipientId"],
           properties: {
-            payloadType: { type: "string", enum: ["mcp-server", "skill-bundle"] },
+            payloadType: { type: "string", enum: ["mcp-server"] },
             payloadId: { type: "string" },
             recipientType: { type: "string", enum: ["user", "group"] },
             recipientId: { type: "string" },

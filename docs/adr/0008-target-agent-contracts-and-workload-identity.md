@@ -92,7 +92,7 @@ omitted from the network column for brevity.
 | `apps/_infra/cognee` | Durable memory engine | `cognee` | none | its mounted stores, LiteLLM |
 | `apps/_infra/litellm` | Model gateway | `litellm` | none | approved model providers and its mounted store |
 | `apps/_infra/obot` | Integration gateway | `obot` | none | approved external integrations and its mounted store |
-| `apps/postgres` | OpenCrane CNPG database Pods | `postgres` | none | in-silo database replication and approved backup destination |
+| `apps/postgres` | OpenCrane CNPG database Pods | CNPG-generated `<cluster-name>` instance identity | CNPG-generated instance-manager Role only | in-silo database replication and approved backup destination |
 | `apps/skill-authoring` | Skill authoring Job | `skill-authoring` | none | artifact-service, LiteLLM |
 | `apps/tool-runner` | Sandboxed non-Obot tool Job | per-job projected `tool-runner` identity | none | only capability-declared destinations |
 | `apps/silo-provisioner` | Fresh target-store initialization Job | `silo-provisioner` | none | target Postgres and app-owned mounted stores |

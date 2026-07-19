@@ -3,7 +3,7 @@ export { type ControlPlaneClient } from "./client.types.js";
 export { type AgentRevision, type AgentRevisionId, type AgentRevisionState, type AgentRun, type AgentRunId, type AgentRunState, type AgentService, type AgentServiceId, type AgentServiceKind, type AgentServiceState, type Message, type MessageId, type MessageRole, type PersonaInterview, type PersonaInterviewAnswer, type PersonaInterviewQuestion, type PersonaInterviewQuestionSet, type PersonaOnboarding, type PersonaRevision, type PersonaRevisionId, type RunEvent, type RunEventType, type SiloId, type SoulTemplate, type Thread, type ThreadId, type UserId } from "@opencrane/models/agents";
 export { ApprovalStatus, type Approval, type ApprovalId } from "./approval.types.js";
 export { type Artifact, type ArtifactContentReference, type ArtifactId, type ArtifactRevision, type ArtifactRevisionId, type ArtifactRevisionReference, type SkillRevision, type SkillRevisionId } from "@opencrane/models/artifacts";
-export { type AuthorizationDecision, type AuthorizationGrant, type AuthorizationRequest, type AuthorizationScope, type CapabilityCatalogReference, type CapabilityReference, type FleetMembershipAssertion, type FleetMembershipTrustDecision, type FleetMembershipTrustExpectation, type FleetSignatureVerificationEvidence, type SignedFleetMembershipRevision } from "@opencrane/models/authorization";
+export { type ActionCapability, type AuthorizationDecision, type AuthorizationGrant, type AuthorizationRequest, type AuthorizationResourceLocator, type AuthorizationScope, type CanonicalJsonSha256Digest, type CapabilityCatalogReference, type CapabilityProofBindingExpectation, type CapabilityProofClaims, type CapabilityProofExpectation, type CapabilityProofFailureReason, type CapabilityProofHeader, type CapabilityProofVerification, type CapabilityReference, type Es256PublicJwk, type FleetMembershipAssertion, type FleetMembershipTrustDecision, type FleetMembershipTrustExpectation, type FleetSignatureVerificationEvidence, type InvalidCapabilityProof, type SignedFleetMembershipRevision, type ValidCapabilityProof } from "@opencrane/models/authorization";
 export {
   ClusterTenantComputeMode,
   ClusterTenantIsolationTier,
@@ -40,7 +40,6 @@ export {
   AutoRoutingObjective,
   ByokProvider,
   ModelRoutingScope,
-  RoutingProposalStatus,
   SkillModelMode,
   type AutoRoutingConfig,
   type ModelDefinition,
@@ -51,16 +50,10 @@ export {
   type ProviderCredentialWrite,
   type ProviderKeySetRequest,
   type ProviderKeyStatus,
-  type RoutingEvalCase,
-  type RoutingEvalCaseWrite,
-  type RoutingMeasurement,
-  type RoutingProposal,
-  type SavingsRecommendation,
 } from "./model-routing.types.js";
 export { type DurableStatePolicy, type PlatformPolicy, type RuntimeFilesystemPolicy, type SiloUpdatePolicy } from "@opencrane/models/platform-policy";
 export { type RunInputSnapshot } from "./run-input-snapshot.types.js";
 export { type RuntimeAssignment } from "./runtime-assignment.types.js";
-export { SkillBundleStatus, SkillPromotionStatus, type SkillBundle, type SkillPromotion } from "./skill-bundle.types.js";
 export { type TenantModelSet } from "./tenant-models.types.js";
 export {
   ThirdPartySourceItemKind,

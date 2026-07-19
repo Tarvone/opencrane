@@ -38,11 +38,32 @@ NAMESPACE="${NAMESPACE:-opencrane-system}"
 RELEASE_NAME="${RELEASE_NAME:-opencrane-silo}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-0}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-240}"
-DB_STORAGE_GB="${DB_STORAGE_GB:-10}"
+DB_STORAGE_GB="${DB_STORAGE_GB:-20}"
 DISK_HEADROOM_GB="${DISK_HEADROOM_GB:-2}"
 MIN_FREE_GB="${MIN_FREE_GB:-$(( DB_STORAGE_GB + DISK_HEADROOM_GB ))}"
-DB_RELEASE_NAME="${DB_RELEASE_NAME:-opencrane-db}"
+OPENCRANE_DB_RELEASE_NAME="${OPENCRANE_DB_RELEASE_NAME:-opencrane-postgres}"
+OBOT_DB_RELEASE_NAME="${OBOT_DB_RELEASE_NAME:-opencrane-obot-postgres}"
+LITELLM_DB_RELEASE_NAME="${LITELLM_DB_RELEASE_NAME:-opencrane-litellm-postgres}"
+POSTGRES_CREDENTIALS_SECRET="${POSTGRES_CREDENTIALS_SECRET:-opencrane-postgres-credentials}"
+OBOT_POSTGRES_CREDENTIALS_SECRET="${OBOT_POSTGRES_CREDENTIALS_SECRET:-opencrane-obot-postgres-credentials}"
+LITELLM_POSTGRES_CREDENTIALS_SECRET="${LITELLM_POSTGRES_CREDENTIALS_SECRET:-opencrane-litellm-postgres-credentials}"
+POSTGRES_OWNER="${POSTGRES_OWNER:-opencrane_e2e}"
+OBOT_POSTGRES_OWNER="${OBOT_POSTGRES_OWNER:-obot_e2e}"
+LITELLM_POSTGRES_OWNER="${LITELLM_POSTGRES_OWNER:-litellm_e2e}"
 DB_PASSWORD="${DB_PASSWORD:-opencrane-e2e-password}"
+OBOT_DB_PASSWORD="${OBOT_DB_PASSWORD:-obot-e2e-password}"
+LITELLM_DB_PASSWORD="${LITELLM_DB_PASSWORD:-litellm-e2e-password}"
+CNPG_CHART_VERSION="${CNPG_CHART_VERSION:-0.29.0}"
+CNPG_SYSTEM_NAMESPACE="cnpg-system"
+CERT_MANAGER_CHART_VERSION="${CERT_MANAGER_CHART_VERSION:-v1.15.1}"
+BARMAN_CLOUD_PLUGIN_VERSION="${BARMAN_CLOUD_PLUGIN_VERSION:-0.13.0}"
+MINIO_IMAGE="${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}"
+MINIO_CLIENT_IMAGE="${MINIO_CLIENT_IMAGE:-quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z}"
+BACKUP_OBJECT_STORE_NAME="${BACKUP_OBJECT_STORE_NAME:-opencrane-backup-store}"
+BACKUP_MINIO_NAME="${BACKUP_MINIO_NAME:-opencrane-backup-minio}"
+BACKUP_NAME="${BACKUP_NAME:-opencrane-backup-smoke}"
+RESTORE_DB_RELEASE_NAME="${RESTORE_DB_RELEASE_NAME:-opencrane-postgres-restored}"
+BACKUP_MARKER="${BACKUP_MARKER:-opencrane-backup-restore-smoke-v1}"
 
 # Standalone self-seed identity (#151 item 4). The operator creates + binds THIS
 # ClusterTenant on boot, then seeds its `<org>-default` workspace Tenant.
@@ -200,6 +221,31 @@ function _wait_for_tenant_running()
   return 1
 }
 
+function _wait_for_backup_completed()
+{
+  local deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
+
+  while [[ $(date +%s) -lt $deadline ]]; do
+    local phase
+    phase="$(kubectl get backup "$BACKUP_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    case "$(printf '%s' "$phase" | tr '[:upper:]' '[:lower:]')" in
+      completed)
+        return 0
+        ;;
+      failed|"terminal error")
+        echo "[e2e] Backup '$BACKUP_NAME' entered terminal phase '$phase'"
+        kubectl describe backup "$BACKUP_NAME" -n "$NAMESPACE" 2>/dev/null || true
+        return 1
+        ;;
+    esac
+    sleep 2
+  done
+
+  echo "[e2e] Timed out waiting for Backup '$BACKUP_NAME' to complete"
+  kubectl get backup "$BACKUP_NAME" -n "$NAMESPACE" -o yaml 2>/dev/null || true
+  return 1
+}
+
 trap _cleanup EXIT
 
 # 1. Pre-flight — fail fast when required CLIs are missing.
@@ -218,9 +264,6 @@ _retry 3 docker build -f "$ROOT_DIR/apps/opencrane/deploy/Dockerfile" -t opencra
 echo "[e2e] Building tenant image"
 _retry 3 docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:e2e "$ROOT_DIR"
 
-echo "[e2e] Building skill registry image"
-_retry 3 docker build -f "$ROOT_DIR/apps/feat-skill-registry/deploy/Dockerfile" -t opencrane/skills-registry:e2e "$ROOT_DIR"
-
 # 3. Create a fresh cluster for deterministic test runs.
 echo "[e2e] Recreating k3d cluster '$CLUSTER_NAME'"
 k3d cluster delete "$CLUSTER_NAME" >/dev/null 2>&1 || true
@@ -228,107 +271,488 @@ k3d cluster create "$CLUSTER_NAME" --agents 1
 
 # 4a. Pre-pulling the official CloudNativePG database image (retried — registry pulls flake).
 echo "[e2e] Pre-pulling official CloudNativePG database image"
-_retry 3 docker pull ghcr.io/cloudnative-pg/postgresql:16
+_retry 3 docker pull ghcr.io/cloudnative-pg/postgresql:17.5
+echo "[e2e] Pre-pulling pinned backup smoke images"
+_retry 3 docker pull "$MINIO_IMAGE"
+_retry 3 docker pull "$MINIO_CLIENT_IMAGE"
 
 # 4b. Import images into the k3d cluster runtime.
 echo "[e2e] Importing images into k3d"
 k3d image import opencrane/opencrane-server:e2e --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:e2e --cluster "$CLUSTER_NAME"
-k3d image import opencrane/skills-registry:e2e --cluster "$CLUSTER_NAME"
-k3d image import ghcr.io/cloudnative-pg/postgresql:16 --cluster "$CLUSTER_NAME"
+k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
+k3d image import "$MINIO_IMAGE" --cluster "$CLUSTER_NAME"
+k3d image import "$MINIO_CLIENT_IMAGE" --cluster "$CLUSTER_NAME"
 
-# 4c. DIAGNOSTIC (temporary): the db-migrate initContainer reported "No migration found
-#     in prisma/migrations" despite 32 committed migrations. Print what the built image
-#     actually contains so we can tell an image/COPY problem from a prisma schema-folder
-#     migrations-resolution problem. Remove once the migrate path is fixed.
-echo "[e2e] DIAGNOSTIC: prisma migrations/schema inside opencrane-server:e2e image"
-docker run --rm --entrypoint sh opencrane/opencrane-server:e2e -c '
-  echo "[img] cwd package root = apps/opencrane"
-  echo "[img] prisma/migrations dirs:"; ls apps/opencrane/prisma/migrations 2>&1 | head
-  echo "[img] migration.sql count:"; find apps/opencrane/prisma/migrations -name migration.sql 2>/dev/null | wc -l
-  echo "[img] migration_lock.toml:"; ls -l apps/opencrane/prisma/migrations/migration_lock.toml 2>&1
-  echo "[img] prisma/schema files:"; ls apps/opencrane/prisma/schema 2>&1 | head -3
-  echo "[img] any migrations INSIDE prisma/schema?:"; ls apps/opencrane/prisma/schema/migrations 2>&1 | head
-' || echo "[e2e] (diagnostic docker run failed — non-fatal)"
+# 5. Install the pinned external CNPG test substrate. The Barman plugin must run in
+# the same namespace as the CNPG operator and requires cert-manager for its mTLS
+# certificates. These are test-only prerequisites; production keeps all three as BYO
+# cluster substrate.
+echo "[e2e] Installing cert-manager for the CNPG-I backup plugin"
+helm repo add jetstack https://charts.jetstack.io --force-update >/dev/null
+helm upgrade --install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version "$CERT_MANAGER_CHART_VERSION" \
+  --wait \
+  --set crds.enabled=true
 
-# 5. Install in-cluster PostgreSQL and publish the DATABASE_URL secrets expected by the chart.
 echo "[e2e] Installing CloudNativePG Engine Operator into control plane"
 helm repo add cnpg https://cloudnative-pg.github.io/charts --force-update >/dev/null
 helm upgrade --install cnpg cnpg/cloudnative-pg \
-  --namespace "$NAMESPACE" \
+  --namespace "$CNPG_SYSTEM_NAMESPACE" \
   --create-namespace \
+  --version "$CNPG_CHART_VERSION" \
   --wait \
   --set-string monitoring.podMonitor.enabled=false
 
-echo "[e2e] Bootstrapping credentials secret for PostgreSQL"
-kubectl create secret generic "${DB_RELEASE_NAME}-creds" \
+echo "[e2e] Installing pinned Barman Cloud CNPG-I plugin"
+kubectl apply -f "https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v${BARMAN_CLOUD_PLUGIN_VERSION}/manifest.yaml"
+kubectl wait --for=condition=Established crd/objectstores.barmancloud.cnpg.io --timeout="${TIMEOUT_SECONDS}s"
+kubectl rollout status deployment/barman-cloud \
+  -n "$CNPG_SYSTEM_NAMESPACE" \
+  --timeout="${TIMEOUT_SECONDS}s"
+
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+function _create_database_credentials()
+{
+  local credentials_secret="$1"
+  local database_owner="$2"
+  local database_password="$3"
+
+  kubectl create secret generic "$credentials_secret" \
+    -n "$NAMESPACE" \
+    --type=kubernetes.io/basic-auth \
+    --from-literal=username="$database_owner" \
+    --from-literal=password="$database_password" \
+    --dry-run=client \
+    -o yaml | kubectl apply -f -
+}
+
+echo "[e2e] Bootstrapping one credentials Secret per PostgreSQL authority"
+_create_database_credentials "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" "$DB_PASSWORD"
+_create_database_credentials "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" "$OBOT_DB_PASSWORD"
+_create_database_credentials "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" "$LITELLM_DB_PASSWORD"
+
+echo "[e2e] Installing pinned MinIO backup target"
+kubectl create secret generic opencrane-backup-object-store-credentials \
   -n "$NAMESPACE" \
-  --from-literal=username=opencrane \
-  --from-literal=password="$DB_PASSWORD" \
+  --from-literal=ACCESS_KEY_ID=opencrane-backup \
+  --from-literal=ACCESS_SECRET_KEY=opencrane-backup-password \
   --dry-run=client \
   -o yaml | kubectl apply -f -
 
-echo "[e2e] Applying CloudNativePG configuration layer"
 cat <<EOF | kubectl apply -f -
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: ${DB_RELEASE_NAME}
+  name: ${BACKUP_MINIO_NAME}
   namespace: ${NAMESPACE}
 spec:
-  instances: 1
-  enablePDB: false
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
-  storage:
-    size: ${DB_STORAGE_GB}Gi
-    storageClass: local-path
-  resources:
-    requests:
-      cpu: 250m
-      memory: 256Mi
-  bootstrap:
-    initdb:
-      # The silo (clustertenant) opencrane-ui owns its own Prisma database. Its
-      # runtime planes each get a sibling DB on the same server (own _prisma_migrations).
-      database: silo
-      # Owner role pinned to opencrane (NOT defaulted to the database name silo):
-      # the creds secret user, every DATABASE_URL, and the CREATE DATABASE OWNER
-      # statements below all use role opencrane. No backticks/dollar-refs in this
-      # heredoc comment -- it is unquoted for var expansion, so they would run as
-      # command substitution (bash: "owner: command not found").
-      owner: opencrane
-      secret:
-        name: ${DB_RELEASE_NAME}-creds
-      postInitApplicationSQL:
-        - CREATE DATABASE obot OWNER opencrane;
-        - CREATE DATABASE litellm OWNER opencrane;
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${BACKUP_MINIO_NAME}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${BACKUP_MINIO_NAME}
+    spec:
+      containers:
+        - name: minio
+          image: ${MINIO_IMAGE}
+          args: ["server", "/data"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: opencrane-backup-object-store-credentials
+                  key: ACCESS_KEY_ID
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opencrane-backup-object-store-credentials
+                  key: ACCESS_SECRET_KEY
+          ports:
+            - name: s3
+              containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: s3
+            periodSeconds: 2
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${BACKUP_MINIO_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app.kubernetes.io/name: ${BACKUP_MINIO_NAME}
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3
+EOF
+kubectl rollout status "deployment/${BACKUP_MINIO_NAME}" \
+  -n "$NAMESPACE" \
+  --timeout="${TIMEOUT_SECONDS}s"
+
+cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opencrane-backup-bucket
+  namespace: ${NAMESPACE}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: create-bucket
+          image: ${MINIO_CLIENT_IMAGE}
+          command: ["/bin/sh", "-ceu"]
+          args:
+            - |
+              mc alias set local http://${BACKUP_MINIO_NAME}:9000 "\$ACCESS_KEY_ID" "\$ACCESS_SECRET_KEY"
+              mc mb --ignore-existing local/backups
+          env:
+            - name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: opencrane-backup-object-store-credentials
+                  key: ACCESS_KEY_ID
+            - name: ACCESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: opencrane-backup-object-store-credentials
+                  key: ACCESS_SECRET_KEY
+EOF
+kubectl wait --for=condition=Complete job/opencrane-backup-bucket \
+  -n "$NAMESPACE" \
+  --timeout="${TIMEOUT_SECONDS}s"
+
+cat <<EOF | kubectl apply -f -
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: ${BACKUP_OBJECT_STORE_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  configuration:
+    destinationPath: s3://backups/
+    endpointURL: http://${BACKUP_MINIO_NAME}.${NAMESPACE}.svc.cluster.local:9000
+    s3Credentials:
+      accessKeyId:
+        name: opencrane-backup-object-store-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: opencrane-backup-object-store-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+  instanceSidecarConfiguration:
+    env:
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required
 EOF
 
-echo "[e2e] Waiting for Control-Plane Database Engine to stabilize..."
-kubectl wait --for=condition=Ready cluster/"${DB_RELEASE_NAME}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+function _validate_cnpg_backup_recovery_schema()
+{
+  local rendered
+  rendered="$(mktemp)"
 
-# Note: CNPG creates a service structured as [cluster-name]-rw for write/read routes.
-# Silo opencrane-ui DB secret (clustertenantManager.database.existingSecret).
-kubectl create secret generic "opencrane-silo-db" \
-  -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/silo" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+  echo "[e2e] Validating backup contract against the pinned CNPG API server schema"
+  helm template postgres-backup-contract "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --set "credentials.existingSecret=$POSTGRES_CREDENTIALS_SECRET" \
+    --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
+    --set backup.enabled=true \
+    --set backup.plugin.name=barman-cloud.cloudnative-pg.io \
+    --set backup.plugin.parameters.barmanObjectName=contract-only >"$rendered"
+  kubectl apply --server-side --dry-run=server -n "$NAMESPACE" -f "$rendered" >/dev/null
 
-# Obot dsn secret — the obot-mcp-gateway reads OBOT_SERVER_DSN from the release-prefixed
-# `<release>-obot` Secret (opencrane.obotSecretName), provisioned out-of-band, not by the chart.
-kubectl create secret generic "${RELEASE_NAME}-obot" \
-  -n "$NAMESPACE" \
-  --from-literal=dsn="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/obot" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+  echo "[e2e] Validating recovery contract against the pinned CNPG API server schema"
+  helm template postgres-recovery-contract "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --set "credentials.existingSecret=$POSTGRES_CREDENTIALS_SECRET" \
+    --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
+    --set restore.enabled=true \
+    --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
+    --set restore.plugin.parameters.barmanObjectName=contract-only \
+    --set-string restore.targetTime=2026-07-18T00:00:00Z >"$rendered"
+  kubectl apply --server-side --dry-run=server -n "$NAMESPACE" -f "$rendered" >/dev/null
+  rm -f "$rendered"
+}
 
-# LiteLLM DB secret (litellm.existingDatabaseSecret).
-kubectl create secret generic "opencrane-litellm-db" \
-  -n "$NAMESPACE" \
-  --from-literal=DATABASE_URL="postgresql://opencrane:${DB_PASSWORD}@${DB_RELEASE_NAME}-rw.${NAMESPACE}.svc.cluster.local:5432/litellm" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
+function _install_database()
+{
+  local release_name="$1"
+  local database_name="$2"
+  local credentials_secret="$3"
+  local database_owner="$4"
+  local client_selectors_json="$5"
+
+  echo "[e2e] Installing PostgreSQL target '$database_name' as '$release_name'"
+  helm upgrade --install "$release_name" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --set "credentials.existingSecret=$credentials_secret" \
+    --set-string "database.name=$database_name" \
+    --set-string "database.owner=$database_owner" \
+    --set "storage.size=${DB_STORAGE_GB}Gi" \
+    --set "storage.storageClass=local-path" \
+    --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
+    --set-json "networkPolicy.clientPodSelectors=$client_selectors_json"
+  kubectl wait --for=condition=Ready "cluster/$release_name" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
+    "$NAMESPACE" "$credentials_secret" "${release_name}-app" "${release_name}-rw" "$database_name"
+}
+
+function _copy_cnpg_uri_secret()
+{
+  local source_secret="$1"
+  local target_secret="$2"
+  local target_key="$3"
+
+  kubectl get secret "$source_secret" -n "$NAMESPACE" -o jsonpath='{.data.uri}' \
+    | base64 -d \
+    | kubectl create secret generic "$target_secret" -n "$NAMESPACE" \
+        --from-file="${target_key}=/dev/stdin" --dry-run=client -o yaml \
+    | kubectl apply -f -
+}
+
+function _migrate_opencrane_database()
+{
+  # A physical recovery must restore a bootable *fresh* application database, not
+  # merely arbitrary PostgreSQL tables. Run the immutable application's normal
+  # Prisma deploy before writing the backup marker so `_prisma_migrations` and the
+  # target schema travel with the base backup. This is first-install bootstrap,
+  # not compatibility or legacy-data migration.
+  echo "[e2e] Initializing the fresh OpenCrane schema before physical backup"
+  cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opencrane-backup-schema-migrate
+  namespace: ${NAMESPACE}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: opencrane-server-migrate
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: db-migrate
+          image: opencrane/opencrane-server:e2e
+          imagePullPolicy: IfNotPresent
+          command: ["node", "dist/apps/opencrane/scripts/migrate.js"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ${OPENCRANE_DB_RELEASE_NAME}-app
+                  key: uri
+EOF
+  kubectl wait --for=condition=Complete job/opencrane-backup-schema-migrate \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+}
+
+function _run_backup_restore_smoke()
+{
+  echo "[e2e] Enabling the pinned Barman plugin on '$OPENCRANE_DB_RELEASE_NAME'"
+  helm upgrade "$OPENCRANE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --reuse-values \
+    --set backup.enabled=true \
+    --set backup.plugin.name=barman-cloud.cloudnative-pg.io \
+    --set-string "backup.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME"
+
+  kubectl wait --for=condition=ContinuousArchiving "cluster/$OPENCRANE_DB_RELEASE_NAME" \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+
+  echo "[e2e] Writing marker before the physical base backup"
+  cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opencrane-backup-marker-writer
+  namespace: ${NAMESPACE}
+spec:
+  # The in-container SQL readiness loop owns the full bounded retry window.
+  # Do not let Kubernetes multiply that window with replacement Pods.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: opencrane-server
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: writer
+          image: ghcr.io/cloudnative-pg/postgresql:17.5
+          command: ["/bin/sh", "-ceu"]
+          args:
+            - |
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for source PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+                "CREATE TABLE IF NOT EXISTS backup_restore_smoke (marker text PRIMARY KEY);"
+              psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+                "INSERT INTO backup_restore_smoke(marker) VALUES ('${BACKUP_MARKER}') ON CONFLICT (marker) DO NOTHING;"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ${OPENCRANE_DB_RELEASE_NAME}-app
+                  key: uri
+EOF
+  kubectl wait --for=condition=Complete job/opencrane-backup-marker-writer \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+
+  echo "[e2e] Taking an on-demand plugin backup"
+  cat <<EOF | kubectl apply -f -
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: ${BACKUP_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  cluster:
+    name: ${OPENCRANE_DB_RELEASE_NAME}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+EOF
+  _wait_for_backup_completed
+  kubectl wait --for=condition=LastBackupSucceeded "cluster/$OPENCRANE_DB_RELEASE_NAME" \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+
+  echo "[e2e] Recovering the backup into fresh Cluster '$RESTORE_DB_RELEASE_NAME'"
+  helm upgrade --install "$RESTORE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --set "credentials.existingSecret=$POSTGRES_CREDENTIALS_SECRET" \
+    --set-string database.name=opencrane \
+    --set-string "database.owner=$POSTGRES_OWNER" \
+    --set "storage.size=${DB_STORAGE_GB}Gi" \
+    --set storage.storageClass=local-path \
+    --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
+    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}}]' \
+    --set restore.enabled=true \
+    --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
+    --set-string "restore.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME" \
+    --set-string "restore.plugin.parameters.serverName=$OPENCRANE_DB_RELEASE_NAME"
+  kubectl wait --for=condition=Ready "cluster/$RESTORE_DB_RELEASE_NAME" \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+  bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
+    "$NAMESPACE" "$POSTGRES_CREDENTIALS_SECRET" "${RESTORE_DB_RELEASE_NAME}-app" "${RESTORE_DB_RELEASE_NAME}-rw" opencrane
+
+  echo "[e2e] Verifying the restored marker through the recovered application Secret"
+  cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opencrane-backup-restore-verifier
+  namespace: ${NAMESPACE}
+spec:
+  # The in-container SQL readiness loop owns the full bounded retry window.
+  # Do not let Kubernetes multiply that window with replacement Pods.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postgres-restore-smoke
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: verifier
+          image: ghcr.io/cloudnative-pg/postgresql:17.5
+          command: ["/bin/sh", "-ceu"]
+          args:
+            - |
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for recovered PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT marker FROM backup_restore_smoke LIMIT 1')"
+              test "\$restored_marker" = "${BACKUP_MARKER}"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ${RESTORE_DB_RELEASE_NAME}-app
+                  key: uri
+EOF
+  kubectl wait --for=condition=Complete job/opencrane-backup-restore-verifier \
+    -n "$NAMESPACE" \
+    --timeout="${TIMEOUT_SECONDS}s"
+}
+
+_validate_cnpg_backup_recovery_schema
+_install_database "$OPENCRANE_DB_RELEASE_NAME" opencrane "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}}]'
+_install_database "$OBOT_DB_RELEASE_NAME" obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}}]'
+_install_database "$LITELLM_DB_RELEASE_NAME" litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" \
+  '[{"matchLabels":{"app.kubernetes.io/component":"litellm"}}]'
+
+_migrate_opencrane_database
+_run_backup_restore_smoke
+
+function _assert_distinct_cnpg_app_credentials()
+{
+  local app_secrets=("$@")
+  local i
+  local j
+  local left_username
+  local left_password
+  local right_username
+  local right_password
+  for ((i = 0; i < ${#app_secrets[@]}; i++)); do
+    left_username="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+    left_password="$(kubectl get secret "${app_secrets[$i]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+    for ((j = i + 1; j < ${#app_secrets[@]}; j++)); do
+      right_username="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.username}')"
+      right_password="$(kubectl get secret "${app_secrets[$j]}" -n "$NAMESPACE" -o jsonpath='{.data.password}')"
+      if [[ "$left_username" == "$right_username" || "$left_password" == "$right_password" ]]; then
+        echo "[e2e] CNPG authorities '${app_secrets[$i]}' and '${app_secrets[$j]}' share generated credentials"
+        exit 1
+      fi
+    done
+  done
+}
+_assert_distinct_cnpg_app_credentials "${OPENCRANE_DB_RELEASE_NAME}-app" "${OBOT_DB_RELEASE_NAME}-app" "${LITELLM_DB_RELEASE_NAME}-app"
+
+_copy_cnpg_uri_secret "${OBOT_DB_RELEASE_NAME}-app" "${RELEASE_NAME}-obot" dsn
+_copy_cnpg_uri_secret "${LITELLM_DB_RELEASE_NAME}-app" opencrane-litellm-db DATABASE_URL
 
 # Boot-time BYOK bootstrap key — seeds a model so the default-tenant seed's ≥1-model gate passes.
 kubectl create secret generic "$BOOTSTRAP_SECRET_NAME" \
@@ -338,10 +762,10 @@ kubectl create secret generic "$BOOTSTRAP_SECRET_NAME" \
   -o yaml | kubectl apply -f -
 
 # 6. Install ONLY the standalone silo chart, wired to the in-cluster database and images.
-#    cert-manager is disabled: the CI cluster has no cert-manager controller, so the
-#    chart-rendered self-managed Issuer/Certificate (certManager.enabled in standalone.yaml)
-#    would reference CRDs that are absent. Per-org domain provisioning stays on
-#    (manageOwnDomain, from standalone.yaml) — it fail-closes cleanly without cert-manager.
+#    The test substrate has cert-manager for the CNPG-I plugin, but the OpenCrane release's
+#    self-managed Issuer/Certificate stays disabled because this smoke has no routable domain.
+#    Per-org domain provisioning stays on (manageOwnDomain, from standalone.yaml) and
+#    fail-closes cleanly without external-dns.
 echo "[e2e] Installing standalone silo release '$RELEASE_NAME'"
 helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --namespace "$NAMESPACE" \
@@ -353,8 +777,10 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set "clustertenantManager.standaloneSeed.displayName=$ORG_DISPLAY_NAME" \
   --set "clustertenantManager.standaloneSeed.ownerEmail=$OWNER_EMAIL" \
   --set "clustertenantManager.standaloneSeed.tier=$ORG_TIER" \
-  --set "clustertenantManager.database.existingSecret=opencrane-silo-db" \
+  --set "clustertenantManager.database.existingSecret=${OPENCRANE_DB_RELEASE_NAME}-app" \
+  --set "clustertenantManager.database.secretKey=uri" \
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db" \
+  --set "litellm.databaseSecretKey=DATABASE_URL" \
   --set "bootstrap.providerKey.existingSecret=$BOOTSTRAP_SECRET_NAME" \
   --set "certManager.enabled=false"
 

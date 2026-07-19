@@ -25,7 +25,6 @@ The non-obvious shape of the system (verified June 2026). Read this before touch
 | **opencrane-api** | API-first management surface (`/api/v1`), OIDC broker, source of truth for Tenants/AccessPolicies/Grants/MCP/Skills. Dual-writes CRDs + Postgres. | everything |
 | **operator** | Reconciles UserTenant (`Tenant`)/ClusterTenant/AccessPolicy CRs → namespaces, pods, Ingresses, NetworkPolicies, buckets. | Kubernetes API |
 | **Obot MCP gateway** | MCP credential custody and tool-execution PEP. OpenCrane owns catalog and grants; tenant pods reach MCP servers *through* Obot. | tenant pods, MCP workloads |
-| **feat-skill-registry** | Entitlement-gated skill-bundle delivery; validates pod identity via TokenReview, proxies to opencrane-api. Non-entitled → **404** (existence-hiding). | opencrane-api, tenant pods |
 | **feat-central-agents** | Background ingestion worker (Slack connector → Postgres `OrgDocument`). Not API-first. | external sources, Postgres |
 
 **Target identity is purpose-specific**, with non-interchangeable credentials: (1) OIDC session

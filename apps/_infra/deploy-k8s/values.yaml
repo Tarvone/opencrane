@@ -129,16 +129,6 @@ sharedPlatform:
       # -- Base endpoint of the shared LiteLLM (e.g. http://litellm.platform.svc:4000).
       #    Required when mode=shared; consumed by the operator as LITELLM_ENDPOINT.
       endpoint: ""
-  # -- Skill-registry delivery plane scope.
-  skillRegistry:
-    # -- `instance` (default): use the release-local feat-skill-registry Deployment + Service.
-    #    `shared`: reference an external feat-skill-registry at `shared.url` and skip the
-    #    in-release Deployment/Service/RBAC.
-    mode: instance
-    shared:
-      # -- Base URL of the shared feat-skill-registry (e.g. http://feat-skill-registry.platform.svc:5000).
-      #    Required when mode=shared; consumed by the operator as SKILL_REGISTRY_URL.
-      url: ""
   # -- Obot MCP gateway plane scope.
   mcpGateway:
     # -- `instance` (default): use the release-local Obot Deployment + Service.
@@ -261,6 +251,45 @@ fleetManager:
   #    in the cluster; if its policy CRDs are absent the operator fails closed (skips the
   #    objects) so flipping this on without Linkerd is a safe no-op.
   linkerdMeshEnabled: false
+
+# -- Channel trust-boundary settings
+channelProxy:
+  # -- Standalone target channel trust boundary. It delegates all identity, membership,
+  #    thread, and runtime-target decisions to OpenCrane.
+  enabled: true
+  image:
+    repository: ghcr.io/italanta/opencrane-channel-proxy
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 8080
+  # -- Empty derives the release-local OpenCrane internal Service URL.
+  openCraneInternalUrl: ""
+  # -- Empty derives the exact HTTPS control-plane origin from ingress.controlPlaneHost/domain.
+  allowedOrigins: []
+  targetHostSuffixes:
+    - .svc.cluster.local
+  resolverTimeoutMs: 3000
+  commandTimeoutMs: 30000
+  streamConnectTimeoutMs: 5000
+  streamDurationMs: 300000
+  streamIdleTimeoutMs: 45000
+  maxCommandBytes: 1048576
+  maxCommandResponseBytes: 1048576
+  maxEventBytes: 262144
+  rateLimit: 120
+  rateWindowMs: 60000
+  projectedTokenTtlSeconds: 600
+  # -- Namespace from which the public ingress controller may reach the proxy.
+  ingressNamespace: ingress-nginx
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 # -- Control plane settings
 clustertenantManager:
@@ -1026,63 +1055,6 @@ mcpGateway:
       cpu: 1000m
       memory: 512Mi
 
-# -- Skill registry delivery plane settings (self-built; source in apps/feat-skill-registry).
-skillRegistry:
-  enabled: true
-  image:
-    # Built and published by .github/workflows/docker.yml (SKILL_REGISTRY_IMAGE), matching
-    # the opencrane-<service> naming of the other first-party images.
-    repository: ghcr.io/italanta/opencrane-skills-registry
-    tag: latest
-    pullPolicy: IfNotPresent
-  replicas: 1
-  service:
-    port: 5000
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 10001
-    runAsGroup: 10001
-    fsGroup: 10001
-    seccompProfile:
-      type: RuntimeDefault
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: false
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
-  # -- OCI registry (Zot) for digest-pinned skill-bundle storage (P4D.2). Default off;
-  # enable once the publish/delivery cutover lands. The control plane reaches it via
-  # SKILL_OCI_REGISTRY_URL (wired in the cutover slice).
-  ociStore:
-    enabled: false
-    image:
-      repository: ghcr.io/project-zot/zot-linux-amd64
-      tag: latest
-      pullPolicy: IfNotPresent
-    service:
-      port: 5000
-    # -- Repository path bundles are stored under (registry name).
-    repository: skills
-    persistence:
-      enabled: true
-      size: 10Gi
-      storageClass: ""
-    resources:
-      requests:
-        cpu: 50m
-        memory: 64Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
-
 # -- Identity-routing gateway proxy (DOMAIN.T4), folded IN-PROCESS into the operator
 # (interim — can be split into its own pod later). When enabled, the operator runs a WS
 # proxy on `port`: the per-org host's gateway WS upgrade is path-routed here, the proxy
@@ -1130,7 +1102,7 @@ networkPolicy:
   #
   #    CONTEXT: S2 ships per-silo (per-ClusterTenant-namespace) default-deny policies
   #    emitted by the operator. The PLATFORM namespace — where opencrane-ui, LiteLLM,
-  #    Cognee, Obot (mcp-gateway), feat-skill-registry, and the CNPG Postgres cluster run —
+  #    channel-proxy, Cognee, Obot (mcp-gateway), and the CNPG Postgres cluster run —
   #    has no such policy by default. This section adds one as a gated, additive block.
   #
   #    GATE: `enabled` defaults to FALSE. The whole template is a no-op until an operator

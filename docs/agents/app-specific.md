@@ -13,7 +13,6 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | Package | Deep-dive | One-liner |
 |---------|-----------|-----------|
 | `@opencrane/server` | [apps/opencrane.md](./apps/opencrane.md) | API-first hub (**Express 5** + Prisma + K8s client). The app owns process bootstrap, configuration, route/lifecycle composition, Prisma, and its Helm unit; HTTP capabilities and reconcilers live in libraries. Listens `:8080`. |
-| `@opencrane/feat-skill-registry` | [apps/feat-skill-registry.md](./apps/feat-skill-registry.md) | Entitlement-gated skill delivery (`:5000`). TokenReview (`aud=feat-skill-registry`) → proxy to opencrane-api; non-entitled **and** non-existent → `404` (existence-hiding). |
 | `@opencrane/feat-central-agents` | [apps/feat-central-agents.md](./apps/feat-central-agents.md) | Background ingestion worker (not API-first). Slack → normalise → Cognee; cursor in Postgres. `/healthz`, `/metrics`. |
 | _(apps/opencrane-ui)_ | — | Org-admin Angular SPA, ported in from WeOwnAI (#152). PrimeNG, zoneless/signals, standalone components — see [`angular.md`](./angular.md). Just another client of the opencrane-api (API-First Rule below). `npx nx build\|serve opencrane-ui`. |
 | `cognee`, `litellm`, `obot` | Local `README.md` | Deployment-only Nx apps under `apps/_infra/<name>`. Each owns its pinned image contract, identity, service, policy, and Helm templates; the upstream product source remains external. |

@@ -357,12 +357,6 @@ consumers should use:
 {{- if eq (default "instance" $c.mode) "shared" -}}true{{- end -}}
 {{- end }}
 
-{{- define "opencrane.skillRegistryShared" -}}
-{{- $sp := .Values.sharedPlatform | default dict -}}
-{{- $c := $sp.skillRegistry | default dict -}}
-{{- if eq (default "instance" $c.mode) "shared" -}}true{{- end -}}
-{{- end }}
-
 {{- define "opencrane.mcpGatewayShared" -}}
 {{- $sp := .Values.sharedPlatform | default dict -}}
 {{- $c := $sp.mcpGateway | default dict -}}
@@ -386,20 +380,6 @@ instance → release-local Service; shared → sharedPlatform.litellm.shared.end
 {{- $ep -}}
 {{- else -}}
 {{- printf "http://%s-litellm:%v" (include "opencrane.fullname" .) .Values.litellm.service.port -}}
-{{- end -}}
-{{- end }}
-
-{{/*
-Skill-registry base URL the operator injects into tenant runtimes.
-instance → release-local Service; shared → sharedPlatform.skillRegistry.shared.url.
-*/}}
-{{- define "opencrane.skillRegistryUrl" -}}
-{{- if eq (include "opencrane.skillRegistryShared" .) "true" -}}
-{{- $u := .Values.sharedPlatform.skillRegistry.shared.url | default "" -}}
-{{- if not $u -}}{{- fail "sharedPlatform.skillRegistry.mode=shared requires sharedPlatform.skillRegistry.shared.url" -}}{{- end -}}
-{{- $u -}}
-{{- else -}}
-{{- printf "http://%s-feat-skill-registry:%v" (include "opencrane.fullname" .) .Values.skillRegistry.service.port -}}
 {{- end -}}
 {{- end }}
 

@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - feat/agent-platform-v2
+      - own-personal-ai-agent-setup
   pull_request:
     branches:
       - main
-      - "feat/agent-platform-v2*"
+      - own-personal-ai-agent-setup
 
 # One live run per ref: a new push supersedes the in-flight PR validation of the stale commit.
 # Pushes to the integration branches are never cancelled mid-publish.
@@ -34,6 +34,7 @@ jobs:
       has_deployables: ${{ steps.affected.outputs.has_deployables }}
       api_contract_changed: ${{ steps.affected.outputs.api_contract_changed }}
       e2e_required: ${{ steps.affected.outputs.e2e_required }}
+      guard_inputs_changed: ${{ steps.affected.outputs.guard_inputs_changed }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -58,7 +59,7 @@ jobs:
       - name: Select the last successful base
         uses: nrwl/nx-set-shas@v5
         with:
-          main-branch-name: ${{ github.base_ref || (github.ref_name == 'feat/agent-platform-v2' && 'feat/agent-platform-v2' || 'main') }}
+          main-branch-name: ${{ github.base_ref || (github.ref_name == 'own-personal-ai-agent-setup' && 'own-personal-ai-agent-setup' || 'main') }}
 
       - name: Emit affected deployable matrix
         id: affected

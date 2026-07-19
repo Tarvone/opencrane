@@ -16,6 +16,8 @@
 ---
 {{ include "opencrane.ui.service" . }}
 ---
+{{ include "opencrane.channelProxy.resources" . }}
+---
 {{ include "opencrane.databaseSchema.job" . }}
 ---
 {{ include "opencrane.cognee.resources" . }}

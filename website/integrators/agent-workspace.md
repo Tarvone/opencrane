@@ -6,8 +6,8 @@ voice into a personalised agent without erasing it, and why none of this prose i
 trusted as a security boundary.
 
 > See also: [Architecture](/advanced/architecture) (how the pieces fit together),
-> [Obot MCP gateway](/integrators/mcp-gateway) and [Skill registry](/integrators/skill-registry)
-> (the planes that actually enforce access), and [Authentication](/security/identity)
+> [Obot MCP gateway](/integrators/mcp-gateway) (the tool-execution boundary),
+> [Share skills](/guide/skills), and [Authentication](/security/identity)
 > (the token audiences referenced below).
 
 ## Two kinds of control
@@ -142,20 +142,19 @@ file **rendered from the contract**, not written by hand.
 - The entrypoint polls the effective contract roughly every **30 seconds**. When a grant is
   added or revoked, the new `TOOLS.md` is written and the agent is **SIGHUP**-ed to reload —
   so a skill promotion or revocation reflects within one poll interval, with no pod restart.
-- Awareness is **descriptive**; the Obot gateway and skill registry remain the authoritative
-  boundary, so a stale view can never become a privilege. The same allow-set drives both, so
-  what the agent *thinks* it can use stays aligned with what IAM *lets* it use.
+- Awareness is **descriptive**; target authorization and proof-bound capabilities remain the
+  authoritative boundary, so a stale view can never become a privilege.
 
 → The enforcement side of this is documented in
-[Obot MCP gateway](/integrators/mcp-gateway) and [Skill registry & delivery](/integrators/skill-registry).
+[Obot MCP gateway](/integrators/mcp-gateway).
 
 ## Platform invariants
 
 These hold for every agent regardless of anything written in any workspace file — they are
 the sentences in `AGENTS.md` that are actually backed by infrastructure.
 
-- **You cannot call MCP servers or use skills outside your entitlement grant.** Enforced at
-  the gateway and registry.
+- **You cannot call MCP servers or use skills outside your entitlement grant.** Enforced by
+  target authorization and proof-bound capabilities.
 - **You cannot access another tenant's data, workspace, or secrets.** Enforced by per-tenant
   isolation and network policy.
 - **Secrets are encrypted at rest and never leave the pod unencrypted.** Personal keys are

@@ -35,7 +35,6 @@ enum ThirdPartySourceStatus {
 
 enum ThirdPartySourceItemKind {
   McpServer   @map("mcp-server")
-  SkillBundle @map("skill-bundle")
 }
 
 model ThirdPartySource {
@@ -52,7 +51,6 @@ model ThirdPartySource {
   updatedAt   DateTime               @updatedAt @map("updated_at")
   items       ThirdPartySourceItem[]
   mcpServers  McpServer[]
-  skillBundles SkillBundle[]
 
   @@map("third_party_sources")
 }

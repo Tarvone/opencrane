@@ -86,15 +86,6 @@ spec:
               value: "Issuer"
             {{- end }}
             {{- end }}
-            {{- if .Values.skillRegistry.ociStore.enabled }}
-            # OCI (Zot) store for skill-bundle content (P4D.2). When set, the control
-            # plane pushes published bundles here and serves delivery by digest from it,
-            # falling back to the DB `content` column until the destructive cutover lands.
-            - name: SKILL_OCI_REGISTRY_URL
-              value: "http://{{ include "opencrane.fullname" . }}-skill-oci.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.skillRegistry.ociStore.service.port }}"
-            - name: SKILL_OCI_REPOSITORY
-              value: {{ .Values.skillRegistry.ociStore.repository | quote }}
-            {{- end }}
             # -- Cognee endpoint, resolved by role (ADR 0002): silo + bundled Cognee →
             #    release-prefixed in-cluster Service; central / BYO → configured endpoint.
             - name: COGNEE_ENDPOINT
@@ -398,11 +389,9 @@ spec:
               value: {{ .Values.clustertenantManager.fleetApiToken | quote }}
             {{- end }}
             {{- end }}
-            # -- Runtime-plane endpoints injected into tenant Deployments (sharedPlatform scope, B5).
+            # -- Runtime-plane endpoint retained for the target Obot adapter.
             - name: MCP_GATEWAY_URL
               value: {{ include "opencrane.mcpGatewayUrl" . | quote }}
-            - name: SKILL_REGISTRY_URL
-              value: {{ include "opencrane.skillRegistryUrl" . | quote }}
             - name: PROJECTED_TOKEN_TTL_SECONDS
               value: {{ .Values.projectedIdentity.ttlSeconds | quote }}
             # -- Internal API base the DB-less operator calls on ITS OWN in-pod internal

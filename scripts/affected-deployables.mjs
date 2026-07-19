@@ -5,8 +5,8 @@ import { appendFileSync } from "node:fs";
 
 const _deployables = [
   { project: "opencrane", image: "opencrane-server", dockerfile: "apps/opencrane/deploy/Dockerfile" },
+  { project: "channel-proxy", image: "opencrane-channel-proxy", dockerfile: "apps/channel-proxy/deploy/Dockerfile" },
   { project: "feat-openclaw-tenant", image: "opencrane-openclaw-tenant", dockerfile: "apps/feat-openclaw-tenant/deploy/Dockerfile" },
-  { project: "feat-skill-registry", image: "opencrane-skills-registry", dockerfile: "apps/feat-skill-registry/deploy/Dockerfile" },
   { project: "opencrane-ui", image: "opencrane-ui", dockerfile: "apps/opencrane-ui/deploy/Dockerfile" },
 ];
 

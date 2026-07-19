@@ -55,24 +55,6 @@ export interface EffectiveContractResponse
       endpoint: string;
     }>;
   };
-  /** Compiled skill entitlement list. */
-  skills: {
-    /** Registry base URL used for runtime pulls. */
-    registry: string;
-    /** Allowed bundle metadata. */
-    entitled: Array<{
-      /** Stable bundle identifier. */
-      id: string;
-      /** Bundle name. */
-      name: string;
-      /** Bundle scope. */
-      scope: string;
-      /** Semantic version. */
-      version: string;
-      /** Digest pin. */
-      digest: string;
-    }>;
-  };
 }
 
 /** Request body for creating a new tenant. */

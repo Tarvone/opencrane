@@ -1,147 +1,12 @@
 # -----------------------------------------------------------------------------
 # App Deploy module
 #
-# Deploys in-cluster PostgreSQL (CloudNativePG) and the OpenCrane Helm chart.
+# Deploys the OpenCrane Helm chart onto an already prepared cluster.
 # The chart-owned database-schema hook applies Prisma schema revisions. This is
 # the final step that brings the application online after infrastructure provisioning.
+# PostgreSQL and its credentials are app-owned and installed separately through
+# apps/postgres; Terraform deliberately has no duplicate database authority.
 # -----------------------------------------------------------------------------
-
-# ---- In-cluster PostgreSQL via CloudNativePG Operator ----
-
-resource "random_password" "db_password"
-{
-  length  = 32
-  special = false
-}
-
-resource "helm_release" "cnpg"
-{
-  name             = "cnpg"
-  namespace        = var.namespace
-  create_namespace = true
-  repository       = "https://cloudnative-pg.github.io/charts"
-  chart            = "cloudnative-pg"
-  version          = "0.22.0"
-  wait             = true
-  timeout          = 600
-
-  set
-  {
-    name  = "monitoring.podMonitor.enabled"
-    value = "false"
-  }
-}
-
-resource "kubernetes_secret" "db_creds"
-{
-  metadata
-  {
-    name      = "opencrane-db-creds"
-    namespace = var.namespace
-  }
-
-  data =
-  {
-    username = "opencrane"
-    password = random_password.db_password.result
-  }
-}
-
-resource "kubernetes_manifest" "postgresql_cluster"
-{
-  manifest = {
-    apiVersion = "postgresql.cnpg.io/v1"
-    kind       = "Cluster"
-    metadata = {
-      name      = "opencrane-db"
-      namespace = var.namespace
-    }
-    spec = {
-      instances = 1
-      imageName = "ghcr.io/cloudnative-pg/postgresql:16"
-      storage = {
-        size = "10Gi"
-      }
-      resources = {
-        requests = {
-          cpu    = "250m"
-          memory = "256Mi"
-        }
-      }
-      bootstrap = {
-        initdb = {
-          database = "opencrane"
-          secret = {
-            name = kubernetes_secret.db_creds.metadata[0].name
-          }
-          postInitApplicationSQL = [
-            "CREATE DATABASE obot OWNER opencrane;",
-            "CREATE DATABASE litellm OWNER opencrane;"
-          ]
-        }
-      }
-    }
-  }
-
-  depends_on = [
-    helm_release.cnpg,
-    kubernetes_secret.db_creds,
-  ]
-}
-
-# ---- Kubernetes Secret with DATABASE_URL for the opencrane-ui ----
-
-resource "kubernetes_secret" "database_url"
-{
-  metadata
-  {
-    name      = "opencrane-db"
-    namespace = var.namespace
-  }
-
-  data =
-  {
-    DATABASE_URL = "postgresql://opencrane:${random_password.db_password.result}@opencrane-db-rw.${var.namespace}.svc.cluster.local:5432/opencrane"
-  }
-
-  depends_on = [kubernetes_manifest.postgresql_cluster]
-}
-
-# ---- Kubernetes Secret with dsn for the Obot MCP Gateway ----
-
-resource "kubernetes_secret" "opencrane_obot"
-{
-  metadata
-  {
-    name      = "opencrane-obot"
-    namespace = var.namespace
-  }
-
-  data =
-  {
-    dsn = "postgresql://opencrane:${random_password.db_password.result}@opencrane-db-rw.${var.namespace}.svc.cluster.local:5432/obot"
-  }
-
-  depends_on = [kubernetes_manifest.postgresql_cluster]
-}
-
-# ---- Kubernetes Secret with DATABASE_URL for LiteLLM ----
-
-resource "kubernetes_secret" "database_url_litellm"
-{
-  metadata
-  {
-    name      = "opencrane-litellm-db"
-    namespace = var.namespace
-  }
-
-  data =
-  {
-    DATABASE_URL = "postgresql://opencrane:${random_password.db_password.result}@opencrane-db-rw.${var.namespace}.svc.cluster.local:5432/litellm"
-  }
-
-  depends_on = [kubernetes_manifest.postgresql_cluster]
-}
 
 # ---- Static ingress IP (reserved so DNS can point to it) ----
 
@@ -206,23 +71,16 @@ resource "helm_release" "opencrane"
     value = "Always"
   }
 
-  # Fleet registry database — use the in-cluster secret.
   set
   {
     name  = "fleetManager.database.existingSecret"
-    value = kubernetes_secret.database_url.metadata[0].name
+    value = var.database_secret_name
   }
 
   set
   {
     name  = "fleetManager.database.secretKey"
-    value = "DATABASE_URL"
-  }
-
-  set
-  {
-    name  = "litellm.existingDatabaseSecret"
-    value = kubernetes_secret.database_url_litellm.metadata[0].name
+    value = var.database_secret_key
   }
 
   # Ingress
@@ -276,10 +134,6 @@ resource "helm_release" "opencrane"
   }
 
   depends_on = [
-    kubernetes_secret.database_url,
-    kubernetes_secret.database_url_litellm,
-    kubernetes_secret.opencrane_obot,
-    kubernetes_manifest.postgresql_cluster,
     helm_release.cert_manager,
   ]
 }

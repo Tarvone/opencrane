@@ -1,5 +1,5 @@
 /** A valid API payload-type string for a share. */
-export type SharePayloadType = "mcp-server" | "skill-bundle";
+export type SharePayloadType = "mcp-server";
 /** A valid API recipient-kind string for a share. */
 export type ShareRecipientType = "user" | "group";
 /** A valid API scope string for a share (mirrors GrantScope; defaults to personal). */

@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { GrantAccess, GrantPayloadType, GrantScope, GrantSubjectType, type PrismaClient } from "@prisma/client";
+import { GrantAccess, GrantScope, GrantSubjectType, type GrantPayloadType, type PrismaClient } from "@prisma/client";
 
 import { compile } from "../core/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../core/grant-compiler.types.js";
@@ -9,7 +9,7 @@ import type { CreateShareBody, SharePayloadType, ShareRecipientType, ShareScope 
 import "@opencrane/server/_infra/auth";
 
 /** Payload families a user may share (the entitlement surfaces the runtime contract carries). */
-const _PAYLOAD_TYPES: readonly SharePayloadType[] = ["mcp-server", "skill-bundle"];
+const _PAYLOAD_TYPES: readonly SharePayloadType[] = ["mcp-server"];
 /** Recipient kinds a share may target. */
 const _RECIPIENT_TYPES: readonly ShareRecipientType[] = ["user", "group"];
 /** Visibility scopes a share may carry (mirrors GrantScope; defaults to personal). */
@@ -18,13 +18,11 @@ const _SCOPES: readonly ShareScope[] = ["org", "department", "project", "persona
 /** Map the API payload-type string to the compiler enum used by the least-privilege gate. */
 const _COMPILER_PAYLOAD_BY_API: Record<SharePayloadType, GrantCompilerPayloadType> = {
   "mcp-server": GrantCompilerPayloadType.McpServer,
-  "skill-bundle": GrantCompilerPayloadType.SkillBundle,
 };
 
 /** Map the API payload-type string to the Prisma enum written on the Grant row. */
 const _PRISMA_PAYLOAD_BY_API: Record<SharePayloadType, GrantPayloadType> = {
-  "mcp-server": GrantPayloadType.McpServer,
-  "skill-bundle": GrantPayloadType.SkillBundle,
+  "mcp-server": "McpServer" as GrantPayloadType,
 };
 
 /** Map the API scope string to the Prisma GrantScope enum. */
@@ -97,15 +95,15 @@ export function sharesRouter(prisma: PrismaClient): Router
       const recipientId = typeof body.recipientId === "string" ? body.recipientId.trim() : "";
       if (!_PAYLOAD_TYPES.includes(payloadType) || !_RECIPIENT_TYPES.includes(recipientType) || !_SCOPES.includes(scope) || !payloadId || !recipientId)
       {
-        res.status(400).json({ error: "payloadType (mcp-server|skill-bundle), payloadId, recipientType (user|group), recipientId are required; scope must be org|department|project|personal.", code: "VALIDATION_ERROR" });
+        res.status(400).json({ error: "payloadType must be mcp-server; payloadId, recipientType (user|group), and recipientId are required; scope must be org|department|project|personal.", code: "VALIDATION_ERROR" });
         return;
       }
 
-      // 3. The payload must exist (you cannot share a server/bundle that is gone). Resolved by
-      //    family so the share row also carries the cascade-on-delete relation id.
-      const payloadExists = payloadType === "mcp-server"
-        ? await prisma.mcpServer.findUnique({ where: { id: payloadId }, select: { id: true } })
-        : await prisma.skillBundle.findUnique({ where: { id: payloadId }, select: { id: true } });
+      // 3. The payload must exist (you cannot share a server that is gone).
+      const payloadExists = await prisma.mcpServer.findUnique({
+        where: { id: payloadId },
+        select: { id: true },
+      });
       if (!payloadExists)
       {
         res.status(404).json({ error: `No ${payloadType} found with id '${payloadId}'.`, code: "NOT_FOUND" });
@@ -162,7 +160,7 @@ export function sharesRouter(prisma: PrismaClient): Router
           note: body.note,
           sharedBy: caller,
           ...(recipientType === "group" ? { groupId: recipientId } : {}),
-          ...(payloadType === "mcp-server" ? { mcpServerId: payloadId } : { skillBundleId: payloadId }),
+          mcpServerId: payloadId,
         },
       });
       _log.info({ caller, payloadType, payloadId, recipientType, recipientId, grantId: created.id }, "share created (inherited by the recipient's tenant on its next contract poll)");

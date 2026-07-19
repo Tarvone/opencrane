@@ -21,7 +21,6 @@ import { _PoliciesOpenapiPaths } from "@opencrane/backend/server/policies";
 import { _McpOpenapiPaths } from "@opencrane/backend/server/mcp";
 import { _GrantsOpenapiPaths } from "@opencrane/backend/server/grants";
 import { _GroupsOpenapiPaths } from "@opencrane/backend/server/groups";
-import { _SkillsOpenapiPaths } from "@opencrane/backend/server/skills";
 import { _RetrievalOpenapiPaths } from "@opencrane/backend/server/retrieval";
 import { _AccessTokensOpenapiPaths } from "@opencrane/backend/server/access-tokens";
 import { _ProvidersOpenapiPaths } from "@opencrane/backend/server/providers";
@@ -398,24 +397,6 @@ const GroupSchema = {
   },
 };
 
-const SkillBundleSchema = {
-  type: "object" as const,
-  properties: {
-    id: { type: "string" },
-    name: { type: "string" },
-    description: { type: "string" },
-    version: { type: "string" },
-    digest: { type: "string" },
-    scope: { type: "string", enum: ["org", "team", "project", "personal"] },
-    status: { type: "string", enum: ["draft", "published", "deprecated"] },
-    tags: { type: "array", items: { type: "string" } },
-    sourceName: { type: "string" },
-    publishedAt: { type: "string", format: "date-time" },
-    grants: { type: "array", items: { type: "object" } },
-    promotions: { type: "array", items: { type: "object" } },
-  },
-};
-
 const AuditEntrySchema = {
   type: "object" as const,
   properties: {
@@ -568,133 +549,6 @@ const ModelRoutingDefaultWriteSchema = {
   },
 };
 
-const SkillModelPostureSchema = {
-  type: "object" as const,
-  required: ["name", "scope", "team", "path"],
-  properties: {
-    name: { type: "string", description: "Skill name (part of the compound key)." },
-    scope: { type: "string", description: "Skill scope, e.g. org/team/personal (part of the compound key)." },
-    team: { type: "string", description: "Owning team for team-scoped skills; empty string when not team-scoped (part of the compound key)." },
-    path: { type: "string", description: "Workspace-relative path the skill is delivered to." },
-    modelMode: { type: "string", enum: ["pinned", "auto"], nullable: true, description: "pinned (use pinnedModel), auto (route within autoConfig), or null (inherit the scope default)." },
-    pinnedModel: { type: "string", nullable: true, description: "The pinned model's publicModelName, when modelMode is pinned." },
-    autoConfig: { ...AutoRoutingConfigSchema, nullable: true, description: "The skill's auto-routing config, when modelMode is auto." },
-    createdAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time" },
-  },
-};
-
-const SkillModelPostureWriteSchema = {
-  type: "object" as const,
-  required: ["modelMode"],
-  description: "Set a skill's model posture. pinned requires pinnedModel; auto validates autoConfig; null clears the posture (inherit the scope default).",
-  properties: {
-    modelMode: { type: "string", enum: ["pinned", "auto"], nullable: true, description: "pinned, auto, or null to clear the posture." },
-    pinnedModel: { type: "string", nullable: true, description: "Required when modelMode is pinned." },
-    autoConfig: { ...AutoRoutingConfigSchema, nullable: true, description: "Provided when modelMode is auto." },
-  },
-};
-
-const RoutingEvalCaseSchema = {
-  type: "object" as const,
-  required: ["id", "skillName", "skillScope", "skillTeam", "qualityBar"],
-  properties: {
-    id: { type: "string", description: "Stable identifier." },
-    skillName: { type: "string", description: "Owning skill name." },
-    skillScope: { type: "string", description: "Owning skill scope." },
-    skillTeam: { type: "string", description: "Owning skill team (empty for org/global)." },
-    input: { description: "The prompt/inputs for this case." },
-    expected: { nullable: true, description: "Optional golden answer or grader rubric." },
-    qualityBar: { type: "number", minimum: 0, maximum: 1, description: "Minimum judge score (0..1) a model must clear on this case." },
-    createdAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time" },
-  },
-};
-
-const RoutingEvalCaseWriteSchema = {
-  type: "object" as const,
-  required: ["skillName", "skillScope", "input"],
-  description: "Create/update body for a routing eval case (AIR.6).",
-  properties: {
-    skillName: { type: "string", description: "Owning skill name." },
-    skillScope: { type: "string", description: "Owning skill scope." },
-    skillTeam: { type: "string", description: "Owning skill team (defaults to empty)." },
-    input: { description: "The prompt/inputs for this case." },
-    expected: { nullable: true, description: "Optional golden answer or grader rubric." },
-    qualityBar: { type: "number", minimum: 0, maximum: 1, description: "Minimum judge score (0..1); defaults to 0.8." },
-  },
-};
-
-const RoutingMeasurementSchema = {
-  type: "object" as const,
-  required: ["id", "skillName", "skillScope", "skillTeam", "sampledCalls", "atBarCheapFraction", "projectedSavingsPct", "ciLowPct", "ciHighPct", "overheadPct"],
-  properties: {
-    id: { type: "string", description: "Stable identifier." },
-    skillName: { type: "string", description: "Owning skill name." },
-    skillScope: { type: "string", description: "Owning skill scope." },
-    skillTeam: { type: "string", description: "Owning skill team." },
-    candidateModel: { type: "string", nullable: true, description: "The cheaper candidate model evaluated against the current default." },
-    sampledCalls: { type: "integer", description: "Number of logged calls sampled + shadow-graded." },
-    atBarCheapFraction: { type: "number", description: "Fraction of sampled traffic the candidate served at-or-above the skill's bar." },
-    projectedSavingsPct: { type: "number", description: "Point estimate of % spend saved at equal quality." },
-    ciLowPct: { type: "number", description: "Lower bound of the bootstrap 95% CI on projected savings." },
-    ciHighPct: { type: "number", description: "Upper bound of the bootstrap 95% CI on projected savings." },
-    overheadPct: { type: "number", description: "Token overhead of running the measurement, as % of the skill's serve spend." },
-    skillContentHash: { type: "string", nullable: true, description: "Skill content version coordinate: the Skill.contentHash at run time (best-effort; null if unresolved)." },
-    skillDigest: { type: "string", nullable: true, description: "Skill content version coordinate: the live published SkillBundle.digest at run time (best-effort; null when no published bundle)." },
-    candidateModelId: { type: "string", nullable: true, description: "Model deployment coordinate: the candidate's stable litellmModelId (best-effort; null if unresolved)." },
-    candidateUpstreamModel: { type: "string", nullable: true, description: "Model deployment coordinate: the candidate's upstreamModel (best-effort; null if unresolved)." },
-    runAt: { type: "string", format: "date-time" },
-  },
-};
-
-const RoutingProposalSchema = {
-  type: "object" as const,
-  required: ["id", "skillName", "skillScope", "skillTeam", "proposedModel", "projectedSavingsPct", "ciLowPct", "ciHighPct", "status"],
-  properties: {
-    id: { type: "string", description: "Stable identifier." },
-    skillName: { type: "string", description: "Owning skill name." },
-    skillScope: { type: "string", description: "Owning skill scope." },
-    skillTeam: { type: "string", description: "Owning skill team." },
-    fromModel: { type: "string", nullable: true, description: "The model the skill resolves to today (null when unset)." },
-    proposedModel: { type: "string", description: "The cheaper model the loop proposes switching to." },
-    projectedSavingsPct: { type: "number", description: "Point estimate of % spend saved at equal quality." },
-    ciLowPct: { type: "number", description: "Lower bound of the bootstrap 95% CI (must exclude zero to propose)." },
-    ciHighPct: { type: "number", description: "Upper bound of the bootstrap 95% CI." },
-    skillContentHash: { type: "string", nullable: true, description: "Skill content version coordinate: the Skill.contentHash at proposal time (best-effort; null if unresolved)." },
-    skillDigest: { type: "string", nullable: true, description: "Skill content version coordinate: the live published SkillBundle.digest at proposal time (best-effort; null when none)." },
-    proposedModelId: { type: "string", nullable: true, description: "Model deployment coordinate: the proposed model's stable litellmModelId (best-effort; null if unresolved)." },
-    measurementId: { type: "string", nullable: true, description: "The measurement that produced this proposal." },
-    status: { type: "string", enum: ["pending", "approved", "rejected", "applied"], description: "Lifecycle status." },
-    decidedBy: { type: "string", nullable: true, description: "Principal who approved/rejected, when decided." },
-    decidedAt: { type: "string", format: "date-time", nullable: true },
-    createdAt: { type: "string", format: "date-time" },
-  },
-};
-
-const SavingsRecommendationSchema = {
-  type: "object" as const,
-  required: ["skillName", "skillScope", "skillTeam", "projectedSavingsPct", "ciLowPct", "ciHighPct", "hasOpenProposal", "measurementId", "runAt"],
-  properties: {
-    skillName: { type: "string", description: "Owning skill name." },
-    skillScope: { type: "string", description: "Owning skill scope." },
-    skillTeam: { type: "string", description: "Owning skill team (empty for org/global)." },
-    modelMode: { type: "string", enum: ["pinned", "auto"], nullable: true, description: "The skill's posture: pinned, auto, or null (inherits the scope default) — lets the UI flag a fixed-model advisory distinctly." },
-    currentModel: { type: "string", nullable: true, description: "The model the skill resolves to today — proposal fromModel, else the skill's pin, else null." },
-    recommendedModel: { type: "string", nullable: true, description: "The cheaper model recommended — proposal proposedModel, else the measurement candidate, else null." },
-    recommendedModelId: { type: "string", nullable: true, description: "Stable deployment id of the recommended model — proposal proposedModelId, else the measurement's candidateModelId, else null." },
-    skillContentHash: { type: "string", nullable: true, description: "Skill content version coordinate the evidence was gathered at — lets the console flag stale evidence; null if unresolved." },
-    skillDigest: { type: "string", nullable: true, description: "Live published SkillBundle.digest the evidence was gathered at; null when none." },
-    projectedSavingsPct: { type: "number", description: "Point estimate of % spend saved at equal quality (from the latest measurement)." },
-    ciLowPct: { type: "number", description: "Lower bound of the bootstrap 95% CI on projected savings." },
-    ciHighPct: { type: "number", description: "Upper bound of the bootstrap 95% CI on projected savings." },
-    hasOpenProposal: { type: "boolean", description: "True when an open Pending proposal exists for this skill." },
-    proposalId: { type: "string", nullable: true, description: "Id of the open Pending proposal, when one exists; null otherwise." },
-    measurementId: { type: "string", description: "Id of the latest measurement this recommendation is derived from." },
-    runAt: { type: "string", format: "date-time", description: "When the latest measurement ran (ISO-8601)." },
-  },
-};
-
 const DatasetMembershipSchema = {
   type: "object" as const,
   required: ["org", "team", "department", "project", "personal"],
@@ -715,7 +569,6 @@ const EffectiveContractSchema = {
     tenant: { type: "object" },
     awareness: { type: "object" },
     mcp: { type: "object" },
-    skills: { type: "object" },
   },
 };
 
@@ -819,8 +672,8 @@ export const spec = {
         description: "An inter-user share: an Allow grant the caller created on a recipient for an entitlement they hold (S4).",
         properties: {
           id: { type: "string" },
-          payloadType: { type: "string", enum: ["mcp-server", "skill-bundle"], description: "The entitlement family shared." },
-          payloadId: { type: "string", description: "Id of the shared MCP server or skill bundle." },
+          payloadType: { type: "string", enum: ["mcp-server"], description: "The MCP entitlement family shared." },
+          payloadId: { type: "string", description: "Id of the shared MCP server." },
           recipientType: { type: "string", enum: ["user", "group"], description: "Whether the share targets a user (IdP subject) or a group." },
           recipientId: { type: "string", description: "The recipient user subject or group id." },
           scope: { type: "string", enum: ["org", "department", "project", "personal"] },
@@ -841,7 +694,6 @@ export const spec = {
         },
         required: ["groupId", "resourceType", "resourceId", "members"],
       },
-      SkillBundle: SkillBundleSchema,
       AuditEntry: AuditEntrySchema,
       AccessToken: AccessTokenSchema,
       ProviderKey: ProviderKeySchema,
@@ -854,13 +706,6 @@ export const spec = {
       AutoRoutingConfig: AutoRoutingConfigSchema,
       ModelRoutingDefault: ModelRoutingDefaultSchema,
       ModelRoutingDefaultWrite: ModelRoutingDefaultWriteSchema,
-      SkillModelPosture: SkillModelPostureSchema,
-      SkillModelPostureWrite: SkillModelPostureWriteSchema,
-      RoutingEvalCase: RoutingEvalCaseSchema,
-      RoutingEvalCaseWrite: RoutingEvalCaseWriteSchema,
-      RoutingMeasurement: RoutingMeasurementSchema,
-      RoutingProposal: RoutingProposalSchema,
-      SavingsRecommendation: SavingsRecommendationSchema,
       AwarenessRollout: {
         type: "object",
         properties: {
@@ -964,7 +809,6 @@ export const spec = {
     ..._McpOpenapiPaths,
     ..._GrantsOpenapiPaths,
     ..._GroupsOpenapiPaths,
-    ..._SkillsOpenapiPaths,
     ..._RetrievalOpenapiPaths,
     ..._AccessTokensOpenapiPaths,
     ..._ProvidersOpenapiPaths,

@@ -20,7 +20,6 @@ enum GrantAccess {
 enum GrantPayloadType {
   Awareness  @map("awareness")
   McpServer  @map("mcp-server")
-  SkillBundle @map("skill-bundle")
 }
 
 model Grant {
@@ -39,14 +38,11 @@ model Grant {
   sharedBy     String?          @map("shared_by")
   groupId      String?          @map("group_id")
   mcpServerId  String?          @map("mcp_server_id")
-  skillBundleId String?         @map("skill_bundle_id")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
   group        Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
   mcpServer    McpServer?       @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
-  skillBundle  SkillBundle?     @relation(fields: [skillBundleId], references: [id], onDelete: Cascade)
   mcpGrant     McpServerGrant?
-  entitlement  SkillEntitlement?
 
   @@index([payloadType, payloadId])
   @@index([subjectType, subjectId])

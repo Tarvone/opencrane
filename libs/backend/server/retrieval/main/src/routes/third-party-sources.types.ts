@@ -5,7 +5,7 @@ export type ThirdPartySourceRouteKind = "mcp-registry" | "anthropic-skills" | "g
 export type ThirdPartySourceRouteStatus = "healthy" | "syncing" | "error" | "pending-approval";
 
 /** Supported discovered item kinds linked to a source. */
-export type ThirdPartySourceItemRouteKind = "mcp-server" | "skill-bundle";
+export type ThirdPartySourceItemRouteKind = "mcp-server";
 
 /** Request body used to create or update a source item. */
 export interface ThirdPartySourceItemInput
@@ -18,7 +18,7 @@ export interface ThirdPartySourceItemInput
   upstreamId: string;
   /** Optional upstream version label. */
   version?: string;
-  /** Optional OCI digest or content digest. */
+  /** Optional content digest supplied by the upstream registry. */
   digest?: string;
   /** Optional raw metadata preserved for later install steps. */
   metadata?: Record<string, unknown>;

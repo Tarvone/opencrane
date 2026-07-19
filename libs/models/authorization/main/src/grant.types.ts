@@ -1,5 +1,6 @@
 import type { AuthorizationScope } from "./authorization-scope.types.js";
 import type { CapabilityReference } from "./capability.types.js";
+import type { AuthorizationResourceLocator } from "./resource-locator.types.js";
 
 /** Effect applied by an authorization grant. */
 export type AuthorizationGrantEffect = "allow" | "deny";
@@ -17,10 +18,18 @@ export interface AuthorizationGrant
 	scope: AuthorizationScope;
 	/** Immutable capability catalog reference covered by the grant. */
 	capability: CapabilityReference;
+	/** Exact resource covered by the grant, with no implicit wildcard or hierarchy. */
+	resource: AuthorizationResourceLocator;
 	/** Allow or deny effect applied when this grant wins. */
 	effect: AuthorizationGrantEffect;
 	/** Non-negative integer precedence where a larger number has higher priority. */
 	priority: number;
+	/** Trusted epoch-millisecond boundary at which the grant becomes valid. */
+	validFromEpochMs: number;
+	/** Optional exclusive epoch-millisecond expiry boundary. */
+	expiresAtEpochMs: number | null;
+	/** Optional epoch-millisecond revocation time; any recorded revocation disables the grant. */
+	revokedAtEpochMs: number | null;
 }
 
 /** Authorization request evaluated against grants. */
@@ -34,6 +43,10 @@ export interface AuthorizationRequest
 	scope: AuthorizationScope;
 	/** Immutable capability reference required by the action. */
 	capability: CapabilityReference;
+	/** Exact resource targeted by the action. */
+	resource: AuthorizationResourceLocator;
+	/** Trusted current epoch-millisecond time used for grant validity. */
+	nowEpochMs: number;
 }
 
 /** Reason returned by deterministic grant evaluation. */
@@ -41,7 +54,9 @@ export type AuthorizationDecisionReason =
 	"winning_allow"
 	| "winning_deny"
 	| "no_matching_grant"
-	| "invalid_grant_priority";
+	| "invalid_request_time"
+	| "invalid_grant_priority"
+	| "invalid_grant_validity";
 
 /** Fail-closed result of deterministic grant evaluation. */
 export interface AuthorizationDecision

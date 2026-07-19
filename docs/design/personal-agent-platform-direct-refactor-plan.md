@@ -12,7 +12,7 @@ are obsolete; version control retains their history without keeping them in the 
 documentation set.
 
 The active sequencing index is [`plan.md`](../../plan.md). Implementation works from its linked
-issues and lands as small reviewed PRs on `feat/agent-platform-v2`.
+issues and lands as small reviewed PRs on `own-personal-ai-agent-setup`.
 
 ## Executive conclusion
 

@@ -4,8 +4,7 @@ OpenCrane runs **Obot** as the in-cluster gateway for MCP (Model Context Protoco
 tools. This page separates Obot's runtime catalogue from OpenCrane's API-first
 governance and per-tenant access decisions.
 
-> See also: [Skill registry and delivery](/integrators/skill-registry) (the sibling
-> delivery plane), [Agent workspace and control](/integrators/agent-workspace) (how
+> See also: [Agent workspace and control](/integrators/agent-workspace) (how
 > allowed tools appear to an agent), [Control access](/guide/permissions) (the admin
 > workflow), and [Identity and connection auth](/security/identity) (human and workload identity).
 

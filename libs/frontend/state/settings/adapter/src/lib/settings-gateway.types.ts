@@ -1,6 +1,6 @@
 import { InjectionToken } from "@angular/core";
 
-import { DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
+import { DatasetAccess, EgressDomain } from "@opencrane/core";
 
 /**
  * Read model for the Account settings section.
@@ -165,13 +165,6 @@ export interface SettingsGateway
 	 * @param tenantName - Stable pod/tenant identifier.
 	 */
 	getDatasetAccess(tenantName: string): Promise<DatasetAccess[]>;
-
-	/**
-	 * Load the skill catalogue rows for the Skills section.
-	 *
-	 * Cluster-wide (`GET /skills/catalog`), so it takes no tenant key.
-	 */
-	getSkills(): Promise<SkillRow[]>;
 
 	/**
 	 * Load the egress allowlist rows for the Network & Egress section.

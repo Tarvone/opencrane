@@ -92,7 +92,7 @@ locals
   registry_url = var.enable_artifact_registry ? module.artifact_registry[0].repository_url : var.registry_url
 }
 
-# ---- Phase 4: Application (OPT-IN: PostgreSQL + OpenCrane) ----
+# ---- Phase 4: Application (OPT-IN: OpenCrane only) ----
 #
 # Disabled by default so a bare `terraform apply` provisions only the cluster and
 # never has to bootstrap the kubernetes/helm providers from a cluster created in
@@ -111,6 +111,8 @@ module "app_deploy"
   namespace          = "opencrane"
   enable_gcs_storage = var.enable_gcs_storage
   fleet_chart_path   = var.fleet_chart_path
+  database_secret_name = var.app_database_secret_name
+  database_secret_key  = var.app_database_secret_key
 
   depends_on = [module.gke]
 }

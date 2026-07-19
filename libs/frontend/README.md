@@ -1,0 +1,22 @@
+# OpenCrane frontend libraries
+
+Frontend packages are grouped by Angular responsibility: `elements/` for presentation,
+`features/` for routed UI slices, and `state/` for gateway ports, adapters, and client state.
+That technical layering is deliberately unchanged by the server's domain regrouping.
+
+## Shared vocabulary map
+
+The table gives readers the closest server-domain vocabulary without creating a second forced
+directory hierarchy in the SPA.
+
+| Product vocabulary | Frontend entry points | Server group |
+| --- | --- | --- |
+| Managed personal agents | `features/conversation`, `state/conversation/*`, `state/onboarding` | personal agents and `server/agents` |
+| Gateway governance | `features/tools`, `state/mcp/adapter`, `state/provider-key/adapter` | `server/gateways` |
+| Tenancy and administration | `features/customer-admin`, `state/tenant/adapter`, `state/settings/adapter` | `server/tenancy`, `server/iam` |
+| Reporting | `features/metrics` | `server/reporting` |
+| Shared browser composition | `core`, `platform`, `elements/*`, `state/core`, `state/gateways` | cross-cutting |
+
+`state/gateways` is Angular dependency-injection composition, not the server `gateways` domain.
+Keep the names distinct: frontend dependencies follow the technical layer policy; server imports
+use explicit public domain barrels.

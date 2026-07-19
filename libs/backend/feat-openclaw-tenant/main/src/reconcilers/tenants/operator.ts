@@ -9,7 +9,7 @@ import type { Tenant } from "./models/tenant.types.js";
 import { TenantPolicyResolutionState, TenantStatusPhase, type TenantDegradedReason } from "./models/tenant-status.types.js";
 
 import { __K8sApplyResource, _IsK8sNotFound, _RunWatchLoop, K8sWatchEventType, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, TENANT_CRD_PLURAL, type ClusterTenantResource } from "@opencrane/server/_infra/api";
-import { _BuildOrgDomainProvisioner, type OrgDomainProvisioner } from "@opencrane/backend/server/cluster-tenants";
+import { _BuildOrgDomainProvisioner, type OrgDomainProvisioner } from "@opencrane/backend/server/tenancy/cluster-tenants";
 import { _BuildClusterTenantLimitRange, _BuildClusterTenantNamespace, _BuildClusterTenantResourceQuota, _BuildConfigMap, _BuildDeployment, _BuildGatewayNetworkPolicy, _BuildService, _BuildServiceAccount, _BuildSiloBaselineNetworkPolicy, _BuildSiloExternalEgressNetworkPolicy, _BuildSiloKubernetesApiEgressNetworkPolicy, _BuildSiloLinkerdIdentityPolicy, _BuildStatePvc, _ConfigChecksum, _ResolveTenantModelGate } from "./deploy/index.js";
 import { TenantCleanup } from "./destroy/tenant-cleanup.js";
 import { LinkerdIdentityClient } from "./internal/linkerd-identity.client.js";

@@ -13,7 +13,7 @@ retired personal-agent runtime and must not receive new functionality.
 
 ```text
 libs/backend/
-  server/<domain>/main/       OpenCrane server capability
+  server/<group>/<domain>/main OpenCrane server capability
     project.json              Nx project metadata and targets
     src/index.ts              public barrel
     src/routes/               Express transport adapters
@@ -27,15 +27,9 @@ flattening unrelated responsibilities together.
 
 ## Current functional domains
 
-- Target agent authority: agent services and immutable revisions, logical runs and workload
-  assignments, proof-bound authorization, and verified fleet membership.
-- Identity and access: access tokens, identity, grants, groups, policies, and cluster membership.
-- Tenant and runtime lifecycle: tenants, connections, effective contracts, and projection repair.
-- Models and economics: providers, model routing, spend, and budgets.
-- Knowledge and memory: awareness, retrieval sources, and company documents.
-- Tools and integrations: skills and silo-scoped integrations; the legacy MCP catalogue remains
-  isolated until a target browser/runtime integration path replaces it.
-- Operations and API composition: audit, metrics, and the generated API specification.
+The server map is grouped into IAM, managed agents, gateway governance, knowledge, tenancy, and
+reporting. See [`server/README.md`](./server/README.md) for the member map and why `api-spec`
+remains outside every group.
 
 These are current code ownership boundaries, not promises that legacy Tenant, AccessPolicy,
 OpenClaw, rollout, or projection behavior survives the direct target refactor.
@@ -45,7 +39,7 @@ OpenClaw, rollout, or projection behavior survives the direct target refactor.
 - Server capabilities may depend on models, contracts, utilities, `libs/server/_infra` support,
   and explicit backend peers; they never depend on an app.
 - Cross-capability imports use a public barrel such as
-  `@opencrane/backend/server/<domain>`, never an internal source path.
+  `@opencrane/backend/server/<group>/<domain>`, never an internal source path.
 - Server-runtime imports use `@opencrane/server/_infra/<runtime>`.
 - No compatibility aliases exist for the previous flat paths.
 - Database models remain in the OpenCrane app's per-domain Prisma schema files; see
@@ -53,11 +47,11 @@ OpenClaw, rollout, or projection behavior survives the direct target refactor.
 
 ## Adding a server capability
 
-1. Create `libs/backend/server/<domain>/main` by copying a small peer such as
-   `libs/backend/server/audit/main`.
+1. Create `libs/backend/server/<group>/<domain>/main` by copying a small peer such as
+   `libs/backend/server/iam/audit/main`.
 2. Name its Nx project `backend-server-<domain>` and update `sourceRoot`, target working
    directories, and its root-relative TypeScript and Vitest paths.
-3. Add `@opencrane/backend/server/<domain>` to the root `tsconfig.json` paths.
+3. Add `@opencrane/backend/server/<group>/<domain>` to the root `tsconfig.json` paths.
 4. Export only the public capability surface from `src/index.ts` and mount transport adapters from
    `apps/opencrane`.
 5. Add or update the app-owned Prisma schema slice when the capability owns durable models.

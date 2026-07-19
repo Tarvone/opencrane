@@ -18,6 +18,13 @@ databases:
     owner: langfuse
     credentialsSecret: ""
 
+# A separate operational role may inspect every logical database in this one tenant
+# server. It is not an application credential and never receives superuser, DDL, or
+# RLS-bypass power; owners retain write/schema authority for their own database.
+databaseAdmin:
+  name: opencrane_database_admin
+  credentialsSecret: ""
+
 storage:
   size: 20Gi
   storageClass: ""

@@ -5,6 +5,9 @@
 {{- $databaseNames := dict -}}
 {{- $databaseOwners := dict -}}
 {{- $credentialSecrets := dict -}}
+{{- if or (not .Values.databaseAdmin.name) (not .Values.databaseAdmin.credentialsSecret) -}}
+{{- fail "databaseAdmin.name and databaseAdmin.credentialsSecret are required; OpenCrane never generates database credentials" -}}
+{{- end -}}
 {{- range $database := .Values.databases }}
 {{- if or (not .name) (not .owner) (not .credentialsSecret) -}}
 {{- fail "every databases entry requires name, owner, and credentialsSecret; OpenCrane never generates database credentials" -}}
@@ -21,6 +24,12 @@
 {{- $_ := set $databaseNames $database.name true -}}
 {{- $_ := set $databaseOwners $database.owner true -}}
 {{- $_ := set $credentialSecrets $database.credentialsSecret true -}}
+{{- end -}}
+{{- if hasKey $databaseOwners .Values.databaseAdmin.name -}}
+{{- fail (printf "databaseAdmin.name must not equal a database owner; duplicate %q" .Values.databaseAdmin.name) -}}
+{{- end -}}
+{{- if hasKey $credentialSecrets .Values.databaseAdmin.credentialsSecret -}}
+{{- fail (printf "databaseAdmin.credentialsSecret must be distinct from database credentials; duplicate %q" .Values.databaseAdmin.credentialsSecret) -}}
 {{- end -}}
 {{- if and .Values.backup.enabled (not .Values.backup.plugin.name) -}}
 {{- fail "backup.plugin.name is required when backup.enabled=true" -}}
@@ -95,9 +104,21 @@ spec:
       secret:
         name: {{ $primary.credentialsSecret | quote }}
   {{- end }}
-  {{- if gt (len .Values.databases) 1 }}
   managed:
     roles:
+      - name: {{ .Values.databaseAdmin.name | quote }}
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        replication: false
+        bypassrls: false
+        inRoles:
+          - pg_monitor
+          - pg_read_all_data
+        passwordSecret:
+          name: {{ .Values.databaseAdmin.credentialsSecret | quote }}
       {{- range $index, $database := .Values.databases }}
       {{- if gt $index 0 }}
       - name: {{ $database.owner | quote }}
@@ -112,7 +133,6 @@ spec:
           name: {{ $database.credentialsSecret | quote }}
       {{- end }}
       {{- end }}
-  {{- end }}
   {{- if .Values.backup.enabled }}
   plugins:
     - name: {{ .Values.backup.plugin.name | quote }}

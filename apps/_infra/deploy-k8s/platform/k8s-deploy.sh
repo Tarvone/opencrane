@@ -29,6 +29,7 @@
 #                            --obot-postgres-credentials-secret NAME [--obot-postgres-owner OWNER]
 #                            --litellm-postgres-credentials-secret NAME [--litellm-postgres-owner OWNER]
 #                            --langfuse-postgres-credentials-secret NAME [--langfuse-postgres-owner OWNER]
+#                            --postgres-admin-credentials-secret NAME [--postgres-admin-name NAME]
 #                            [--postgres-values FILE]
 #                            [--no-ingress-nginx]
 #                            [--no-external-dns]
@@ -242,6 +243,8 @@ LITELLM_POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_LITELLM_POSTGRES_CREDENTIALS_SE
 LITELLM_POSTGRES_OWNER="${OPENCRANE_LITELLM_POSTGRES_OWNER:-litellm}"
 LANGFUSE_POSTGRES_CREDENTIALS_SECRET="${OPENCRANE_LANGFUSE_POSTGRES_CREDENTIALS_SECRET:-}"
 LANGFUSE_POSTGRES_OWNER="${OPENCRANE_LANGFUSE_POSTGRES_OWNER:-langfuse}"
+POSTGRES_ADMIN_CREDENTIALS_SECRET="${OPENCRANE_POSTGRES_ADMIN_CREDENTIALS_SECRET:-}"
+POSTGRES_ADMIN_NAME="${OPENCRANE_POSTGRES_ADMIN_NAME:-opencrane_database_admin}"
 # The central fleet profile owns a separate registry database. Silo wrappers disable
 # it through fleetManager.enabled=false; an explicit environment override exists for
 # other thin profiles that do not render the fleet manager.
@@ -322,6 +325,8 @@ while [[ $# -gt 0 ]]; do
     --litellm-postgres-owner) LITELLM_POSTGRES_OWNER="$2"; shift 2 ;;
     --langfuse-postgres-credentials-secret) LANGFUSE_POSTGRES_CREDENTIALS_SECRET="$2"; shift 2 ;;
     --langfuse-postgres-owner) LANGFUSE_POSTGRES_OWNER="$2"; shift 2 ;;
+    --postgres-admin-credentials-secret) POSTGRES_ADMIN_CREDENTIALS_SECRET="$2"; shift 2 ;;
+    --postgres-admin-name) POSTGRES_ADMIN_NAME="$2"; shift 2 ;;
     --postgres-values) POSTGRES_VALUES_FILE="$2"; shift 2 ;;
     --dns-writer-gsa)   DNS_WRITER_GSA="$2"; shift 2 ;;
     --cert-manager)  CERT_MANAGER="on"; shift ;;
@@ -413,6 +418,7 @@ _run_preflight() {
   _preflight_postgres_bootstrap obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER"
   _preflight_postgres_bootstrap litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER"
   _preflight_postgres_bootstrap langfuse "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_OWNER"
+  _preflight_postgres_bootstrap database-admin "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME"
 
   # 2. NetworkPolicy-enforcing CNI — the platform's isolation model is built on
   #    NetworkPolicy; a CNI that silently ignores them (e.g. stock kindnet/flannel) makes
@@ -632,6 +638,7 @@ _require_postgres_bootstrap opencrane "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_
 _require_postgres_bootstrap obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER"
 _require_postgres_bootstrap litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER"
 _require_postgres_bootstrap langfuse "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_OWNER"
+_require_postgres_bootstrap database-admin "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME"
 
 POSTGRES_RELEASE="${RELEASE}-postgres"
 _install_postgres_server() {
@@ -644,6 +651,8 @@ _install_postgres_server() {
   local postgres_args=(upgrade --install "$POSTGRES_RELEASE" "$POSTGRES_CHART_DIR"
     --namespace "$NAMESPACE"
     --set-json "databases=$databases_json"
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME"
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET"
     --set-json "networkPolicy.clientPodSelectors=$client_selectors_json")
   [[ -n "$POSTGRES_VALUES_FILE" ]] && postgres_args+=(--values "$POSTGRES_VALUES_FILE")
   [[ -n "$STORAGE_CLASS" ]] && postgres_args+=(--set-string "storage.storageClass=$STORAGE_CLASS")
@@ -689,10 +698,12 @@ POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-opencrane-app"
 OBOT_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-obot-app"
 LITELLM_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-litellm-app"
 LANGFUSE_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-langfuse-app"
+POSTGRES_ADMIN_APP_SECRET="${POSTGRES_RELEASE}-admin"
 _publish_database_connection "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_APP_SECRET" opencrane
 _publish_database_connection "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_APP_SECRET" obot
 _publish_database_connection "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_APP_SECRET" litellm
 _publish_database_connection "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_APP_SECRET" langfuse
+_publish_database_connection "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_APP_SECRET" opencrane
 if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
   FLEET_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-fleet-app"
   _publish_database_connection "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_APP_SECRET" fleet

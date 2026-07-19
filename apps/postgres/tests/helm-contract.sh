@@ -7,7 +7,7 @@ OUTPUT="$(mktemp)"
 trap 'rm -f "$OUTPUT"' EXIT
 
 DATABASES_JSON='[{"name":"opencrane","owner":"opencrane","credentialsSecret":"postgres-opencrane-bootstrap"},{"name":"obot","owner":"obot","credentialsSecret":"postgres-obot-bootstrap"},{"name":"litellm","owner":"litellm","credentialsSecret":"postgres-litellm-bootstrap"},{"name":"langfuse","owner":"langfuse","credentialsSecret":"postgres-langfuse-bootstrap"}]'
-COMMON_VALUES=(--set-json "databases=$DATABASES_JSON")
+COMMON_VALUES=(--set-json "databases=$DATABASES_JSON" --set-string databaseAdmin.name=opencrane_database_admin --set-string databaseAdmin.credentialsSecret=postgres-admin-bootstrap)
 
 helm lint "$CHART" "${COMMON_VALUES[@]}" >/dev/null
 helm template opencrane-postgres "$CHART" \
@@ -28,6 +28,11 @@ grep -q 'helm.sh/hook: post-install,post-upgrade' "$OUTPUT"
 test "$(grep -c 'app.kubernetes.io/component: postgres-database-privileges' "$OUTPUT")" -ge 2
 grep -q 'REVOKE CONNECT, TEMPORARY ON DATABASE' "$OUTPUT"
 grep -q 'GRANT CONNECT, TEMPORARY ON DATABASE' "$OUTPUT"
+grep -q 'name: "postgres-admin-bootstrap"' "$OUTPUT"
+grep -q 'name: "opencrane_database_admin"' "$OUTPUT"
+grep -q 'pg_read_all_data' "$OUTPUT"
+grep -q 'pg_monitor' "$OUTPUT"
+grep -q 'TO :"database_admin"' "$OUTPUT"
 grep -q '^kind: ScheduledBackup$' "$OUTPUT"
 grep -q '^kind: NetworkPolicy$' "$OUTPUT"
 grep -q 'helm.sh/resource-policy: keep' "$OUTPUT"
@@ -72,6 +77,14 @@ function _assert_invalid_databases()
 _assert_invalid_databases duplicate-name '[{"name":"opencrane","owner":"opencrane","credentialsSecret":"opencrane-secret"},{"name":"opencrane","owner":"obot","credentialsSecret":"obot-secret"}]'
 _assert_invalid_databases duplicate-owner '[{"name":"opencrane","owner":"opencrane","credentialsSecret":"opencrane-secret"},{"name":"obot","owner":"opencrane","credentialsSecret":"obot-secret"}]'
 _assert_invalid_databases duplicate-credentials '[{"name":"opencrane","owner":"opencrane","credentialsSecret":"shared-secret"},{"name":"obot","owner":"obot","credentialsSecret":"shared-secret"}]'
+
+helm template one-database "$CHART" \
+  --set-json 'databases=[{"name":"opencrane","owner":"opencrane","credentialsSecret":"postgres-opencrane-bootstrap"}]' \
+  --set-string databaseAdmin.name=opencrane_database_admin \
+  --set-string databaseAdmin.credentialsSecret=postgres-admin-bootstrap \
+  >"$OUTPUT"
+grep -q 'name: "opencrane_database_admin"' "$OUTPUT"
+grep -q 'pg_read_all_data' "$OUTPUT"
 
 helm template restored "$CHART" \
   "${COMMON_VALUES[@]}" \

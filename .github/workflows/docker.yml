@@ -117,6 +117,12 @@ jobs:
         if: needs.prepare.outputs.guard_inputs_changed == 'true' || github.event_name == 'push'
         run: npm run test:phase-b-topology
 
+      - name: Enforce Phase D personal-agent namespace boundary
+        run: npm run check:phase-d-agent-namespaces
+
+      - name: Prove the Phase D namespace boundary rejects drift
+        run: npm run test:phase-d-agent-namespaces
+
       - name: Enforce Phase A runtime contracts
         run: |
           ./apps/_infra/deploy-k8s/platform/tests/tenant-entrypoint-contract-policy.sh

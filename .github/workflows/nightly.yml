@@ -74,6 +74,8 @@ jobs:
           npm run --if-present test:phase-a-forbidden-references
           npm run --if-present check:phase-b-topology
           npm run --if-present test:phase-b-topology
+          npm run --if-present check:phase-d-agent-namespaces
+          npm run --if-present test:phase-d-agent-namespaces
           npm run --if-present lint:boundaries
 
       - name: Build, test, and lint every project

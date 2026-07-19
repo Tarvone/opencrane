@@ -40,8 +40,8 @@
       "@opencrane/backend/server/connections": [
         "./libs/backend/server/connections/main/src/index.ts"
       ],
-      "@opencrane/backend/server/conversations": [
-        "./libs/backend/server/conversations/main/src/index.ts"
+      "@opencrane/backend/agents/personal/conversations": [
+        "./libs/backend/agents/personal/conversations/main/src/index.ts"
       ],
       "@opencrane/backend/server/contract": [
         "./libs/backend/server/contract/main/src/index.ts"
@@ -67,8 +67,8 @@
       "@opencrane/backend/server/membership": [
         "./libs/backend/server/membership/main/src/index.ts"
       ],
-      "@opencrane/backend/server/memory": [
-        "./libs/backend/server/memory/main/src/index.ts"
+      "@opencrane/backend/agents/personal/memory": [
+        "./libs/backend/agents/personal/memory/main/src/index.ts"
       ],
       "@opencrane/backend/server/model-routing": [
         "./libs/backend/server/model-routing/main/src/index.ts"
@@ -76,8 +76,8 @@
       "@opencrane/backend/server/policies": [
         "./libs/backend/server/policies/main/src/index.ts"
       ],
-      "@opencrane/backend/server/personas": [
-        "./libs/backend/server/personas/main/src/index.ts"
+      "@opencrane/backend/agents/personal/personas": [
+        "./libs/backend/agents/personal/personas/main/src/index.ts"
       ],
       "@opencrane/backend/server/projection": [
         "./libs/backend/server/projection/main/src/index.ts"
@@ -88,8 +88,8 @@
       "@opencrane/backend/server/retrieval": [
         "./libs/backend/server/retrieval/main/src/index.ts"
       ],
-      "@opencrane/backend/server/runs": [
-        "./libs/backend/server/runs/main/src/index.ts"
+      "@opencrane/backend/agents/personal/runs": [
+        "./libs/backend/agents/personal/runs/main/src/index.ts"
       ],
       "@opencrane/backend/server/skills": [
         "./libs/backend/server/skills/main/src/index.ts"

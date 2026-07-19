@@ -1,0 +1,11 @@
+{
+  "name": "backend-agents-personal-runs",
+  "$schema": "../../../../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/backend/agents/personal/runs/main/src",
+  "tags": ["type:lib", "layer:backend", "scope:personal-runs"],
+  "targets": {
+    "lint": { "executor": "nx:run-commands", "options": { "command": "tsc -p tsconfig.json --noEmit", "cwd": "libs/backend/agents/personal/runs/main" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "vitest run", "cwd": "libs/backend/agents/personal/runs/main" } }
+  }
+}

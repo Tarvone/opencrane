@@ -32,9 +32,9 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 
-## OpenCrane server domains (`libs/backend/server/*/main`)
+## Server/control-plane domains (`libs/backend/server/*/main`)
 
-The control plane and extracted runtime capabilities are split into 21 NX packages
+The control plane and extracted runtime capabilities are split into NX packages
 (`backend-server-<d>` at `libs/backend/server/<d>/main`): tenants, policies, grants, skills,
 model-routing, providers, awareness, spend, groups, mcp, company-docs, audit,
 access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection,
@@ -44,6 +44,15 @@ Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, bounded `scope:<capability>` rules, and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);
 schema/migration ownership in [`prisma.md`](./prisma.md).
+
+## Personal-agent domains (`libs/backend/agents/personal/*/main`)
+
+Personal-agent product capabilities use the `backend-agents-personal-<d>` NX namespace under
+`libs/backend/agents/personal/<d>/main`: personas, conversations, runs, and memory. They own a
+person's approved persona, conversation events, run lifecycle, and memory catalogue respectively.
+Fleet membership, proof-bound authorization, and agent-service publication remain in
+`libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
+A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.
 
 ## Frontend libs (`libs/frontend/*`)
 

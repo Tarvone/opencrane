@@ -864,11 +864,23 @@ spec:
           command: ["/bin/sh", "-ceu"]
           args:
             - |
+              # Wait until PostgreSQL accepts the source role before asserting isolation. The
+              # managed-role reconcile that runs just after the cluster first reports Ready can
+              # briefly bounce the primary; this Job has backoffLimit 0, so a single premature
+              # attempt would hit "connection refused" and fail the whole check.
+              deadline="$(( $(date +%s) + 120 ))"
+              until psql -v ON_ERROR_STOP=1 -d "${source_name}" -c 'SELECT 1' >/dev/null 2>&1; do
+                if [ "$(date +%s)" -ge "$deadline" ]; then
+                  echo "timed out waiting for ${source_name} database connectivity" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              # The source role must NOT be able to reach the target database.
               if psql -v ON_ERROR_STOP=1 -d "${target_name}" -c 'SELECT 1' >/dev/null 2>&1; then
                 echo "${source_name} unexpectedly connected to ${target_name}" >&2
                 exit 1
               fi
-              psql -v ON_ERROR_STOP=1 -d "${source_name}" -c 'SELECT 1' >/dev/null
           env:
             - name: PGHOST
               value: ${OPENCRANE_DB_RELEASE_NAME}-rw

@@ -18,9 +18,11 @@ function _domainAction(action: ChannelInvocationAction): ChannelResolutionAction
 function _runCanReceiveCommand(trigger: AgentRunTrigger, state: AgentRunState): boolean
 {
 	return trigger === AgentRunTrigger.Interactive
-		&& state !== AgentRunState.Completed
-		&& state !== AgentRunState.Failed
-		&& state !== AgentRunState.Cancelled;
+		&& (state === AgentRunState.Accepted
+			|| state === AgentRunState.Queued
+			|| state === AgentRunState.Assigned
+			|| state === AgentRunState.Running
+			|| state === AgentRunState.WaitingForApproval);
 }
 
 /** Accepts only credential-free HTTP(S) endpoints inside configured runtime DNS suffixes. */

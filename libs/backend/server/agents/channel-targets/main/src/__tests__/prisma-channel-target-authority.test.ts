@@ -33,10 +33,27 @@ describe("PrismaChannelTargetAuthorityRepository run lifecycle", function _suite
 		await expect(repository.issueInvocationContextAtomically(_issueCommand())).resolves.toEqual({ status: "run_conflict" });
 	});
 
-	it.each([AgentRunState.Completed, AgentRunState.Failed, AgentRunState.Cancelled])("rejects terminal run state %s during issuance", async function _test(state)
+	it.each([AgentRunState.Cancelling, AgentRunState.Completed, AgentRunState.Failed, AgentRunState.Cancelled])("rejects closed run state %s during issuance", async function _test(state)
 	{
 		const repository = new PrismaChannelTargetAuthorityRepository(_prisma(_issueTransaction(AgentRunTrigger.Interactive, state)));
 		await expect(repository.issueInvocationContextAtomically(_issueCommand())).resolves.toEqual({ status: "run_conflict" });
+	});
+
+	it("rejects a command context when its run begins cancelling before consumption", async function _test()
+	{
+		const transaction = {
+			$queryRaw: async function _queryRaw(): Promise<readonly unknown[]> { return []; },
+			channelInvocationContext: {
+				findUnique: async function _findContext(): Promise<unknown>
+				{
+					return { id: "context-1", digest: `sha256:${"a".repeat(64)}`, subjectId: "user-1", siloId: "silo-1", threadId: "thread-1", agentServiceId: "service-1", action: ChannelInvocationAction.CommandForward, routeId: "route-1", runId: "run-1", authorizationDigest: `sha256:${"b".repeat(64)}`, expiresAt: new Date(2_000), consumedAt: null, revokedAt: null, route: { isCurrent: true, revokedAt: null, expiresAt: new Date(2_000) } };
+				},
+				update: async function _update(): Promise<never> { throw new Error("cancelling run must not consume context"); },
+			},
+			agentRun: { findUnique: async function _findRun(): Promise<unknown> { return { id: "run-1", siloId: "silo-1", threadId: "thread-1", agentServiceId: "service-1", delegatedUserId: "user-1", trigger: AgentRunTrigger.Interactive, state: AgentRunState.Cancelling }; } },
+		};
+		const repository = new PrismaChannelTargetAuthorityRepository(_prisma(transaction));
+		await expect(repository.consumeInvocationContextAtomically({ digest: `sha256:${"a".repeat(64)}`, expectedRouteId: "route-1", nowEpochMs: 1_000 })).resolves.toEqual({ status: "denied", reason: "run_inactive" });
 	});
 
 	it("rejects a command context when its run is cancelled before consumption", async function _test()

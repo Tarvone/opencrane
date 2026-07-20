@@ -1,5 +1,8 @@
 import type { RuntimeCandidate, RuntimeCommandEnvelope } from "@opencrane/contracts";
-import type { AgentRunId } from "@opencrane/models/agents";
+import type { AgentRunId, AgentRunState } from "@opencrane/models/agents";
+
+/** Run lifecycle values relevant to runtime admission, including the cancellation drain state. */
+export type RuntimeAdmissionRunState = AgentRunState;
 
 /** Current immutable authority facts for one active runtime attempt. */
 export interface RuntimeAttemptAuthority
@@ -24,8 +27,8 @@ export interface RuntimeAttemptAuthority
 	readonly acceptedCandidateIds: readonly string[];
 	/** Trusted hard lease expiry for this runtime attempt. */
 	readonly leaseExpiresAtEpochMs: number;
-	/** Whether the run is already terminal and rejects all new work. */
-	readonly terminal: boolean;
+	/** Current durable run state; Cancelling closes admission like a terminal state. */
+	readonly runState: RuntimeAdmissionRunState;
 }
 
 /** Server-owned time source for deterministic runtime-frame validation. */

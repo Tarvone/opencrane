@@ -291,7 +291,7 @@ export class PrismaRunDispatchRepository implements RunDispatchRepository
 					const failureCode = _ReleasePoisonFailureCode(event, run, assignment, bootstrap, candidate, now, config.claimLeaseMilliseconds);
 					if (failureCode !== null)
 					{
-						await _TerminalizePoisonedRelease(transaction, event, run, assignment, now, failureCode);
+						await _TerminalizePoisonedRelease(transaction, event, run, assignment, bootstrap, now, failureCode);
 						return { status: "terminalized", eventId: event.id, runId: run.id, attempt: event.attempt, failureCode };
 					}
 					return { status: "none" };
@@ -615,7 +615,7 @@ function _ReleasePoisonFailureCode(event: OutboxEvent, run: AgentRun, assignment
 }
 
 /** Claim and fail one persistent poisoned release so a later valid row can be selected. */
-async function _TerminalizePoisonedRelease(transaction: Prisma.TransactionClient, event: OutboxEvent, run: AgentRun, assignment: WorkloadAssignment | null, now: Date, failureCode: string): Promise<void>
+async function _TerminalizePoisonedRelease(transaction: Prisma.TransactionClient, event: OutboxEvent, run: AgentRun, assignment: WorkloadAssignment | null, bootstrap: WorkloadBootstrap | null, now: Date, failureCode: string): Promise<void>
 {
 	// 1. Revoke any still-pending assignment before failing this exact Assigned attempt.
 	const revoked = assignment === null ? { count: 0 } : await transaction.workloadAssignment.updateMany({ where: { runId: run.id, attempt: event.attempt, state: WorkloadAssignmentState.PendingPod, podUid: null }, data: { state: WorkloadAssignmentState.Revoked, revokedAt: now } });
@@ -626,7 +626,22 @@ async function _TerminalizePoisonedRelease(transaction: Prisma.TransactionClient
 	const failed = await transaction.outboxEvent.updateMany({ where: { id: event.id, claimedAt: event.claimedAt, deliveryCount: event.deliveryCount, publishedAt: null, failedAt: null }, data: { claimedAt, deliveryCount: event.deliveryCount + 1, failedAt: claimedAt, failureCode } });
 	if ((assignment !== null && revoked.count !== 1) || failedRun.count !== 1 || failed.count !== 1) throw new Error("poisoned run workload release lost its terminal failure fence");
 
-	// 3. Conversation-bound runs require their contiguous canonical failure event.
+	// 3. A committed assignment always receives exact physical cleanup authority; TTL cannot remove a suspended Job.
+	if (assignment !== null)
+	{
+		const maximum = await transaction.outboxEvent.aggregate({ where: { runId: run.id }, _max: { sequence: true } });
+		await transaction.outboxEvent.create({ data: {
+			runId: run.id,
+			attempt: event.attempt,
+			sequence: (maximum._max.sequence ?? 0) + 1,
+			kind: RunOutboxEventKind.RunWorkloadCleanupRequested,
+			idempotencyKey: `${run.id}:cleanup:${event.attempt}`,
+			payload: { runId: run.id, attempt: event.attempt, siloId: run.siloId, agentServiceId: run.agentServiceId, agentRevisionId: run.agentRevisionId, namespace: assignment.namespace, workloadProfile: assignment.workloadProfile, bootstrapReference: bootstrap?.id ?? "unavailable", workloadUid: assignment.workloadUid, mode: "assigned", reason: "dispatch_failure" },
+			availableAt: now,
+		} });
+	}
+
+	// 4. Conversation-bound runs require their contiguous canonical failure event.
 	if (run.threadId !== null)
 	{
 		const maximum = await transaction.conversationRunEvent.aggregate({ where: { runId: run.id }, _max: { sequence: true } });

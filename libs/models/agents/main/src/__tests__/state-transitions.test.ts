@@ -32,7 +32,7 @@ describe("agent model state transitions", function _stateTransitionSuite()
 		expect(__IsAgentRevisionTransitionAllowed("retired", "published")).toBe(false);
 	});
 
-	it("allows approval suspension and rejects skipped or resurrected run states", function _agentRunTransitions()
+	it("requires active runs to pass through cancelling before cancellation becomes terminal", function _agentRunTransitions()
 	{
 		expect(__IsAgentRunTransitionAllowed("accepted", "queued")).toBe(true);
 		expect(__IsAgentRunTransitionAllowed("queued", "assigned")).toBe(true);
@@ -40,6 +40,19 @@ describe("agent model state transitions", function _stateTransitionSuite()
 		expect(__IsAgentRunTransitionAllowed("running", "waiting_for_approval")).toBe(true);
 		expect(__IsAgentRunTransitionAllowed("waiting_for_approval", "running")).toBe(true);
 		expect(__IsAgentRunTransitionAllowed("running", "completed")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("accepted", "cancelling")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("queued", "cancelling")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("assigned", "cancelling")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("running", "cancelling")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("waiting_for_approval", "cancelling")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("cancelling", "cancelled")).toBe(true);
+		expect(__IsAgentRunTransitionAllowed("accepted", "cancelled")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("queued", "cancelled")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("assigned", "cancelled")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("running", "cancelled")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("waiting_for_approval", "cancelled")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("cancelling", "failed")).toBe(false);
+		expect(__IsAgentRunTransitionAllowed("cancelling", "running")).toBe(false);
 		expect(__IsAgentRunTransitionAllowed("accepted", "running")).toBe(false);
 		expect(__IsAgentRunTransitionAllowed("waiting_for_approval", "completed")).toBe(false);
 		expect(__IsAgentRunTransitionAllowed("completed", "running")).toBe(false);

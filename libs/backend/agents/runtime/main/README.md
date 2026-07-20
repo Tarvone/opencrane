@@ -29,8 +29,11 @@ domain may persist or execute that proposal.
 **In this flow:** [personal/runs](../../personal/runs/main/README.md) · [personal/conversations](../../personal/conversations/main/README.md)
 
 Invariant: an executor can only propose a result for a command OpenCrane already accepted for the
-exact current attempt and lease. Duplicate command or candidate identifiers are idempotent; stale,
-expired, out-of-order, malformed, or mismatched frames are denied with a stable reason.
+exact current attempt and lease. The `cancelling` run state closes command, event-candidate, and
+external-action admission immediately through the same `terminal_run` denial used by completed,
+failed, and cancelled runs; it is not a second runtime authority. Duplicate command or candidate
+identifiers are idempotent; stale, expired, out-of-order, malformed, or mismatched frames are denied
+with a stable reason.
 
 It intentionally owns no HTTP listener, Kubernetes resource, model driver, provider credential,
 tool execution, or direct persistence adapter. The app composes it with the stream transport and
@@ -41,16 +44,18 @@ authorities to accept or reject.
 
 - `__AdmitRuntimeCommand` — validates a control-plane command before stream delivery.
 - `__AdmitRuntimeCandidate` — validates a runtime-proposed event or deferred action.
-- `RuntimeAttemptAuthority` — exact durable facts the owning run authority must supply at the final
-  acceptance fence.
+- `RuntimeAttemptAuthority` — exact durable facts, including current run state, that the owning run
+  authority must supply at the final acceptance fence.
+- `RuntimeAdmissionRunState` — run lifecycle values understood by the admission fence, including the
+  non-terminal-but-closed `cancelling` state.
 - `RuntimeCommandAdmission*` / `RuntimeCandidateAdmission*` — typed allow, idempotent, or fail-closed
   decisions and their input ports.
 
 ## Boundary
 
 The runtime opens its authenticated stream outward to OpenCrane. This library makes stale,
-replayed, expired, mismatched, and terminal frames fail closed; it does not create an OpenClaw
-compatibility path or a second durable event authority.
+replayed, expired, mismatched, cancelling, and terminal frames fail closed; it does not create an
+OpenClaw compatibility path, a cancellation side authority, or a second durable event authority.
 
 ## Dependency direction
 

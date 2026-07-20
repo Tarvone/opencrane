@@ -851,3 +851,108 @@ if [[ "$(<"$RACE_DIR/action-receipt-reserve.status")" == "0" ]] \
   exit 1
 fi
 echo 'PASS: receipt reservation waits for assignment authority and rejects after revocation'
+
+run_psql <<'SQL'
+INSERT INTO "agent_services" (
+  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "workload_profile", "updated_at"
+) VALUES (
+  'svc-race-cancel-proof', 'silo-race-cancel-proof', 'personal', 'Cancellation proof race',
+  'user', 'user-race-cancel-proof', 'personal-default', clock_timestamp()
+);
+INSERT INTO "agent_revisions" (
+  "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
+  "model_policy_id", "budget", "authored_by"
+) VALUES (
+  'rev-race-cancel-proof', 'svc-race-cancel-proof', 1, 'draft', 'sha256:' || repeat('9', 64),
+  'prompt-v1', 'model-v1', '{}', 'user-race-cancel-proof'
+);
+UPDATE "agent_revisions"
+SET "state" = 'published', "published_at" = clock_timestamp()
+WHERE "id" = 'rev-race-cancel-proof';
+UPDATE "agent_services"
+SET "state" = 'active', "active_revision_id" = 'rev-race-cancel-proof'
+WHERE "id" = 'svc-race-cancel-proof';
+INSERT INTO "agent_runs" (
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+  "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
+) VALUES (
+  'run-race-cancel-proof', 'silo-race-cancel-proof', 'svc-race-cancel-proof',
+  'rev-race-cancel-proof', 'interactive', 'request-race-cancel-proof', 'run-race-cancel-proof',
+  'sha256:' || repeat('a', 64), 'sha256:' || repeat('b', 64)
+);
+UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-race-cancel-proof';
+INSERT INTO "workload_assignments" (
+  "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid",
+  "workload_profile", "expires_at"
+) VALUES (
+  'run-race-cancel-proof', 1, 'svc-race-cancel-proof', 'rev-race-cancel-proof',
+  'silo-race-cancel-proof', 'user-race-cancel-proof', 'opencrane-agent-runtime', 'runtime',
+  'tenant-race-cancel-proof', 'job', 'job-race-cancel-proof', 'personal-default',
+  clock_timestamp() + interval '1 hour'
+);
+UPDATE "agent_runs" SET "state" = 'assigned' WHERE "id" = 'run-race-cancel-proof';
+INSERT INTO "workload_bootstraps" (
+  "id", "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid",
+  "claim_digest", "expires_at"
+) VALUES (
+  'bootstrap-race-cancel-proof', 'run-race-cancel-proof', 1, 'svc-race-cancel-proof',
+  'rev-race-cancel-proof', 'silo-race-cancel-proof', 'user-race-cancel-proof',
+  'opencrane-agent-runtime', 'runtime', 'tenant-race-cancel-proof', 'job',
+  'job-race-cancel-proof', 'sha256:' || repeat('c', 64), clock_timestamp() + interval '30 minutes'
+);
+UPDATE "workload_assignments"
+SET "state" = 'registered', "pod_uid" = 'pod-race-cancel-proof', "registered_at" = clock_timestamp()
+WHERE "run_id" = 'run-race-cancel-proof' AND "attempt" = 1;
+UPDATE "workload_bootstraps"
+SET "consumed_at" = clock_timestamp(), "consumed_by_pod_uid" = 'pod-race-cancel-proof',
+    "receipt_id" = 'receipt-race-cancel-proof'
+WHERE "id" = 'bootstrap-race-cancel-proof';
+SQL
+
+(
+  set +e
+  run_psql >"$RACE_DIR/cancellation-proof-fence.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-cancellation-proof-fence';
+BEGIN;
+UPDATE "agent_runs" SET "state" = 'cancelling' WHERE "id" = 'run-race-cancel-proof';
+SELECT pg_sleep(3);
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/cancellation-proof-fence.status"
+) &
+cancellation_proof_fence_pid=$!
+wait_for_holder_sleeping 'phase-e-cancellation-proof-fence'
+(
+  set +e
+  run_psql >"$RACE_DIR/cancellation-proof-mint.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-cancellation-proof-mint';
+INSERT INTO "run_proof_keys" (
+  "id", "bootstrap_id", "run_id", "attempt", "workload_kind", "workload_uid", "pod_uid",
+  "public_key_jwk", "key_thumbprint", "expires_at"
+) VALUES (
+  'proof-race-cancel-proof', 'bootstrap-race-cancel-proof', 'run-race-cancel-proof', 1,
+  'job', 'job-race-cancel-proof', 'pod-race-cancel-proof', '{}', repeat('q', 43),
+  clock_timestamp() + interval '20 minutes'
+);
+SQL
+  echo "$?" >"$RACE_DIR/cancellation-proof-mint.status"
+) &
+cancellation_proof_mint_pid=$!
+wait_for_blocked_session 'phase-e-cancellation-proof-mint'
+wait "$cancellation_proof_fence_pid"
+wait "$cancellation_proof_mint_pid"
+if [[ "$(<"$RACE_DIR/cancellation-proof-fence.status")" != "0" ]]; then
+  cat "$RACE_DIR/cancellation-proof-fence.out" >&2
+  echo 'FAIL: cancellation proof fence did not commit' >&2
+  exit 1
+fi
+if [[ "$(<"$RACE_DIR/cancellation-proof-mint.status")" == "0" ]] \
+  || ! grep -q 'RunProofKey requires the current Assigned attempt' "$RACE_DIR/cancellation-proof-mint.out"; then
+  cat "$RACE_DIR/cancellation-proof-mint.out" >&2
+  echo 'FAIL: proof mint bypassed the concurrent cancellation fence' >&2
+  exit 1
+fi
+echo 'PASS: proof mint waits for run authority and rejects after cancellation begins'

@@ -36,7 +36,7 @@ spec:
                 fi
                 sleep 2
               done
-              until psql -v ON_ERROR_STOP=1 -d "$PGDATABASE" -v database_admin="{{ $.Values.databaseAdmin.name }}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = :'database_admin'" | grep -qx '1'; do
+              until echo "SELECT 1 FROM pg_roles WHERE rolname = :'database_admin'" | psql -v ON_ERROR_STOP=1 -d "$PGDATABASE" -v database_admin="{{ $.Values.databaseAdmin.name }}" -tA | grep -qx '1'; do
                 if [ "$(date +%s)" -ge "$deadline" ]; then
                   echo "Timed out waiting for database admin role '{{ $.Values.databaseAdmin.name }}'" >&2
                   exit 1

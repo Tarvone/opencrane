@@ -39,15 +39,15 @@ export interface MemoryProvenance
   capturedAt: string;
 }
 
-/** Stable reference to one revision of a durable memory fact. */
+/** Stable reference to one immutable durable memory-fact catalog row. */
 export interface MemoryFactReference
 {
   /** Dataset containing the fact. */
   datasetId: string;
   /** Stable fact identifier. */
   factId: string;
-  /** Monotonically increasing fact revision. */
-  revision: number;
+  /** Immutable content digest recorded by the authoritative memory-fact catalog row. */
+  contentDigest: string;
   /** Provenance supporting the referenced fact. */
   provenance: MemoryProvenance[];
 }
@@ -57,7 +57,7 @@ export interface MemoryMutationRequest
 {
   /** Requested mutation. */
   kind: MemoryMutationKind;
-  /** Exact fact revision being changed. */
+  /** Exact immutable memory-fact catalog coordinate being changed. */
   fact: MemoryFactReference;
   /** User requesting the mutation. */
   requestedByUserId: UserId;

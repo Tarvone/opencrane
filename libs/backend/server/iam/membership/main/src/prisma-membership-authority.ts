@@ -48,10 +48,10 @@ function _revision(row: { revision: number; issuerId: string; issuerKeyId: strin
 export class PrismaFleetMembershipAuthorityRepository implements FleetMembershipAuthorityRepository
 {
 	/** OpenCrane product-authority database client. */
-	private readonly prisma: PrismaClient;
+	private readonly prisma: PrismaClient | Prisma.TransactionClient;
 
 	/** Creates a membership adapter over canonical Postgres. */
-	constructor(prisma: PrismaClient)
+	constructor(prisma: PrismaClient | Prisma.TransactionClient)
 	{
 		this.prisma = prisma;
 	}
@@ -73,48 +73,64 @@ export class PrismaFleetMembershipAuthorityRepository implements FleetMembership
 	/** Atomically advances membership authority and appends the acceptance audit decision. */
 	async acceptRevisionAtomically(acceptance: FleetMembershipAcceptance): Promise<FleetMembershipAcceptanceResult>
 	{
-		return this.prisma.$transaction(async function _accept(transaction: Prisma.TransactionClient)
+		if (_ownsTransaction(this.prisma))
 		{
-			// 1. Serialize even the first acceptance for an issuer/silo pair, where no row exists to lock.
-			const lockKey = `${acceptance.issuerId}\u0000${acceptance.siloId}`;
-			await transaction.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
-			const current = await transaction.highestAcceptedFleetMembership.findUnique({ where: { issuerId_siloId: { issuerId: acceptance.issuerId, siloId: acceptance.siloId } }, include: { verified: true } });
-			if (current !== null && (current.revision > acceptance.revision || (current.revision === acceptance.revision && current.verified.payloadDigest !== acceptance.payloadDigest)))
+			return this.prisma.$transaction(async function _accept(transaction: Prisma.TransactionClient)
 			{
-				return { status: "conflict", highestAcceptedRevision: current.revision } as const;
-			}
-			if (current?.revision === acceptance.revision) return { status: "already_accepted", highestAcceptedRevision: current.revision } as const;
-
-			// 2. Require the exact locally verified payload before moving the sole trusted projection head.
-			const revision = await transaction.verifiedFleetMembershipRevision.findFirst({ where: { issuerId: acceptance.issuerId, siloId: acceptance.siloId, revision: acceptance.revision, payloadDigest: acceptance.payloadDigest } });
-			if (revision === null) return { status: "conflict", highestAcceptedRevision: current?.revision ?? 0 } as const;
-			await transaction.highestAcceptedFleetMembership.upsert({
-				where: { issuerId_siloId: { issuerId: acceptance.issuerId, siloId: acceptance.siloId } },
-				create: { issuerId: acceptance.issuerId, siloId: acceptance.siloId, revisionId: revision.id, revision: acceptance.revision },
-				update: { revisionId: revision.id, revision: acceptance.revision, acceptedAt: new Date() },
+				return _acceptRevision(transaction, acceptance);
 			});
-
-			// 3. Append durable acceptance evidence before commit so projection and audit cannot diverge.
-			const decisionDigest = __DigestCanonicalJson({ issuerId: acceptance.issuerId, siloId: acceptance.siloId, revision: acceptance.revision, payloadDigest: acceptance.payloadDigest } as JsonValue);
-			await __AppendAuditDecision(transaction, {
-				decisionDigest,
-				siloId: acceptance.siloId,
-				actorKind: "system",
-				actorId: acceptance.issuerId,
-				resourceKind: "fleet-membership",
-				resourceId: `${acceptance.issuerId}:${acceptance.siloId}`,
-				action: "accept-revision",
-				catalogId: "fleet-membership",
-				catalogRevision: acceptance.revision,
-				catalogDigest: acceptance.payloadDigest,
-				argumentsDigest: acceptance.payloadDigest,
-				policyRevisionHash: acceptance.payloadDigest,
-				effectiveAuthorizationDigest: acceptance.payloadDigest,
-				membershipRevision: acceptance.revision,
-				outcome: "allow",
-				reasonCode: "verified_revision_accepted",
-			});
-			return { status: "accepted", highestAcceptedRevision: acceptance.revision } as const;
-		});
+		}
+		return _acceptRevision(this.prisma, acceptance);
 	}
+}
+
+/** Returns whether a Prisma endpoint can open an independent database transaction. */
+function _ownsTransaction(prisma: PrismaClient | Prisma.TransactionClient): prisma is PrismaClient
+{
+	return "$transaction" in prisma;
+}
+
+/** Advances the membership high-watermark and audit inside the caller's already selected transaction. */
+async function _acceptRevision(transaction: Prisma.TransactionClient, acceptance: FleetMembershipAcceptance): Promise<FleetMembershipAcceptanceResult>
+{
+	// 1. Serialize even the first acceptance for an issuer/silo pair, where no row exists to lock.
+	const lockKey = `${acceptance.issuerId}\u0000${acceptance.siloId}`;
+	await transaction.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+	const current = await transaction.highestAcceptedFleetMembership.findUnique({ where: { issuerId_siloId: { issuerId: acceptance.issuerId, siloId: acceptance.siloId } }, include: { verified: true } });
+	if (current !== null && (current.revision > acceptance.revision || (current.revision === acceptance.revision && current.verified.payloadDigest !== acceptance.payloadDigest)))
+	{
+		return { status: "conflict", highestAcceptedRevision: current.revision } as const;
+	}
+	if (current?.revision === acceptance.revision) return { status: "already_accepted", highestAcceptedRevision: current.revision } as const;
+
+	// 2. Require the exact locally verified payload before moving the sole trusted projection head.
+	const revision = await transaction.verifiedFleetMembershipRevision.findFirst({ where: { issuerId: acceptance.issuerId, siloId: acceptance.siloId, revision: acceptance.revision, payloadDigest: acceptance.payloadDigest } });
+	if (revision === null) return { status: "conflict", highestAcceptedRevision: current?.revision ?? 0 } as const;
+	await transaction.highestAcceptedFleetMembership.upsert({
+		where: { issuerId_siloId: { issuerId: acceptance.issuerId, siloId: acceptance.siloId } },
+		create: { issuerId: acceptance.issuerId, siloId: acceptance.siloId, revisionId: revision.id, revision: acceptance.revision },
+		update: { revisionId: revision.id, revision: acceptance.revision, acceptedAt: new Date() },
+	});
+
+	// 3. Append durable acceptance evidence before commit so projection and audit cannot diverge.
+	const decisionDigest = __DigestCanonicalJson({ issuerId: acceptance.issuerId, siloId: acceptance.siloId, revision: acceptance.revision, payloadDigest: acceptance.payloadDigest } as JsonValue);
+	await __AppendAuditDecision(transaction, {
+		decisionDigest,
+		siloId: acceptance.siloId,
+		actorKind: "system",
+		actorId: acceptance.issuerId,
+		resourceKind: "fleet-membership",
+		resourceId: `${acceptance.issuerId}:${acceptance.siloId}`,
+		action: "accept-revision",
+		catalogId: "fleet-membership",
+		catalogRevision: acceptance.revision,
+		catalogDigest: acceptance.payloadDigest,
+		argumentsDigest: acceptance.payloadDigest,
+		policyRevisionHash: acceptance.payloadDigest,
+		effectiveAuthorizationDigest: acceptance.payloadDigest,
+		membershipRevision: acceptance.revision,
+		outcome: "allow",
+		reasonCode: "verified_revision_accepted",
+	});
+	return { status: "accepted", highestAcceptedRevision: acceptance.revision } as const;
 }

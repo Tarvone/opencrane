@@ -1,6 +1,6 @@
 # @opencrane/backend/channel-proxy — edge trust-boundary logic
 
-> [backend](../../README.md) › [channel-proxy](../README.md) › main
+> [backend](../../README.md) › channel-proxy › main
 
 ## What it owns
 
@@ -75,5 +75,5 @@ itself to OpenCrane. All limits, allowlisted origins, and target host suffixes c
 
 ## See also
 
-- Parent index: [channel-proxy](../README.md)
+- Parent index: [backend](../../README.md)
 - Related: [artifacts/authorization](../../artifacts/authorization/main/README.md) *(the platform's other edge trust boundary)*

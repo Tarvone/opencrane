@@ -1,6 +1,6 @@
 # @opencrane/backend/agents/personal/memory — memory fact catalog
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › [personal](../../README.md) › memory
+> [backend](../../../../README.md) › [agents](../../../README.md) › personal › memory
 
 ## What it owns
 
@@ -65,5 +65,5 @@ repository. Postgres-level behaviour is exercised by the `test:sql` target (`tes
 
 ## See also
 
-- Parent index: [personal](../../README.md)
+- Parent index: [agents](../../../README.md)
 - Siblings: [conversations](../../conversations/main/README.md) · [runs](../../runs/main/README.md) · [personas](../../personas/main/README.md)

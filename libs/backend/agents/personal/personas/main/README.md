@@ -1,6 +1,6 @@
 # @opencrane/backend/agents/personal/personas — persona approval process
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › [personal](../../README.md) › personas
+> [backend](../../../../README.md) › [agents](../../../README.md) › personal › personas
 
 ## What it owns
 
@@ -63,5 +63,5 @@ Postgres-level behaviour is exercised by the `test:sql` target (`tests/persona-a
 
 ## See also
 
-- Parent index: [personal](../../README.md)
+- Parent index: [agents](../../../README.md)
 - Siblings: [conversations](../../conversations/main/README.md) · [memory](../../memory/main/README.md) · [runs](../../runs/main/README.md)

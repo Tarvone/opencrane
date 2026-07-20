@@ -1,6 +1,6 @@
 # @opencrane/backend/agents/personal/conversations — append-only run-event history
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › [personal](../../README.md) › conversations
+> [backend](../../../../README.md) › [agents](../../../README.md) › personal › conversations
 
 ## What it owns
 
@@ -62,5 +62,5 @@ exercised by the `test:sql` target (`tests/conversation-authority.sql`).
 
 ## See also
 
-- Parent index: [personal](../../README.md)
+- Parent index: [agents](../../../README.md)
 - Siblings: [runs](../../runs/main/README.md) · [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)

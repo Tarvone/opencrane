@@ -1,6 +1,6 @@
 # @opencrane/backend/agents/personal/runs — agent-run attempt authority
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › [personal](../../README.md) › runs
+> [backend](../../../../README.md) › [agents](../../../README.md) › personal › runs
 
 ## What it owns
 
@@ -68,5 +68,5 @@ both committed together via `PrismaAgentRunAuthorityRepository`.
 
 ## See also
 
-- Parent index: [personal](../../README.md)
+- Parent index: [agents](../../../README.md)
 - Siblings: [conversations](../../conversations/main/README.md) · [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)

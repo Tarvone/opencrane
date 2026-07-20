@@ -126,8 +126,9 @@ own no runtime flow, skip the diagram or use a one-line "used by" sketch.
 >    action router ........... carries out the effect, or refuses
 > ```
 >
-> **In this flow:** [channel-targets](../../agents/channel-targets/main/README.md) · action router
-> *(the runtime action path)*
+> **In this flow:** `channel-targets` · the runtime action path
+> *(in a real README each other-package name is a relative link to its own README, e.g.*
+> `[channel-targets](../../agents/channel-targets/main/README.md)`*)*
 >
 > To decide, it confirms three things line up: the proof the agent gives that it really is who it
 > claims, the permission slip issued earlier, and what the system can independently see about the

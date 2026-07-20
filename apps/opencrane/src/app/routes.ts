@@ -153,18 +153,6 @@ const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
 };
 
 /**
- * Registers all API routes on the given Express application instance.
- * All business routes are namespaced under /api/v1/.
- * Infrastructure routes (/healthz, /prom) remain at the root.
- *
- * @param app       - Express application to register routes on.
- * @param prisma    - Prisma ORM client for database access in route handlers.
- * @param customApi - Kubernetes Custom Objects API client for tenant and policy management.
- * @param coreApi   - Kubernetes Core V1 API client for AI budget management.
- * @param authApi   - Kubernetes Authentication API for tenant contract TokenReview validation.
- * @returns The Express application instance with registered routes.
- */
-/**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
  *   - The NetworkPolicy-only `tenant-models` route takes no token; access is

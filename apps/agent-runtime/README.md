@@ -11,13 +11,14 @@ runs inside the customer's isolated Kubernetes namespace, opens its own authenti
 OpenCrane, and never accepts inbound network traffic.
 
 This slice removes the shared long-lived Deployment and defines the fresh, initially suspended Job
-that will contain this process for one attempt. The next controller slice will create that Job from
-durable run authority; this slice does not submit or unsuspend it. The runtime itself still ignores
-commands until later dispatch/executor authority is connected.
+that contains this process for one attempt. The agent controller creates that Job from durable run
+authority and reports its Kubernetes-issued identity to OpenCrane; it does not yet bootstrap or
+unsuspend it. The runtime itself still ignores commands until later dispatch/executor authority is
+connected.
 
 ```text
  durable run attempt
-        │  next slice: controller creates and assigns the suspended Job
+        │  controller creates and assigns the suspended Job
         ▼
  ┌──────────────────────────────┐
  │  agent-runtime  ◄── HERE      │  outbound command stream; no listener
@@ -74,9 +75,9 @@ The container runs as an unprivileged numeric user with a read-only root filesys
 ## Status
 
 The current image proves the identity and outbound-stream boundary but deliberately ignores command
-frames. The Job is a pure rendered contract until the next controller slice creates it. Durable
-dispatch and the selected model/tool executor are later Phase E slices, so this app cannot yet
-complete an agent run.
+frames. The controller now creates or exact-adopts its NetworkPolicy and suspended Job and commits
+the Job UID to OpenCrane. Bootstrap, unsuspension, durable dispatch, and the selected model/tool
+executor are later Phase E slices, so this app cannot yet complete an agent run.
 
 ## See also
 

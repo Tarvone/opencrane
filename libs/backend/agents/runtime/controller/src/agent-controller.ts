@@ -69,12 +69,15 @@ async function _Wait(milliseconds: number, signal: AbortSignal): Promise<void>
 	if (signal.aborted) return;
 	await new Promise<void>(function _wait(resolve)
 	{
-		const timer = setTimeout(function _completeWait() { resolve(); }, milliseconds);
-		signal.addEventListener("abort", function _cancelWait()
+		/** Complete the delay once and release the listener retained by the process signal. */
+		function _CompleteWait(): void
 		{
 			clearTimeout(timer);
+			signal.removeEventListener("abort", _CompleteWait);
 			resolve();
-		}, { once: true });
+		}
+		const timer = setTimeout(_CompleteWait, milliseconds);
+		signal.addEventListener("abort", _CompleteWait, { once: true });
 	});
 }
 

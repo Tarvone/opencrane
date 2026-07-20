@@ -16,8 +16,8 @@ single-Pod Job using a controller-selected ServiceAccount from the bounded runti
  │  runtime/k8s-launcher  ◄── HERE      │  pure manifest construction
  └──────────────────┬──────────────────┘
                     ▼
- suspended Job + NetworkPolicy
-                    │  next slice: controller persists Job UID, then unsuspends
+suspended Job + NetworkPolicy
+                    │  controller persists Job UID; later bootstrap then unsuspends
                     ▼
  agent-runtime process
 ```
@@ -44,9 +44,9 @@ default ServiceAccount token is disabled; the only workload credential is a shor
 
 The builder is pure. It does not call Kubernetes, read Prisma, own run state, provision
 ServiceAccounts, grant role-based access control (RBAC), or decide whether an attempt may execute.
-The next `apps/agent-controller` slice will be the only process allowed to create these resources,
-read the Job UID, persist the matching assignment/bootstrap, and then unsuspend the Job. This package
-defines that contract but has no production caller in this slice.
+`apps/agent-controller` is the only process allowed to create or exact-adopt these resources and
+persist the Job UID as a pending assignment. Later slices add one-time bootstrap and unsuspension;
+those transitions do not belong to this package.
 
 ## Dependency direction
 

@@ -1,9 +1,9 @@
 import type { V1Job, V1NetworkPolicy } from "@kubernetes/client-node";
 import type { Logger } from "@opencrane/observability";
 import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptClaim } from "@opencrane/contracts";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { __ReconcileNextAgentRuntimeAttempt } from "../agent-controller.js";
+import { __ReconcileNextAgentRuntimeAttempt, __RunAgentController, __ValidateAgentControllerRuntimeProfiles } from "../agent-controller.js";
 import type { AgentControllerAuthority, AgentControllerKubernetesStore, AgentControllerOptions, AgentControllerRuntimeProfiles } from "../agent-controller.types.js";
 
 /** Silent structured logger used by orchestration tests. */
@@ -47,6 +47,11 @@ function _Options(authority: AgentControllerAuthority, kubernetes: AgentControll
 
 describe("agent-controller orchestration", function _Suite()
 {
+	afterEach(function _RestoreTimers()
+	{
+		vi.useRealTimers();
+	});
+
 	it("creates policy before suspended Job and commits only the API-issued UID", async function _AssignsSuspendedJob()
 	{
 		const calls: string[] = [];
@@ -96,5 +101,35 @@ describe("agent-controller orchestration", function _Suite()
 		await expect(__ReconcileNextAgentRuntimeAttempt(_Options(authority, policyFailure), new AbortController().signal)).rejects.toThrow(/policy denied/);
 		await expect(__ReconcileNextAgentRuntimeAttempt(_Options(authority, missingUid), new AbortController().signal)).rejects.toThrow(/immutable UID/);
 		expect(commits).toBe(0);
+	});
+
+	it("releases the shutdown listener after every completed poll delay", async function _ReleasesWaitListener()
+	{
+		vi.useFakeTimers();
+		const shutdown = new AbortController();
+		const removeListener = vi.spyOn(shutdown.signal, "removeEventListener");
+		let claims = 0;
+		const authority: AgentControllerAuthority = {
+			async __Claim()
+			{
+				claims += 1;
+				if (claims === 2) shutdown.abort();
+				return null;
+			},
+			async __CommitAssignment() { throw new Error("unexpected commit"); },
+		};
+		const kubernetes: AgentControllerKubernetesStore = { async __EnsureNetworkPolicy() { throw new Error("unexpected policy"); }, async __EnsureSuspendedJob() { throw new Error("unexpected job"); } };
+
+		const running = __RunAgentController(_Options(authority, kubernetes), shutdown.signal);
+		await vi.advanceTimersByTimeAsync(1_000);
+		await running;
+
+		expect(removeListener).toHaveBeenCalledTimes(1);
+	});
+
+	it("rejects a deployment profile with a non-Kubernetes image pull policy", function _RejectsInvalidPullPolicy()
+	{
+		const profile = { ..._Profiles()["personal-default"], imagePullPolicy: "Sometimes" };
+		expect(function _InvalidProfile() { __ValidateAgentControllerRuntimeProfiles({ "personal-default": profile }, "silo-a"); }).toThrow(/image pull policy/);
 	});
 });

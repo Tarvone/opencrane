@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { RunInputSnapshot } from "@opencrane/contracts";
+import type { Logger } from "@opencrane/observability";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaRunAdmissionRepository } from "../prisma-run-admission-repository.js";
@@ -51,5 +52,18 @@ describe("PrismaRunAdmissionRepository", function _describeAdmissionRepository()
 		expect(compiled).toBe(false);
 		expect(transaction.agentRun.create).not.toHaveBeenCalled();
 		expect(transaction.runInputSnapshot.create).not.toHaveBeenCalled();
+	});
+
+	it("fails closed and logs safe authority coordinates when persistence is unavailable", async function _LogsPersistenceFailure()
+	{
+		const persistenceError = new Error("database unavailable");
+		const prisma = { $transaction: vi.fn().mockRejectedValue(persistenceError) } as unknown as PrismaClient;
+		const error = vi.fn();
+		const log = { error } as unknown as Logger;
+		const repository = new PrismaRunAdmissionRepository(prisma, { now: function _now() { return new Date("2026-07-20T00:00:00.000Z"); } }, log);
+
+		await expect(repository.admit(_command(), async function _UnexpectedBuild() { throw new Error("unexpected build"); })).resolves.toEqual({ outcome: "denied", reason: "persistence_unavailable" });
+		expect(error).toHaveBeenCalledWith({ err: persistenceError, runId: "run-1", siloId: "silo-1", agentServiceId: "service-1", failureKind: "transaction_failed" }, "personal run admission persistence failed");
+		expect(error.mock.calls[0]?.[0]).not.toHaveProperty("requestIdempotencyKey");
 	});
 });

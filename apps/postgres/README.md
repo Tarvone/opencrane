@@ -27,6 +27,7 @@ own logical database inside the shared Cluster, and each authenticates only to i
  │   one CNPG Cluster                             │
  │     ├── opencrane   ├── litellm                │  one logical DB + owner role per authority
  │     ├── obot        └── langfuse  (+ fleet)    │
+ │     └── database admin .........................│  inspect every DB; no durable writes/superuser
  └──────────────────────────────────────────────┘
         ▲ reconciled by                    ▲ connects to (own DB only)
    CloudNativePG operator (vendor)    opencrane server · litellm · obot · langfuse
@@ -37,8 +38,12 @@ own logical database inside the shared Cluster, and each authenticates only to i
 [langfuse](../_infra/langfuse/README.md)
 
 CNPG bootstraps the first database, then declaratively reconciles the remaining least-privilege roles
-and `Database` custom resources. Each application role can authenticate only to its own database — there
-are no shared owner roles or credentials. One connection Secret per database is published by
+and `Database` custom resources. Each application role can authenticate only to its own database —
+there are no shared owner roles or credentials. A separate operational administrator can connect to
+every logical database for monitoring and investigation, but cannot durably write application data,
+change persistent schemas, bypass row-level security, create databases/roles, or act as a superuser.
+It does receive PostgreSQL's temporary-object privilege for operational queries. Its credential is
+never reused by an application. One connection Secret per database is published by
 `scripts/publish-app-connection-secret.sh`, which adds the `uri` without sharing credentials across
 authorities or leaking them into command arguments or logs.
 
@@ -46,15 +51,17 @@ authorities or leaking them into command arguments or logs.
 pods and volumes). Because CNPG (as the database-pod controller) generates the instance-manager
 `ServiceAccount` and its narrow `Role`/`RoleBinding` — deterministically named after the Cluster and
 published in the `opencrane.ai/cnpg-service-account` annotation — this chart must **not** render a
-competing `ServiceAccount`, `Role`, or `RoleBinding`. The app owns the desired state and boundary; the
-vendor controller owns the runtime identity it reconciles.
+competing `ServiceAccount`, `Role`, or `RoleBinding`. The database administrator must also remain a
+distinct, non-superuser operational role with its own Secret; it must never collapse into an
+application owner. The app owns the desired state and boundary; the vendor controller owns the
+runtime identity it reconciles.
 
 ## What OpenCrane owns vs the vendor
 
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
-| Publishing one connection Secret per database | Bootstrapping and reconciling roles/`Database` CRs |
+| Supplying distinct application/admin Secret names and reconciling database access | Bootstrapping and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 
 OpenCrane does **not** install or upgrade the CNPG operator, and does **not** generate, rotate, or
@@ -67,6 +74,9 @@ repair database credentials.
 - a compatible CloudNativePG operator and CRDs, installed outside the OpenCrane release;
 - one pre-created `kubernetes.io/basic-auth` Secret per logical database (`username`/`password`, where
   `username` equals that database's owner);
+- one separate basic-auth Secret for the operational database administrator; its `username` must
+  equal `databaseAdmin.name`, and both the username and Secret must differ from every application
+  owner/Secret;
 - a mounted `ReadWriteOnce` StorageClass with volume expansion enabled.
 
 ## Boundary
@@ -87,6 +97,8 @@ Install the database **before** the server release; grow the PVC request as dura
 ```bash
 helm upgrade --install opencrane-postgres apps/postgres/helm \
   --namespace opencrane --create-namespace \
+  --set databaseAdmin.name=opencrane_database_admin \
+  --set databaseAdmin.credentialsSecret=opencrane-postgres-admin \
   --set databases[0].credentialsSecret=opencrane-postgres-bootstrap \
   --set databases[1].credentialsSecret=opencrane-obot-postgres-bootstrap \
   --set databases[2].credentialsSecret=opencrane-litellm-postgres-bootstrap \

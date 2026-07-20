@@ -41,6 +41,9 @@ POSTGRES_CREDENTIALS_SECRET="${POSTGRES_CREDENTIALS_SECRET:-opencrane-postgres-c
 OBOT_POSTGRES_CREDENTIALS_SECRET="${OBOT_POSTGRES_CREDENTIALS_SECRET:-opencrane-obot-postgres-credentials}"
 LITELLM_POSTGRES_CREDENTIALS_SECRET="${LITELLM_POSTGRES_CREDENTIALS_SECRET:-opencrane-litellm-postgres-credentials}"
 LANGFUSE_POSTGRES_CREDENTIALS_SECRET="${LANGFUSE_POSTGRES_CREDENTIALS_SECRET:-opencrane-langfuse-postgres-credentials}"
+POSTGRES_ADMIN_NAME="${POSTGRES_ADMIN_NAME:-opencrane_database_admin}"
+POSTGRES_ADMIN_CREDENTIALS_SECRET="${POSTGRES_ADMIN_CREDENTIALS_SECRET:-opencrane-postgres-admin-credentials}"
+ADMIN_DB_PASSWORD="${ADMIN_DB_PASSWORD:-opencrane-admin-e2e-password}"
 POSTGRES_OWNER="${POSTGRES_OWNER:-opencrane_e2e}"
 OBOT_POSTGRES_OWNER="${OBOT_POSTGRES_OWNER:-obot_e2e}"
 LITELLM_POSTGRES_OWNER="${LITELLM_POSTGRES_OWNER:-litellm_e2e}"
@@ -327,6 +330,9 @@ function _create_database_credentials()
 }
 
 echo "[e2e] Bootstrapping one credentials Secret per PostgreSQL authority"
+# The superuser/admin role has its own credentials Secret, distinct from every database owner —
+# the postgres chart requires databaseAdmin.{name,credentialsSecret} and never generates them.
+_create_database_credentials "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME" "$ADMIN_DB_PASSWORD"
 _create_database_credentials "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" "$DB_PASSWORD"
 _create_database_credentials "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" "$OBOT_DB_PASSWORD"
 _create_database_credentials "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" "$LITELLM_DB_PASSWORD"
@@ -475,6 +481,8 @@ function _validate_cnpg_backup_recovery_schema()
   helm template postgres-backup-contract "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
     --set-json "databases=$DATABASES_JSON" \
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set backup.enabled=true \
     --set backup.plugin.name=barman-cloud.cloudnative-pg.io \
@@ -485,6 +493,8 @@ function _validate_cnpg_backup_recovery_schema()
   helm template postgres-recovery-contract "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
     --set-json "databases=$DATABASES_JSON" \
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set restore.enabled=true \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
@@ -500,6 +510,8 @@ function _install_postgres_server()
   helm upgrade --install "$OPENCRANE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
     --set-json "databases=$DATABASES_JSON" \
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
@@ -697,6 +709,8 @@ EOF
   helm upgrade --install "$RESTORE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
     --set-json "databases=$DATABASES_JSON" \
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set storage.storageClass=local-path \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \

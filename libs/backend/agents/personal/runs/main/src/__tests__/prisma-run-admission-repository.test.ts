@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { RunInputSnapshot } from "@opencrane/contracts";
 import type { Logger } from "@opencrane/observability";
 import { describe, expect, it, vi } from "vitest";
@@ -64,6 +64,20 @@ describe("PrismaRunAdmissionRepository", function _describeAdmissionRepository()
 
 		await expect(repository.admit(_command(), async function _UnexpectedBuild() { throw new Error("unexpected build"); })).resolves.toEqual({ outcome: "denied", reason: "persistence_unavailable" });
 		expect(error).toHaveBeenCalledWith({ err: persistenceError, runId: "run-1", siloId: "silo-1", agentServiceId: "service-1", failureKind: "transaction_failed" }, "personal run admission persistence failed");
+		expect(error.mock.calls[0]?.[0]).not.toHaveProperty("requestIdempotencyKey");
+	});
+
+	it("fails closed and identifies a failed duplicate recovery without logging its key", async function _LogsDuplicateRecoveryFailure()
+	{
+		const duplicateError = new Prisma.PrismaClientKnownRequestError("duplicate run admission", { code: "P2002", clientVersion: "6.19.3" });
+		const recoveryError = new Error("recovery lookup unavailable");
+		const prisma = { $transaction: vi.fn().mockRejectedValue(duplicateError), agentRun: { findUnique: vi.fn().mockRejectedValue(recoveryError) }, runInputSnapshot: { findUnique: vi.fn() } } as unknown as PrismaClient;
+		const error = vi.fn();
+		const log = { error } as unknown as Logger;
+		const repository = new PrismaRunAdmissionRepository(prisma, { now: function _now() { return new Date("2026-07-20T00:00:00.000Z"); } }, log);
+
+		await expect(repository.admit(_command(), async function _UnexpectedBuild() { throw new Error("unexpected build"); })).resolves.toEqual({ outcome: "denied", reason: "persistence_unavailable" });
+		expect(error).toHaveBeenCalledWith({ err: recoveryError, runId: "run-1", siloId: "silo-1", agentServiceId: "service-1", failureKind: "duplicate_recovery_failed" }, "personal run admission persistence failed");
 		expect(error.mock.calls[0]?.[0]).not.toHaveProperty("requestIdempotencyKey");
 	});
 });

@@ -45,6 +45,49 @@
         "projectedTokenTtlSeconds": { "type": "integer", "minimum": 600, "maximum": 3600 }
       }
     },
+    "agentController": {
+      "type": "object",
+      "required": ["enabled", "image", "claimLeaseSeconds", "assignmentTtlSeconds", "kubernetesApiServerCidrs", "kubernetesApiServerPort", "runtimeProfile"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "claimLeaseSeconds": { "type": "integer", "minimum": 1, "maximum": 300 },
+        "assignmentTtlSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "image": {
+          "type": "object",
+          "required": ["repository", "digest", "pullPolicy"],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "digest": { "type": "string" },
+            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
+        "kubernetesApiServerCidrs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[0-9a-fA-F:.]+/(32|128)$" },
+          "uniqueItems": true
+        },
+        "kubernetesApiServerPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "runtimeProfile": {
+          "type": "object",
+          "required": ["name", "image", "serviceAccountName", "projectedTokenTtlSeconds", "scratchSize"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "serviceAccountName": { "type": "string", "pattern": "^agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$" },
+            "projectedTokenTtlSeconds": { "type": "integer", "minimum": 600, "maximum": 3600 },
+            "scratchSize": { "type": "string", "pattern": "^[1-9][0-9]*(Ki|Mi|Gi)$" },
+            "image": {
+              "type": "object",
+              "required": ["repository", "digest", "pullPolicy"],
+              "properties": {
+                "repository": { "type": "string", "minLength": 1 },
+                "digest": { "type": "string" },
+                "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+              }
+            }
+          }
+        }
+      }
+    },
     "gatewayProxy": {
       "type": "object",
       "properties": {
@@ -105,6 +148,40 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "required": ["agentController"],
+        "properties": {
+          "agentController": {
+            "required": ["enabled"],
+            "properties": { "enabled": { "const": true } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "agentController": {
+            "properties": {
+              "kubernetesApiServerCidrs": { "minItems": 1 },
+              "image": {
+                "properties": {
+                  "digest": { "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              },
+              "runtimeProfile": {
+                "properties": {
+                  "image": {
+                    "properties": {
+                      "digest": { "pattern": "^sha256:[a-f0-9]{64}$" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     {
       "if": {
         "required": ["gatewayProxy"],

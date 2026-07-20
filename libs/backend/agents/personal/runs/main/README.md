@@ -21,7 +21,7 @@ the Kubernetes workload actually doing the work is the one authorised for the cu
  └──────────────────────────────────────┘
           │  started (attempt++, outbox event) / trusted assignment / denied
           ▼
- run-owned outbox  ── dispatch picks up "RunAttemptRequested" and launches the workload
+ run-owned outbox  ── controller claims it ── creates suspended Job ── commits Job UID
 ```
 
 **In this flow:** [conversations](../../conversations/main/README.md) *(the started attempt appends its events there)* ·
@@ -38,6 +38,13 @@ polls) so a started attempt can never be lost between deciding and launching.
 Job, confirms the workload's full identity (who / where / which attempt) matches the expected authority exactly, uses the fixed
 `opencrane-agent-runtime` projected-token audience, and has not expired.
 
+`PrismaRunDispatchRepository` is the database side of the controller handshake. It issues a short,
+server-owned claim lease over `RunAttemptRequested`, exposes only the coordinates needed to create a
+suspended Job, and commits the Job UID as a `PendingPod` assignment together with the run's `Assigned`
+state and outbox publication. The exact `claimedAt` plus `deliveryCount` pair is the compare-and-swap
+fence: an expired claimant cannot overwrite a later reclaim. Both claim and commit also require the
+snapshot's signed fleet-membership trust window to remain in the future according to database time.
+
 Invariant: one logical run keeps one identity; attempts only ever move forward under optimistic
 concurrency (detect conflicts at commit time); and any mismatch or staleness is a fail-closed denial with a precise reason.
 
@@ -46,14 +53,17 @@ concurrency (detect conflicts at commit time); and any mismatch or staleness is 
 - `__StartNextRunAttempt(repository, command)` — start the next attempt of a run via compare-and-swap.
 - `__ValidateRunWorkloadAssignment(assignment, expectation)` — confirm a workload is the one authorised for this attempt.
 - `PrismaAgentRunAuthorityRepository` — the Prisma-backed adapter implementing the persistence port (atomic retry + outbox append).
+- `PrismaRunDispatchRepository` — atomically claim an attempt and commit its suspended Job assignment.
+- `__CreateAgentControllerRunDispatchRouter` — projected-token-authenticated internal claim/commit API for the fixed `agent-controller` ServiceAccount.
+- `RunDispatchRepository` / `AgentControllerTokenReviewer` — persistence and TokenReview ports used by that internal API.
 - `AgentRunAuthorityRepository` / `AgentRunAuthoritySnapshot` — the persistence port and its consistent read shape.
 - `StartNextRunAttemptCommand` / `StartNextRunAttemptResult`, `AtomicStartNextRunAttemptCommand` / `AtomicRunAttemptResult` — retry request/result and their atomic commit forms.
 - `RunWorkloadAssignment` / `RunWorkloadAssignmentExpectation` / `RunWorkloadAssignmentDecision` — the workload-identity check inputs and verdict.
 
 ## Boundary
 
-Consumed by the run-dispatch and workload-admission paths. It does not run the agent, schedule the
-Pod, or emit run events — it only governs attempt state and workload identity. Unlike its sibling
+Consumed by the controller and workload-admission paths. It does not run the agent, create or unsuspend
+the Job, or expose the private input snapshot — it only governs claim, attempt state, and workload identity. Unlike its sibling
 authorities it ships its own Prisma adapter, so the atomic increment and outbox append stay in one
 transaction; pure use cases still accept an injected port for testing.
 
@@ -64,8 +74,9 @@ Tagged `scope:personal-runs`: it may depend only on `scope:agents` (shared run m
 
 ## Data & persistence
 
-Owns the `AgentRun` attempt counter and appends `RunOutboxEventKind.RunAttemptRequested` outbox rows,
-both committed together via `PrismaAgentRunAuthorityRepository`.
+Owns the `AgentRun` attempt counter and `RunOutboxEventKind.RunAttemptRequested` outbox lifecycle.
+Admission appends the event; dispatch leases it, persists the immutable `WorkloadAssignment`, advances
+the run to `Assigned`, and publishes the event in one Prisma transaction.
 
 ## See also
 

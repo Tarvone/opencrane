@@ -7,6 +7,7 @@
     "opencrane-ui",
     "channel-proxy",
     "artifact-service",
+    "agent-controller",
     "agent-runtime",
     "cognee",
     "litellm",
@@ -50,7 +51,11 @@
       "setValues": [
         "langfuse.inCluster.enabled=true",
         "controlPlaneSpa.enabled=true",
-        "channelProxy.enabled=true"
+        "channelProxy.enabled=true",
+        "agentController.enabled=true",
+        "agentController.kubernetesApiServerCidrs[0]=10.43.0.1/32",
+        "agentController.image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "agentController.runtimeProfile.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       ],
       "expectedRenderedPodClasses": [
         "Deployment/opencrane-s3",
@@ -60,6 +65,7 @@
         "Deployment/opencrane-opencrane-ui-spa",
         "Deployment/opencrane-channel-proxy",
         "Deployment/opencrane-artifact-service",
+        "Deployment/opencrane-agent-controller",
         "Deployment/opencrane-cognee",
         "Deployment/opencrane-litellm",
         "Deployment/opencrane-mcp-gateway",
@@ -92,6 +98,11 @@
       "workloadIds": ["agent-runtime"]
     },
     {
+      "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
+      "anchor": "options.batchApi.createNamespacedJob({ namespace, body: expected })",
+      "workloadIds": ["agent-runtime"]
+    },
+    {
       "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
       "anchor": "local postgres_args=(upgrade --install \"$POSTGRES_RELEASE\" \"$POSTGRES_CHART_DIR\"",
       "workloadIds": ["postgres-database"]
@@ -120,6 +131,7 @@
         "opencrane-ui",
         "channel-proxy",
         "artifact-service",
+        "agent-controller",
         "cognee",
         "litellm",
         "obot-gateway-controller",
@@ -133,6 +145,16 @@
     }
   ],
   "nonProducingRuntimeMatches": [
+    {
+      "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
+      "anchor": "kind: current.kind",
+      "reason": "Exact NetworkPolicy adoption comparison only; it cannot construct or submit a workload."
+    },
+    {
+      "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
+      "anchor": "kind: expected.kind",
+      "reason": "Exact NetworkPolicy adoption comparison only; it cannot construct or submit a workload."
+    },
     {
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/destroy/tenant-cleanup.ts",
       "anchor": "kind: \"Deployment\"",
@@ -235,6 +257,16 @@
       "localOwner": true,
       "source": { "type": "file", "path": "apps/artifact-service/helm/templates/_resources.tpl", "anchor": "kind: Deployment", "coversLocalTemplate": true },
       "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.artifactService.resources\"" }
+    },
+    {
+      "id": "agent-controller",
+      "podClass": "Deployment/agent-controller",
+      "renderedPodClass": "Deployment/opencrane-agent-controller",
+      "image": "ghcr.io/italanta/opencrane-agent-controller@sha256:<release-digest>",
+      "owner": "apps/agent-controller",
+      "localOwner": true,
+      "source": { "type": "file", "path": "apps/agent-controller/helm/templates/_resources.tpl", "anchor": "kind: Deployment", "coversLocalTemplate": true },
+      "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.agentController.resources\"" }
     },
     {
       "id": "agent-runtime",

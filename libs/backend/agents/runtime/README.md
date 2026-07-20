@@ -12,11 +12,12 @@ durable transcript store.
 | --- | --- |
 | [`main`](./main/README.md) | Fenced command and candidate admission against durable run authority. |
 | [`k8s-launcher`](./k8s-launcher/README.md) | Pure suspended Job and bounded NetworkPolicy resource construction. |
+| [`controller`](./controller/README.md) | Crash-safe claim, exact Kubernetes adoption, and pending-assignment orchestration. |
 
 ```
  durable run authority ──► main ──► accepted command/candidate
                             │
-                            └────► k8s-launcher ──► suspended attempt Job
+                            └────► controller ──► k8s-launcher ──► suspended attempt Job
 ```
 
 The domain authority stays dependency-light. The launcher is a separate `layer:infra` package so

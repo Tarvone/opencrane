@@ -26,6 +26,7 @@ fi
 
 run_psql < "$TEST_FILE"
 run_psql < "$SCRIPT_DIR/run-input-snapshot-admission.sql"
+run_psql < "$SCRIPT_DIR/run-dispatch-terminalization.sql"
 
 RACE_DIR="$(mktemp -d)"
 trap 'rm -rf "$RACE_DIR"' EXIT
@@ -73,6 +74,101 @@ wait_for_holder_sleeping() {
   echo "FAIL: $application_name did not reach its post-lock hold point" >&2
   return 1
 }
+
+run_psql <<'SQL'
+INSERT INTO "agent_services" (
+  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "workload_profile", "updated_at"
+) VALUES (
+  'dispatch-lock-service', 'dispatch-lock-silo', 'personal', 'Dispatch lock service',
+  'user', 'dispatch-lock-user', 'personal-default', clock_timestamp()
+);
+INSERT INTO "agent_revisions" (
+  "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
+  "model_policy_id", "budget", "authored_by"
+) VALUES (
+  'dispatch-lock-revision', 'dispatch-lock-service', 1, 'draft',
+  'sha256:' || repeat('e', 64), 'prompt-v1', 'model-v1', '{}', 'dispatch-lock-user'
+);
+UPDATE "agent_revisions"
+SET "state" = 'published', "published_at" = clock_timestamp()
+WHERE "id" = 'dispatch-lock-revision';
+UPDATE "agent_services"
+SET "state" = 'active', "active_revision_id" = 'dispatch-lock-revision'
+WHERE "id" = 'dispatch-lock-service';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('dispatch-lock-thread', 'dispatch-lock-silo', 'dispatch-lock-service', clock_timestamp());
+INSERT INTO "agent_runs" (
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
+  "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
+) VALUES (
+  'dispatch-lock-run', 'dispatch-lock-silo', 'dispatch-lock-service', 'dispatch-lock-revision',
+  'dispatch-lock-thread', 'interactive', 'dispatch-lock-request', 'dispatch-lock-run',
+  'sha256:' || repeat('f', 64), 'sha256:' || repeat('0', 64)
+);
+INSERT INTO "run_outbox_events" (
+  "id", "run_id", "attempt", "sequence", "kind", "idempotency_key", "payload"
+) VALUES (
+  'dispatch-lock-outbox', 'dispatch-lock-run', 1, 1, 'run.attempt_requested',
+  'dispatch-lock-run:attempt:1', '{"runId":"dispatch-lock-run","attempt":1}'
+);
+SQL
+
+(
+  set +e
+  run_psql >"$RACE_DIR/dispatch-event-holder.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-dispatch-event-holder';
+BEGIN;
+INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload", "occurred_at")
+VALUES ('dispatch-lock-run', 1, 'run.started', '{}', clock_timestamp());
+SELECT pg_sleep(3);
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/dispatch-event-holder.status"
+) &
+dispatch_event_holder_pid=$!
+wait_for_holder_sleeping 'phase-e-dispatch-event-holder'
+(
+  set +e
+  run_psql >"$RACE_DIR/dispatch-terminalizer.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-dispatch-terminalizer';
+BEGIN;
+SELECT "id" FROM "agent_services" WHERE "id" = 'dispatch-lock-service' FOR UPDATE;
+SELECT pg_advisory_xact_lock(hashtextextended('dispatch-lock-run', 0));
+SELECT "id" FROM "agent_runs" WHERE "id" = 'dispatch-lock-run' FOR UPDATE;
+SELECT "id" FROM "run_outbox_events" WHERE "id" = 'dispatch-lock-outbox' FOR UPDATE;
+UPDATE "run_outbox_events"
+SET "claimed_at" = clock_timestamp(), "delivery_count" = 1,
+    "failed_at" = clock_timestamp(), "failure_code" = 'RUN_DISPATCH_SNAPSHOT_INVALID'
+WHERE "id" = 'dispatch-lock-outbox';
+UPDATE "agent_runs"
+SET "state" = 'failed', "terminal_reason" = 'invalid_input', "finished_at" = clock_timestamp()
+WHERE "id" = 'dispatch-lock-run';
+INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload", "occurred_at")
+VALUES (
+  'dispatch-lock-run', 2, 'run.failed',
+  '{"terminalReason":"invalid_input","failureCode":"RUN_DISPATCH_SNAPSHOT_INVALID"}',
+  clock_timestamp()
+);
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/dispatch-terminalizer.status"
+) &
+dispatch_terminalizer_pid=$!
+wait_for_blocked_session 'phase-e-dispatch-terminalizer'
+wait "$dispatch_event_holder_pid"
+wait "$dispatch_terminalizer_pid"
+if [[ "$(<"$RACE_DIR/dispatch-event-holder.status")" != "0" ]]; then
+  cat "$RACE_DIR/dispatch-event-holder.out" >&2
+  echo 'FAIL: concurrent conversation event append failed' >&2
+  exit 1
+fi
+if [[ "$(<"$RACE_DIR/dispatch-terminalizer.status")" != "0" ]]; then
+  cat "$RACE_DIR/dispatch-terminalizer.out" >&2
+  echo 'FAIL: dispatch terminalisation deadlocked with a conversation event append' >&2
+  exit 1
+fi
+echo 'PASS: dispatch terminalisation serializes behind concurrent conversation event append without deadlock'
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (

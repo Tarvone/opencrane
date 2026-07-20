@@ -117,6 +117,8 @@ export default [
             { sourceTag: "scope:channel-proxy", onlyDependOnLibsWithTags: ["scope:channel-proxy", "scope:shared"] },
             { sourceTag: "scope:agent-runtime-stream", onlyDependOnLibsWithTags: ["scope:agent-runtime-stream", "scope:shared"] },
             { sourceTag: "scope:agent-runtime-launcher", onlyDependOnLibsWithTags: ["scope:agent-runtime-launcher", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime-controller", onlyDependOnLibsWithTags: ["scope:agent-runtime-controller", "scope:agent-runtime-launcher", "scope:shared"] },
+            { sourceTag: "scope:agent-controller", onlyDependOnLibsWithTags: ["scope:agent-controller", "scope:agent-runtime-controller", "scope:shared"] },
             { sourceTag: "scope:cluster-tenants", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:company-docs", onlyDependOnLibsWithTags: ["scope:auth", "scope:company-docs", "scope:shared"] },
             { sourceTag: "scope:connections", onlyDependOnLibsWithTags: ["scope:auth", "scope:connections", "scope:shared"] },

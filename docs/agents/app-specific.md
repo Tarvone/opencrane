@@ -21,6 +21,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | _(apps/_infra/deploy-k8s)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, owns deploy-only components such as the schema Job, and carries CRDs, issuers, external-secret wiring, and cross-plane defaults. |
 | _(apps/feat-openclaw-tenant)_ | — | Deletion target: remove this OpenClaw tenant image/build rollup with its controller and renderer when the personal-agent runtime replacement lands. |
 | _(apps/agent-runtime)_ | [apps/agent-runtime/README.md](../../apps/agent-runtime/README.md) | Controller-assigned one-attempt Job image. Its current Python shell opens only a projected-token-authenticated stream; no listener, model/tool driver, or durable tenant storage. |
+| _(apps/agent-controller)_ | [apps/agent-controller/README.md](../../apps/agent-controller/README.md) | Thin outbound-only process and app-owned Helm/RBAC boundary for the sole personal-runtime Kubernetes mutator. |
 
 ## Libs (`libs/`)
 
@@ -32,6 +33,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `libs/server/_infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport owned by the OpenCrane server runtime. |
 | `libs/server/_infra/agent-runtime-stream` | [README](../../libs/server/_infra/agent-runtime-stream/README.md) | Runtime-initiated projected-token HTTP/SSE transport. It never owns assignments or durable run state. |
 | `libs/backend/agents/runtime/k8s-launcher` | [README](../../libs/backend/agents/runtime/k8s-launcher/README.md) | Pure suspended Job/NetworkPolicy projection for the agent controller's bounded runtime profiles. |
+| `libs/backend/agents/runtime/controller` | [README](../../libs/backend/agents/runtime/controller/README.md) | Crash-safe controller orchestration: authenticated claims, exact NetworkPolicy/Job adoption, and pending assignment commit. Composed only by `apps/agent-controller`. |
 | `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 

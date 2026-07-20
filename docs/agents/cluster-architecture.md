@@ -111,6 +111,7 @@ library units with the parent release context; shared labels and topology helper
 | `apps/_infra/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
 | `apps/_infra/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
 | `apps/artifact-service/helm` | Canonical ArtifactStore byte service: RWO expandable PVC, private service, and no catalog authority |
+| `apps/agent-controller/helm` | Outbound-only controller Deployment, fixed projected identity, `get/create` Job and NetworkPolicy RBAC, and bounded egress |
 | `apps/_infra/deploy-k8s/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
 
 The machine-enforced inventory is `docs/agents/workload-ownership.json`; adding a pod class
@@ -127,6 +128,9 @@ All planes are **ClusterIP-only** (no external LB) — external traffic arrives 
   tenant pods reach MCP servers through it (projected token `aud=obot-gateway`). OpenCrane remains
   the catalog/grant authority; the removed registry-poll route is not a synchronization mechanism.
 - **artifact-service** (`:8080`) → owns only content-addressed artifact bytes on its mounted PVC. It runs in the release's dedicated `<release>-artifacts` namespace with the receipt-signing key; OpenCrane remains the catalog and authorization authority in the control namespace, holds only the lease signer, and tenant/runtime pods never mount the volume.
+- **agent-controller** → owns no listener. It claims desired attempts from OpenCrane, exactly creates
+  or adopts their NetworkPolicy and suspended Job, then reports the Kubernetes Job UID back to the
+  durable run authority. It cannot patch, delete, watch, read Secrets, or start a Job in this slice.
 - **litellm** (`:4000`) → the only LLM egress path for tenant pods; operator mints a per-tenant virtual key Secret; enforces budget.
 
 ## Namespace Model

@@ -868,9 +868,9 @@ spec:
               # managed-role reconcile that runs just after the cluster first reports Ready can
               # briefly bounce the primary; this Job has backoffLimit 0, so a single premature
               # attempt would hit "connection refused" and fail the whole check.
-              deadline="$(( $(date +%s) + 120 ))"
+              deadline="\$(( \$(date +%s) + 120 ))"
               until psql -v ON_ERROR_STOP=1 -d "${source_name}" -c 'SELECT 1' >/dev/null 2>&1; do
-                if [ "$(date +%s)" -ge "$deadline" ]; then
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
                   echo "timed out waiting for ${source_name} database connectivity" >&2
                   exit 1
                 fi

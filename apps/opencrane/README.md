@@ -77,12 +77,15 @@ import back into it.
 
 ## Data & persistence
 
-Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, with applied migrations
-under `prisma/migrations/`. The runs slice binds every `AgentRun` to exactly one immutable
+Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, and one greenfield
+initializer at `prisma/migrations/0001_target_baseline/migration.sql`. The runs slice binds every
+`AgentRun` to exactly one immutable
 `RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
 and commits its initial acceptance and dispatch events in the same transaction. A partial or
-mismatched admission therefore cannot commit. The migrate init-container runs `prisma migrate deploy`
-from this package root at rollout; this is the one place the silo's database shape is defined.
+mismatched admission therefore cannot commit. The initializer includes the reviewed PostgreSQL
+functions and triggers that enforce authority invariants Prisma cannot express. The migrate
+init-container applies it to a new database with `prisma migrate deploy`; OpenCrane does not carry an
+upgrade path or data migration from an older product schema.
 
 ## Runtime & config
 

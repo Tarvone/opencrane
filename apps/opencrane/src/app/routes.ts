@@ -136,8 +136,9 @@ function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api): 
 }
 
 /**
- * Deliberately empty composition until the next controller slice owns durable runtime assignments.
- * It permits an authenticated shell to stay connected but accepts no candidate and issues no command.
+ * Deliberately empty runtime-stream composition until bootstrap and command/candidate authority are
+ * connected. The controller already records the suspended Job assignment; this adapter permits that
+ * authenticated runtime shell to stay connected without inventing executable work or durable output.
  */
 const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
   /** Refuse to invent commands before durable assignment authority is connected. */

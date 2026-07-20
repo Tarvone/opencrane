@@ -57,6 +57,18 @@ describe("__AssembleRunInputSnapshot", function _describeSessionAssembly()
 		expect(admitted).toBe(false);
 	});
 
+	it("fails closed before persistence when a managed service carries an approved persona", async function _deniesManagedPersona()
+	{
+		let admitted = false;
+		const authorities = _Authorities(function _accept() { admitted = true; return "accepted"; });
+		authorities.runAuthority = { load: async function _load() { return { outcome: "loaded", value: { agentServiceId: "service-1", agentRevisionId: "revision-1", agentKind: "managed", effectiveContractDigest: "sha256:contract", promptCompilerVersion: "prompt-v1", trigger: "managed_invocation", delegatedUserId: null, rootRunId: "run-1", parentRunId: null } } as const; } };
+
+		const result = await __AssembleRunInputSnapshot(_COMMAND, authorities);
+
+		expect(result).toEqual({ outcome: "denied", reason: "persona_unavailable" });
+		expect(admitted).toBe(false);
+	});
+
 	it("returns a typed source refusal without accepting a partial snapshot", async function _deniesSourceRefusal()
 	{
 		let admitted = false;

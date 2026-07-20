@@ -22,6 +22,8 @@
 #   TYPES-IN-IMPL     exported interface/type outside a *.types.ts file
 #   JSDOC             exported declaration with no JSDoc directly above (heuristic)
 #   BRACE             opening { not on its own line for a multi-line fn/class (heuristic)
+#   MISSING-README    new/changed package (project.json) with no sibling README.md
+#   README-SECTIONS   leaf package README missing a mandatory package-docs section
 
 set -euo pipefail
 
@@ -50,11 +52,6 @@ for f in "${FILES[@]:-}"; do
 	CHECKABLE+=("$f")
 done
 
-if [[ ${#CHECKABLE[@]} -eq 0 ]]; then
-	echo "agent-style-check: no checkable TypeScript files in scope."
-	exit 0
-fi
-
 ERRORS=0
 WARNS=0
 
@@ -64,6 +61,47 @@ _report()
 	printf '%s:%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5"
 	if [[ "$3" == "ERROR" ]]; then ERRORS=$((ERRORS + 1)); else WARNS=$((WARNS + 1)); fi
 }
+
+# MISSING-README / README-SECTIONS — package docs (docs/agents/package-docs.md).
+# A changed package must ship a README, and a changed leaf-package README must
+# carry the mandatory sections. Diff-scoped like the .ts checks; skipped when
+# explicit files were passed.
+DOC_FILES=()
+if [[ $# -eq 0 ]]; then
+	while IFS= read -r f; do DOC_FILES+=("$f"); done < <(git diff --name-only --diff-filter=ACMR HEAD -- 'libs/**/README.md' 'apps/**/README.md' 'libs/**/project.json' 'apps/**/project.json' 2>/dev/null || true)
+elif [[ "${1:-}" == "--diff" ]]; then
+	while IFS= read -r f; do DOC_FILES+=("$f"); done < <(git diff --name-only --diff-filter=ACMR "$2" -- 'libs/**/README.md' 'apps/**/README.md' 'libs/**/project.json' 'apps/**/project.json' 2>/dev/null || true)
+fi
+for f in "${DOC_FILES[@]:-}"; do
+	[[ -z "$f" || ! -f "$f" ]] && continue
+	dir="$(dirname "$f")"
+	case "$f" in
+		*/project.json)
+			if [[ ! -f "$dir/README.md" ]]; then
+				_report "$f" 1 ERROR MISSING-README "package has no README.md — create it from docs/agents/README-TEMPLATE.md"
+			fi
+			;;
+		*/README.md)
+			# Only leaf packages (the directory owning project.json) follow the
+			# fixed section order; group/area index READMEs have their own shape.
+			[[ -f "$dir/project.json" ]] || continue
+			if ! head -5 "$f" | grep -q '^> '; then
+				_report "$f" 1 ERROR README-SECTIONS "missing breadcrumb line ('> area > group > package') — see docs/agents/package-docs.md"
+			fi
+			for section in "## What it owns" "## Public surface" "## See also"; do
+				if ! grep -q "^${section}" "$f"; then
+					_report "$f" 1 ERROR README-SECTIONS "missing mandatory section '${section}' — see docs/agents/package-docs.md"
+				fi
+			done
+			;;
+	esac
+done
+
+if [[ ${#CHECKABLE[@]} -eq 0 ]]; then
+	echo "agent-style-check: no checkable TypeScript files in scope."
+	[[ $ERRORS -gt 0 ]] && exit 1
+	exit 0
+fi
 
 for f in "${CHECKABLE[@]}"; do
 

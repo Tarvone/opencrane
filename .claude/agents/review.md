@@ -84,6 +84,11 @@ fresh context — do not assume the author's intent was correct.
   (mechanism changes, capability stays — never propose deleting it).
 - **Contract drift**: an `openapi/spec.ts` entry that no longer matches its handler
   breaks every generated client — always a finding.
+- **Stale package README**: a diff that changes a package's exports, boundary, invariant,
+  owned Prisma models, or config without updating that package's `README.md` is incomplete
+  (`docs/agents/package-docs.md`). Missing READMEs and missing mandatory sections are caught
+  by the style script; *stale* content is yours to catch — compare the diff against the
+  README's "Public surface" and "What it owns" claims.
 - Never recommend removing a required auth/security capability before its replacement is covered by
   contract and security tests. Remove the superseded mechanism in the same replacement slice.
 - `plan.md` status changes must be backed by implemented, validated evidence.

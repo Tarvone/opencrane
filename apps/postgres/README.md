@@ -43,7 +43,9 @@ there are no shared owner roles or credentials. A separate operational administr
 every logical database for monitoring and investigation, but cannot durably write application data,
 change persistent schemas, bypass row-level security, create databases/roles, or act as a superuser.
 It does receive PostgreSQL's temporary-object privilege for operational queries. Its credential is
-never reused by an application. One connection Secret per database is published by
+never reused by an application. Deployment publishes a separate administrator connection Secret
+for explicit operator access; no application workload consumes it. One connection Secret per
+database is published by
 `scripts/publish-app-connection-secret.sh`, which adds the `uri` without sharing credentials across
 authorities or leaking them into command arguments or logs.
 

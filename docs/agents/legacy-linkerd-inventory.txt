@@ -24,6 +24,7 @@ docs/adr/0003-cilium-spiffe-identity-substrate.md
 docs/design/personal-agent-platform-architecture.md
 docs/design/personal-agent-platform-direct-refactor-plan.md
 docs/optimalisation-plan.md
+libs/server/_infra/api/README.md
 libs/server/_infra/api/src/cluster-tenant-namespace.ts
 libs/server/_infra/api/src/custom-object-apply.ts
 libs/server/_infra/api/src/index.ts

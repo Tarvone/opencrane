@@ -20,6 +20,7 @@ Read these before reaching a verdict:
 2. `docs/agents/monorepo.md`;
 3. `docs/agents/architecture.md`, `docs/agents/cluster-architecture.md`, and
    `docs/agents/app-specific.md` when the slice touches identity, Kubernetes, apps, or libraries;
+   also `docs/agents/package-docs.md` when the slice adds or moves a package;
 4. the selected `plan.md` entry and its linked issue/design acceptance criteria;
 5. for personal-agent replacement work, the active direct-refactor plan and the target architecture
    it links.
@@ -134,6 +135,9 @@ preserves the old implementation, so no compatibility or operational-retention g
 - Reject generic plugin/framework seams until at least two concrete consumers establish the
   contract.
 - Require project-local tests plus wave-level NX affected/boundary validation.
+- Require every new app or library to ship a `README.md` that follows
+  `docs/agents/package-docs.md` (leaf section order, junior-dev voice), and require a moved/renamed
+  package to carry its README and update the parent index + `app-specific.md` map.
 - Require every new independently deployable app to expose build, test, lint, and `container`
   targets, an independent semantic release identity, and an immutable image digest/SHA hand-off to
   deployment wiring. Until a semantic release identity exists, CI may publish only SHA artifacts. Its

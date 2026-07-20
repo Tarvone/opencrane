@@ -89,6 +89,9 @@ predates the diff.
    - **Test helpers & fixtures**: helpers whose only consumers were deleted/rewritten
      tests; fixture fields nothing asserts on; mocks stubbing methods that no longer
      exist on the real interface.
+   - **Package docs**: when a whole package is deleted, its `README.md`, its row in the
+     parent index README, and its row in `docs/agents/app-specific.md` are all
+     co-deletions — per `docs/agents/package-docs.md`.
    - Where the repo has `knip`/`ts-prune`/`depcheck` installed, run them scoped to the
      affected packages and fold results in; otherwise the `rg` sweep is the tool.
 

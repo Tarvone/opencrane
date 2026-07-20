@@ -70,6 +70,11 @@ independent review is required before the turn can end. When the gate asks for r
    your response why it is not applicable.
 3. Only then finish the turn.
 
+A change to a package's public surface, boundary, invariant, owned Prisma models, or config that
+does **not** update that package's `README.md` in the same change is an incomplete change — the
+review gate treats a stale or missing package README as a finding. See
+[`package-docs.md`](./package-docs.md) for the standard.
+
 Run `scripts/agent-style-check.sh` before delegating — mechanical style violations are
 cheaper to fix pre-review than to have the reviewer report back.
 

@@ -1,0 +1,87 @@
+# deploy-k8s — silo umbrella chart & deploy entrypoint
+
+> [apps](../../README.md) › [_infra](../README.md) › deploy-k8s
+
+<!-- No import alias: this deployable is a Helm umbrella chart plus a deploy script.
+     Named by its `project.json` (`deploy-k8s`). This README is the overview altitude;
+     the deep detail lives in the linked sub-docs. -->
+
+## What it owns
+
+This is the **install root** for one **silo** — one customer's isolated slice of OpenCrane, running in
+its own namespace and sharing nothing with other customers. Everything else under `apps/` ships a small
+Helm named-template library; this app is the **umbrella chart** (`opencrane-silo`) that pulls those
+libraries together into one release, plus `deploy.sh`, the entrypoint that installs and upgrades it.
+
+Think of it as the assembly point: each app owns its own workload templates, and this chart composes
+them — unchanged — with one shared release context. It renders nothing customer-specific itself; it just
+wires the pieces and the per-silo networking together.
+
+```
+ deploy.sh  (per-ClusterTenant silo profile)
+        │  helm dep build (from Chart.lock) → helm upgrade --install
+        ▼
+ ┌────────────────────────────────────────────────────────────┐
+ │  opencrane-silo umbrella chart  ◄── HERE                     │
+ │    composes app-owned template libraries into one release:   │
+ │    server · opencrane-ui · channel-proxy · artifact-service  │
+ │    · database-schema Job · cognee · litellm · obot · langfuse│
+ └────────────────────────────────────────────────────────────┘
+        │  requires (external prerequisites, NOT installed here)
+        ▼
+ ingress-nginx · external-dns · CloudNativePG · cert-manager issuer
+```
+
+**In this flow:** [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
+· [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+· [postgres](../../postgres/README.md) · [cognee](../cognee/README.md) · [litellm](../litellm/README.md)
+· [obot](../obot/README.md) · [langfuse](../langfuse/README.md)
+
+A silo installs **only** its own namespaced app releases. Cluster-wide controllers (ingress-nginx,
+external-dns, CloudNativePG, cert-manager) are external prerequisites a silo never installs. Dependencies
+resolve from `Chart.lock` via `helm dep build` (pinned, reproducible) — never from open version ranges.
+
+## Public surface
+
+`Entrypoint: deploy.sh` — the per-ClusterTenant silo deploy profile, a thin wrapper over the shared
+install core (`platform/k8s-deploy.sh`). It requires a base domain, a ClusterTenant name, and one
+pre-created PostgreSQL basic-auth Secret per logical database (server, obot, litellm, langfuse).
+
+## Boundary
+
+The umbrella renders no business logic and installs no cluster-wide controller. It composes app-owned
+templates and per-silo `NetworkPolicies`; it does not own the workloads themselves (each app does) or
+the shared substrate helpers (the `k8s-platform` library does). Self-service ClusterTenant management and
+billing are OFF — a silo serves exactly one ClusterTenant.
+
+## Dependency direction
+
+An app entrypoint (`type:app`); it composes app template libraries and the `k8s-platform` substrate. No
+package imports it.
+
+## Runtime & config
+
+- Umbrella chart: `Chart.yaml` (`opencrane-silo`), values in `values.yaml`, schema in
+  `values.schema.json`, pins in `Chart.lock`.
+- `crds.install` — defaults `true` (standalone: this chart installs the ClusterTenant/Tenant/AccessPolicy
+  CRDs); set `false` when running under a fleet that installs its own CRDs.
+- Reusable environment/multi-instance profiles live under `values/` and `platform/values/`.
+
+## Sub-docs (the deep detail)
+
+- **[platform/README.md](platform/README.md)** — the cluster and release substrate: the `k8s-platform`
+  Helm library (labels, names, RBAC, endpoint/database/identity/observability helpers), the
+  `k8s-deploy.sh` install engine, OIDC configuration, cluster provisioning, Terraform, values profiles,
+  and the k3d conformance tests.
+- **[components/database-schema/README.md](components/database-schema/README.md)** — the pre-install /
+  pre-upgrade Prisma schema-reconciliation Job, which reuses the immutable server image and holds
+  database-only authority.
+
+## See also
+
+- Parent index: [_infra](../README.md)
+- Composed apps: [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
+  · [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+  · [postgres](../../postgres/README.md)
+- Composed infra: [cognee](../cognee/README.md) · [litellm](../litellm/README.md) ·
+  [obot](../obot/README.md) · [langfuse](../langfuse/README.md)

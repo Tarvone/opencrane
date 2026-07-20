@@ -1,4 +1,66 @@
-# Skills domain
+# @opencrane/backend/server/agents/skills — publish a skill revision
 
-Owns immutable, ArtifactStore-backed SkillRevision publication. Skill bytes are exact
-ArtifactRevision references; this package never stores bundle content or speaks a registry protocol.
+> [backend](../../../../README.md) › [server](../../../README.md) › [agents](../../README.md) › skills
+
+## What it owns
+
+A *skill* is a reusable capability an agent can be given — packaged code plus its metadata. Like an
+agent service, a skill has a stable identity and many immutable, versioned *revisions*. The actual
+bundle of bytes for a revision is not stored here: it lives in the artifact store and is referenced
+by an exact SHA-256 content address (a fingerprint computed from the bytes). This package is the
+authority that publishes a reviewed skill revision.
+
+It is the final step of the authoring flow. A bundle is authored, uploaded as an artifact, then
+tested, scanned, and signed by an isolated job; this package publishes the revision only when that
+review evidence and the artifact reference still line up.
+
+```
+ authored skill bundle  ──►  ArtifactRevision (exact content address)
+        │  + review evidence (test report · security/secret/licence/malware scan · signature)
+        ▼
+ ┌──────────────────────────────────┐
+ │  skills  ◄── HERE                 │  revision in review? artifact still published?
+ │                                   │  content address matches the reviewed one?
+ └──────────────────────────────────┘
+        │  publish the immutable SkillRevision + advance the current pointer  (atomically)
+        ▼
+ agent revisions assign the published skill
+```
+
+**In this flow:** [artifacts](../../artifacts/main/README.md) *(holds the bundle)* · [agent-services](../../agent-services/main/README.md) *(assigns the skill)*
+
+Invariant: publication is bound to an *exact* artifact revision. The skill bytes are always an exact
+`ArtifactRevision` reference — this package never stores bundle content and never speaks a package
+registry protocol. It publishes only when the revision is in the `review` state, the referenced
+artifact is still published, and the pinned content address matches, all read from one consistent
+snapshot; the publish and pointer advance happen atomically. A mismatched or unpublished artifact,
+or a revision not in review, fails closed with a stable reason.
+
+## Public surface
+
+- `__PublishSkillRevision` — the use case: verify evidence and artifact, then publish atomically.
+- Types: `SkillAuthorityRepository` (the persistence boundary), `PublishSkillRevisionCommand`,
+  `PublishSkillRevisionResult`, `SkillPublicationEvidence`, `SkillPublicationSnapshot`, and the
+  atomic result `AtomicPublishSkillRevisionResult`.
+
+## Boundary
+
+The application layer supplies the Prisma-backed `SkillAuthorityRepository` and calls the use case.
+This package does not author, test, scan, or sign bundles, and it does not store bytes — it only
+records that a reviewed revision is now published, consistently with the artifact authority.
+
+## Dependency direction
+
+Tagged `scope:skills`: it may depend only on `scope:artifacts`, `scope:cluster-tenants`,
+`scope:grants`, `scope:skills`, and `scope:shared` — never on apps, gateways, or other agent
+domains directly.
+
+## Data & persistence
+
+Owns `Skill` and `SkillRevision` in `apps/opencrane/prisma/schema/skills.prisma`. A companion SQL
+authority test lives in `tests/skill-authority.sql`.
+
+## See also
+
+- Parent index: [agents](../../README.md)
+- Siblings: [artifacts](../../artifacts/main/README.md) · [agent-services](../../agent-services/main/README.md) · [channel-targets](../../channel-targets/main/README.md)

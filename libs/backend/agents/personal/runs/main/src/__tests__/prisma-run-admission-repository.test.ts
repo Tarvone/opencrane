@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { RunInputSnapshot } from "@opencrane/contracts";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaRunAdmissionRepository } from "./prisma-run-admission-repository.js";
+import { PrismaRunAdmissionRepository } from "../prisma-run-admission-repository.js";
 
 /** Creates one complete canonical snapshot accepted at initial logical-run admission. */
 function _snapshot(): RunInputSnapshot

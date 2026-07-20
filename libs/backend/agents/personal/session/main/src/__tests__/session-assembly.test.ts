@@ -1,8 +1,8 @@
 import type { RunInputSnapshot } from "@opencrane/contracts";
-import type { SessionAssemblyAuthorities } from "./session-assembly.types.js";
+import type { SessionAssemblyAuthorities } from "../session-assembly.types.js";
 import { describe, expect, it } from "vitest";
 
-import { __AssembleRunInputSnapshot } from "./session-assembly.js";
+import { __AssembleRunInputSnapshot } from "../session-assembly.js";
 
 /** Fixed admission coordinates used to prove deterministic snapshot assembly. */
 const _COMMAND = { runId: "run-1", siloId: "silo-1", agentServiceId: "service-1", threadId: "thread-1", executionSubjectId: "user-1", requestIdempotencyKey: "request-1" };

@@ -330,7 +330,7 @@ function _create_database_credentials()
 }
 
 echo "[e2e] Bootstrapping one credentials Secret per PostgreSQL authority"
-# The superuser/admin role has its own credentials Secret, distinct from every database owner —
+# The non-superuser operational administrator has its own Secret, distinct from every database owner —
 # the postgres chart requires databaseAdmin.{name,credentialsSecret} and never generates them.
 _create_database_credentials "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME" "$ADMIN_DB_PASSWORD"
 _create_database_credentials "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" "$DB_PASSWORD"

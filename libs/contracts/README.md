@@ -36,7 +36,10 @@ Two halves:
 **In this flow:** [models/agents](../models/agents/main/README.md) · [models/authorization](../models/authorization/main/README.md) *(re-exported DTOs)* · the `apps/opencrane` server *(spec producer)*
 
 Invariant: the client's types are a faithful projection of the server's published spec — regenerate
-after any API change so the two never silently diverge.
+after any API change so the two never silently diverge. `RunInputSnapshot` is the cross-domain
+record of one run's frozen persona, transcript, memory references, tools, budgets, model route and
+verified identity provenance; it carries only immutable coordinates and canonical JSON, never
+provider credentials or mutable source objects.
 
 ## Public surface
 
@@ -44,7 +47,9 @@ after any API change so the two never silently diverge.
 - Hand-written DTOs/enums: `Grant`/`GrantScope`/`GrantAccess`, `Group`, `ClusterTenant*`,
   `McpServer*`/`Mcp*` operator types (MCP — the Model Context Protocol for connecting external tools),
   model-routing types, `Memory*`, `Approval`, `ThirdPartySource*`, `RuntimeAssignment`,
-  `RunInputSnapshot`, `TenantModelSet`, domain-topology host builders.
+  `RunInputSnapshot`/`RunInputSnapshotIdentity`, `MemoryFactReference`, `TenantModelSet`, and
+  domain-topology host builders. A memory fact reference pins an immutable content digest and its
+  provenance rather than a mutable revision counter.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

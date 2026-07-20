@@ -1,9 +1,9 @@
-import type { RunInputSnapshot } from "@opencrane/contracts";
 import { __DigestRunInputSnapshot } from "@opencrane/backend/agents/personal/runs";
+import type { InitialRunAuthority } from "@opencrane/backend/agents/personal/runs";
+import type { RunInputSnapshot } from "@opencrane/contracts";
 import { ___CloneCanonicalJson, ___SortBy } from "@opencrane/util";
 import type { JsonValue } from "@opencrane/util";
 
-import type { InitialRunAuthority } from "@opencrane/backend/agents/personal/runs";
 import { _CanonicalMemoryFacts, _IsIdentityFresh } from "./utils/canonical-inputs.js";
 import type { ApprovedPersonaInput, AssembleRunInputSnapshotResult, IdentityEnvelopeInput, MemoryScopeInput, SessionAssemblyAuthorities, SessionAssemblyCommand, SessionAssemblyRefusalReason, ThreadContextInput, ToolPolicyInput } from "./session-assembly.types.js";
 

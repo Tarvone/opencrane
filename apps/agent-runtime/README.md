@@ -68,10 +68,11 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 - `OPENCRANE_RUNTIME_TOKEN_PATH` — rotating projected-token file; reread for every connection.
 - `POD_UID` — immutable Pod identity supplied by the Kubernetes downward API.
 
-The image runs as an unprivileged numeric user with a read-only root filesystem. The chart is
-disabled by default and supplies finite CPU/memory and `emptyDir` scratch defaults, which operators
-may override. This initial chart still accepts a mutable image tag; the next Job-launcher slice
-replaces it with an immutable digest requirement before any command execution is enabled.
+The image runs as numeric user and group `65532` with a read-only root filesystem. Its projected
+credential is group-readable (`0440`) only by that runtime group; it is never world-readable. The
+chart is disabled by default and supplies finite CPU/memory and `emptyDir` scratch defaults, which
+operators may override. This initial chart still accepts a mutable image tag; the next Job-launcher
+slice replaces it with an immutable digest requirement before any command execution is enabled.
 
 ## See also
 

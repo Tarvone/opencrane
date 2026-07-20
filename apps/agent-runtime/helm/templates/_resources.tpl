@@ -36,6 +36,8 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -67,7 +69,7 @@ spec:
       volumes:
         - name: runtime-token
           projected:
-            defaultMode: 0400
+            defaultMode: 0440
             sources:
               - serviceAccountToken:
                   path: runtime.token

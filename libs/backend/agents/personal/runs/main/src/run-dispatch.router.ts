@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 
-import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, type AgentControllerRunAttemptAssignmentCommand } from "@opencrane/contracts";
+import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, type AgentControllerRunAttemptAssignmentCommand, type AgentControllerRunWorkloadRegistrationCommand } from "@opencrane/contracts";
 
 import type { AgentControllerRunDispatchRouterDependencies, ReviewedAgentControllerIdentity } from "./run-dispatch.types.js";
 
@@ -76,6 +76,73 @@ export function __CreateAgentControllerRunDispatchRouter(dependencies: AgentCont
 		}
 	});
 
+	router.post("/workload-releases:claim", async function _claimRelease(request: Request, response: Response)
+	{
+		try
+		{
+			// 1. Authenticate the sole controller before revealing any pending workload coordinates.
+			if (!await _IsController(request, dependencies) || !_IsEmptyObject(request.body))
+			{
+				_RespondProblem(response, 401, "controller_identity_denied");
+				return;
+			}
+
+			// 2. Claim or terminalise one database-fenced release, including an expired queue head.
+			const result = await dependencies.repository.claimNextWorkloadReleaseAtomically();
+			if (result.status === "terminalized")
+			{
+				dependencies.logger.warn({ eventId: result.eventId, runId: result.runId, attempt: result.attempt, failureCode: result.failureCode }, "Poisoned workload release terminalized after durable repair");
+				response.status(204).end();
+				return;
+			}
+			if (result.status === "none")
+			{
+				response.status(204).end();
+				return;
+			}
+			response.status(200).json(result.claim);
+		}
+		catch (err)
+		{
+			dependencies.logger.error({ err, operation: "agent_controller.release_claim" }, "Agent-controller workload release claim failed");
+			_RespondProblem(response, 503, "dispatch_authority_unavailable");
+		}
+	});
+
+	router.put("/workload-releases/:eventId/registration", async function _registerPod(request: Request, response: Response)
+	{
+		try
+		{
+			// 1. Authenticate before parsing Pod evidence so unauthorised callers learn no release state.
+			if (!await _IsController(request, dependencies))
+			{
+				_RespondProblem(response, 401, "controller_identity_denied");
+				return;
+			}
+			const command = _ParseRegistrationCommand(request.body);
+			const eventId = request.params["eventId"];
+			if (!command || typeof eventId !== "string" || !eventId)
+			{
+				_RespondProblem(response, 400, "invalid_registration");
+				return;
+			}
+
+			// 2. Let the run authority register only the first Pod and publish the release atomically.
+			const result = await dependencies.repository.registerFirstPodAndPublishReleaseAtomically(eventId, command);
+			if (result.status === "conflict")
+			{
+				_RespondProblem(response, 409, result.reason);
+				return;
+			}
+			response.status(200).json(result.result);
+		}
+		catch (err)
+		{
+			dependencies.logger.error({ err, operation: "agent_controller.pod_registration" }, "Agent-controller Pod registration failed");
+			_RespondProblem(response, 503, "dispatch_authority_unavailable");
+		}
+	});
+
 	return router;
 }
 
@@ -115,10 +182,21 @@ function _ParseAssignmentCommand(value: unknown): AgentControllerRunAttemptAssig
 {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 	const body = value as Record<string, unknown>;
-	const expectedKeys = ["attempt", "claimedAt", "deliveryCount", "expectedWorkloadProfile", "namespace", "runId", "serviceAccountName", "workloadUid"];
+	const expectedKeys = ["attempt", "bootstrapReference", "claimedAt", "deliveryCount", "expectedWorkloadProfile", "namespace", "runId", "serviceAccountName", "workloadUid"];
 	if (Object.keys(body).length !== expectedKeys.length || !expectedKeys.every(key => key in body)) return null;
-	if (typeof body["claimedAt"] !== "string" || typeof body["deliveryCount"] !== "number" || typeof body["runId"] !== "string" || typeof body["attempt"] !== "number" || typeof body["expectedWorkloadProfile"] !== "string" || typeof body["namespace"] !== "string" || typeof body["serviceAccountName"] !== "string" || typeof body["workloadUid"] !== "string") return null;
-	return { claimedAt: body["claimedAt"], deliveryCount: body["deliveryCount"], runId: body["runId"], attempt: body["attempt"], expectedWorkloadProfile: body["expectedWorkloadProfile"], namespace: body["namespace"], serviceAccountName: body["serviceAccountName"], workloadUid: body["workloadUid"] };
+	if (typeof body["claimedAt"] !== "string" || typeof body["deliveryCount"] !== "number" || typeof body["runId"] !== "string" || typeof body["attempt"] !== "number" || typeof body["expectedWorkloadProfile"] !== "string" || typeof body["bootstrapReference"] !== "string" || typeof body["namespace"] !== "string" || typeof body["serviceAccountName"] !== "string" || typeof body["workloadUid"] !== "string") return null;
+	return { claimedAt: body["claimedAt"], deliveryCount: body["deliveryCount"], runId: body["runId"], attempt: body["attempt"], expectedWorkloadProfile: body["expectedWorkloadProfile"], bootstrapReference: body["bootstrapReference"], namespace: body["namespace"], serviceAccountName: body["serviceAccountName"], workloadUid: body["workloadUid"] };
+}
+
+/** Parse exact first-Pod registration evidence without accepting self-asserted extensions. */
+function _ParseRegistrationCommand(value: unknown): AgentControllerRunWorkloadRegistrationCommand | null
+{
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const body = value as Record<string, unknown>;
+	const expectedKeys = ["agentRevisionId", "agentServiceId", "attempt", "bootstrapReference", "claimedAt", "deliveryCount", "namespace", "podUid", "runId", "serviceAccountName", "siloId", "workloadProfile", "workloadUid"];
+	if (Object.keys(body).length !== expectedKeys.length || !expectedKeys.every(key => key in body)) return null;
+	if (typeof body["claimedAt"] !== "string" || typeof body["deliveryCount"] !== "number" || typeof body["runId"] !== "string" || typeof body["attempt"] !== "number" || typeof body["siloId"] !== "string" || typeof body["agentServiceId"] !== "string" || typeof body["agentRevisionId"] !== "string" || typeof body["namespace"] !== "string" || typeof body["serviceAccountName"] !== "string" || typeof body["workloadUid"] !== "string" || typeof body["workloadProfile"] !== "string" || typeof body["bootstrapReference"] !== "string" || typeof body["podUid"] !== "string") return null;
+	return { claimedAt: body["claimedAt"], deliveryCount: body["deliveryCount"], runId: body["runId"], attempt: body["attempt"], siloId: body["siloId"], agentServiceId: body["agentServiceId"], agentRevisionId: body["agentRevisionId"], namespace: body["namespace"], serviceAccountName: body["serviceAccountName"], workloadUid: body["workloadUid"], workloadProfile: body["workloadProfile"], bootstrapReference: body["bootstrapReference"], podUid: body["podUid"] };
 }
 
 /** Write one bounded, non-sensitive internal problem response. */

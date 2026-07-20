@@ -102,8 +102,10 @@ tests fail closed; backup/restore reconstructs target-owned stores; no legacy co
 **In progress:** the active PR stack now defines immutable run input, the fenced runtime protocol,
 the outbound-only runtime process, the suspended one-Job-per-attempt resource contract, and a
 crash-safe controller boundary that exactly creates/adopts suspended Jobs before persisting their
-Kubernetes UID as the pending assignment. Durable
-assignment/command dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
+Kubernetes UID as the pending assignment. This dependent slice adds a durable release claim,
+conditionally unsuspends only that assigned Job, and records its unique first Pod before bootstrap
+exchange can begin. Bootstrap exchange, cancellation-owned cleanup of abandoned suspended Jobs,
+runtime command dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
 capabilities below are not complete yet.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement

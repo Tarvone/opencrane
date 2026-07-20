@@ -18,11 +18,11 @@ async function _Main(): Promise<void>
 		// 1. Validate the fixed silo/profile contract before loading any mutable desired state.
 		const config = _ReadConfig();
 
-		// 2. Compose only the projected-token HTTP authority and namespaced get/create clients.
+		// 2. Compose only the projected-token authority and least-privilege namespaced clients.
 		const kubeConfig = new k8s.KubeConfig();
 		kubeConfig.loadFromCluster();
 		const authority = __CreateHttpAgentControllerAuthority({ openCraneInternalUrl: config.openCraneInternalUrl, tokenPath: config.controllerTokenPath, requestTimeoutMilliseconds: config.requestTimeoutMilliseconds });
-		const kubernetes = __CreateKubernetesAgentControllerStore({ batchApi: kubeConfig.makeApiClient(k8s.BatchV1Api), networkingApi: kubeConfig.makeApiClient(k8s.NetworkingV1Api) });
+		const kubernetes = __CreateKubernetesAgentControllerStore({ batchApi: kubeConfig.makeApiClient(k8s.BatchV1Api), coreApi: kubeConfig.makeApiClient(k8s.CoreV1Api), requestTimeoutMilliseconds: config.requestTimeoutMilliseconds, shutdownSignal: shutdown.signal });
 
 		// 3. Convert both Kubernetes termination signals into one abortable poll loop.
 		function _Shutdown(signal: string): void
@@ -33,8 +33,8 @@ async function _Main(): Promise<void>
 		}
 		process.once("SIGTERM", function _sigterm() { _Shutdown("SIGTERM"); });
 		process.once("SIGINT", function _sigint() { _Shutdown("SIGINT"); });
-		log.info({ namespace: config.namespace, profiles: Object.keys(config.profiles) }, "agent controller started");
-		await __RunAgentController({ authority, kubernetes, profiles: config.profiles, namespace: config.namespace, pollIntervalMilliseconds: config.pollIntervalMilliseconds, log }, shutdown.signal);
+		log.info({ runtimeNamespace: config.runtimeNamespace, profiles: Object.keys(config.profiles) }, "agent controller started");
+		await __RunAgentController({ authority, kubernetes, profiles: config.profiles, runtimeNamespace: config.runtimeNamespace, pollIntervalMilliseconds: config.pollIntervalMilliseconds, log }, shutdown.signal);
 	}
 	finally
 	{

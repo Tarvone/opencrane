@@ -35,6 +35,28 @@ function _ReadBoundedSeconds(name: string, fallbackSeconds: number, minimumSecon
 	return seconds * 1_000;
 }
 
+/** Return whether one value is a bounded Kubernetes namespace DNS label. */
+function _IsNamespace(value: string): boolean
+{
+	return value.length <= 63 && /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value);
+}
+
+/**
+ * Read the server and runtime namespaces as one fail-closed deployment boundary.
+ * The runtime namespace is explicit because it identifies untrusted workload subjects and durable
+ * assignments; it must never silently collapse back into the OpenCrane server namespace.
+ */
+function _ReadRuntimeNamespaceBoundary(): { readonly serverNamespace: string; readonly runtimeNamespace: string }
+{
+	const serverNamespace = process.env.POD_NAMESPACE?.trim() || "default";
+	const runtimeNamespace = process.env.AGENT_RUNTIME_NAMESPACE?.trim();
+	if (!_IsNamespace(serverNamespace) || !runtimeNamespace || !_IsNamespace(runtimeNamespace) || runtimeNamespace === serverNamespace)
+	{
+		throw new Error("AGENT_RUNTIME_NAMESPACE must be a valid namespace different from POD_NAMESPACE");
+	}
+	return { serverNamespace, runtimeNamespace };
+}
+
 /**
  * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
  *
@@ -94,15 +116,14 @@ async function _ReviewProjectedToken(authApi: k8s.AuthenticationV1Api, token: st
  * the workload identity needed by the transport. It never forwards the raw token or TokenReview
  * response; a valid signature without all bindings is still unauthorised.
  */
-function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
+function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api, runtimeNamespace: string): RuntimeTokenReviewer
 {
-  const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
   return {
     async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
     {
 		const status = await _ReviewProjectedToken(authApi, token, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
 		if (!status) return null;
-		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, _ReadReviewedPodUid(status.user?.extra));
+		return _ParseRuntimeSubject(status.user?.username ?? "", runtimeNamespace, _ReadReviewedPodUid(status.user?.extra));
     },
   };
 }
@@ -123,14 +144,13 @@ function _ParseAgentControllerSubject(username: string, expectedNamespace: strin
  * The adapter fixes audience, namespace, and ServiceAccount before exposing a reviewed identity to
  * the run-dispatch router; no caller-provided coordinate can widen those bindings.
  */
-function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api): AgentControllerTokenReviewer
+function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api, serverNamespace: string): AgentControllerTokenReviewer
 {
-	const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
 	return {
 		async __Review(token: string): Promise<ReviewedAgentControllerIdentity | null>
 		{
 			const status = await _ReviewProjectedToken(authApi, token, AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE);
-			return status ? _ParseAgentControllerSubject(status.user?.username ?? "", expectedNamespace, status.audiences ?? []) : null;
+			return status ? _ParseAgentControllerSubject(status.user?.username ?? "", serverNamespace, status.audiences ?? []) : null;
 		},
 	};
 }
@@ -166,11 +186,11 @@ const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
  */
 export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, authApi: k8s.AuthenticationV1Api): void
 {
-	const namespace = process.env.POD_NAMESPACE?.trim() || "default";
+	const { serverNamespace, runtimeNamespace } = _ReadRuntimeNamespaceBoundary();
 	const claimLeaseMilliseconds = _ReadBoundedSeconds("AGENT_CONTROLLER_CLAIM_LEASE_SECONDS", 30, 1, 300);
 	const assignmentTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS", 3_600, 60, 86_400);
-	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace, claimLeaseMilliseconds, assignmentTtlMilliseconds });
-	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi), namespace, repository: runDispatchRepository, logger: _log }));
+	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace: runtimeNamespace, claimLeaseMilliseconds, assignmentTtlMilliseconds });
+	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi, serverNamespace), namespace: serverNamespace, repository: runDispatchRepository, logger: _log }));
   // NetworkPolicy-only (no auth/TokenReview): the operator fetches a tenant's
   // allowed model set + effective default at reconcile. Best-effort — never 404/500.
   app.use("/api/internal/tenant-models", _RegisterInternalTenantModels(prisma));
@@ -180,7 +200,7 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
   // The runtime opens this internal SSE connection itself. TokenReview is the identity
   // boundary; the intentionally empty authority below cannot issue commands or persist data.
   app.use("/api/internal/agent-runtime", _RegisterInternalAgentRuntimeStream({
-    tokenReviewer: _CreateRuntimeTokenReviewer(authApi),
+    tokenReviewer: _CreateRuntimeTokenReviewer(authApi, runtimeNamespace),
     authority: _NoRuntimeAssignmentAuthority,
     maxBodyBytes: 64 * 1024,
     heartbeatMilliseconds: 15_000,

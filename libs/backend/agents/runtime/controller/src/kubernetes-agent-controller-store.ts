@@ -1,12 +1,31 @@
 import { isDeepStrictEqual } from "node:util";
 
-import type { V1Job, V1NetworkPolicy, V1ObjectMeta } from "@kubernetes/client-node";
+import { Observable, type ConfigurationOptions, type ObservableMiddleware, type RequestContext, type ResponseContext, type V1Job, type V1ObjectMeta, type V1Pod } from "@kubernetes/client-node";
+import { __DeriveAgentRuntimeReleaseDeadlineSeconds } from "@opencrane/backend/agents/runtime/k8s-launcher";
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import type { AgentControllerKubernetesStore, AgentControllerKubernetesStoreOptions } from "./agent-controller.types.js";
 
 /** Kubernetes-managed metadata fields excluded from an owned-contract comparison. */
 const _SERVER_METADATA_FIELDS = ["creationTimestamp", "generation", "managedFields", "resourceVersion", "selfLink", "uid"] as const;
+
+/** Attach one combined shutdown and deadline signal to the generated Kubernetes request. */
+function _KubernetesRequestOptions(shutdownSignal: AbortSignal, timeoutMilliseconds: number): ConfigurationOptions
+{
+	const signal = AbortSignal.any([shutdownSignal, AbortSignal.timeout(timeoutMilliseconds)]);
+	const middleware: ObservableMiddleware = {
+		pre(context: RequestContext): Observable<RequestContext>
+		{
+			context.setSignal(signal);
+			return new Observable(Promise.resolve(context));
+		},
+		post(context: ResponseContext): Observable<ResponseContext>
+		{
+			return new Observable(Promise.resolve(context));
+		},
+	};
+	return { middleware: [middleware], middlewareMergeStrategy: "append" };
+}
 
 /** Read a Kubernetes HTTP status from the client library's supported error shapes. */
 function _StatusCode(err: unknown): number | undefined
@@ -20,7 +39,7 @@ function _StatusCode(err: unknown): number | undefined
 }
 
 /** Require deterministic namespaced metadata before making a Kubernetes call. */
-function _Coordinates(resource: V1Job | V1NetworkPolicy): { readonly name: string; readonly namespace: string }
+function _Coordinates(resource: V1Job): { readonly name: string; readonly namespace: string }
 {
 	const name = resource.metadata?.name;
 	const namespace = resource.metadata?.namespace;
@@ -40,17 +59,6 @@ function _OwnedMetadata(metadata: V1ObjectMeta | undefined): V1ObjectMeta
 		delete (owned as Record<string, unknown>)[field];
 	}
 	return owned;
-}
-
-/** Assert an API result still equals the entire controller-authored NetworkPolicy. */
-function _AssertExactNetworkPolicy(current: V1NetworkPolicy, expected: V1NetworkPolicy): void
-{
-	const currentContract = { apiVersion: current.apiVersion, kind: current.kind, metadata: _OwnedMetadata(current.metadata), spec: current.spec };
-	const expectedContract = { apiVersion: expected.apiVersion, kind: expected.kind, metadata: _OwnedMetadata(expected.metadata), spec: expected.spec };
-	if (!isDeepStrictEqual(currentContract, expectedContract))
-	{
-		throw new Error("refusing to adopt a NetworkPolicy that differs from the claimed runtime attempt");
-	}
 }
 
 /** Remove one known API default only when it carries the canonical default value. */
@@ -127,38 +135,156 @@ function _AssertExactSuspendedJob(current: V1Job, expected: V1Job): void
 	}
 }
 
+/** Assert an API result is the complete assigned Job, allowing only its durable release state. */
+function _AssertExactAssignedJob(current: V1Job, expected: V1Job, workloadUid: string): void
+{
+	if (current.metadata?.uid !== workloadUid || (current.spec?.suspend !== true && current.spec?.suspend !== false))
+	{
+		throw new Error("refusing to adopt a Job outside the exact durable workload assignment");
+	}
+	const expectedAtCurrentReleaseState = structuredClone(expected);
+	if (!expectedAtCurrentReleaseState.spec)
+	{
+		throw new Error("expected runtime Job is missing its owned specification");
+	}
+	expectedAtCurrentReleaseState.spec.suspend = current.spec.suspend;
+	if (current.spec.suspend === false)
+	{
+		const currentDeadline = current.spec.activeDeadlineSeconds;
+		const maximumDeadline = expected.spec?.activeDeadlineSeconds;
+		if (!Number.isSafeInteger(currentDeadline) || currentDeadline! < 1 || !Number.isSafeInteger(maximumDeadline) || currentDeadline! > maximumDeadline!)
+		{
+			throw new Error("refusing to adopt a released Job outside its bounded assignment deadline");
+		}
+		expectedAtCurrentReleaseState.spec.activeDeadlineSeconds = currentDeadline;
+	}
+	if (!isDeepStrictEqual(_NormalizedJob(current), _NormalizedJob(expectedAtCurrentReleaseState)))
+	{
+		throw new Error("refusing to adopt a Job that differs from the assigned runtime workload");
+	}
+}
+
+/** Require one conservative release deadline within the immutable profile maximum. */
+function _AssertReleaseDeadline(expected: V1Job, activeDeadlineSeconds: number): void
+{
+	const maximumDeadline = expected.spec?.activeDeadlineSeconds;
+	if (!Number.isSafeInteger(activeDeadlineSeconds) || activeDeadlineSeconds < 1 || !Number.isSafeInteger(maximumDeadline) || activeDeadlineSeconds > maximumDeadline!)
+	{
+		throw new Error("agent-controller release deadline exceeds the assigned runtime profile");
+	}
+}
+
+/** Parse the canonical UTC timestamp required at the Kubernetes authority boundary. */
+function _CanonicalUtcEpochMilliseconds(value: string): number
+{
+	const epochMilliseconds = Date.parse(value);
+	if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isSafeInteger(epochMilliseconds) || new Date(epochMilliseconds).toISOString() !== value)
+	{
+		throw new Error("agent-controller release requires one canonical UTC authority instant");
+	}
+	return epochMilliseconds;
+}
+
+/**
+ * Prove a released Job cannot execute beyond the absolute durable assignment expiry.
+ * @param current - Exact UID-bound released Job returned by Kubernetes.
+ * @param assignmentExpiresAt - Canonical absolute assignment expiry.
+ * @param requiredDeadlineSeconds - Exact deadline required from an immediate patch response.
+ */
+function _AssertReleasedAssignmentDeadline(current: V1Job, assignmentExpiresAt: string, requiredDeadlineSeconds?: number): void
+{
+	const deadlineSeconds = current.spec?.activeDeadlineSeconds;
+	if (!Number.isSafeInteger(deadlineSeconds) || (requiredDeadlineSeconds !== undefined && deadlineSeconds !== requiredDeadlineSeconds))
+	{
+		throw new Error("Kubernetes released the runtime Job with an unexpected assignment deadline");
+	}
+	const startTime = current.status?.startTime;
+	if (startTime === undefined)
+	{
+		if (requiredDeadlineSeconds === undefined) throw new Error("released runtime Job is missing the start time required to prove assignment expiry");
+		return;
+	}
+	const startEpochMilliseconds = startTime.getTime();
+	const assignmentExpiresAtEpochMilliseconds = _CanonicalUtcEpochMilliseconds(assignmentExpiresAt);
+	if (!Number.isSafeInteger(startEpochMilliseconds) || startEpochMilliseconds + (deadlineSeconds! * 1_000) > assignmentExpiresAtEpochMilliseconds)
+	{
+		throw new Error("released runtime Job can outlive its absolute assignment expiry");
+	}
+}
+
+/** Require the API-issued identity needed by the conditional release patch. */
+function _JobReleaseIdentity(job: V1Job): { readonly name: string; readonly namespace: string; readonly uid: string; readonly resourceVersion: string }
+{
+	const { name, namespace } = _Coordinates(job);
+	const uid = job.metadata?.uid;
+	const resourceVersion = job.metadata?.resourceVersion;
+	if (!uid || !resourceVersion)
+	{
+		throw new Error("assigned runtime Job is missing UID or resourceVersion for conditional release");
+	}
+	return { name, namespace, uid, resourceVersion };
+}
+
+/** Build the exact label selector permitted by the controller's Pod-list Role. */
+function _RuntimePodSelector(jobName: string, workloadUid: string): string
+{
+	return `batch.kubernetes.io/controller-uid=${workloadUid},opencrane.ai/runtime-attempt=${jobName}`;
+}
+
+/** Return the exact labels Kubernetes must place on the first Pod for this Job. */
+function _ExpectedPodLabels(expectedJob: V1Job, workloadUid: string): Record<string, string>
+{
+	const name = expectedJob.metadata?.name;
+	const authored = expectedJob.spec?.template.metadata?.labels;
+	if (!name || !authored)
+	{
+		throw new Error("expected runtime Job is missing deterministic Pod labels");
+	}
+	return {
+		...authored,
+		"batch.kubernetes.io/controller-uid": workloadUid,
+		"batch.kubernetes.io/job-name": name,
+		"controller-uid": workloadUid,
+		"job-name": name,
+	};
+}
+
+/** Assert one listed Pod is the exact first Pod owned by the assigned Job. */
+function _AssertExactRuntimePod(pod: V1Pod, expectedJob: V1Job, workloadUid: string, serviceAccountName: string): string
+{
+	const jobName = expectedJob.metadata?.name;
+	const namespace = expectedJob.metadata?.namespace;
+	const podUid = pod.metadata?.uid;
+	const ownerReferences = pod.metadata?.ownerReferences ?? [];
+	const controllerOwner = ownerReferences.filter(function _controllerOwner(reference) { return reference.controller === true; });
+	if (!jobName || !namespace || !podUid || pod.metadata?.namespace !== namespace || pod.spec?.serviceAccountName !== serviceAccountName || (pod.spec.serviceAccount !== undefined && pod.spec.serviceAccount !== serviceAccountName) || !isDeepStrictEqual(pod.metadata?.labels, _ExpectedPodLabels(expectedJob, workloadUid)) || ownerReferences.length !== 1 || controllerOwner.length !== 1)
+	{
+		throw new Error("refusing to register a Pod that differs from the assigned runtime workload");
+	}
+	const owner = controllerOwner[0];
+	if (owner.apiVersion !== "batch/v1" || owner.kind !== "Job" || owner.name !== jobName || owner.uid !== workloadUid)
+	{
+		throw new Error("refusing to register a Pod without the exact assigned Job owner");
+	}
+	return podUid;
+}
+
 /**
  * Create the only Kubernetes adapter used by the reduced agent-controller slice.
  *
- * Creation is the sole mutation. An AlreadyExists response becomes an exact owned-contract check,
- * never a patch or replacement, so a colliding or externally changed object stops reconciliation
- * instead of being silently adopted as the authorised run attempt.
- * @param options - Batch and Networking clients constrained by namespaced get/create RBAC.
- * @returns Exact-adoption operations for attempt policies and suspended Jobs.
+ * Creation and the fenced `suspend=false` transition are the only mutations. An AlreadyExists
+ * response becomes an exact owned-contract check, so a colliding or externally changed object stops
+ * reconciliation instead of being silently adopted as the authorised run attempt.
+ * @param options - Batch and Core clients constrained by namespaced least privilege.
+ * @returns Exact adoption, conditional release, and first-Pod discovery operations.
  */
 export function __CreateKubernetesAgentControllerStore(options: AgentControllerKubernetesStoreOptions): AgentControllerKubernetesStore
 {
+	if (!Number.isSafeInteger(options.requestTimeoutMilliseconds) || options.requestTimeoutMilliseconds < 1_000 || options.requestTimeoutMilliseconds > 60_000)
+	{
+		throw new Error("agent controller Kubernetes store requires a 1-60s request timeout");
+	}
 	return {
-		async __EnsureNetworkPolicy(expected: V1NetworkPolicy): Promise<V1NetworkPolicy>
-		{
-			const { name, namespace } = _Coordinates(expected);
-			return ___DoWithTrace("agent_controller.network_policy.ensure", { name, namespace }, async function _ensureNetworkPolicy()
-			{
-				try
-				{
-					const created = await options.networkingApi.createNamespacedNetworkPolicy({ namespace, body: expected });
-					_AssertExactNetworkPolicy(created, expected);
-					return created;
-				}
-				catch (err)
-				{
-					if (_StatusCode(err) !== 409) throw err;
-					const current = await options.networkingApi.readNamespacedNetworkPolicy({ namespace, name });
-					_AssertExactNetworkPolicy(current, expected);
-					return current;
-				}
-			});
-		},
 		async __EnsureSuspendedJob(expected: V1Job): Promise<V1Job>
 		{
 			const { name, namespace } = _Coordinates(expected);
@@ -166,17 +292,78 @@ export function __CreateKubernetesAgentControllerStore(options: AgentControllerK
 			{
 				try
 				{
-					const created = await options.batchApi.createNamespacedJob({ namespace, body: expected });
+					const created = await options.batchApi.createNamespacedJob({ namespace, body: expected }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
 					_AssertExactSuspendedJob(created, expected);
 					return created;
 				}
 				catch (err)
 				{
 					if (_StatusCode(err) !== 409) throw err;
-					const current = await options.batchApi.readNamespacedJob({ namespace, name });
+					const current = await options.batchApi.readNamespacedJob({ namespace, name }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
 					_AssertExactSuspendedJob(current, expected);
 					return current;
 				}
+			});
+		},
+		async __EnsureRuntimeJobReleased(expected: V1Job, workloadUid: string, assignmentExpiresAt: string, releaseLeaseExpiresAt: string): Promise<V1Job>
+		{
+			const { name, namespace } = _Coordinates(expected);
+			const assignmentExpiresAtEpochMilliseconds = _CanonicalUtcEpochMilliseconds(assignmentExpiresAt);
+			const releaseLeaseExpiresAtEpochMilliseconds = _CanonicalUtcEpochMilliseconds(releaseLeaseExpiresAt);
+			return ___DoWithTrace("agent_controller.job.release", { name, namespace, workloadUid, assignmentExpiresAt }, async function _releaseRuntimeJob()
+			{
+				// 1. Read and exact-adopt the durable assignment before considering any mutation.
+				const current = await options.batchApi.readNamespacedJob({ namespace, name }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
+				_AssertExactAssignedJob(current, expected, workloadUid);
+				if (current.spec?.suspend === false)
+				{
+					_AssertReleasedAssignmentDeadline(current, assignmentExpiresAt);
+					return current;
+				}
+				const previousDeadline = current.spec?.activeDeadlineSeconds;
+				if (!Number.isSafeInteger(previousDeadline)) throw new Error("assigned runtime Job is missing its profile deadline");
+				const releaseUpperBoundEpochMilliseconds = Math.max(Date.now(), releaseLeaseExpiresAtEpochMilliseconds) + options.requestTimeoutMilliseconds;
+				const activeDeadlineSeconds = __DeriveAgentRuntimeReleaseDeadlineSeconds(assignmentExpiresAt, releaseUpperBoundEpochMilliseconds, previousDeadline!);
+				_AssertReleaseDeadline(expected, activeDeadlineSeconds);
+
+				// 2. Compare-and-swap every identity fence so stale replicas cannot release changed work.
+				const identity = _JobReleaseIdentity(current);
+				const released = await options.batchApi.patchNamespacedJob({
+					name: identity.name,
+					namespace: identity.namespace,
+					body: [
+						{ op: "test", path: "/metadata/uid", value: identity.uid },
+						{ op: "test", path: "/metadata/resourceVersion", value: identity.resourceVersion },
+						{ op: "test", path: "/spec/suspend", value: true },
+						{ op: "test", path: "/spec/activeDeadlineSeconds", value: previousDeadline! },
+						{ op: "replace", path: "/spec/activeDeadlineSeconds", value: activeDeadlineSeconds },
+						{ op: "replace", path: "/spec/suspend", value: false },
+					],
+				}, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
+
+				// 3. Revalidate the API result so a surprising patch response never advances authority.
+				_AssertExactAssignedJob(released, expected, workloadUid);
+				if (released.spec?.suspend !== false)
+				{
+					throw new Error("Kubernetes did not release the exact assigned runtime Job");
+				}
+				_AssertReleasedAssignmentDeadline(released, new Date(assignmentExpiresAtEpochMilliseconds).toISOString(), activeDeadlineSeconds);
+				return released;
+			});
+		},
+		async __FindFirstRuntimePod(expectedJob: V1Job, workloadUid: string, serviceAccountName: string): Promise<V1Pod | null>
+		{
+			const { name, namespace } = _Coordinates(expectedJob);
+			return ___DoWithTrace("agent_controller.pod.find_first", { name, namespace, workloadUid }, async function _findFirstRuntimePod()
+			{
+				const listed = await options.coreApi.listNamespacedPod({ namespace, labelSelector: _RuntimePodSelector(name, workloadUid) }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
+				if (listed.items.length === 0) return null;
+				if (listed.items.length !== 1)
+				{
+					throw new Error("refusing to choose among multiple Pods for one assigned runtime Job");
+				}
+				_AssertExactRuntimePod(listed.items[0], expectedJob, workloadUid, serviceAccountName);
+				return listed.items[0];
 			});
 		},
 	};

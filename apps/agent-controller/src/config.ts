@@ -4,9 +4,6 @@ import { __ValidateAgentControllerRuntimeProfiles } from "@opencrane/backend/age
 
 import type { AgentControllerProcessConfig } from "./config.types.js";
 
-/** Standard path read by Kubernetes client-node's in-cluster configuration. */
-const _KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
-
 /** Read one required, trimmed environment value. */
 function _Required(environment: NodeJS.ProcessEnv, name: string): string
 {
@@ -43,13 +40,8 @@ function _Json(value: string): unknown
 /** Read and fail-closed validate the complete agent-controller process configuration. */
 export function _ReadConfig(environment: NodeJS.ProcessEnv = process.env): AgentControllerProcessConfig
 {
-	// 1. Fix the controller to one namespace and the standard explicit Kubernetes token mount.
-	const namespace = _Required(environment, "AGENT_CONTROLLER_NAMESPACE");
-	const kubernetesTokenPath = environment.AGENT_CONTROLLER_KUBERNETES_TOKEN_PATH?.trim() || _KUBERNETES_TOKEN_PATH;
-	if (kubernetesTokenPath !== _KUBERNETES_TOKEN_PATH)
-	{
-		throw new Error(`AGENT_CONTROLLER_KUBERNETES_TOKEN_PATH must be ${_KUBERNETES_TOKEN_PATH}`);
-	}
+	// 1. Fix workload mutations to the explicit dedicated runtime namespace.
+	const runtimeNamespace = _Required(environment, "AGENT_RUNTIME_NAMESPACE");
 
 	// 2. Require the separately audience-bound OpenCrane credential by mounted path, never raw value.
 	const controllerTokenPath = _Required(environment, "OPENCRANE_CONTROLLER_TOKEN_PATH");
@@ -58,13 +50,12 @@ export function _ReadConfig(environment: NodeJS.ProcessEnv = process.env): Agent
 		throw new Error("OPENCRANE_CONTROLLER_TOKEN_PATH must be absolute");
 	}
 
-	// 3. Validate all immutable profiles at startup through the canonical Job/NetworkPolicy builder.
-	const profiles = __ValidateAgentControllerRuntimeProfiles(_Json(_Required(environment, "AGENT_CONTROLLER_PROFILES_JSON")), namespace);
+	// 3. Validate the runtime/server namespace split and every immutable Job profile at startup.
+	const profiles = __ValidateAgentControllerRuntimeProfiles(_Json(_Required(environment, "AGENT_CONTROLLER_PROFILES_JSON")), runtimeNamespace);
 	return {
 		openCraneInternalUrl: _Required(environment, "OPENCRANE_INTERNAL_URL"),
 		controllerTokenPath,
-		kubernetesTokenPath,
-		namespace,
+		runtimeNamespace,
 		pollIntervalMilliseconds: _Integer(environment, "AGENT_CONTROLLER_POLL_INTERVAL_MS", 1_000, 100, 60_000),
 		requestTimeoutMilliseconds: _Integer(environment, "AGENT_CONTROLLER_REQUEST_TIMEOUT_MS", 10_000, 1_000, 60_000),
 		profiles,

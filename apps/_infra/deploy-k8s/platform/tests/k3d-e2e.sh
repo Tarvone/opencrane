@@ -31,6 +31,7 @@ NAMESPACE="${NAMESPACE:-opencrane-system}"
 # stay <release>-<component> (nameOverride "opencrane" is a prefix of the release
 # name, so opencrane.fullname == the release name).
 RELEASE_NAME="${RELEASE_NAME:-opencrane-silo}"
+RUNTIME_NAMESPACE="${RUNTIME_NAMESPACE:-${RELEASE_NAME}-runtime}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-0}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-240}"
 DB_STORAGE_GB="${DB_STORAGE_GB:-20}"
@@ -1049,6 +1050,11 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db" \
   --set "litellm.databaseSecretKey=DATABASE_URL" \
   --set "bootstrap.providerKey.existingSecret=$BOOTSTRAP_SECRET_NAME" \
+  --set agentController.enabled=true \
+  --set agentController.replicas=0 \
+  --set-string agentController.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --set-string agentController.runtimeProfile.image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  --set-string 'agentController.kubernetesApiServerCidrs[0]=10.43.0.1/32' \
   --set "certManager.enabled=false"
 
 # Wait for the opencrane-server (skip helm --wait because local-path PVCs don't bind until a pod
@@ -1056,6 +1062,12 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
 # by the release name because nameOverride (opencrane) is a prefix of it, so
 # opencrane.fullname == the release name → <release>-<component>.
 kubectl rollout status "deployment/${RELEASE_NAME}-opencrane-server" -n "$NAMESPACE" --timeout=180s
+
+# Execute both controller trust boundaries against the live API server. Replicas stay at zero so
+# the probe owns every state transition: admission checks the exact Job shape, while a one-shot Job
+# proves the projected controller token reaches server-side TokenReview through both policies.
+bash "$ROOT_DIR/apps/agent-controller/tests/admission-conformance.sh" "$NAMESPACE" "$RUNTIME_NAMESPACE" "$RELEASE_NAME"
+bash "$ROOT_DIR/apps/agent-controller/tests/identity-conformance.sh" "$NAMESPACE" "$RELEASE_NAME"
 
 # Wait for LiteLLM (a silo plane) when cost routing is enabled by chart values.
 if kubectl get "deployment/${RELEASE_NAME}-litellm" -n "$NAMESPACE" >/dev/null 2>&1; then

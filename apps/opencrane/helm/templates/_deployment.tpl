@@ -64,6 +64,9 @@ spec:
               value: {{ .Values.agentController.claimLeaseSeconds | quote }}
             - name: AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS
               value: {{ .Values.agentController.assignmentTtlSeconds | quote }}
+            # The server accepts runtime assignments only for this Helm-owned restricted namespace.
+            - name: AGENT_RUNTIME_NAMESPACE
+              value: {{ include "opencrane.agentController.runtimeNamespace" . | quote }}
             {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "opencrane-server") | nindent 12 }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}

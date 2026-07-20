@@ -175,7 +175,7 @@ reference. The site is built with [VitePress](https://vitepress.dev) from
 ### Prerequisites
 
 - Node 22+
-- Kubernetes 1.28+ (GKE recommended)
+- Kubernetes 1.30+ (GKE recommended; required for stable runtime admission policy)
 - Helm 3
 - Terraform 1.5+ (for GCP deployment)
 - PostgreSQL 15+ (Cloud SQL or local)

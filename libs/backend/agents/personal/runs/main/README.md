@@ -21,7 +21,7 @@ use, then governs later attempts without changing the logical run or its frozen 
  └──────────────────────────────────────────┘
           │  accepted / retry started / assignment trusted / denied
           ▼
- run-owned outbox  ── controller claims it ── creates suspended Job ── commits Job UID
+ run-owned outbox  ── controller claims it ── suspended Job ── release ── first Pod registered
 ```
 
 **In this flow:** [session](../../session/main/README.md) *(assembles the snapshot through this
@@ -48,10 +48,28 @@ Job, confirms the workload's full identity (who / where / which attempt) matches
 
 `PrismaRunDispatchRepository` is the database side of the controller handshake. It issues a short,
 server-owned claim lease over `RunAttemptRequested`, exposes only the coordinates needed to create a
-suspended Job, and commits the Job UID as a `PendingPod` assignment together with the run's `Assigned`
-state and outbox publication. The exact `claimedAt` plus `deliveryCount` pair is the compare-and-swap
-fence: an expired claimant cannot overwrite a later reclaim. Both claim and commit also require the
-snapshot's signed fleet-membership trust window to remain in the future according to database time.
+suspended Job, and commits the Job UID as a `PendingPod` assignment. That commit also creates an
+unconsumed bootstrap record and a second durable command asking the controller to release the Job.
+The bootstrap reference is an opaque label, not a password: it grants nothing without the exact
+projected workload identity, assigned Job and registered first Pod. The stored integrity digest binds
+the label to every immutable assignment field, including the selected workload profile.
+
+Release uses another recoverable claim lease. The controller unsuspends only the assigned Job, then
+returns the first Pod's immutable Kubernetes identifier. This package changes `PendingPod` to
+`Registered` and marks the release delivered in one transaction. Replaying the same Pod returns the
+recorded answer even after the run or assignment advances to a later lifecycle state; presenting a
+different Pod fails permanently. The oldest release row is selected even when its assignment or
+bootstrap has expired, then classified under locks rather than returned as claimable work. Expired
+or corrupt authority is failed under its exact outbox fence with a structured reason; its pending
+assignment is revoked and its run receives the canonical failure
+event in the same transaction, so the next poll can continue to newer work without stranding the old
+run. After that transaction commits, the HTTP boundary emits one structured warning and retains the
+normal empty-poll response, so operators see the repair without making the controller treat it as an
+API outage. Both handshakes use database time and the exact `claimedAt` plus `deliveryCount` pair to fence a
+controller whose lease has expired. The assignment and bootstrap also expire no later than the
+signed fleet-membership evidence they rely on. That absolute expiry is sealed into the release
+outbox payload and projected back to the controller, so delayed release cannot restart the full
+profile lifetime after some assignment authority has already elapsed.
 
 Invariant: a logical run either commits with exactly one digest-sealed snapshot and its dispatch
 event, or does not exist. Retries retain that run and snapshot identity, attempts only move forward
@@ -70,9 +88,13 @@ uncertainty fails closed.
   `RunAdmissionBuildResult` and `RunAdmissionResult` — the transaction-fenced initial-admission port
   and its input/output vocabulary.
 - `PrismaAgentRunAuthorityRepository` — the Prisma-backed adapter implementing the persistence port (atomic retry + outbox append).
-- `PrismaRunDispatchRepository` — atomically claim an attempt and commit its suspended Job assignment.
-- `__CreateAgentControllerRunDispatchRouter` — projected-token-authenticated internal claim/commit API for the fixed `agent-controller` ServiceAccount.
+- `PrismaRunDispatchRepository` — claim an attempt, commit its suspended Job and bootstrap, then
+  claim release work and register exactly one first Pod.
+- `__CreateAgentControllerRunDispatchRouter` — projected-token-authenticated internal assignment and
+  release API for the fixed `agent-controller` ServiceAccount.
 - `RunDispatchRepository` / `AgentControllerTokenReviewer` — persistence and TokenReview ports used by that internal API.
+- `ClaimNextRunWorkloadReleaseResult` / `RegisterRunWorkloadPodResult` — release-claim and first-Pod
+  registration outcomes used across the internal adapter boundary.
 - `AgentRunAuthorityRepository` / `AgentRunAuthoritySnapshot` — the persistence port and its consistent read shape.
 - `StartNextRunAttemptCommand` / `StartNextRunAttemptResult`, `AtomicStartNextRunAttemptCommand` / `AtomicRunAttemptResult` — retry request/result and their atomic commit forms.
 - `RunWorkloadAssignment` / `RunWorkloadAssignmentExpectation` / `RunWorkloadAssignmentDecision` — the workload-identity check inputs and verdict.
@@ -82,8 +104,9 @@ uncertainty fails closed.
 Consumed by the [session assembler](../../session/main/README.md), run-dispatch and workload-
 admission paths. It does not choose persona, memory, tools, budgets or membership evidence; session
 supplies those through the transaction callback. It does not run the agent, create/unsuspend the Job,
-or expose the private input snapshot to the controller. It owns only the durable admission, attempt,
-dispatch-lease, assignment, and workload-identity boundaries.
+or expose the private input snapshot to the controller. It does not treat the bootstrap reference as
+a credential and does not inspect Kubernetes itself. It owns only durable admission, attempts,
+dispatch leases, assignment integrity, release delivery and first-Pod registration.
 
 ## Dependency direction
 
@@ -96,8 +119,10 @@ Owns `AgentRun`, its one `RunInputSnapshot`, and run-domain outbox rows in
 `apps/opencrane/prisma/schema/runs.prisma`. Initial admission commits the run, snapshot,
 `RunAccepted`, and first `RunAttemptRequested` event together; later retries atomically advance the
 attempt counter and append another `RunAttemptRequested` event. Dispatch leases that event, persists
-the immutable `WorkloadAssignment`, advances the run to `Assigned`, and publishes the event in one
-transaction.
+the immutable `WorkloadAssignment` and `WorkloadBootstrap`, advances the run to `Assigned`, appends
+one `RunWorkloadReleaseRequested` event for that attempt, and publishes only the attempt event in one
+transaction. First-Pod registration publishes the release event atomically, leaving no gap where a
+Pod is trusted but its release command can be reclaimed.
 
 ## See also
 

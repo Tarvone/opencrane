@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 
 import { ___DoWithTrace } from "@opencrane/observability";
-import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim } from "@opencrane/contracts";
+import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim, AgentControllerRunAttemptClaimLease, AgentControllerRunWorkloadRegistrationCommand, AgentControllerRunWorkloadRegistrationResult, AgentControllerRunWorkloadReleaseClaim } from "@opencrane/contracts";
 
 import type { AgentControllerAuthority, AgentControllerFetch, AgentControllerHttpAuthorityOptions, AgentControllerTokenReader } from "./agent-controller.types.js";
 
@@ -11,6 +11,9 @@ const _MAX_RESPONSE_BYTES = 64 * 1024;
 
 /** Stable internal claim route appended to the configured OpenCrane base URL. */
 const _CLAIM_PATH = "/api/internal/agent-controller/run-attempts:claim";
+
+/** Stable internal release route appended to the configured OpenCrane base URL. */
+const _RELEASE_CLAIM_PATH = "/api/internal/agent-controller/workload-releases:claim";
 
 /** Return whether an untrusted JSON value is a non-empty bounded identifier. */
 function _IsIdentifier(value: unknown): value is string
@@ -27,7 +30,9 @@ function _IsPositiveInteger(value: unknown): value is number
 /** Return whether an untrusted JSON value is a valid ISO instant. */
 function _IsTime(value: unknown): value is string
 {
-	return typeof value === "string" && Number.isFinite(Date.parse(value));
+	if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+	const epochMilliseconds = Date.parse(value);
+	return Number.isSafeInteger(epochMilliseconds) && new Date(epochMilliseconds).toISOString() === value;
 }
 
 /** Return a plain object suitable for security-boundary parsing. */
@@ -54,19 +59,56 @@ async function _ReadJson(response: Response): Promise<unknown>
 	}
 }
 
+/** Parse one exact database-issued claim generation. */
+function _ParseLease(value: unknown): AgentControllerRunAttemptClaimLease
+{
+	const lease = _AsObject(value);
+	if (!lease || !_IsIdentifier(lease.eventId) || !_IsTime(lease.claimedAt) || !_IsPositiveInteger(lease.deliveryCount) || !_IsTime(lease.expiresAt) || Date.parse(lease.claimedAt) >= Date.parse(lease.expiresAt))
+	{
+		throw new Error("OpenCrane returned a malformed controller claim lease");
+	}
+	return { eventId: lease.eventId, claimedAt: lease.claimedAt, deliveryCount: lease.deliveryCount, expiresAt: lease.expiresAt };
+}
+
 /** Parse the exact desired-state projection returned by the claim endpoint. */
 function _ParseClaim(value: unknown): AgentControllerRunAttemptClaim
 {
 	const root = _AsObject(value);
-	const lease = _AsObject(root?.lease);
 	const attempt = _AsObject(root?.attempt);
-	if (!root || !lease || !attempt || !_IsIdentifier(lease.eventId) || !_IsTime(lease.claimedAt) || !_IsPositiveInteger(lease.deliveryCount) || !_IsTime(lease.expiresAt) || Date.parse(lease.claimedAt) >= Date.parse(lease.expiresAt) || !_IsIdentifier(attempt.runId) || !_IsPositiveInteger(attempt.attempt) || !_IsIdentifier(attempt.siloId) || !_IsIdentifier(attempt.agentServiceId) || !_IsIdentifier(attempt.agentRevisionId) || !_IsIdentifier(attempt.inputSnapshotDigest) || !_IsIdentifier(attempt.namespace) || !_IsIdentifier(attempt.workloadProfile))
+	if (!root || !attempt || !_IsIdentifier(attempt.runId) || !_IsPositiveInteger(attempt.attempt) || !_IsIdentifier(attempt.siloId) || !_IsIdentifier(attempt.agentServiceId) || !_IsIdentifier(attempt.agentRevisionId) || !_IsIdentifier(attempt.inputSnapshotDigest) || !_IsIdentifier(attempt.namespace) || !_IsIdentifier(attempt.workloadProfile) || !_IsIdentifier(attempt.bootstrapReference))
 	{
 		throw new Error("OpenCrane returned a malformed controller claim");
 	}
 	return {
-		lease: { eventId: lease.eventId, claimedAt: lease.claimedAt, deliveryCount: lease.deliveryCount, expiresAt: lease.expiresAt },
-		attempt: { runId: attempt.runId, attempt: attempt.attempt, siloId: attempt.siloId, agentServiceId: attempt.agentServiceId, agentRevisionId: attempt.agentRevisionId, inputSnapshotDigest: attempt.inputSnapshotDigest, namespace: attempt.namespace, workloadProfile: attempt.workloadProfile },
+		lease: _ParseLease(root.lease),
+		attempt: { runId: attempt.runId, attempt: attempt.attempt, siloId: attempt.siloId, agentServiceId: attempt.agentServiceId, agentRevisionId: attempt.agentRevisionId, inputSnapshotDigest: attempt.inputSnapshotDigest, namespace: attempt.namespace, workloadProfile: attempt.workloadProfile, bootstrapReference: attempt.bootstrapReference },
+	};
+}
+
+/** Parse the exact durable assignment returned by the workload-release claim endpoint. */
+function _ParseWorkloadReleaseClaim(value: unknown): AgentControllerRunWorkloadReleaseClaim
+{
+	const root = _AsObject(value);
+	const workload = _AsObject(root?.workload);
+	if (!root || !workload || !_IsIdentifier(workload.runId) || !_IsPositiveInteger(workload.attempt) || !_IsIdentifier(workload.siloId) || !_IsIdentifier(workload.agentServiceId) || !_IsIdentifier(workload.agentRevisionId) || !_IsIdentifier(workload.namespace) || !_IsIdentifier(workload.serviceAccountName) || !_IsIdentifier(workload.workloadUid) || !_IsIdentifier(workload.workloadProfile) || !_IsTime(workload.assignmentExpiresAt) || !_IsIdentifier(workload.bootstrapReference))
+	{
+		throw new Error("OpenCrane returned a malformed workload-release claim");
+	}
+	return {
+		lease: _ParseLease(root.lease),
+		workload: {
+			runId: workload.runId,
+			attempt: workload.attempt,
+			siloId: workload.siloId,
+			agentServiceId: workload.agentServiceId,
+			agentRevisionId: workload.agentRevisionId,
+			namespace: workload.namespace,
+			serviceAccountName: workload.serviceAccountName,
+			workloadUid: workload.workloadUid,
+			workloadProfile: workload.workloadProfile,
+			assignmentExpiresAt: workload.assignmentExpiresAt,
+			bootstrapReference: workload.bootstrapReference,
+		},
 	};
 }
 
@@ -79,6 +121,17 @@ function _ParseAssignmentResult(value: unknown, command: AgentControllerRunAttem
 		throw new Error("OpenCrane returned a mismatched controller assignment result");
 	}
 	return { outcome: root.outcome, runId: command.runId, attempt: command.attempt, workloadUid: command.workloadUid };
+}
+
+/** Parse a registration result and bind it back to the exact submitted evidence. */
+function _ParseRegistrationResult(value: unknown, command: AgentControllerRunWorkloadRegistrationCommand): AgentControllerRunWorkloadRegistrationResult
+{
+	const root = _AsObject(value);
+	if (!root || (root.outcome !== "registered" && root.outcome !== "idempotent") || root.runId !== command.runId || root.attempt !== command.attempt || root.workloadUid !== command.workloadUid || root.podUid !== command.podUid)
+	{
+		throw new Error("OpenCrane returned a mismatched first-Pod registration result");
+	}
+	return { outcome: root.outcome, runId: command.runId, attempt: command.attempt, workloadUid: command.workloadUid, podUid: command.podUid };
 }
 
 /** Read the latest rotated projected token from its mounted file. */
@@ -162,6 +215,29 @@ export function __CreateHttpAgentControllerAuthority(options: AgentControllerHtt
 				const response = await fetchRequest(new URL(path, baseUrl), { method: "PUT", headers: _Headers(token), body: JSON.stringify(command), signal: _RequestSignal(signal, options.requestTimeoutMilliseconds) });
 				if (response.status !== 200) throw new Error(`OpenCrane controller assignment failed with HTTP ${response.status}`);
 				return _ParseAssignmentResult(await _ReadJson(response), command);
+			});
+		},
+		async __ClaimWorkloadRelease(signal: AbortSignal): Promise<AgentControllerRunWorkloadReleaseClaim | null>
+		{
+			return ___DoWithTrace("agent_controller.workload_release.claim", {}, async function _claimWorkloadRelease()
+			{
+				const token = await readToken();
+				const response = await fetchRequest(new URL(_RELEASE_CLAIM_PATH, baseUrl), { method: "POST", headers: _Headers(token), body: "{}", signal: _RequestSignal(signal, options.requestTimeoutMilliseconds) });
+				if (response.status === 204) return null;
+				if (response.status !== 200) throw new Error(`OpenCrane workload-release claim failed with HTTP ${response.status}`);
+				return _ParseWorkloadReleaseClaim(await _ReadJson(response));
+			});
+		},
+		async __RegisterFirstPod(eventId: string, command: AgentControllerRunWorkloadRegistrationCommand, signal: AbortSignal): Promise<AgentControllerRunWorkloadRegistrationResult>
+		{
+			return ___DoWithTrace("agent_controller.workload_release.register", { eventId, runId: command.runId, attempt: command.attempt, workloadUid: command.workloadUid, podUid: command.podUid }, async function _registerFirstPod()
+			{
+				if (!_IsIdentifier(eventId)) throw new Error("agent controller registration requires one valid event id");
+				const token = await readToken();
+				const path = `/api/internal/agent-controller/workload-releases/${encodeURIComponent(eventId)}/registration`;
+				const response = await fetchRequest(new URL(path, baseUrl), { method: "PUT", headers: _Headers(token), body: JSON.stringify(command), signal: _RequestSignal(signal, options.requestTimeoutMilliseconds) });
+				if (response.status !== 200) throw new Error(`OpenCrane first-Pod registration failed with HTTP ${response.status}`);
+				return _ParseRegistrationResult(await _ReadJson(response), command);
 			});
 		},
 	};

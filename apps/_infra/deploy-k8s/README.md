@@ -8,8 +8,9 @@
 
 ## What it owns
 
-This is the **install root** for one **silo** — one customer's isolated slice of OpenCrane, running in
-its own namespace and sharing nothing with other customers. Everything else under `apps/` ships a small
+This is the **install root** for one **silo** — one customer's isolated slice of OpenCrane. The
+trusted services run in the release namespace; untrusted personal-agent Jobs run in a sibling runtime
+namespace owned by the same release. Nothing is shared with other customers. Everything else under `apps/` ships a small
 Helm named-template library; this app is the **umbrella chart** (`opencrane-silo`) that pulls those
 libraries together into one release, plus `deploy.sh`, the entrypoint that installs and upgrades it.
 
@@ -42,10 +43,14 @@ A silo installs **only** its own namespaced app releases. Cluster-wide controlle
 external-dns, CloudNativePG, cert-manager) are external prerequisites a silo never installs. Dependencies
 resolve from `Chart.lock` via `helm dep build` (pinned, reproducible) — never from open version ranges.
 
-The personal `agent-runtime` image is deliberately absent from this static rollup. It is not a
+The personal `agent-runtime` image is deliberately absent from the long-lived Deployment rollup. It is not a
 long-lived silo service: the agent controller creates its bounded, suspended Job for each authorised
 run attempt and commits the Kubernetes-issued Job identity to OpenCrane. Workload lifetime and
-Kubernetes identity therefore remain tied to that attempt rather than to a release.
+Kubernetes identity therefore remain tied to that attempt. The release still owns the runtime
+namespace, its zero-RBAC ServiceAccount, default-deny and fixed-egress policies, and a uniquely named
+cluster-scoped admission policy that permits only the exact digest-pinned Job shape and its one-time
+unsuspend transition. An aggregate ResourceQuota bounds conforming Jobs, Pods, CPU, and memory even
+if the controller identity is compromised. The admission boundary requires Kubernetes 1.30+.
 
 ## Public surface
 
@@ -56,7 +61,8 @@ pre-created PostgreSQL basic-auth Secret per logical database (server, obot, lit
 ## Boundary
 
 The umbrella renders no business logic and installs no cluster-wide controller. It composes app-owned
-templates and per-silo `NetworkPolicies`; it does not own the workloads themselves (each app does) or
+templates, the server and runtime namespaces, per-silo `NetworkPolicies`, and the runtime Job's
+release-scoped `ValidatingAdmissionPolicy`; it does not own the workloads themselves (each app does) or
 the shared substrate helpers (the `k8s-platform` library does). Self-service ClusterTenant management and
 billing are OFF — a silo serves exactly one ClusterTenant.
 
@@ -69,6 +75,10 @@ package imports it.
 
 - Umbrella chart: `Chart.yaml` (`opencrane-silo`), values in `values.yaml`, schema in
   `values.schema.json`, pins in `Chart.lock`.
+- `agentController.runtimeNamespace` — optional DNS-label override for the sibling runtime namespace;
+  empty derives `<release>-runtime`, and the chart rejects the trusted server namespace.
+- `agentController.runtimeQuota` — aggregate Job, Pod, CPU, and memory ceilings for the dedicated
+  untrusted runtime namespace.
 - `crds.install` — defaults `true` (standalone: this chart installs the ClusterTenant/Tenant/AccessPolicy
   CRDs); set `false` when running under a fleet that installs its own CRDs.
 - Reusable environment/multi-instance profiles live under `values/` and `platform/values/`.

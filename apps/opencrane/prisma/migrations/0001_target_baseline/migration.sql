@@ -167,7 +167,7 @@ CREATE TYPE "WorkloadAssignmentState" AS ENUM ('pending_pod', 'registered', 'rev
 CREATE TYPE "WorkloadKind" AS ENUM ('job', 'deployment');
 
 -- CreateEnum
-CREATE TYPE "RunOutboxEventKind" AS ENUM ('run.accepted', 'run.attempt_requested', 'run.cancellation_requested', 'run.resume_requested');
+CREATE TYPE "RunOutboxEventKind" AS ENUM ('run.accepted', 'run.attempt_requested', 'run.workload_release_requested', 'run.cancellation_requested', 'run.resume_requested');
 
 -- CreateEnum
 CREATE TYPE "SkillState" AS ENUM ('active', 'retired');
@@ -1277,6 +1277,7 @@ CREATE TABLE "workload_assignments" (
     "namespace" TEXT NOT NULL,
     "workload_kind" "WorkloadKind" NOT NULL,
     "workload_uid" TEXT NOT NULL,
+    "workload_profile" TEXT NOT NULL,
     "pod_uid" TEXT,
     "state" "WorkloadAssignmentState" NOT NULL DEFAULT 'pending_pod',
     "expires_at" TIMESTAMP(3) NOT NULL,
@@ -2709,6 +2710,7 @@ BEGIN
         OR NEW."namespace" IS DISTINCT FROM OLD."namespace"
         OR NEW."workload_kind" IS DISTINCT FROM OLD."workload_kind"
         OR NEW."workload_uid" IS DISTINCT FROM OLD."workload_uid"
+        OR NEW."workload_profile" IS DISTINCT FROM OLD."workload_profile"
         OR NEW."expires_at" IS DISTINCT FROM OLD."expires_at" OR NEW."created_at" IS DISTINCT FROM OLD."created_at" THEN
         RAISE EXCEPTION 'WorkloadAssignment identity is immutable';
     END IF;
@@ -3721,7 +3723,7 @@ ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_attempt_
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_nonempty_check" CHECK (
         btrim("agent_service_id") <> '' AND btrim("agent_revision_id") <> '' AND btrim("silo_id") <> '' AND
         btrim("subject_id") <> '' AND "audience" = 'opencrane-agent-runtime' AND btrim("service_account_name") <> '' AND
-        btrim("namespace") <> '' AND btrim("workload_uid") <> ''
+        btrim("namespace") <> '' AND btrim("workload_uid") <> '' AND btrim("workload_profile") <> ''
     );
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_expiry_check" CHECK ("expires_at" > "created_at");
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_state_check" CHECK (

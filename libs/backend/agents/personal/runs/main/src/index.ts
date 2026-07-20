@@ -6,4 +6,4 @@ export { PrismaAgentRunAuthorityRepository } from "./prisma-run-authority.js";
 export { PrismaRunAdmissionRepository } from "./prisma-run-admission-repository.js";
 export { PrismaRunDispatchRepository } from "./prisma-run-dispatch-repository.js";
 export { __CreateAgentControllerRunDispatchRouter } from "./run-dispatch.router.js";
-export type { AgentControllerRunDispatchRouterDependencies, AgentControllerTokenReviewer, ClaimNextRunAttemptResult, CommitRunAttemptAssignmentResult, ReviewedAgentControllerIdentity, RunDispatchRepository, RunDispatchRepositoryConfig } from "./run-dispatch.types.js";
+export type { AgentControllerRunDispatchRouterDependencies, AgentControllerTokenReviewer, ClaimNextRunAttemptResult, ClaimNextRunWorkloadReleaseResult, CommitRunAttemptAssignmentResult, RegisterRunWorkloadPodResult, ReviewedAgentControllerIdentity, RunDispatchRepository, RunDispatchRepositoryConfig } from "./run-dispatch.types.js";

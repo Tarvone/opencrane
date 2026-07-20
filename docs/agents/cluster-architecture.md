@@ -111,7 +111,7 @@ library units with the parent release context; shared labels and topology helper
 | `apps/_infra/obot/helm` | Obot gateway Deployment, Service, KSA/RBAC, and NetworkPolicy |
 | `apps/_infra/langfuse` | Pinned upstream chart ownership for web, worker, ClickHouse, ZooKeeper, Valkey, and MinIO workload classes |
 | `apps/artifact-service/helm` | Canonical ArtifactStore byte service: RWO expandable PVC, private service, and no catalog authority |
-| `apps/agent-controller/helm` | Outbound-only controller Deployment, fixed projected identity, `get/create` Job and NetworkPolicy RBAC, and bounded egress |
+| `apps/agent-controller/helm` | Outbound-only controller in the server namespace; dedicated restricted runtime namespace, zero-RBAC runtime identity, exact Job create/release and first-Pod list RBAC, fixed network floor, and fail-closed Job admission |
 | `apps/_infra/deploy-k8s/templates/{cluster-issuer,external-secrets-store,networkpolicy-*}.yaml` | Issuer/external-secret composition and cross-plane/default-deny policy |
 
 The machine-enforced inventory is `docs/agents/workload-ownership.json`; adding a pod class
@@ -129,13 +129,21 @@ All planes are **ClusterIP-only** (no external LB) — external traffic arrives 
   the catalog/grant authority; the removed registry-poll route is not a synchronization mechanism.
 - **artifact-service** (`:8080`) → owns only content-addressed artifact bytes on its mounted PVC. It runs in the release's dedicated `<release>-artifacts` namespace with the receipt-signing key; OpenCrane remains the catalog and authorization authority in the control namespace, holds only the lease signer, and tenant/runtime pods never mount the volume.
 - **agent-controller** → owns no listener. It claims desired attempts from OpenCrane, exactly creates
-  or adopts their NetworkPolicy and suspended Job, then reports the Kubernetes Job UID back to the
-  durable run authority. It cannot patch, delete, watch, read Secrets, or start a Job in this slice.
+  or adopts their suspended Job in a Helm-owned dedicated runtime namespace, reports the Kubernetes
+  Job UID, then separately
+  claims the durable release. Release is one conditional patch fenced by Job UID, resource version,
+  and `suspend=true`; the controller lists only exact Job-owned Pod candidates and registers the
+  unique first Pod. It cannot delete or watch, read Secrets, create NetworkPolicies, or mutate Pods.
+  The runtime namespace enforces Pod Security Standards `restricted`, default-deny networking, fixed
+  OpenCrane-and-DNS egress, and a release-specific ValidatingAdmissionPolicy for the exact Job shape.
 - **litellm** (`:4000`) → the only LLM egress path for tenant pods; operator mints a per-tenant virtual key Secret; enforces budget.
 
 ## Namespace Model
 
-**Single-install (default):** one release namespace holds all planes + all UserTenant workloads; CRDs and RBAC are cluster-scoped singletons. Ref-less UserTenants land here (an implicit "default" ClusterTenant binds this namespace).
+**Single-install (default):** one release namespace holds the server-side planes. Personal-runtime
+Jobs and Pods occupy a deterministic sibling `<release>-runtime` namespace containing only their
+zero-RBAC ServiceAccount and Helm-owned security policies. CRDs and other RBAC remain scoped by
+their owning plane.
 
 **Multi-instance (`multiInstance.enabled: true`):** each customer install gets its own namespace (`oc-acme`, `oc-globex`, …) with its own planes, namespaced RBAC, namespaced cert Issuer/SecretStore, and a default-deny cross-instance NetworkPolicy. CRDs are installed **once** cluster-wide (`--skip-crds` on releases). See [Multi-Instance](#multi-instance-cluster-shape).
 
@@ -145,6 +153,10 @@ All planes are **ClusterIP-only** (no external LB) — external traffic arrives 
 
 - **Ingress:** GCE Ingress (GCP) or ingress-nginx (on-prem). The **control plane** is reached on the **fixed super-operator host** (`ingress.controlPlaneHost`, default `platform.<base>`); org hosts `<org>.<base>` are resolved by the platform wildcard `*.<base>` and routed via a single wildcard Ingress to the operator's identity-routing proxy (gateway WebSocket) and the control plane (API). There are no per-user Ingress objects. See [Tenancy Model](#tenancy-model--clustertenant-vs-usertenant).
 - **App-owned NetworkPolicies** restrict ArtifactStore ingress to the OpenCrane server only across the control-to-artifact namespace boundary; its PVC is mounted only in the artifact-service pod. Server RBAC is namespaced to its explicit control/tenant namespaces and cannot read the artifact namespace receipt signer. The server's `/api/internal/*` listener remains separately protected by its own policy and is never internet-routable.
+- **Personal-runtime NetworkPolicies** default-deny the whole dedicated runtime namespace and admit
+  only runtime Pod egress to the exact OpenCrane internal port in the server namespace plus cluster
+  DNS. The controller remains in the server namespace and has its own explicit OpenCrane/API/DNS
+  egress policy.
 - **Tenant egress** is default-DNS + the CIDR/FQDN allow-lists compiled from the tenant's AccessPolicy (standard NetworkPolicy always; optional CiliumNetworkPolicy for FQDN filtering).
 - **TLS:** one **platform** cert (`*.<base>` + apex + opencrane-api host), issued via cert-manager DNS-01. It covers every org host `<org>.<base>`. A per-org HTTP-01 cert is issued only when a `vanityDomain` is set on the ClusterTenant. The platform cert is rendered by the chart; per-org vanity certs by the cluster-tenants operator. There are no per-org wildcard certs.
 

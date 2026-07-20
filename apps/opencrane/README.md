@@ -63,12 +63,15 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 - `createInternalApp(prisma, authApi)` — builds the internal-only Express app; each mounted route
   declares projected-workload TokenReview or explicit NetworkPolicy-only trust.
 
-The internal controller routes TokenReview only the fixed `agent-controller` ServiceAccount and
-`opencrane-agent-controller` audience. They let that process claim a database-fenced run attempt and
-commit only the immutable UID of the suspended Job it created. The runtime stream separately accepts
-the `opencrane-agent-runtime` audience and bounded runtime-profile ServiceAccount grammar. Durable
-assignment remains the authority for the exact ServiceAccount, Job, Pod, run, and revision; a
-ServiceAccount name alone is never sufficient.
+The internal controller routes TokenReview only the fixed `agent-controller` ServiceAccount in the
+server namespace and `opencrane-agent-controller` audience. They let that process claim a
+database-fenced run attempt and commit only the immutable UID of the suspended Job it created. A
+separate durable release route lets the controller conditionally unsuspend that assigned Job and
+register its exact first Pod UID. The runtime stream separately accepts the
+`opencrane-agent-runtime` audience and bounded runtime-profile ServiceAccount grammar in the
+explicit, separate runtime namespace. Durable assignment remains the authority for the exact
+ServiceAccount, Job, Pod, run, and revision; the projected bootstrap reference and a ServiceAccount
+name alone are never sufficient.
 The runtime stream still injects an empty command authority, so a verified Pod may maintain a
 heartbeat connection but cannot receive commands or persist candidate output yet.
 
@@ -107,6 +110,7 @@ Read from the environment at startup.
 | `DATABASE_URL` | Postgres connection string (Prisma) | *(required)* |
 | `NAMESPACE` | Silo namespace the reconcilers act on | `default` |
 | `AGENT_CONTROLLER_CLAIM_LEASE_SECONDS` | Database-owned lease for one controller delivery attempt | `30` |
+| `AGENT_RUNTIME_NAMESPACE` | Dedicated namespace for untrusted runtime Jobs; must differ from `POD_NAMESPACE` | *(required)* |
 | `AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS` | Hard lifetime of a pending runtime workload assignment | `3600` |
 | `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |
 | `FLEET_INTERNAL_URL` | Fleet membership write-through URL; empty = standalone silo | *(empty)* |

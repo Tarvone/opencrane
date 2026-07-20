@@ -99,7 +99,7 @@
     },
     {
       "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
-      "anchor": "options.batchApi.createNamespacedJob({ namespace, body: expected })",
+      "anchor": "options.batchApi.createNamespacedJob({ namespace, body: expected }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds))",
       "workloadIds": ["agent-runtime"]
     },
     {
@@ -145,16 +145,6 @@
     }
   ],
   "nonProducingRuntimeMatches": [
-    {
-      "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
-      "anchor": "kind: current.kind",
-      "reason": "Exact NetworkPolicy adoption comparison only; it cannot construct or submit a workload."
-    },
-    {
-      "path": "libs/backend/agents/runtime/controller/src/kubernetes-agent-controller-store.ts",
-      "anchor": "kind: expected.kind",
-      "reason": "Exact NetworkPolicy adoption comparison only; it cannot construct or submit a workload."
-    },
     {
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/destroy/tenant-cleanup.ts",
       "anchor": "kind: \"Deployment\"",
@@ -271,7 +261,7 @@
     {
       "id": "agent-runtime",
       "podClass": "Job/agent-runtime-attempt",
-      "image": "ghcr.io/italanta/opencrane-agent-runtime:<release-tag>",
+      "image": "ghcr.io/italanta/opencrane-agent-runtime@sha256:<release-digest>",
       "owner": "apps/agent-runtime",
       "localOwner": true,
       "source": { "type": "file", "path": "libs/backend/agents/runtime/k8s-launcher/src/agent-runtime-job.ts", "anchor": "kind: \"Job\"" },

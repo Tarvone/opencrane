@@ -7,14 +7,13 @@
 ## What it owns
 
 The agent runtime is the process in which one personal-agent attempt will eventually execute. It
-runs inside the customer's isolated Kubernetes namespace, opens its own authenticated connection to
-OpenCrane, and never accepts inbound network traffic.
+runs inside the customer's dedicated runtime Kubernetes namespace, opens its own authenticated
+connection to OpenCrane in the separate server namespace, and never accepts inbound network traffic.
 
 This slice removes the shared long-lived Deployment and defines the fresh, initially suspended Job
 that contains this process for one attempt. The agent controller creates that Job from durable run
-authority and reports its Kubernetes-issued identity to OpenCrane; it does not yet bootstrap or
-unsuspend it. The runtime itself still ignores commands until later dispatch/executor authority is
-connected.
+authority, then separately releases the exact assigned Job and registers its first Pod. The runtime
+still ignores commands until later dispatch/executor authority is connected.
 
 ```text
  durable run attempt
@@ -35,7 +34,8 @@ connected.
 Invariant: this process cannot choose its user, agent revision, run, tools, permissions, or durable
 state. A failed or retried attempt receives a different Job identity, and runtime-local files
 disappear with its bounded scratch volume. If identity or server authority is unavailable, the
-process reconnects with bounded backoff and does no work.
+process reconnects with bounded backoff and does no work. The runtime namespace may never collapse
+into the OpenCrane server namespace.
 
 ## Public surface
 
@@ -67,6 +67,8 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 - `OPENCRANE_RUNTIME_STREAM_URL` — exact in-cluster OpenCrane stream endpoint.
 - `OPENCRANE_RUNTIME_TOKEN_PATH` — rotating audience-bound projected-token path.
 - `POD_UID` — immutable Pod identity supplied through the Kubernetes downward API.
+- `/var/run/opencrane/bootstrap/reference` — read-only opaque lookup reference projected from the
+  Pod annotation. It is not a credential and is never placed in an environment variable or argument.
 - Writable storage is only a per-attempt `emptyDir` capped at 1 GiB and mounted at `/tmp`.
 
 The Job builder requires an immutable image digest plus bounded CPU, memory, deadline, and scratch.
@@ -76,9 +78,10 @@ credential is group-readable (`0440`) only by that runtime group; it is never wo
 ## Status
 
 The current image proves the identity and outbound-stream boundary but deliberately ignores command
-frames. The controller now creates or exact-adopts its NetworkPolicy and suspended Job and commits
-the Job UID to OpenCrane. Bootstrap, unsuspension, durable dispatch, and the selected model/tool
-executor are later Phase E slices, so this app cannot yet complete an agent run.
+frames. The controller now creates or exact-adopts the suspended Job, conditionally releases the
+durable assignment, and registers the unique first Pod. The opaque bootstrap reference is projected,
+but authenticated one-use exchange, durable dispatch, and the selected model/tool executor remain
+later Phase E slices, so this app cannot yet complete an agent run.
 
 ## See also
 

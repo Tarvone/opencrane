@@ -236,9 +236,6 @@ channelProxy:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
-  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
-  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
-  maxUploadDurationMilliseconds: 300000
   service:
     port: 8080
   # -- Empty derives the release-local OpenCrane internal Service URL.
@@ -294,6 +291,9 @@ agentRuntime:
 # release-local PVC; OpenCrane remains the catalog and authorization authority.
 artifactService:
   enabled: true
+  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
+  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
+  maxUploadDurationMilliseconds: 300000
   # -- The isolated byte-plane namespace. It is never one of the server's RBAC-owned
   # namespaces, so the server cannot read the service-only receipt signing key.
   namespace: ""

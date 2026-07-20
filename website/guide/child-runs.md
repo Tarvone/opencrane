@@ -8,7 +8,7 @@ own budget, its own capability set, and its own audit trail, linked to the run t
 ::: info Target design
 Child runs build on the run authority that is already implemented (run trees, capability proofs,
 input snapshots). The spawn tool and runtime behaviour land with the personal-agent runtime
-(Phase E of the [platform architecture](https://github.com/italanta/opencrane/blob/own-personal-ai-agent-setup/docs/design/personal-agent-platform-architecture.md);
+(Phase E of the [platform architecture](https://github.com/italanta/opencrane/blob/main/docs/design/personal-agent-platform-architecture.md);
 tracked in [#320](https://github.com/italanta/opencrane/issues/320)).
 :::
 

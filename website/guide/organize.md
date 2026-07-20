@@ -29,7 +29,7 @@ The same four scopes appear everywhere you share or restrict something:
 
 - **Skills** are published at a scope and promoted to wider ones — a skill that starts
   *personal* can be promoted to *project*, then *department*, then *org*.
-  → [Share skills](/guide/skills)
+  → [Agent skills](/guide/skills)
 - **Knowledge** is organized into datasets by scope, so a department's documents only
   reach that department. → [Organizational knowledge](/guide/knowledge)
 - **Access grants** allow or deny something for a person, team, or whole department.

@@ -24,7 +24,7 @@ a *tenant* — same thing.) → [Create one](/guide/first-tenant)
 ### Skill
 A **reusable ability** you can give to assistants — like installing an app. A skill
 might be "write a sales follow-up" or "review a pull request." You build a skill
-once and share it with whoever should have it. → [Share skills](/guide/skills)
+once and share it with whoever should have it. → [Agent skills](/guide/skills)
 
 ### Tool (MCP)
 A **connection to another system** — Slack, Jira, your CRM — so an assistant can

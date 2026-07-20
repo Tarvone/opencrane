@@ -21,7 +21,7 @@ It requires successful test and scan evidence, a signature and signer key, and a
 review. It then publishes the revision and advances the skill's current pointer atomically.
 
 The implementation lives in
-[`libs/backend/server/skills/main`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/skills/main).
+[`libs/backend/server/agents/skills/main`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/agents/skills/main).
 The public product workflow will build on that authority rather than restoring an OCI bundle
 registry or compatibility route.
 

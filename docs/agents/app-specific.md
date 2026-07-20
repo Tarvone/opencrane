@@ -32,14 +32,17 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 
-## Server/control-plane domains (`libs/backend/server/*/main`)
+## Server/control-plane domains (`libs/backend/server/<group>/<domain>/main`)
 
 The control plane and extracted runtime capabilities are split into NX packages
-(`backend-server-<d>` at `libs/backend/server/<d>/main`): tenants, policies, grants, skills,
-model-routing, providers, awareness, spend, groups, mcp, company-docs, audit,
-access-tokens, metrics, connections, cluster-tenants, retrieval, contract, projection,
-identity, and api-spec. The separate `libs/backend/feat-openclaw-tenant/main` package remains a
-deletion boundary until the personal-agent runtime replacement lands.
+(`backend-server-<d>` at `libs/backend/server/<group>/<d>/main`). The six navigational groups are
+IAM (identity, membership, authorization, policies, grants, groups, access-tokens, audit), managed
+agents (agent-services, skills, artifacts, channel-targets), gateway governance (mcp, integrations,
+providers, model-routing), knowledge (retrieval, company-docs), tenancy (tenants, cluster-tenants,
+projection, contract, connections), and reporting (metrics, spend, awareness). `api-spec` remains
+at `libs/backend/server/api-spec/main` because it aggregates all groups. The separate
+`libs/backend/feat-openclaw-tenant/main` package remains a deletion boundary until the
+personal-agent runtime replacement lands.
 Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, bounded `scope:<capability>` rules, and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);

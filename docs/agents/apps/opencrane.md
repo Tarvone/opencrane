@@ -59,7 +59,7 @@ CRUD + notable actions:
 
 ## Auth subsystem
 
-- **OIDC** — `libs/backend/server/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
+- **OIDC** — `libs/backend/server/iam/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
 - **pod connection preflight** — `POST /api/v1/auth/pod-token` is a direct-deletion endpoint; target
   channel/session resolution uses the target authorization and capability contracts.
 - **`___AuthMiddleware` fallback chain** — OIDC and target access tokens survive only through the

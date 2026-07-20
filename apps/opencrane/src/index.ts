@@ -15,15 +15,15 @@ import { ___BindConsole, ___GetContext, ___RequestContext, ___ShutdownTelemetry 
 import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
 import { _ErrorHandler, _RateLimit, _TransportSecurity } from "@opencrane/server/_infra/http";
 
-import { ___AuthRouter, ___CreateOidcAuthService } from "@opencrane/backend/server/identity";
+import { ___AuthRouter, ___CreateOidcAuthService } from "@opencrane/backend/server/iam/identity";
 import { ___CreatePrismaClient } from "./infra/db/db.js";
 import { _CreateArtifactUploadGateway } from "./infra/artifacts/artifact-upload.factory.js";
 import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
-import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/server/projection";
+import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/server/tenancy/projection";
 import { OpenClawTenantLifecycle } from "@opencrane/backend/feat-openclaw-tenant";
-import { _CutTenant } from "@opencrane/backend/server/connections";
-import { _SetTenantSuspended } from "@opencrane/backend/server/tenants";
+import { _CutTenant } from "@opencrane/backend/server/tenancy/connections";
+import { _SetTenantSuspended } from "@opencrane/backend/server/tenancy/tenants";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped

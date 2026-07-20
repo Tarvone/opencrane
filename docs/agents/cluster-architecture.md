@@ -184,7 +184,7 @@ reconciler (in the operator) does (fail-closed, API-first).
 | `dedicatedNodes` | Namespace + a tainted node pool; operator stamps `nodeSelector`+`tolerations` (from `compute.mode=dedicated`, `compute.nodePool`). | ✅ Built |
 | `dedicatedCluster` | Customer gets its own kube-apiserver via an **external provisioner** (webhook seam, AGPL-clean; Kamaji-shaped). | ⏸️ **Parked** — opencrane-api validates and rejects with `422 TIER_UNAVAILABLE` unless a provisioner is registered. |
 
-The provisioner seam is a registry (`libs/backend/server/cluster-tenants/main/src/core/`) with a built-in shared provisioner plus an optional external webhook (`CLUSTER_TENANT_PROVISIONER_WEBHOOK_*`).
+The provisioner seam is a registry (`libs/backend/server/tenancy/cluster-tenants/main/src/core/`) with a built-in shared provisioner plus an optional external webhook (`CLUSTER_TENANT_PROVISIONER_WEBHOOK_*`).
 
 ## Multi-Instance Cluster Shape
 

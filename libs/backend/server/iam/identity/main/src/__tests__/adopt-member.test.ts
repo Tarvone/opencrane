@@ -20,9 +20,9 @@ function _notFound(): Error
 }
 
 /** A fully-provisioned ClusterTenant CR for `name` (so per-org resolution returns non-null). */
-function _cr(name: string): Record<string, unknown>
+function _cr(name: string, owner?: { subject?: string; email?: string }): Record<string, unknown>
 {
-  return { metadata: { name }, spec: { zitadel: { clientId: `client-${name}`, orgId: `org-${name}` } } };
+  return { metadata: { name }, spec: { zitadel: { clientId: `client-${name}`, orgId: `org-${name}` }, ...(owner ? { owner } : {}) } };
 }
 
 /** CustomObjectsApi stub: resolves the org CR by name, 404s Tenant CRD reads, records CRD creates. */
@@ -65,7 +65,7 @@ describe("_AdoptMemberOnLogin — first-login org adoption + workspace seed", fu
     await _AdoptMemberOnLogin({
       prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate: vi.fn() }),
       customApi: _mockApi(_cr("acme"), vi.fn()),
-      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "", email: "dev@acme.com", fleetWriter: null, log: _log,
+      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "", email: "dev@acme.com", log: _log,
     });
     expect(upsert).not.toHaveBeenCalled();
   });
@@ -77,7 +77,7 @@ describe("_AdoptMemberOnLogin — first-login org adoption + workspace seed", fu
       prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate: vi.fn() }),
       // customApi=null → _ResolvePerOrgClient returns null (no org to adopt into).
       customApi: null,
-      namespace: "ns", host: "app.dev.opencrane.ai", subject: "sub-1", email: "dev@acme.com", fleetWriter: null, log: _log,
+      namespace: "ns", host: "app.dev.opencrane.ai", subject: "sub-1", email: "dev@acme.com", log: _log,
     });
     expect(upsert).not.toHaveBeenCalled();
   });
@@ -89,11 +89,10 @@ describe("_AdoptMemberOnLogin — first-login org adoption + workspace seed", fu
     await _AdoptMemberOnLogin({
       prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate }),
       customApi: _mockApi(_cr("acme"), vi.fn()),
-      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "sub-42", email: "dev@acme.com", fleetWriter: null, log: _log,
+      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "sub-42", email: "dev@acme.com", log: _log,
     });
 
-    // Standalone silo (no fleet writer) → adopted into acme's LOCAL read-model as Member,
-    // create-if-absent, `update: {}` preserving any existing role.
+    // Adoption is local and idempotent: `update: {}` preserves an existing role.
     expect(upsert).toHaveBeenCalledWith({
       where: { clusterTenant_subject: { clusterTenant: "acme", subject: "sub-42" } },
       create: { clusterTenant: "acme", subject: "sub-42", role: "Member" },
@@ -113,7 +112,7 @@ describe("_AdoptMemberOnLogin — first-login org adoption + workspace seed", fu
       // The owner already holds `acme-default` under their email → the collision guard fires.
       prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate, existingForEmail: { name: "acme-default" } }),
       customApi: _mockApi(_cr("acme"), vi.fn()),
-      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "owner-sub", email: "owner@acme.com", fleetWriter: null, log: _log,
+      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "owner-sub", email: "owner@acme.com", log: _log,
     });
 
     // Membership upsert is still idempotent with `update: {}` — never downgrading the Owner role...
@@ -122,38 +121,33 @@ describe("_AdoptMemberOnLogin — first-login org adoption + workspace seed", fu
     expect(tenantCreate).not.toHaveBeenCalled();
   });
 
-  it("writes adoption THROUGH to the fleet (not the local read-model) when a fleet writer is present", async function _fleetManaged()
+  it("materializes the ClusterTenant's trusted owner as an Owner membership on first login", async function _ownerBootstrap()
   {
-    const upsert = vi.fn();
-    const tenantCreate = vi.fn();
-    const adopt = vi.fn().mockResolvedValue(true);
+    const upsert = vi.fn().mockResolvedValue({});
     await _AdoptMemberOnLogin({
-      prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate }),
-      customApi: _mockApi(_cr("acme"), vi.fn()),
-      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "sub-42", email: "dev@acme.com",
-      fleetWriter: { adopt }, log: _log,
+      prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate: vi.fn() }),
+      customApi: _mockApi(_cr("acme", { subject: "owner-sub", email: "owner@acme.com" }), vi.fn()),
+      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "owner-sub", email: "owner@acme.com", log: _log,
     });
 
-    // Fleet-managed: the adoption is written through to the fleet SoR (the repairer mirrors it
-    // back) — NOT to the local read-model, which the next projection sweep would otherwise reap.
-    expect(adopt).toHaveBeenCalledWith("acme", "sub-42");
-    expect(upsert).not.toHaveBeenCalled();
-    // The workspace seed is silo-local either way.
-    expect(tenantCreate).toHaveBeenCalledWith(expect.objectContaining({ name: _MemberTenantName("acme", "sub-42") }));
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: { clusterTenant: "acme", subject: "owner-sub", role: "Owner" },
+      update: {},
+    }));
   });
 
-  it("does NOT seed a workspace when the fleet write-through fails (transient error or seat cap)", async function _writeThroughFailed()
+  it("does not use the owner email when the CR has a different trusted owner subject", async function _subjectWins()
   {
-    const tenantCreate = vi.fn();
-    const adopt = vi.fn().mockResolvedValue(false); // fleet 409 (seat cap) or transport error
+    const upsert = vi.fn().mockResolvedValue({});
     await _AdoptMemberOnLogin({
-      prisma: _mockPrisma({ modelCount: 1, upsert: vi.fn(), tenantCreate }),
-      customApi: _mockApi(_cr("acme"), vi.fn()),
-      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "sub-42", email: "dev@acme.com",
-      fleetWriter: { adopt }, log: _log,
+      prisma: _mockPrisma({ modelCount: 1, upsert, tenantCreate: vi.fn() }),
+      customApi: _mockApi(_cr("acme", { subject: "owner-sub", email: "owner@acme.com" }), vi.fn()),
+      namespace: "ns", host: "acme.dev.opencrane.ai", subject: "different-sub", email: "owner@acme.com", log: _log,
     });
 
-    // No seat ⇒ no workspace: the seed is deferred to a login where the membership write succeeds.
-    expect(tenantCreate).not.toHaveBeenCalled();
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: { clusterTenant: "acme", subject: "different-sub", role: "Member" },
+    }));
   });
+
 });

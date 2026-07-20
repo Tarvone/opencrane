@@ -9,14 +9,11 @@ import { _ResolveOwnClusterTenant } from "./resolve-own-cluster-tenant.js";
 /**
  * Seed the silo's own `<org>-default` workspace Tenant on boot (Stage 5).
  *
- * Called ONLY in standalone mode (#151 item 4 — see the `deploymentMode` gate around this
- * call in `index.ts`): a standalone silo has no fleet-side create to wait on, so it seeds
- * its own first workspace itself. In fleet-managed mode the external fleet's own
- * provisioning flow (member adoption / first login) is authoritative instead — this call is
- * skipped there so a boot-time seed can never race ahead of / diverge from the fleet's
- * membership state. It discovers WHICH org it serves via {@link _ResolveOwnClusterTenant}
- * (the single boundNamespace-discovery implementation — populated by `_SeedOwnClusterTenant`
- * on a fresh standalone boot), then dual-writes the `<org>-default` Tenant (CRD + DB row) via
+ * Called during local control-plane boot: it seeds its own first workspace rather than waiting
+ * on an upstream lifecycle service. It discovers WHICH org it serves via
+ * {@link _ResolveOwnClusterTenant} (the single boundNamespace-discovery implementation —
+ * populated by `_SeedOwnClusterTenant` on a fresh boot), then dual-writes the
+ * `<org>-default` Tenant (CRD + DB row) via
  * {@link _EnsureOwnerDefaultTenant}; the silo's own TenantOperator reconciles the CRD into a
  * running openclaw.
  *

@@ -11,8 +11,7 @@ trace, toolkit decision gate, and conformance plan for the runtime slice.
 
 Adopt a personal-agent platform in which the user's own assistant is the primary product and the
 same assistant is the front door to company AI assets. Use one per-ClusterTenant OpenCrane API as
-the authority for silo-owned agents, assets, grants, persona, schedules, and runs; keep
-fleet-managed membership/lifecycle as explicit upstream contracts. Use one runtime contract, one
+the authority for agents, assets, grants, persona, schedules, runs, and membership. Use one runtime contract, one
 artifact authority, one scheduler/controller, and one management console.
 
 The target is an OpenCrane-owned, OpenClaw-free TypeScript runtime with one
@@ -23,8 +22,8 @@ SDK's `ToolLoopAgent` is the control and fallback.
 Build that target directly. Do not transfer, import, convert, or preserve legacy data, state,
 configuration, credentials, keys, salts, schemas, protocols, IDs, or runtime behavior. Create the
 new stores, credentials, persona, grants, catalog, skills, providers, agents, documents, and
-artifacts from the target contracts. Fleet and OIDC remain live target authorities, not legacy
-inputs. Each replacement slice deletes the OpenClaw or earlier OpenCrane path it supersedes.
+artifacts from the target contracts. OIDC remains the live identity authority, not a legacy
+input. Each replacement slice deletes the OpenClaw or earlier OpenCrane path it supersedes.
 
 This is a simplification **only if the replacement is exclusive**. Keeping OpenClaw and the selected
 driver as permanent peers would create two loop contracts, two session models, two persona paths,
@@ -33,9 +32,8 @@ the most complex option and is explicitly out of scope.
 
 The target can be summarized as five rules:
 
-1. **One silo management authority:** Postgres behind the per-silo OpenCrane API owns agents,
-   assets, grants, persona, schedules, and runs. In fleet-managed mode, fleet lifecycle and
-   membership remain explicit upstream authorities with a fail-closed silo read model.
+1. **One management authority:** Postgres behind the per-ClusterTenant OpenCrane API owns
+   agents, assets, grants, persona, schedules, runs, and membership.
 2. **One agent loop:** the conformance-selected TypeScript driver in a pinned OpenCrane runtime
    image.
 3. **One artifact authority:** content-addressed files on a Kubernetes volume, with metadata in
@@ -103,8 +101,8 @@ It does not create:
 ### What is structurally sound
 
 The accepted per-ClusterTenant silo decision remains the right containment boundary. Each silo owns
-its OpenCrane API/database, Cognee, Obot, LiteLLM, agent workloads, and storage. Fleet lifecycle—and
-membership in fleet-managed mode—and Zitadel authentication are cross-silo. This preserves
+its OpenCrane API/database, Cognee, Obot, LiteLLM, agent workloads, and storage. Zitadel
+authentication is the external identity boundary. This preserves
 independent data, credentials, resource limits, backup, and failure domains; see
 [ADR 0002](../adr/0002-per-clustertenant-silo-architecture.md).
 
@@ -318,18 +316,11 @@ synchronization and operating problem before the resource/action model itself is
 
 ### Membership authority and freshness
 
-“Central port of authority” does not mean pretending fleet-owned membership is local. In a
-fleet-managed install, the fleet `OrgMembership` store remains authoritative and the silo has an
-explicit read model. In standalone mode, the silo owns the same membership contract locally.
-
-The read model stores the highest fleet-issued membership revision whose issuer signature, silo,
-issued-at/expiry, and membership assertions have been verified. That is the “last signed
-fleet-membership revision”; it is not a locally editable snapshot. Capability issuance must fail
-closed when the revision is too stale for the requested action: no new membership-derived privilege
-or administrative capability is issued beyond the configured freshness window, and existing
-short-lived capabilities expire naturally. Membership writes in fleet-managed mode go through the
-fleet authority; the silo never creates a competing local truth. The freshness/expiry setting is a
-target authorization parameter, not a production-transition decision.
+Membership is native to the ClusterTenant authority. The membership record has a monotonically
+increasing revision and is changed only through the authorised management path. Capability
+issuance binds the revision it observed, and fails closed when that evidence is stale for the
+requested action; existing short-lived capabilities expire naturally. The freshness/expiry setting
+is a target authorization parameter, not a production-transition decision.
 
 ### Identity flow
 
@@ -800,9 +791,8 @@ The following decisions are accepted together and bind the implementation issues
 
 1. The product has one OpenCrane-owned, OpenClaw-free runtime with a conformance-selected loop
    driver. Do not build an OpenClaw bridge or a parallel runtime path.
-2. Postgres/OpenCrane is the source of truth for silo-owned business state; fleet-managed membership
-   and lifecycle remain explicit upstream contracts, and Kubernetes is execution state.
-3. The ClusterTenant CRD remains at the fleet/silo boundary; delete Tenant and AccessPolicy CRDs as
+2. Postgres/OpenCrane is the source of truth for ClusterTenant business state, and Kubernetes is execution state.
+3. The ClusterTenant CRD remains at the control-plane boundary; delete Tenant and AccessPolicy CRDs as
    their target Postgres/OpenCrane model lands, and never use them to initialize the new authority.
 4. Artifact bytes live on a per-silo filesystem/PVC; Cognee is a downstream derived index.
 5. Authorization is a per-silo OpenCrane module first, with signed run capabilities; no global PDP.

@@ -24,6 +24,7 @@ INSERT INTO "persona_profiles" ("id", "silo_id", "user_id", "updated_at") VALUES
 INSERT INTO "persona_interviews" ("id", "persona_profile_id", "user_id", "question_set_id", "question_set_version") VALUES ('interview-1','profile-1','user-1','onboarding',1);
 INSERT INTO "persona_interview_answers" ("id", "interview_id", "question_set_id", "question_set_version", "question_id", "value")
 SELECT 'answer-' || "ordinal", 'interview-1', 'onboarding', 1, "question_id", 'answer' FROM "persona_questions" WHERE "question_set_id"='onboarding' AND "question_set_version"=1;
+SELECT pg_temp.expect_failure('answer must bind a declared question', $statement$INSERT INTO "persona_interview_answers" ("id", "interview_id", "question_set_id", "question_set_version", "question_id", "value") VALUES ('missing-question-answer','interview-1','onboarding',1,'missing-question','answer')$statement$, 'persona_interview_answers_question_fkey');
 UPDATE "persona_interviews" SET "state"='completed', "completed_at"=clock_timestamp() WHERE "id"='interview-1';
 SELECT pg_temp.expect_failure('completed interview cannot gain answers', $statement$INSERT INTO "persona_interview_answers" ("id", "interview_id", "question_set_id", "question_set_version", "question_id", "value") VALUES ('late-answer','interview-1','onboarding',1,'q1','changed')$statement$, 'only while PersonaInterview is InProgress');
 INSERT INTO "persona_soul_templates" ("template_id", "version", "digest", "content", "selection_rules", "reviewed_by", "reviewed_at") VALUES ('collaborator',1,'sha256:'||repeat('d',64),'# Soul','[{"id":"collaborator-rule","priority":10,"answers":{"q1":"answer"}}]','reviewer-1',clock_timestamp());
@@ -32,6 +33,7 @@ INSERT INTO "persona_insights" ("id", "persona_revision_id", "category", "statem
 ('insight-1','persona-1','relationship_role','Insight one','interview-1','onboarding',1,'q1','answer-1'),
 ('insight-2','persona-1','tone_language','Insight two','interview-1','onboarding',1,'q2','answer-2'),
 ('insight-3','persona-1','answer_structure','Insight three','interview-1','onboarding',1,'q3','answer-3');
+SELECT pg_temp.expect_failure('insight must bind its exact interview answer', $statement$INSERT INTO "persona_insights" ("id", "persona_revision_id", "category", "statement", "interview_id", "question_set_id", "question_set_version", "question_id", "answer_id") VALUES ('missing-answer-insight','persona-1','relationship_role','missing answer','interview-1','onboarding',1,'q1','missing-answer')$statement$, 'persona_insights_answer_provenance_fkey');
 SELECT pg_temp.expect_failure('insight category must match question', $statement$INSERT INTO "persona_insights" ("id", "persona_revision_id", "category", "statement", "interview_id", "question_set_id", "question_set_version", "question_id", "answer_id") VALUES ('bad-insight','persona-1','initiative','wrong','interview-1','onboarding',1,'q4','answer-4')$statement$, 'exact question category');
 UPDATE "persona_revisions" SET "state"='approved', "approved_by"='user-1', "approved_at"=clock_timestamp() WHERE "id"='persona-1';
 UPDATE "persona_profiles" SET "active_revision_id"='persona-1' WHERE "id"='profile-1';

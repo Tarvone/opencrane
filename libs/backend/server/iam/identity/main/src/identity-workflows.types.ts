@@ -2,7 +2,6 @@ import type * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 import type { Logger } from "pino";
 
-import type { FleetMembershipWriter } from "@opencrane/backend/server/tenancy/projection";
 
 /** Dependencies and verified identity claims used to adopt a member after login. */
 export interface AdoptMemberOnLoginOptions
@@ -19,8 +18,6 @@ export interface AdoptMemberOnLoginOptions
   subject: string | undefined;
   /** IdP-verified email. */
   email: string | undefined;
-  /** Fleet writer, or null when this silo owns membership locally. */
-  fleetWriter: FleetMembershipWriter | null;
   /** Scoped logger. */
   log: Logger;
 }

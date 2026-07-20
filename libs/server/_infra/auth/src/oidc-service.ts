@@ -176,11 +176,6 @@ export abstract class OidcAuthServiceBase
       };
     }
 
-    if ((process.env.OPENCRANE_API_TOKEN?.trim() ?? "") !== "")
-    {
-      return { mode: "token", authenticated: false, user: null };
-    }
-
     return { mode: "development", authenticated: false, user: null };
   }
 

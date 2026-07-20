@@ -36,12 +36,6 @@ const McpServerCredentialInputSchema = {
   required: ["displayName"],
   properties: {
     displayName: { type: "string", description: "Operator-facing label." },
-    brokeringMode: {
-      type: "string",
-      enum: ["static", "obo"],
-      description: "Defaults to 'static'. 'static' requires secretRef; 'obo' must omit it.",
-    },
-    secretRef: { type: "string", description: "Required for 'static' brokering; omit for 'obo'." },
   },
 };
 

@@ -19,9 +19,15 @@ INSERT INTO "agent_revisions" ("id", "agent_service_id", "revision", "state", "d
 VALUES ('conversation-agent-revision', 'conversation-service', 1, 'draft', 'sha256:' || repeat('a', 64), 'prompt-v1', 'model-v1', '{}', 'user-1');
 UPDATE "agent_revisions" SET "state" = 'published', "published_at" = clock_timestamp() WHERE "id" = 'conversation-agent-revision';
 UPDATE "agent_services" SET "state" = 'active', "active_revision_id" = 'conversation-agent-revision' WHERE "id" = 'conversation-service';
+SELECT pg_temp.expect_failure('thread must bind its exact agent service', $statement$INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at") VALUES ('thread-missing-service','silo-conversation','missing-service',clock_timestamp())$statement$, 'conversation_threads_agent_service_id_silo_id_fkey');
 INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at") VALUES ('thread-1', 'silo-conversation', 'conversation-service', clock_timestamp());
 INSERT INTO "agent_runs" ("id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger", "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest")
 VALUES ('conversation-run', 'silo-conversation', 'conversation-service', 'conversation-agent-revision', 'thread-1', 'interactive', 'conversation-request', 'conversation-run', 'sha256:' || repeat('b', 64), 'sha256:' || repeat('c', 64));
+INSERT INTO "run_input_snapshots" ("run_id", "snapshot_version", "silo_id", "agent_service_id", "agent_revision_id", "effective_contract_digest", "thread_id", "memory_facts", "identity_snapshot", "model_route", "memory_query_policy", "budget_policy", "capability_set_digest", "prompt_compiler_version", "input_digest")
+VALUES ('conversation-run', 1, 'silo-conversation', 'conversation-service', 'conversation-agent-revision', 'sha256:' || repeat('b', 64), 'thread-1', '[]', '{}', '{}', '{}', '{}', 'sha256:' || repeat('d', 64), 'prompt-v1', 'sha256:' || repeat('c', 64));
+SET CONSTRAINTS ALL IMMEDIATE;
+SET CONSTRAINTS ALL DEFERRED;
+SELECT pg_temp.expect_failure('run must bind its exact conversation thread', $statement$INSERT INTO "agent_runs" ("id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger", "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest") VALUES ('missing-thread-run','silo-conversation','conversation-service','conversation-agent-revision','missing-thread','interactive','missing-thread-request','missing-thread-run','sha256:'||repeat('e',64),'sha256:'||repeat('f',64))$statement$, 'agent_runs_conversation_thread_fkey');
 INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload") VALUES ('conversation-run', 1, 'run.accepted', '{}');
 
 SELECT pg_temp.expect_failure('event sequence cannot skip', $statement$INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload") VALUES ('conversation-run', 3, 'run.started', '{}')$statement$, 'must be contiguous');

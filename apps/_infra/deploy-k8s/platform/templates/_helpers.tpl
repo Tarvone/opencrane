@@ -252,29 +252,6 @@ AND `multiInstance.certIssuer` is `namespaced`; legacy installs stay ClusterIssu
 {{- end }}
 
 {{/*
-Resolve the single topology switch (#151 item 4): `"standalone"` (this silo owns ClusterTenant
-lifecycle/namespace/domain/membership itself, no external fleet anywhere) or `"fleet-managed"`
-(an external fleet-manager owns ClusterTenant lifecycle and this silo defers to it).
-
-Returns the explicit `deploymentMode` value when it is one of the two valid strings; otherwise
-derives it from the SAME fallback signal `apps/opencrane/src/app/config.ts` itself
-falls back to when `DEPLOYMENT_MODE` is unset — an empty `clustertenantManager.fleetInternalUrl`
-means standalone (no external fleet configured), a non-empty one means fleet-managed. Keeping
-this identical to the operator's own fallback means the chart's resolved value and what the
-operator would derive on its own can never disagree, whether or not `deploymentMode` is set.
-*/}}
-{{- define "opencrane.deploymentMode" -}}
-{{- $explicit := .Values.deploymentMode | default "" -}}
-{{- if or (eq $explicit "standalone") (eq $explicit "fleet-managed") -}}
-{{- $explicit -}}
-{{- else if (.Values.clustertenantManager.fleetInternalUrl | default "") -}}
-fleet-managed
-{{- else -}}
-standalone
-{{- end -}}
-{{- end }}
-
-{{/*
 Shared `spec:` body for a self-managed cert-manager Issuer/ClusterIssuer (#151 item 2),
 reused by cluster-issuer.yaml for BOTH the namespaced-Issuer and cluster-singleton-
 ClusterIssuer branches so the two can never drift. Takes a dict `{ cm, ingress }` (the

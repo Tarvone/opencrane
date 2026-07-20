@@ -10,9 +10,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {
-      "@opencrane/backend/server/iam/access-tokens": [
-        "./libs/backend/server/iam/access-tokens/main/src/index.ts"
-      ],
       "@opencrane/backend/server/agents/agent-services": [
         "./libs/backend/server/agents/agent-services/main/src/index.ts"
       ],

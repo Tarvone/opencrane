@@ -192,21 +192,6 @@ spec:
                   optional: true
             {{- end }}
             {{- include "opencrane.clustertenantManagerDatabaseEnv" . | nindent 12 }}
-            {{- if .Values.clusterTenant.provisionerWebhook.url }}
-            - name: CLUSTER_TENANT_PROVISIONER_WEBHOOK_URL
-              value: {{ .Values.clusterTenant.provisionerWebhook.url | quote }}
-            {{- if .Values.clusterTenant.provisionerWebhook.id }}
-            - name: CLUSTER_TENANT_PROVISIONER_WEBHOOK_ID
-              value: {{ .Values.clusterTenant.provisionerWebhook.id | quote }}
-            {{- end }}
-            {{- if .Values.clusterTenant.provisionerWebhook.existingSecret }}
-            - name: CLUSTER_TENANT_PROVISIONER_WEBHOOK_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.clusterTenant.provisionerWebhook.existingSecret }}
-                  key: {{ .Values.clusterTenant.provisionerWebhook.secretKey }}
-            {{- end }}
-            {{- end }}
             {{- /* Langfuse metrics proxy (AIR.10): wire the opencrane-ui to the in-cluster
                    Langfuse when it is deployed as a subchart. LANGFUSE_HOST points at the
                    in-cluster Service; public/secret keys come from the opencrane-langfuse
@@ -317,42 +302,21 @@ spec:
             #    closed if the Linkerd policy CRDs are absent — a safe no-op without Linkerd.
             - name: LINKERD_MESH_ENABLED
               value: {{ .Values.fleetManager.linkerdMeshEnabled | quote }}
-            {{- /*
-              #151 item 4 — single deploymentMode switch. Fail-fast guard: an EXPLICIT
-              deploymentMode must agree with fleetInternalUrl, never silently disagree with it.
-              Only fires when deploymentMode is deliberately set (the default "" always derives
-              from fleetInternalUrl and can never trip this).
-            */}}
-            {{- $deploymentModeExplicit := .Values.deploymentMode | default "" }}
-            {{- if and (eq $deploymentModeExplicit "fleet-managed") (not .Values.clustertenantManager.fleetInternalUrl) }}
-            {{- fail "deploymentMode=fleet-managed requires clustertenantManager.fleetInternalUrl to be set — the fleet-managed topology mirrors membership from, and write-throughs adoptions to, an external fleet's internal API." }}
-            {{- end }}
-            {{- if and (eq $deploymentModeExplicit "standalone") .Values.clustertenantManager.fleetInternalUrl }}
-            {{- fail "deploymentMode=standalone requires clustertenantManager.fleetInternalUrl to be empty — a standalone silo owns membership locally; a non-empty fleetInternalUrl implies fleet-managed." }}
-            {{- end }}
-            # -- Single explicit topology switch (#151 item 4), always rendered from the
-            #    RESOLVED value (the chart value if set, else the same fleetInternalUrl-emptiness
-            #    fallback config.ts itself uses) so the chart and the operator's own fallback can
-            #    never disagree about which mode is active.
-            - name: DEPLOYMENT_MODE
-              value: {{ include "opencrane.deploymentMode" . | quote }}
+            # -- The clean target runs one local ClusterTenant authority topology.
             # -- Whether this silo creates per-ClusterTenant namespaces itself (standalone) or
             #    defers to the fleet-manager (default). Paired with the gated namespace-management
             #    ClusterRole in _rbac.tpl (this chart).
             - name: MANAGE_TENANT_NAMESPACES
               value: {{ .Values.clustertenantManager.manageTenantNamespaces | default false | quote }}
             {{- if not (kindIs "invalid" .Values.clustertenantManager.manageOwnDomain) }}
-            # -- Explicit override for per-org domain ownership (#151 item 2). Left unset by
-            #    default so config.ts derives it itself from DEPLOYMENT_MODE/FLEET_INTERNAL_URL
-            #    (the single source of truth for the standalone-vs-fleet-managed default);
-            #    only rendered here when the chart value is deliberately set true/false.
+            # -- Explicit override for per-org domain ownership.
             - name: MANAGE_OWN_DOMAIN
               value: {{ .Values.clustertenantManager.manageOwnDomain | quote }}
             {{- end }}
             {{- if .Values.clustertenantManager.standaloneSeed.name }}
             # -- Standalone ClusterTenant self-seed (#151 item 4): the operator creates + binds
             #    its OWN ClusterTenant CR on boot from these fields. Ignored by the operator
-            #    outside deploymentMode=standalone (see config.ts's standaloneSeedName doc).
+            #    when a seed is intentionally configured (see config.ts's standaloneSeedName doc).
             - name: CLUSTER_TENANT_SEED_NAME
               value: {{ .Values.clustertenantManager.standaloneSeed.name | quote }}
             {{- if .Values.clustertenantManager.standaloneSeed.displayName }}
@@ -370,23 +334,6 @@ spec:
             {{- if .Values.clustertenantManager.standaloneSeed.tier }}
             - name: CLUSTER_TENANT_SEED_TIER
               value: {{ .Values.clustertenantManager.standaloneSeed.tier | quote }}
-            {{- end }}
-            {{- end }}
-            {{- if .Values.clustertenantManager.fleetInternalUrl }}
-            # -- Fleet internal API (fleet-managed topology): the membership mirror pulls the
-            #    authoritative OrgMembership set from here and first-login adoption writes
-            #    through to it. Absent = standalone (the silo owns membership locally).
-            - name: FLEET_INTERNAL_URL
-              value: {{ .Values.clustertenantManager.fleetInternalUrl | quote }}
-            {{- if .Values.clustertenantManager.fleetApiTokenExistingSecret }}
-            - name: OPENCRANE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.clustertenantManager.fleetApiTokenExistingSecret }}
-                  key: {{ .Values.clustertenantManager.fleetApiTokenSecretKey | default "token" }}
-            {{- else if .Values.clustertenantManager.fleetApiToken }}
-            - name: OPENCRANE_API_TOKEN
-              value: {{ .Values.clustertenantManager.fleetApiToken | quote }}
             {{- end }}
             {{- end }}
             # -- Runtime-plane endpoint retained for the target Obot adapter.

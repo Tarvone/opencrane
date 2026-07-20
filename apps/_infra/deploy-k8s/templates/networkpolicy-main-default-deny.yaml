@@ -96,17 +96,8 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.port }}
-    # 4. Fleet-manager -> opencrane-ui, PUBLIC port (cross-silo ops in the fleet-managed
-    #    topology; a no-op allow in standalone installs where no fleet-manager pod exists).
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: fleet-manager
-      ports:
-        - protocol: TCP
-          port: {{ .Values.clustertenantManager.service.port }}
   egress:
-    # 5. Reciprocal platform pod -> platform pod (see ingress rule 1).
+    # 4. Reciprocal platform pod -> platform pod (see ingress rule 1).
     - to:
         - podSelector:
             matchLabels:

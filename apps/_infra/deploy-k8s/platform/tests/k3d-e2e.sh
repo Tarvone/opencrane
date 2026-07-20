@@ -4,17 +4,12 @@ set -euo pipefail
 # ============================================================================
 # Standalone-silo k3d e2e smoke test.
 #
-# Exercises the SILO chart (apps/_infra/deploy-k8s) on its own, in STANDALONE mode
-# (deploymentMode=standalone) — no external fleet-manager anywhere. The fleet
-# artifacts (apps/fleet-operator + apps/fleet-platform) moved to the WeOwnAI repo
-# (italanta/opencrane#150) and no longer ship here, so the old fleet+silo
-# integration test moved with them; the cross-plane "fleet provisions/manages a
-# silo" assertions now live in WeOwnAI. This test proves opencrane's own
-# standalone story stands up unassisted:
+# Exercises the OpenCrane chart (apps/_infra/deploy-k8s) on its own. This test proves the
+# local-control-plane story stands up unassisted:
 #
 #   1. install apps/_infra/deploy-k8s alone, standalone mode;
-#   2. the operator self-seeds its OWN ClusterTenant CR on boot and binds it to
-#      this namespace (no fleet to do it) — `_SeedOwnClusterTenant`;
+#   2. the operator self-seeds its own ClusterTenant CR on boot and binds it to
+#      this namespace — `_SeedOwnClusterTenant`;
 #   3. it then seeds that org's `<org>-default` workspace Tenant — the ≥1-model
 #      onboarding gate is satisfied by the bootstrap provider key below, which
 #      seeds a model at boot — `_SeedOwnDefaultTenant`;
@@ -929,7 +924,6 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --create-namespace \
   --values "$ROOT_DIR/apps/_infra/deploy-k8s/values/standalone.yaml" \
   --values "$ROOT_DIR/apps/_infra/deploy-k8s/platform/tests/values-k3d-e2e.yaml" \
-  --set "deploymentMode=standalone" \
   --set "clustertenantManager.standaloneSeed.name=$ORG_NAME" \
   --set "clustertenantManager.standaloneSeed.displayName=$ORG_DISPLAY_NAME" \
   --set "clustertenantManager.standaloneSeed.ownerEmail=$OWNER_EMAIL" \

@@ -25,4 +25,10 @@ export interface ResolvedPerOrgClient
 
   /** The redirect URI registered on the org's app, when known (else null). */
   redirectUri: string | null;
+
+  /** IdP subject configured as the ClusterTenant owner, when present. */
+  ownerSubject: string | null;
+
+  /** Owner email used only while the trusted owner subject has not been configured. */
+  ownerEmail: string | null;
 }

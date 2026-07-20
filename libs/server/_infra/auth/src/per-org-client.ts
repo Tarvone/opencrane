@@ -28,6 +28,7 @@ interface ClusterTenantCrForLogin
   spec?: {
     vanityDomain?: string;
     zitadel?: { clientId?: string; orgId?: string; redirectUri?: string };
+    owner?: { subject?: string; email?: string };
   };
 }
 
@@ -116,6 +117,8 @@ export async function _ResolvePerOrgClient(customApi: k8s.CustomObjectsApi | nul
     clientId: zitadel.clientId,
     orgId: zitadel.orgId,
     redirectUri: zitadel.redirectUri ?? null,
+    ownerSubject: cr.spec?.owner?.subject?.trim() || null,
+    ownerEmail: cr.spec?.owner?.email?.trim().toLowerCase() || null,
   };
 }
 

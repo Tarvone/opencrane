@@ -226,17 +226,7 @@ apps/_infra/deploy-k8s/platform/deploy-single-tenant.sh --provision gke \
 # (apps/_infra/deploy-k8s/platform/terraform/environments/dev) and run the deploy scripts WITHOUT
 # --provision against the resulting cluster.
 
-# 3. Create a tenant through the authenticated REST API
-export OPENCRANE_URL=https://opencrane.ai
-export OPENCRANE_TOKEN=<your-access-token>
-
-curl --fail-with-body \
-  --request POST "$OPENCRANE_URL/api/v1/tenants" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{"name":"jente","displayName":"Jente","email":"jente@example.com"}'
-
-# Or via CRD directly
+# 3. Create a tenant via its declarative cluster contract
 kubectl apply -f - <<EOF
 apiVersion: opencrane.io/v1alpha1
 kind: Tenant
@@ -252,21 +242,9 @@ The operator provisions everything the tenant needs — storage, identity, an en
 
 ### API quick reference
 
-The management surface is available through the authenticated REST API and its generated TypeScript client:
-
-```bash
-export OPENCRANE_URL=https://opencrane.ai
-export OPENCRANE_TOKEN=<your-access-token>
-
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/tenants"
-curl --fail-with-body --request POST --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/tenants/jente/suspend"
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/ai-budget/jente/spend"
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/audit?tenant=jente"
-```
+Human operators use the OIDC browser flow; the management UI makes same-origin API requests
+with its session cookie. Workload APIs use dedicated projected-token boundaries. Static API
+tokens and terminal bearer-token automation are deliberately not part of this target.
 
 See the [API overview](https://opencrane.ai/reference/api-overview) for authentication and conventions, and the [interactive API reference](https://opencrane.ai/reference/api) for the full endpoint list.
 

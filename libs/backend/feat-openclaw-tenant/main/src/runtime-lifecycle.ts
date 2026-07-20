@@ -96,11 +96,6 @@ export class OpenClawTenantLifecycle
   /** Run the standalone ClusterTenant and default workspace seeds asynchronously. */
   private _startStandaloneSeeds(config: OpenClawTenantOperatorConfig, tenantOperator: { reconcileExistingTenantByName(name: string, namespace: string): Promise<void> }): void
   {
-    if (config.deploymentMode !== "standalone")
-    {
-      this.options.log.info({ deploymentMode: config.deploymentMode }, "fleet-managed silo: skipping standalone boot seeds (ClusterTenant lifecycle + default-workspace seed are the external fleet's)");
-      return;
-    }
     void this._runStandaloneSeeds(config, tenantOperator);
   }
 

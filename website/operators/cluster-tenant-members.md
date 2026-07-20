@@ -103,39 +103,20 @@ Source: [`apps/fleet-operator/src/routes/cluster-tenant-members.ts`](https://git
 
 ## API examples
 
-Set `OPENCRANE_FLEET_URL` to the Fleet Manager origin and authenticate as a platform
-operator or an Owner/Admin of the named organisation.
+Use the management UI after signing in through OIDC as a platform operator or an
+Owner/Admin of the named organisation. The UI calls these routes with its same-origin session;
+there is no static bearer-token flow.
 
 ### List members
 
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants/<org-name>/members"
-```
-
-The response contains the `subject` and `role` for every member of the named org.
+The members view returns the `subject` and `role` for every member of the named org.
 
 ### Add or update a member
 
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants/<org-name>/members" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{"subject":"auth0|abc123","role":"Owner"}'
-```
-
-The operation is an upsert: if the subject already has a row, only the role is changed. The last-owner guardrail applies — demoting the sole Owner returns a 409.
+The operation is an upsert: if the subject already has a row, only the role is changed. The
+last-owner guardrail applies — demoting the sole Owner returns a 409.
 
 ### Remove a member
-
-```bash
-curl --fail-with-body \
-  --request DELETE \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants/<org-name>/members/<url-encoded-subject>"
-```
 
 The endpoint returns a confirmation on success. The sole Owner cannot be removed (409).
 
@@ -172,13 +153,9 @@ Source: [`cluster-tenant-org-admin.ts`](https://github.com/italanta/opencrane/bl
 
 ## Operational notes
 
-**Finding a user's OIDC subject.** The `subject` field is the OIDC `sub` claim from the user's identity provider (Zitadel in the default setup). It is stored on the user's `Tenant` row when an assistant is created. You can retrieve it with:
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/tenants/<tenant-name>" | jq -r '.subject'
-```
+**Finding a user's OIDC subject.** The `subject` field is the OIDC `sub` claim from the user's
+identity provider (Zitadel in the default setup). It is shown on that assistant's management
+view after the user signs in.
 
 **Bootstrapping the first owner.** `POST /api/v1/cluster-tenants` records the authenticated creator as the organisation's Owner transactionally. Add further owners before attempting to remove or demote the creator.
 

@@ -11,7 +11,7 @@ global:
 
 # -- Per-ClusterTenant tenant DB (S6 / ADR 0002 decision 3). Each silo runs ONE CNPG server
 #    IN ITS OWN NAMESPACE. It hosts isolated logical databases and credentials for OpenCrane,
-#    Obot, LiteLLM, and Langfuse (and fleet when that plane is present), while retaining one
+#    Obot, LiteLLM, and Langfuse while retaining one
 #    pod/PVC footprint per silo. The per-namespace Cluster + per-database connection Secrets are
 #    provisioned by the deploy scripts (apps/_infra/deploy-k8s/deploy.sh → k8s-deploy.sh); the
 #    opencrane-ui consumes only its OpenCrane connection Secret. The silo is still the tenant scope,
@@ -30,37 +30,16 @@ global:
 multiCt:
   enabled: false
 
-# -- Single explicit topology switch (#151 item 4): "" (default, UNSET) preserves every
-#    standalone-vs-fleet-managed default exactly as it behaved before this switch existed — each
-#    still derives, implicitly, from `clustertenantManager.fleetInternalUrl` emptiness. Set it
-#    explicitly to `standalone` or `fleet-managed` to (a) fail-fast validate the combination — a
-#    Helm `fail` guard rejects `fleet-managed` with an empty `fleetInternalUrl`, and rejects
-#    `standalone` with a non-empty one — and (b) make the topology self-documenting in this
-#    values file instead of an implication only visible by reading `fleetInternalUrl`.
-#
-#    Mirrors `apps/opencrane/src/app/config.ts`'s own `deploymentMode`: this chart
-#    always renders `DEPLOYMENT_MODE` from the RESOLVED value (this value if set, else the SAME
-#    fleetInternalUrl-emptiness derivation the operator falls back to on its own), so the chart
-#    and the operator's fallback can never disagree about which mode is active.
-#
-#    See `values/standalone.yaml` for a documented single-tenant standalone install preset, and
-#    docs/agents/apps/opencrane.md's "Deployment modes" section for the full
-#    walkthrough of both topologies.
-deploymentMode: ""
-
-# -- Chart self-sufficiency (#151 item 3): install the CRDs this silo needs to function on
-#    its own — ClusterTenant (cluster-scoped, read-only), Tenant + AccessPolicy (namespaced,
-#    full CRUD by the in-silo operators) — via templates/crds/ rather than assuming a fleet
-#    has already installed them cluster-wide. Bodies are copied verbatim from
-#    apps/fleet-platform/crds/ (now in the WeOwnAI repo). Deliberately NOT the native Helm
+# -- Chart self-sufficiency: install the CRDs this control plane needs — ClusterTenant
+#    (cluster-scoped, read-only), Tenant + AccessPolicy (namespaced, full CRUD by the in-silo
+#    operators) — via templates/crds/. Deliberately NOT the native Helm
 #    `crds/` directory: that mechanism cannot be gated by a value, is never updated by
 #    `helm upgrade`, and is removed on `helm uninstall` — none of which fit a CRD that may be
 #    shared by several silo releases in one cluster.
 crds:
-  # -- Default true = self-contained install (a standalone silo with no fleet needs these
-  #    CRDs to exist somewhere). Set false in a fleet-managed topology where the fleet has
+  # -- Default true = self-contained install. Set false only when a shared CRD bundle has
   #    already installed the SAME CRDs cluster-wide, so this release's `helm install`/
-  #    `upgrade` does not contend with the fleet's release for ownership of the same
+  #    `upgrade` does not contend with the owning release for the same
   #    cluster-scoped objects (Helm annotates managed resources with the owning
   #    release+namespace and refuses to adopt one owned by another release).
   #    `helm.sh/resource-policy: keep` is set on every CRD regardless of this flag, so even a
@@ -323,55 +302,21 @@ artifactService:
 
 # -- Control plane settings
 clustertenantManager:
-  # NOTE: a `clustertenantManager.enabled` gate (to suppress the silo manager + its idle planes in
-  # the cluster-wide fleet install) is deferred — it needs the fleet↔silo cross-references untangled
-  # first (the fleet-manager's CLUSTERTENANT_MANAGER_INTERNAL_URL + the shared LiteLLM secret).
-  # Today the fleet install renders an idle clustertenant-manager + planes (waste, not harm). The
-  # correctness-critical gate — never running a SECOND fleet-manager in a silo — is `fleetManager.enabled`.
+  # -- Whether this control plane owns per-ClusterTenant namespace creation. Default true;
+  #    the app-owned OpenCrane Helm unit renders its gated namespace-management ClusterRole
+  #    and injects MANAGE_TENANT_NAMESPACES=true. Set false only when a separate namespace
+  #    provisioner is explicitly responsible for the namespace.
+  manageTenantNamespaces: true
 
-  # -- Whether this silo OWNS per-ClusterTenant namespace creation. Default false: the
-  #    fleet-manager creates + owns each org's namespace, and the silo SA is granted NO
-  #    cluster-scoped `namespaces` RBAC, so the silo skips the create. Set true ONLY for an
-  #    all-in-one / standalone silo — the app-owned OpenCrane Helm unit renders its gated
-  #    namespace-management ClusterRole and injects MANAGE_TENANT_NAMESPACES=true. The
-  #    `deploymentMode: standalone` preset (values/standalone.yaml) sets this explicitly; left
-  #    false here (rather than deriving from `deploymentMode`) so the bare default render is
-  #    byte-for-byte unchanged from before #151 item 4 introduced the switch.
-  manageTenantNamespaces: false
-
-  # -- Explicit override for whether THIS silo owns per-org domain provisioning (#151 item
-  #    2: the DNSEndpoint + any vanity Certificate the operator's OrgDomainProvisioner
-  #    applies). Left `null` (unset) by default so the operator derives it itself from
-  #    `deploymentMode` (#151 item 4) — standalone ⇒ true, fleet-managed ⇒ false — the SAME
-  #    single source of truth as `MANAGE_OWN_DOMAIN` in apps/opencrane/src/app/config.ts.
-  #    Set true/false only to force one mode regardless of `deploymentMode`/`fleetInternalUrl`.
+  # -- Whether this control plane owns per-org domain provisioning (the DNSEndpoint + any
+  #    vanity Certificate the operator's OrgDomainProvisioner applies). Leave null to use the
+  #    local-control-plane default, or set true/false for an explicit installation choice.
   manageOwnDomain: null
 
-  # -- Fleet internal API base for the fleet-managed topology, e.g.
-  #    http://<fleet-fullname>-fleet-manager.<fleet-namespace>.svc:8080. Empty = STANDALONE:
-  #    the silo owns membership locally, and the fleet→silo membership mirror + first-login
-  #    adoption write-through both idle. A fleet-managed silo MUST set this — without it
-  #    member adoptions never reach the fleet's authoritative registry (the next mirror sweep
-  #    reaps them) and login-path seat caps are unenforced. Also the fallback signal
-  #    `deploymentMode` derives from when left unset (empty ⇒ standalone, set ⇒ fleet-managed) —
-  #    see the top-level `deploymentMode` value's doc comment. A Helm `fail` guard rejects the
-  #    combination `deploymentMode: fleet-managed` + this left empty, and the inverse
-  #    (`deploymentMode: standalone` + this set), so the two can never silently disagree.
-  fleetInternalUrl: ""
-  # -- Bearer presented to the fleet internal API (the fleet's OPENCRANE_API_TOKEN — one
-  #    shared service credential). Prefer the existing-Secret form; inline is for dev only.
-  fleetApiToken: ""
-  fleetApiTokenExistingSecret: ""
-  fleetApiTokenSecretKey: "token"
-
-  # -- Standalone ClusterTenant self-seed (#151 item 4). Only meaningful when this silo is
-  #    running standalone (`deploymentMode: standalone`, or its no-fleet fallback derivation):
-  #    the operator creates + binds its OWN cluster-scoped ClusterTenant CR on boot from these
-  #    fields — the one action a genuinely standalone silo has no external fleet to perform.
+  # -- ClusterTenant self-seed. The operator creates + binds its own cluster-scoped
+  #    ClusterTenant CR on boot from these fields.
   #    Leave `name` empty (default) to skip this and bootstrap the ClusterTenant CR by hand
-  #    instead (see docs/agents/apps/opencrane.md's "Deployment modes" section).
-  #    Silently ignored in fleet-managed mode: the fleet is the sole authority that may
-  #    create/bind a ClusterTenant CR there. Wired as `CLUSTER_TENANT_SEED_*`.
+  #    instead. Wired as `CLUSTER_TENANT_SEED_*`.
   standaloneSeed:
     # -- Stable org name (becomes the ClusterTenant CR name). Empty → no self-seed.
     name: ""
@@ -948,16 +893,9 @@ externalDns:
 
 certManager:
   enabled: false
-  # -- Provision this chart's OWN Issuer/ClusterIssuer (#151 item 2, cluster-issuer.yaml) —
-  #    the cert-manager analogue of `crds.install` above: a standalone silo has no fleet to
-  #    pre-create `certManager.issuerName`, so it must own the Issuer itself. Default true =
-  #    self-contained (mirrors crds.install's standalone-first default). Set false in a
-  #    fleet-managed topology where an external fleet chart already creates the Issuer this
-  #    silo's Certificates (the app-owned OpenCrane certificate template + the operator's runtime
-  #    per-org vanity Certificate) reference — so this release's install/upgrade does not
-  #    contend with the fleet's release for ownership of the same object (Helm annotates
-  #    managed resources with the owning release+namespace and refuses to adopt one owned
-  #    by another release).
+  # -- Provision this chart's OWN Issuer/ClusterIssuer (cluster-issuer.yaml). Default true =
+  #    self-contained. Set false only when a separately managed issuer already owns the
+  #    resource referenced by this release's Certificates.
   selfManagedIssuer: true
   # -- Issuer mode: "acme" (production, public CA via DNS-01) or "selfSigned" (dev/local).
   mode: selfSigned
@@ -1244,6 +1182,8 @@ billing:
   enabled: true
 
 clusterTenant:
+  # Compatibility shape for the packaged server chart; no external provisioner is configured.
+  provisionerWebhook: {}
   # -- Single-tenant SEED (Chunk 4). When `name` is set the opencrane-ui seeds ONE org
   #    DIRECTLY at boot — the ClusterTenant CR + its `owner` OrgMembership — bypassing the
   #    billing-gated POST. The #50 reconciler then provisions it. Idempotent and
@@ -1259,16 +1199,6 @@ clusterTenant:
     ownerEmail: ""
     # -- Isolation tier for the seeded org: shared | dedicatedNodes | dedicatedCluster.
     tier: shared
-  provisionerWebhook:
-    # -- HTTPS base URL of the external provisioner (must start with https://).
-    url: ""
-    # -- Stable provisioner id used for capability routing (defaults to "external").
-    id: ""
-    # -- Existing Secret holding the bearer token presented to the webhook.
-    existingSecret: ""
-    # -- Key within that Secret holding the token.
-    secretKey: CLUSTER_TENANT_PROVISIONER_WEBHOOK_TOKEN
-
 # -- In-cluster Langfuse LLM observability.
 #    When inCluster.enabled=true, the official Langfuse Helm subchart (v1.x) is deployed
 #    inside this release. The opencrane-ui metrics proxy and LiteLLM trace callback

@@ -731,41 +731,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/access-tokens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all issued access tokens (hashes only, never plaintext) */
-        get: operations["listAccessTokens"];
-        put?: never;
-        /** Create a new access token. Returns plaintext token once — store it securely. */
-        post: operations["createAccessToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/access-tokens/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke and delete an access token */
-        delete: operations["deleteAccessToken"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/providers/keys": {
         parameters: {
             query?: never;
@@ -1309,13 +1274,6 @@ export interface components {
             id?: string;
             /** @description Operator-facing label. */
             displayName?: string;
-            /**
-             * @description Brokering strategy: 'static' (per-tenant/per-server secret fallback) or 'obo' (per-user RFC 8693 exchange brokered server-side; no static secret).
-             * @enum {string}
-             */
-            brokeringMode?: "static" | "obo";
-            /** @description Secret reference for 'static' brokering; null for 'obo'. */
-            secretRef?: string | null;
         };
         /** @description A catalogue server as exposed by the operator API (distinct from the registry McpServer). Every field beyond id is optional so the same shape serves the entitled user catalogue and the admin governance view. */
         McpCatalogServer: {
@@ -1537,17 +1495,6 @@ export interface components {
             action?: string;
             resource?: string;
             message?: string;
-        };
-        AccessToken: {
-            id?: string;
-            name?: string;
-            owner?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            expiresAt?: string;
-            /** Format: date-time */
-            lastUsedAt?: string;
         };
         ProviderKey: {
             provider?: string;
@@ -2813,13 +2760,6 @@ export interface operations {
                 "application/json": {
                     /** @description Operator-facing label. */
                     displayName: string;
-                    /**
-                     * @description Defaults to 'static'. 'static' requires secretRef; 'obo' must omit it.
-                     * @enum {string}
-                     */
-                    brokeringMode?: "static" | "obo";
-                    /** @description Required for 'static' brokering; omit for 'obo'. */
-                    secretRef?: string;
                 };
             };
         };
@@ -4007,87 +3947,6 @@ export interface operations {
             };
         };
     };
-    listAccessTokens: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Token list. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AccessToken"][];
-                };
-            };
-        };
-    };
-    createAccessToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    owner?: string;
-                    /** Format: date-time */
-                    expiresAt?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Token created. The plainTextToken field will not be returned again. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        plainTextToken: string;
-                    };
-                };
-            };
-        };
-    };
-    deleteAccessToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Token deleted. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     listProviderKeys: {
         parameters: {
             query?: never;
@@ -5165,7 +5024,7 @@ export interface operations {
                          * @description Active authentication mode for this instance.
                          * @enum {string}
                          */
-                        mode: "development" | "oidc" | "token";
+                        mode: "development" | "oidc";
                         authenticated: boolean;
                         user?: {
                             sub: string;

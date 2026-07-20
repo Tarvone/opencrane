@@ -6,7 +6,7 @@ import { CLUSTER_TENANT_CRD_PLURAL, OPENCRANE_API_GROUP, OPENCRANE_API_VERSION, 
 /**
  * Resolve WHICH org (ClusterTenant) this silo serves: the cluster-scoped ClusterTenant CR
  * whose `status.boundNamespace` is this silo's namespace. This is the single discovery
- * implementation — the boot-time default-tenant seed and the membership projection loops
+ * implementation — the boot-time default-tenant seed and other local lifecycle code
  * both consume it. Returns the full CR (callers pick the fields they need), or null when
  * no ClusterTenant is bound to the namespace yet.
  *
@@ -43,7 +43,7 @@ export async function _ResolveOwnClusterTenant(
 
 /**
  * Name-only convenience over {@link _ResolveOwnClusterTenant} for callers that key purely
- * on the org name (e.g. the membership projection repairer).
+ * on the org name.
  */
 export async function _ResolveOwnClusterTenantName(
   customApi: k8s.CustomObjectsApi,

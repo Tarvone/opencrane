@@ -397,9 +397,9 @@ function renderSilo(args, context)
 
 const namespaceManagerName = "opencrane-opencrane-server-ns-manage-opencrane-system";
 const defaultManifest = renderSilo([], "default namespace-authority contract");
-if (defaultManifest.includes(namespaceManagerName))
+if (!defaultManifest.includes(namespaceManagerName))
 {
-  fail("default namespace-authority contract: fleet-managed render must not grant namespace management");
+  fail("default namespace-authority contract: local control plane must grant namespace management");
 }
 
 const standaloneManifest = renderSilo(

@@ -5,7 +5,8 @@ skill's golden eval cases, grades both with an independent judge, and estimates 
 equal quality. It **never** changes live routing — a positive result emits a *Pending* proposal that
 awaits explicit human approval.
 
-This doc covers turning the seams on and driving a measurement end-to-end through the authenticated REST API.
+This doc covers turning the seams on and driving a measurement end-to-end through the
+OIDC-authenticated management UI, which uses the same public REST contract.
 
 ## 1. Environment
 
@@ -31,17 +32,9 @@ absent the cost degrades to `0` (logged as a warning) rather than failing the ru
 
 ## 2. Register a model
 
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_URL/api/v1/models" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "publicModelName":"my-cheap-model",
-    "upstreamModel":"openai/gpt-4o-mini",
-    "providerCredentialId":"<providerCredentialId>"
-  }'
-```
+Create the model from the management UI after signing in through OIDC. Enter the public model
+slug, upstream model, and provider credential there; reusable API tokens are not part of the
+target architecture.
 
 `publicModelName` is the routable public slug, `upstreamModel` the model the deployment targets,
 and `providerCredentialId` the provider credential backing it (`apiBase` overrides the endpoint
@@ -54,36 +47,16 @@ Add a golden suite for the skill you want to measure. Each case carries an `inpu
 `expected` answer/rubric, and a `qualityBar` the candidate's judge score must clear to count as a
 pass.
 
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_URL/api/v1/model-routing/eval-cases" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "skillName":"summarise",
-    "skillScope":"org",
-    "input":{"messages":[{"role":"user","content":"Summarise: …"}]},
-    "expected":"A two-sentence summary covering …",
-    "qualityBar":0.8
-  }'
-```
+Add the golden suite in the management UI: select the skill and scope, then enter each input,
+optional expected answer or rubric, and quality bar.
 
 `input` is arbitrary JSON. If it is an object with a `messages` array it is sent verbatim; a bare
 string becomes a single user turn; anything else is JSON-stringified into one user message.
 
 ## 4. Run a measurement
 
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_URL/api/v1/model-routing/measurements/run" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "skillName":"summarise",
-    "skillScope":"org",
-    "candidateModel":"my-cheap-model"
-  }'
-```
+Start the measurement from the management UI by selecting the skill, scope, and candidate
+model.
 
 This runs every eval case through both the resolved baseline and the candidate, grades the
 candidate with `ROUTING_JUDGE_MODEL`, estimates savings with a bootstrap confidence interval, and
@@ -92,12 +65,9 @@ persists a `RoutingMeasurement`. If the savings CI excludes zero it also persist
 
 ## 5. Read the result
 
-```bash
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/model-routing/measurements?skillName=summarise"
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/model-routing/recommendations?skillScope=org&onlyOpen=true"
-```
+Review measurements and open recommendations in the management UI. The public endpoint and
+response schemas remain available through the interactive API reference for integrations that
+run inside the same authenticated browser context.
 
 A measurement reports `sampledCalls`, `projectedSavingsPct`, and the CI bounds (`ciLowPct` /
 `ciHighPct`). Apply happens only on approval of the proposal — the loop never auto-applies.

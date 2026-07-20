@@ -12,8 +12,17 @@ import { mcpServersRouter } from "../routes/mcp-servers.js";
  * and the dev-mode/fail-closed posture matches the rest of the platform.
  */
 
-/** Auth env that decides `_IsDevAuthMode`; cleared/restored around each test. */
-const _AUTH_ENV = ["OPENCRANE_API_TOKEN", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "OIDC_SESSION_SECRET"] as const;
+/** OIDC env that decides `_IsDevAuthMode`; cleared/restored around each test. */
+const _AUTH_ENV = ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "OIDC_SESSION_SECRET"] as const;
+
+/** Configure a complete OIDC setup so no-session guards must fail closed. */
+function _enableOidc(): void
+{
+  process.env.OIDC_ISSUER_URL = "https://issuer.example.test";
+  process.env.OIDC_CLIENT_ID = "opencrane";
+  process.env.OIDC_REDIRECT_URI = "https://opencrane.example.test/auth/callback";
+  process.env.OIDC_SESSION_SECRET = "test-session-secret";
+}
 
 /**
  * Recording Prisma stub: every `prisma.<model>.<method>()` resolves to `[]` and is a
@@ -125,7 +134,7 @@ describe("mcp-servers router — _RequireOrgAdmin gate (P0.5)", function _suite(
 
   it("fails closed for an unauthenticated mutation when real auth is configured", async function _failClosed()
   {
-    process.env.OPENCRANE_API_TOKEN = "ci-token";
+    _enableOidc();
     const { prisma, spies } = _mockPrisma();
     const res = await request(_buildApp(prisma)).delete("/api/v1/mcp-servers/srv-1");
 

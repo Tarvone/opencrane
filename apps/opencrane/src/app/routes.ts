@@ -2,7 +2,6 @@ import type { Express } from "express";
 import * as k8s from "@kubernetes/client-node";
 import type { PrismaClient } from "@prisma/client";
 
-import { accessTokensRouter } from "@opencrane/backend/server/iam/access-tokens";
 import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backend/server/reporting/spend";
 import { auditRouter } from "@opencrane/backend/server/iam/audit";
 import { groupsRouter } from "@opencrane/backend/server/iam/groups";
@@ -91,7 +90,6 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/awareness/rollout", awarenessRolloutRouter(prisma));
   app.use("/api/v1/awareness/participation", awarenessParticipationRouter(prisma));
   app.use("/api/v1/spend", spendRouter(prisma));
-  app.use("/api/v1/access-tokens", accessTokensRouter(prisma));
   app.use("/api/v1/providers/keys", providerKeysRouter(prisma));
   app.use("/api/v1/providers/credentials", providerCredentialsRouter(prisma));
   // BYOK raw-key path — writes the silo's provider key Secret in the operator's own namespace

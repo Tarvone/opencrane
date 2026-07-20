@@ -11,11 +11,9 @@ OpenClaw, Tenant/AccessPolicy CRD, projection, pairing, and static-token respons
 deletion targets, not contracts to preserve.
 Listens on `PORT` (default **8080**).
 
-This is **not** the cross-silo hub — the cluster-wide [`fleet-operator`](./fleet-operator.md) owns
-ClusterTenant lifecycle, platform DNS, and Zitadel management and serves at the fleet host / apex.
-The silo serves the **UserTenant** endpoints (the per-user OpenClaw gateway, CRD kind `Tenant`) and
-the org-scoped management surface below; it READS the cluster-scoped `ClusterTenant` CR only as a
-**read-model** (to resolve a host's per-org login client). See
+This control plane owns its ClusterTenant lifecycle, platform DNS declarations, and per-org
+identity configuration. It serves the org-scoped management surface and reads the cluster-scoped
+`ClusterTenant` CR as the declared lifecycle contract. See
 [`cluster-architecture.md` → Tenancy Model](../cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
 
 ## Layout
@@ -49,11 +47,12 @@ CRUD + notable actions:
 
 - **tenants** and **policies** — current OpenClaw/CRD mutation, drift, and projection routes are
   deleted when AgentService and target authorization APIs land; do not preserve dual writes.
-- **mcp-servers** — `+ credentials` (static-fallback vs per-user OBO brokering).
+- **mcp-servers** — OBO credential brokering only.
 - **skills** — ArtifactStore-backed SkillRevision publication authority.
 - **groups**, **third-party-sources**, **provider-keys**, **access-tokens**, **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**.
 
-**Not served here (fleet-only since the split):** `cluster-tenants` lifecycle CRUD + provisioning, org membership, billing, `platform/dns`, and Zitadel administration moved to the [`fleet-operator`](./fleet-operator.md). The silo keeps `ClusterTenant` + `OrgMembership` as local **read-models** (per-org login + the org-admin gate) but does not mount their management routers.
+**Control-plane ownership:** ClusterTenant lifecycle, org membership, DNS, and Zitadel
+administration are local target authorities. There is no external membership mirror.
 
 **Internal (`/api/internal`, no `___AuthMiddleware`):** `contract/:name` (pod re-pull, TokenReview) and `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
 
@@ -63,7 +62,7 @@ CRUD + notable actions:
 - **pod connection preflight** — `POST /api/v1/auth/pod-token` is a direct-deletion endpoint; target
   channel/session resolution uses the target authorization and capability contracts.
 - **`___AuthMiddleware` fallback chain** — OIDC and target access tokens survive only through the
-  target authorization facade. `OPENCRANE_API_TOKEN` and dev bypass are deletion paths.
+  target authorization facade. Static-token and dev-bypass paths are deletion paths.
 - **TokenReview** — internal endpoints validate projected tokens with `aud=opencrane-server`, parsing the tenant from `system:serviceaccount:<ns>:<name>`.
 
 ## Current authority residue and target grant compiler
@@ -89,18 +88,24 @@ projection; it does not retain legacy columns or readers.
 
 ## Key Env
 
-`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE` (the TenantOperator's reconcile + workspace-seed scope), `DEPLOYMENT_MODE` (`standalone` | `fleet-managed` — see "Deployment modes" below), `MANAGE_TENANT_NAMESPACES` (default false — fleet-manager owns per-org namespace creation; true only for a standalone silo with the gated ns-manage ClusterRole), `MANAGE_OWN_DOMAIN` (defaults from `DEPLOYMENT_MODE`), `FLEET_INTERNAL_URL` (fleet internal API base for the membership mirror + login write-through; unset = standalone membership ownership), `CLUSTER_TENANT_SEED_NAME`/`_DISPLAY_NAME`/`_OWNER_EMAIL`/`_OWNER_SUBJECT`/`_TIER` (standalone-only ClusterTenant self-seed), OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`), `COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`, `OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`, `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, `OPENCRANE_FORCE_HTTPS`. Artifact bytes are reached through the internal ArtifactStore service; the server has no OCI-registry configuration.
+`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE`
+(the TenantOperator's reconcile + workspace-seed scope), `MANAGE_TENANT_NAMESPACES` (default
+true), `MANAGE_OWN_DOMAIN` (default true), `CLUSTER_TENANT_SEED_NAME`/`_DISPLAY_NAME`/
+`_OWNER_EMAIL`/`_OWNER_SUBJECT`/`_TIER`, OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/
+`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`),
+`COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`,
+`OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`,
+`OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, and
+`OPENCRANE_FORCE_HTTPS`. Artifact bytes are reached through the internal ArtifactStore service;
+the server has no OCI-registry configuration.
 
-## Deployment modes (#151 item 4)
+## Deployment topology
 
-A silo runs in exactly one of two topologies, resolved to a single `DEPLOYMENT_MODE` value (`config.ts`'s `deploymentMode`) that every other standalone-vs-fleet-managed default in this app derives from:
+The control plane always owns its ClusterTenant lifecycle. On boot it can self-seed its
+cluster-scoped `ClusterTenant` CR, bind that CR to its namespace, own per-org namespace and
+domain provisioning, and seed the `<org>-default` workspace from the immutable CR owner.
 
-- **`fleet-managed`** — an external fleet-manager (the WeOwnAI control plane, italanta/opencrane#150) owns `ClusterTenant` lifecycle: it creates the CR, seeds `spec.owner`, creates/owns the org namespace, and this silo's `MembershipProjectionRepairer` mirrors membership from `FLEET_INTERNAL_URL`. The silo never creates or binds a `ClusterTenant` itself in this mode.
-- **`standalone`** — no fleet anywhere. This silo is the sole authority: the composed runtime lifecycle self-seeds its own cluster-scoped `ClusterTenant` CR (`_SeedOwnClusterTenant`, gated on `deploymentMode === "standalone"`), binds it to its own namespace, owns per-org namespace creation (`MANAGE_TENANT_NAMESPACES`) and domain provisioning (`MANAGE_OWN_DOMAIN`), and then seeds its own `<org>-default` workspace Tenant from that CR's owner (`_SeedOwnDefaultTenant`) — both boot seeds are best-effort/idempotent and run only in this mode.
-
-`DEPLOYMENT_MODE` wins when set; otherwise the SAME fallback the chart itself uses applies: an empty `FLEET_INTERNAL_URL` derives `standalone`, a non-empty one derives `fleet-managed` — so a deployment that sets neither env var behaves exactly as it did before this switch existed.
-
-**Standalone quickstart** — via the chart (`apps/_infra/deploy-k8s`), no fleet checkout needed:
+**Quickstart** — via the chart (`apps/_infra/deploy-k8s`):
 
 ```bash
 helm dep build apps/_infra/deploy-k8s
@@ -111,7 +116,10 @@ helm install my-silo apps/_infra/deploy-k8s \
   --set clustertenantManager.database.existingSecret=my-db-secret
 ```
 
-This sets `deploymentMode: standalone` (which fans out `manageTenantNamespaces`/`manageOwnDomain`/`DEPLOYMENT_MODE` coherently), leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults (#151 items 2/3), and self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are NOT installed by this chart — bring your own or run them via `apps/_infra/deploy-k8s/platform/k8s-deploy.sh` first. A `helm` `fail` guard (and a `values.schema.json` check, one step earlier) rejects a contradictory combination — `deploymentMode: fleet-managed` with an empty `fleetInternalUrl`, or `deploymentMode: standalone` with a non-empty one.
+This leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults and
+self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster
+prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are not installed by this
+chart — bring your own or run them via `apps/_infra/deploy-k8s/platform/k8s-deploy.sh` first.
 
 To bootstrap a standalone ClusterTenant by hand instead of via `clustertenantManager.standaloneSeed`, apply a CR directly with `spec.owner.email` set — the seed is a convenience, not the only path:
 

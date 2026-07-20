@@ -8,13 +8,8 @@ address, and it acts on that person's behalf. (In the API it's called a
 
 ## Create one
 
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_URL/api/v1/tenants" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{"name":"alice","displayName":"Alice Smith","email":"alice@example.com"}'
-```
+Sign in to the management UI, then create Alice from **Assistants**. The UI uses the OIDC
+session that you just established; it does not mint or store a reusable API token.
 
 That's it — Alice's assistant is now live. She can [sign in and use](/guide/connect) it
 at your organisation's address (e.g. `https://acme.<your-domain>`).

@@ -328,16 +328,16 @@ describe("ClusterTenant isolation enforcement (CT.5 reconcile flow)", () =>
     expect(podSpec?.tolerations).toBeUndefined();
   });
 
-  it("skips the namespace create when manageTenantNamespaces=false (fleet-manager owns it) and still converges", async () =>
+  it("skips the namespace create when manageTenantNamespaces=false and still converges", async () =>
   {
     const clusterTenant = _makeClusterTenant("acme", "ct-acme");
     const tenant = _makeTenant("mike", { clusterTenantRef: "acme" });
 
-    // Default (fleet-managed) silo: the fleet-manager owns the namespace, so the silo must NOT
+    // Namespace creation is explicitly disabled: the external provisioner owns the namespace, so the silo must NOT
     // attempt the create — no 403-catch-as-control-flow — yet reconcile still converges because
     // the namespaced applies (quota, NetworkPolicy) land in the externally-provisioned namespace.
     const statuses: Record<string, unknown>[] = [];
-    const operator = _makeOperator(core, apps, networking, clusterTenant, statuses); // default: manageTenantNamespaces=false
+    const operator = _makeOperator(core, apps, networking, clusterTenant, statuses, { manageTenantNamespaces: false });
 
     await expect(operator.reconcileTenant(tenant)).resolves.toBeUndefined();
 
@@ -384,7 +384,7 @@ describe("ClusterTenant isolation enforcement (CT.5 reconcile flow)", () =>
     }]);
   });
 
-  it("does NOT provision the org domain when manageOwnDomain=false (fleet-managed: fleet owns it)", async () =>
+  it("does NOT provision the org domain when manageOwnDomain=false", async () =>
   {
     const clusterTenant = _makeClusterTenant("acme", "ct-acme");
     const tenant = _makeTenant("mike", { clusterTenantRef: "acme" });

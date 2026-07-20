@@ -25,6 +25,7 @@ else
 fi
 
 run_psql < "$TEST_FILE"
+run_psql < "$SCRIPT_DIR/run-input-snapshot-admission.sql"
 
 RACE_DIR="$(mktemp -d)"
 trap 'rm -rf "$RACE_DIR"' EXIT
@@ -345,10 +346,10 @@ wait_for_holder_sleeping 'phase-d-run-rollover'
   run_psql >"$RACE_DIR/run-after-rollover.out" 2>&1 <<'SQL'
 SET application_name = 'phase-d-run-after-rollover';
 INSERT INTO "agent_runs" (
-  "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
   "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
 ) VALUES (
-  'run-race-superseded', 'silo-race', 'svc-race-run-rollover', 'rev-race-run-rollover-1', 'interactive',
+  'run-race-superseded', 'silo-race', 'svc-race-run-rollover', 'rev-race-run-rollover-1', 'thread-race-superseded', 'interactive',
   'request-race-superseded', 'run-race-superseded', 'sha256:' || repeat('9', 64),
   'sha256:' || repeat('a', 64)
 );
@@ -390,6 +391,8 @@ INSERT INTO "agent_revisions" (
 UPDATE "agent_services"
 SET "state" = 'active', "active_revision_id" = 'rev-race-run-first'
 WHERE "id" = 'svc-race-run-first';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('thread-race-before-retirement', 'silo-race', 'svc-race-run-first', clock_timestamp());
 SQL
 
 (
@@ -398,12 +401,21 @@ SQL
 SET application_name = 'phase-d-run-first';
 BEGIN;
 INSERT INTO "agent_runs" (
-  "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
   "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
 ) VALUES (
-  'run-race-before-retirement', 'silo-race', 'svc-race-run-first', 'rev-race-run-first', 'interactive',
+  'run-race-before-retirement', 'silo-race', 'svc-race-run-first', 'rev-race-run-first', 'thread-race-before-retirement', 'interactive',
   'request-race-before-retirement', 'run-race-before-retirement', 'sha256:' || repeat('c', 64),
   'sha256:' || repeat('d', 64)
+);
+INSERT INTO "run_input_snapshots" (
+  "run_id", "snapshot_version", "silo_id", "agent_service_id", "agent_revision_id",
+  "effective_contract_digest", "thread_id", "memory_facts", "identity_snapshot", "model_route",
+  "memory_query_policy", "budget_policy", "capability_set_digest", "prompt_compiler_version", "input_digest"
+) VALUES (
+  'run-race-before-retirement', 1, 'silo-race', 'svc-race-run-first', 'rev-race-run-first',
+  'sha256:' || repeat('c', 64), 'thread-race-before-retirement', '[]', '{}', '{}', '{}', '{}',
+  'sha256:' || repeat('e', 64), 'prompt-v1', 'sha256:' || repeat('d', 64)
 );
 SELECT pg_sleep(3);
 COMMIT;
@@ -570,14 +582,27 @@ INSERT INTO "agent_revisions" (
 );
 UPDATE "agent_services" SET "state" = 'active', "active_revision_id" = 'rev-race-action-authority'
 WHERE "id" = 'svc-race-action-authority';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('thread-race-action-authority', 'silo-race-action', 'svc-race-action-authority', clock_timestamp());
+BEGIN;
 INSERT INTO "agent_runs" (
-  "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
   "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
 ) VALUES (
   'run-race-action-authority', 'silo-race-action', 'svc-race-action-authority',
-  'rev-race-action-authority', 'interactive', 'request-race-action-authority',
+  'rev-race-action-authority', 'thread-race-action-authority', 'interactive', 'request-race-action-authority',
   'run-race-action-authority', 'sha256:' || repeat('1', 64), 'sha256:' || repeat('2', 64)
 );
+INSERT INTO "run_input_snapshots" (
+  "run_id", "snapshot_version", "silo_id", "agent_service_id", "agent_revision_id",
+  "effective_contract_digest", "thread_id", "memory_facts", "identity_snapshot", "model_route",
+  "memory_query_policy", "budget_policy", "capability_set_digest", "prompt_compiler_version", "input_digest"
+) VALUES (
+  'run-race-action-authority', 1, 'silo-race-action', 'svc-race-action-authority', 'rev-race-action-authority',
+  'sha256:' || repeat('1', 64), 'thread-race-action-authority', '[]', '{}', '{}', '{}', '{}',
+  'sha256:' || repeat('3', 64), 'prompt-v1', 'sha256:' || repeat('2', 64)
+);
+COMMIT;
 UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-race-action-authority';
 INSERT INTO "workload_assignments" (
   "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",

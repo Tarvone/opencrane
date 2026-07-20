@@ -193,17 +193,11 @@ The fleet operator also seeds the `<org>-default` Tenant CRD when the ClusterTen
 # Fleet-manager health
 kubectl logs -n opencrane-system deployment/opencrane-fleet-manager --tail 50
 
-# Confirm ClusterTenant routes are mounted (expect 200)
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<fleet-host>/api/v1/cluster-tenants
+# Confirm the public health endpoint (expect 200)
+curl --fail-with-body https://<control-plane-host>/healthz
 
-# Zitadel SA key probe with a deliberately invalid candidate (platform-operator gated)
-curl --silent --output /dev/null --write-out '%{http_code}\n' \
-  --request POST https://<fleet-host>/api/v1/admin/zitadel/sa-key:rotate \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{"serviceAccountKey":{"keyId":"invalid","key":"invalid","userId":"invalid"}}'
-# Should fail with validation error (422), not auth error (403)
+# Verify ClusterTenant routes and the Zitadel key-rotation validation from the
+# OIDC-authenticated management UI. Reusable bearer-token probes are not supported.
 ```
 
 → For the SA-key rotation runbook, see [Zitadel key rotation](/security/zitadel-key-rotation).

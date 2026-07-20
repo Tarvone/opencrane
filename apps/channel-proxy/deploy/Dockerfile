@@ -20,6 +20,8 @@ RUN npm ci --omit=dev --workspace=apps/channel-proxy
 
 COPY --from=build /app/dist/apps/channel-proxy dist/apps/channel-proxy
 
-USER node
+# Kubernetes cannot prove that a named image user satisfies runAsNonRoot. The upstream `node` user
+# is UID/GID 1000, so pin its numeric identity in the image contract.
+USER 1000:1000
 EXPOSE 8080
 CMD ["node", "dist/apps/channel-proxy/index.js"]

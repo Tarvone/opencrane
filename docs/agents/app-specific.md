@@ -60,6 +60,13 @@ Fleet membership, proof-bound authorization, and agent-service publication remai
 `libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
 A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.
 
+## Agent-runtime domains (`libs/backend/agents/runtime/*`)
+
+Runtime packages sit beside `personal/` because they govern the language-neutral execution boundary
+for personal and managed agents. `runtime/main` admits commands and candidate output only when the
+current run, attempt, workload assignment, sequence, expiry, and lease fence still match. It owns no
+transport, Kubernetes workload, model loop, tool implementation, or second durable event store.
+
 ## Frontend libs (`libs/frontend/*`)
 
 Angular libraries feeding `apps/opencrane-ui`, ported in from WeOwnAI (#152): `core`, `platform`

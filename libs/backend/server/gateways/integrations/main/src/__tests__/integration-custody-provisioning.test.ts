@@ -22,7 +22,7 @@ describe("integration custody provisioning", function _suite()
 	it("revokes remote custody when persistence fails", async function _compensation()
 	{
 		const revoke = vi.fn().mockResolvedValue(undefined);
-		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "catalog-1", obotCustodyReference: "obot:issued:one", expiresAt: new Date("2026-07-20T00:00:00.000Z") }), revoke };
+		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "catalog-1", obotCustodyReference: "obot:issued:one", expiresAt: new Date("2099-01-01T00:00:00.000Z") }), revoke };
 		const log = _CreateLog();
 		const result = await __ProvisionIntegrationCustody(custody, { persistReady: vi.fn().mockRejectedValue(new Error("database unavailable")) }, log, _Command());
 		expect(result).toEqual({ outcome: "unavailable", reason: "persistence_failed" });
@@ -32,7 +32,7 @@ describe("integration custody provisioning", function _suite()
 
 	it("logs an invalid remote response compensation failure without the custody reference", async function _invalidResponseCompensationFailure()
 	{
-		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "different-catalog", obotCustodyReference: "obot:issued:invalid", expiresAt: new Date("2026-07-20T00:00:00.000Z") }), revoke: vi.fn().mockRejectedValue(new Error("remote unavailable")) };
+		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "different-catalog", obotCustodyReference: "obot:issued:invalid", expiresAt: new Date("2099-01-01T00:00:00.000Z") }), revoke: vi.fn().mockRejectedValue(new Error("remote unavailable")) };
 		const log = _CreateLog();
 		await expect(__ProvisionIntegrationCustody(custody, { persistReady: vi.fn() }, log, _Command())).resolves.toEqual({ outcome: "unavailable", reason: "compensation_failed" });
 		expect(log.error).toHaveBeenCalledWith({ siloId: "silo-1", integrationId: "integration-1", obotCatalogEntryId: "catalog-1", errorType: "Error" }, "Obot custody compensation failed after an invalid response");
@@ -41,7 +41,7 @@ describe("integration custody provisioning", function _suite()
 
 	it("reports compensation failure without exposing remote custody", async function _compensationFailure()
 	{
-		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "catalog-1", obotCustodyReference: "obot:issued:one", expiresAt: new Date("2026-07-20T00:00:00.000Z") }), revoke: vi.fn().mockRejectedValue(new Error("remote unavailable")) };
+		const custody = { provision: vi.fn().mockResolvedValue({ obotCatalogEntryId: "catalog-1", obotCustodyReference: "obot:issued:one", expiresAt: new Date("2099-01-01T00:00:00.000Z") }), revoke: vi.fn().mockRejectedValue(new Error("remote unavailable")) };
 		const log = _CreateLog();
 		await expect(__ProvisionIntegrationCustody(custody, { persistReady: vi.fn().mockRejectedValue(new Error("database unavailable")) }, log, _Command())).resolves.toEqual({ outcome: "unavailable", reason: "compensation_failed" });
 		expect(log.error).toHaveBeenCalledWith({ siloId: "silo-1", integrationId: "integration-1", obotCatalogEntryId: "catalog-1", errorType: "Error" }, "Obot custody compensation failed after a persistence failure");

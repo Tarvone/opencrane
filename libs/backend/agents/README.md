@@ -17,12 +17,16 @@ are the per-employee agent looking after itself, not the operator looking after 
 | [`personal/memory`](./personal/memory/main/README.md) | Memory fact catalog. |
 | [`personal/personas`](./personal/personas/main/README.md) | Persona approval process. |
 | [`personal/runs`](./personal/runs/main/README.md) | Agent-run attempt authority. |
+| [`personal/session`](./personal/session/main/README.md) | Run input snapshot assembly. |
 
 ```
               backend/agents/personal   (one employee's agent)
    ┌────────────────┬───────────────┬──────────────┬──────────────┐
  runs           conversations     memory        personas
  (attempts)     (event history)   (learned facts) (who it is)
+   ▲
+   │ admission transaction
+ session  (freezes one immutable input snapshot per run)
 ```
 
 ## Dependency rule for this tier
@@ -34,6 +38,11 @@ authorization model, for memory the artifacts model — plus shared contracts (`
 its own scope. It may **not** import a sibling `personal-*` domain or any control-plane
 (`libs/backend/server`) domain. Cross-domain contact happens above, in the app that composes them.
 Never import an app.
+
+One deliberate exception: `personal/session` (`scope:personal-session`) is the assembly step that
+sits *across* the domains, so its constraint additionally allows `scope:personal-runs` (the
+admission transaction it compiles into), `scope:membership` (verified identity evidence), and
+`scope:artifacts` — see the `depConstraint` in `eslint.config.mjs`.
 
 ## See also
 

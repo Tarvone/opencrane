@@ -1,7 +1,8 @@
 import { Prisma, RunOutboxEventKind, type PrismaClient } from "@prisma/client";
 
 import type { RunInputSnapshot } from "@opencrane/contracts";
-import { ___CanonicalizeJson } from "@opencrane/util";
+import { ___CloneCanonicalJson } from "@opencrane/util";
+import type { JsonValue } from "@opencrane/util";
 
 import type { InitialRunAuthority, RunAdmissionBuild, RunAdmissionBuildResult, RunAdmissionClock, RunAdmissionCommand, RunAdmissionRepository, RunAdmissionResult, RunAdmissionTransaction } from "./run-admission.types.js";
 
@@ -110,7 +111,7 @@ function _trigger(value: InitialRunAuthority["trigger"]): "Interactive" | "Sched
 /** Deep-copies JSON through canonical form before Prisma owns the durable payload. */
 function _json(value: unknown): Prisma.InputJsonValue
 {
-	return JSON.parse(___CanonicalizeJson(value as Parameters<typeof ___CanonicalizeJson>[0])) as Prisma.InputJsonValue;
+	return ___CloneCanonicalJson(value as JsonValue) as Prisma.InputJsonValue;
 }
 
 /** Maps an immutable contract snapshot into its canonical Postgres row. */

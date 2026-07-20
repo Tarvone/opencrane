@@ -1,5 +1,6 @@
 import { __VerifyCurrentFleetMembershipEvidence, PrismaFleetMembershipAuthorityRepository } from "@opencrane/backend/server/iam/membership";
 import type { FleetMembershipAdmissionExpectation, FleetMembershipSignatureVerifier } from "@opencrane/backend/server/iam/membership";
+import { ___IsSha256Digest } from "@opencrane/util";
 
 import type { CapabilitySetDigestSource, IdentityEnvelopeInput, IdentityEnvelopeSource, SessionAssemblyCommand, SessionAssemblyLoad } from "./session-assembly.types.js";
 import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
@@ -28,7 +29,7 @@ export class FleetMembershipIdentityEnvelopeSource implements IdentityEnvelopeSo
 		// 1. Resolve the capability digest within the final transaction so a concurrent revocation cannot leave stale grants in the snapshot.
 		const capabilitySet = await this.capabilitySet.load(command, run, transaction);
 		if (capabilitySet.outcome === "denied") return capabilitySet;
-		if (!_isDigest(capabilitySet.value)) return { outcome: "denied", reason: "identity_unavailable" };
+		if (!___IsSha256Digest(capabilitySet.value)) return { outcome: "denied", reason: "identity_unavailable" };
 
 		// 2. Verify the exact membership assertion and update the issuer/silo high-watermark through this same transaction client.
 		const membership = await __VerifyCurrentFleetMembershipEvidence(new PrismaFleetMembershipAuthorityRepository(transaction.prisma), this.verifier, {
@@ -57,10 +58,4 @@ export class FleetMembershipIdentityEnvelopeSource implements IdentityEnvelopeSo
 			},
 		};
 	}
-}
-
-/** Returns whether a source returned the only supported SHA-256 digest spelling. */
-function _isDigest(value: string): boolean
-{
-	return /^sha256:[0-9a-f]{64}$/.test(value);
 }

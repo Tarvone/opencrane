@@ -180,3 +180,14 @@ export function ___CanonicalizeJson(value: JsonValue): string
 {
 	return _serializeValue(value, new WeakSet<object>());
 }
+
+/**
+ * Deep-copies a JSON value through its RFC 8785 canonical form, so the copy is
+ * detached from caller-owned references and key order is deterministic.
+ * @param value - JSON value to copy.
+ * @returns An equivalent value that shares no references with the input.
+ */
+export function ___CloneCanonicalJson(value: JsonValue): JsonValue
+{
+	return JSON.parse(___CanonicalizeJson(value)) as JsonValue;
+}

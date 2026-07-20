@@ -386,7 +386,7 @@
       "image": "WeOwnAI-owned fleet release image",
       "owner": "external-repository/italanta-WeOwnAI",
       "localOwner": false,
-      "source": { "type": "external", "repository": "italanta/WeOwnAI", "contract": "fleet-platform release", "localEvidence": "docs/agents/cluster-architecture.md", "anchor": "fleet" },
+      "source": { "type": "external", "repository": "italanta/WeOwnAI", "contract": "fleet-platform release", "localEvidence": "README.md", "anchor": "The fleet operator" },
       "classification": "survivor",
       "reason": "The fleet app is intentionally absent from this repository; local render coverage is not claimed."
     },

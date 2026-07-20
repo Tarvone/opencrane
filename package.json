@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run db:generate -w @opencrane/server && nx run-many -t build",
+    "build": "nx run-many -t build",
     "dev": "nx run-many -t dev --parallel=10",
     "test": "nx run-many -t test",
     "test:e2e:k3d": "./apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh",

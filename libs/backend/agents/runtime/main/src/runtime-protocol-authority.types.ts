@@ -39,7 +39,7 @@ export interface RuntimeProtocolClock
 export type RuntimeCommandAdmission =
 	| { readonly outcome: "accepted"; readonly nextCommandSequence: number }
 	| { readonly outcome: "idempotent" }
-	| { readonly outcome: "denied"; readonly reason: "invalid_frame" | "unsupported_protocol" | "expired" | "assignment_mismatch" | "runtime_instance_mismatch" | "fence_mismatch" | "sequence_mismatch" | "terminal_run" | "snapshot_mismatch" };
+	| { readonly outcome: "denied"; readonly reason: "invalid_frame" | "unsupported_protocol" | "not_yet_valid" | "expired" | "assignment_mismatch" | "runtime_instance_mismatch" | "fence_mismatch" | "sequence_mismatch" | "terminal_run" | "snapshot_mismatch" };
 
 /** Stable candidate-admission outcome for a runtime-proposed side-effect or event. */
 export type RuntimeCandidateAdmission =

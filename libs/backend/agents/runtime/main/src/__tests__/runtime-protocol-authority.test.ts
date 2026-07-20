@@ -79,6 +79,12 @@ describe("runtime protocol authority", function _describeRuntimeProtocolAuthorit
 		expect(__AdmitRuntimeCommand({ authority: _authority(), command, clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "invalid_frame" });
 	});
 
+	it("rejects a command before its server-issued validity instant", function _rejectsFutureCommand()
+	{
+		const command = { ..._command(), issuedAt: "2026-07-20T00:04:00.000Z" };
+		expect(__AdmitRuntimeCommand({ authority: _authority(), command, clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "not_yet_valid" });
+	});
+
 	it("rejects expired commands and candidates from an older lease", function _rejectsExpiredOrStaleFrames()
 	{
 		expect(__AdmitRuntimeCommand({ authority: _authority(), command: _command(), clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:05:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "expired" });

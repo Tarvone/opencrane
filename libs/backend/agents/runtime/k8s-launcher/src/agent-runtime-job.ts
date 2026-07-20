@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { V1Job, V1NetworkPolicy } from "@kubernetes/client-node";
 
-import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 
 import type { AgentRuntimeJobAssignment, AgentRuntimeJobProfile, AgentRuntimeJobResources } from "./agent-runtime-job.types.js";
 
@@ -55,7 +55,7 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 	}
 
 	// 2. Bind the profile to one same-namespace runtime identity class, never a per-user KSA.
-	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !/^agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serviceAccountName) || profile.serviceAccountName.length > 63)
+	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !___IsAgentRuntimeServiceAccountName(profile.serviceAccountName))
 	{
 		throw new Error("agent runtime profile requires one valid server namespace and bounded runtime ServiceAccount");
 	}

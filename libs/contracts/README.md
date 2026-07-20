@@ -46,10 +46,12 @@ after any API change so the two never silently diverge.
   model-routing types, `Memory*`, `Approval`, `ThirdPartySource*`, `RuntimeAssignment`,
   `RunInputSnapshot`, `TenantModelSet`, domain-topology host builders.
 - `AGENT_RUNTIME_PROTOCOL_V1`, `AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE`,
+  `___IsAgentRuntimeServiceAccountName`,
   `RuntimeCommandEnvelope`, and `RuntimeCandidate` — transport-neutral
   command and candidate frames for a runtime that opens its own authenticated stream to the control
-  plane. The audience constant fixes that workload identity to `opencrane-agent-runtime`; these
-  frames are not a browser or OpenAPI contract.
+  plane. The audience constant fixes that workload identity to `opencrane-agent-runtime`; the shared
+  validator keeps Job issuance and TokenReview admission on one bounded ServiceAccount grammar.
+  These frames are not a browser or OpenAPI contract.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

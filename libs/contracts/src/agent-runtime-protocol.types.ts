@@ -10,6 +10,16 @@ export const AGENT_RUNTIME_PROTOCOL_V1 = "opencrane.agent-runtime/v1";
 /** Sole projected-token audience accepted from first-party personal-agent runtimes. */
 export const AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE = "opencrane-agent-runtime";
 
+/**
+ * Return whether a ServiceAccount belongs to the bounded first-party runtime identity class.
+ * @param value - Kubernetes ServiceAccount name to validate.
+ * @returns True only for a valid runtime-prefixed DNS label.
+ */
+export function ___IsAgentRuntimeServiceAccountName(value: string): boolean
+{
+	return value.length <= 63 && /^agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value);
+}
+
 /** Exact protocol version literal carried by every runtime frame. */
 export type AgentRuntimeProtocolVersion = typeof AGENT_RUNTIME_PROTOCOL_V1;
 

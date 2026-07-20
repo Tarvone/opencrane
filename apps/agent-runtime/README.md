@@ -69,7 +69,8 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 - Writable storage is only a per-attempt `emptyDir` capped at 1 GiB and mounted at `/tmp`.
 
 The Job builder requires an immutable image digest plus bounded CPU, memory, deadline, and scratch.
-The container runs as an unprivileged numeric user with a read-only root filesystem.
+The container runs as numeric user and group `65532` with a read-only root filesystem. Its projected
+credential is group-readable (`0440`) only by that runtime group; it is never world-readable.
 
 ## Status
 

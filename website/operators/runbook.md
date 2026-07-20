@@ -104,7 +104,6 @@ Set these via Helm values — the deploy scripts wire them automatically. The va
 |----------|----------|----------|-------------|
 | `DATABASE_URL` | Yes | `clustertenantManager.database.existingSecret` | Per-silo PostgreSQL connection string |
 | `LITELLM_MASTER_KEY` | Yes (if LiteLLM enabled) | `litellm.existingSecret` | LiteLLM master API key |
-| `OPENCRANE_API_TOKEN` | Yes | — | Bearer token for opencrane-api auth |
 | `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD` | No | — | Drift count before alert fires (0 = disabled) |
 | `OPENCRANE_DRIFT_WEBHOOK_URL` | No | — | Webhook URL for projection-drift alert delivery |
 
@@ -115,14 +114,8 @@ Set these via Helm values — the deploy scripts wire them automatically. The va
 ### Health Checks
 
 ```bash
-# Fleet-manager health (opencrane-system)
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<fleet-host>/api/v1/healthz
-# Expected response: {"status":"ok","db":true}
-
-# Silo clustertenant-manager health
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/healthz
+# Control-plane health (no operator token is required)
+curl --fail-with-body https://<control-plane-host>/healthz
 # Expected response: {"status":"ok","db":true}
 
 # LiteLLM health (per-silo namespace)
@@ -398,140 +391,15 @@ restores OpenClaw and the Cognee plugin together.
 
 ---
 
-## 6. Projection Drift Remediation
+## 6. Management operations
 
-Projection drift occurs when the PostgreSQL projection rows diverge from the Kubernetes CRD source of truth.
+Projection review and repair, LiteLLM-key lifecycle, assistant lifecycle operations, and MCP
+policy management are available from the OIDC-authenticated management UI. It calls the public
+same-origin API contract and records each write in the audit trail. Static bearer tokens and
+terminal automation are intentionally unsupported in the clean target.
 
-### Detect drift
-
-Drift is detected and repaired per silo. Replace `<silo-host>` with the URL of the affected silo's clustertenant-manager.
-
-```bash
-# Full drift report with lag metrics
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/metrics/projection-drift | jq .
-
-# Tenant-specific drift report
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/drift | jq .
-
-# Policy-specific drift report
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/policies/drift | jq .
-```
-
-### Repair drift
-
-```bash
-# Dry-run repair (shows what would change, does not write)
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/repair | jq .
-
-# Apply repair (write changes to PostgreSQL)
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "https://<silo-host>/api/v1/tenants/repair?dryRun=false" | jq .
-
-# Repair AccessPolicy projections
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "https://<silo-host>/api/v1/policies/repair?dryRun=false" | jq .
-```
-
----
-
-## 7. LiteLLM Key Lifecycle
-
-LiteLLM keys are managed per silo. Replace `<silo-host>` with the clustertenant-manager URL of the relevant silo, and `<ct>` with the ClusterTenant name.
-
-### View active key for a tenant
-
-```bash
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/litellm-key | jq .
-```
-
-### Revoke and regenerate a key
-
-```bash
-# Revoke the current key
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/litellm-key/revoke
-
-# The operator will generate a new key on the next reconcile cycle.
-# Force reconcile by deleting the tenant pod:
-kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
-```
-
-### View tenant spend
-
-```bash
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/spend | jq .
-```
-
----
-
-## 8. Tenant Lifecycle Operations
-
-Tenant lifecycle operations target a **silo's clustertenant-manager**. Replace `<silo-host>` with the URL of the target silo and `<ct>` with the ClusterTenant name.
-
-### Create a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  -H "Content-Type: application/json" \
-  https://<silo-host>/api/v1/tenants \
-  -d '{
-    "name": "acme",
-    "displayName": "ACME Corp",
-    "email": "owner@acme.com",
-    "team": "engineering",
-    "monthlyBudgetUsd": 200
-  }'
-```
-
-### Suspend a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme/suspend
-```
-
-### Resume a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme/resume
-```
-
-### Delete a tenant
-
-```bash
-curl -X DELETE \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme
-```
-
-> **Note**: Deletion removes the Kubernetes deployment and service but retains the tenant's encryption key Secret for data recovery.
-
-### Apply MCP server restrictions through an AccessPolicy
-
-```bash
-curl --fail-with-body \
-  --request PUT "https://<silo-host>/api/v1/policies/restricted-tools" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "tenantSelector":{"matchLabels":{"opencrane.io/tenant":"acme"}},
-    "mcpServers":{"deny":["external-search"],"allow":["skills","retrieval"]}
-  }'
-```
-
-If the policy does not exist yet, create it with `POST /api/v1/policies` and include
-`"name":"restricted-tools"` in the same body. The API persists and audits the
-policy; the effective contract carries the compiled tool decision to the tenant.
+For read-only cluster diagnosis, use the Kubernetes commands in the sections above. For the
+route and response shapes used by the UI, see the [interactive API reference](/reference/api).
 
 ---
 

@@ -219,13 +219,12 @@ OIDC_ALLOWED_EMAIL_DOMAINS=local.test
 The same model works with Dex or Authentik as long as the issuer supports
 standard OpenID Connect discovery.
 
-### Generated clients and automation
+### Browser and workload access
 
 - **Human operators** authenticate through the browser OIDC flow and use the resulting
-  session with the OpenCrane UI or another browser client.
-- **Automation / CI** uses a static bearer token (`Authorization: Bearer …`) with the
-  REST API or generated contracts client.
-  Treat this as a migration target; prefer OIDC/IAM where possible.
+  same-origin session with the OpenCrane UI.
+- **In-cluster workloads** use short-lived, audience-bound projected ServiceAccount tokens
+  at their dedicated TokenReview-protected internal APIs.
 
 ## UserTenant pod access (identity-routing proxy)
 
@@ -284,8 +283,8 @@ Authentication establishes *who*; authorization is split across the two planes:
 
 ## Review notes
 
-- The static bearer-token path can remain as a temporary break-glass fallback for
-  API-only usage; prefer OIDC/IAM for production.
+- There is no static bearer-token or break-glass fallback. Human management uses the
+  OIDC session; workload trust uses its dedicated projected-token boundary.
 - For production, prefer a confidential client with `OIDC_CLIENT_SECRET` set.
 - Behind an ingress or reverse proxy, preserve forwarded headers so callback and
   secure-cookie handling use the external URL correctly (the control plane sets

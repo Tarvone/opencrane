@@ -73,7 +73,7 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "opencrane.fullname" . }}-opencrane-server
     namespace: {{ .Release.Namespace }}
-{{- if and (eq (include "opencrane.deploymentMode" .) "standalone") .Values.clustertenantManager.standaloneSeed.name }}
+{{- if .Values.clustertenantManager.standaloneSeed.name }}
 ---
 {{- /*
   STANDALONE SELF-SEED ONLY: when CLUSTER_TENANT_SEED_NAME is set, there is no fleet-manager
@@ -114,12 +114,11 @@ subjects:
 {{- if .Values.clustertenantManager.manageTenantNamespaces }}
 ---
 {{- /*
-  STANDALONE ONLY (clustertenantManager.manageTenantNamespaces=true): grant the silo the
+  When `clustertenantManager.manageTenantNamespaces=true`, grant the control plane the
   cluster-scoped `namespaces` verbs it needs to create + PSA-label each ClusterTenant's namespace
-  itself. In the default fleet-managed topology this block is NOT rendered — the fleet-manager owns
-  namespace creation and the silo skips it (MANAGE_TENANT_NAMESPACES=false), so the silo never holds
-  this grant. Namespaces are cluster-scoped, so this cannot be a namespaced Role. Kept minimal — no
-  delete (teardown is the fleet's / a human's call): get/list/watch/create/patch only.
+  itself. When namespace provisioning is delegated, this block is not rendered and the service
+  account never holds this grant. Namespaces are cluster-scoped, so this cannot be a namespaced
+  Role. Kept minimal — no delete: get/list/watch/create/patch only.
 */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

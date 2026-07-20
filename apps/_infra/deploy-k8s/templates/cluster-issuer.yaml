@@ -1,13 +1,9 @@
 {{- /*
 #151 item 2 — silo-owned cert-manager Issuer/ClusterIssuer.
 
-certManagerIssuerName references an Issuer that a fleet chart used to be assumed to have
-already created (see the app-owned OpenCrane certificate template). A STANDALONE
-silo has no fleet to do that, so this chart provisions its own — the cert-manager analogue of
-`crds.install` (self-sufficiency, #151 item 3). Gated by `certManager.selfManagedIssuer`
-(default true = self-contained); set false in a fleet-managed topology where an external
-fleet chart already creates the Issuer, so this release's install/upgrade does not contend
-with the fleet's release for ownership of the same object.
+certManagerIssuerName is provisioned by this chart. It is the cert-manager analogue of
+`crds.install`: `certManager.selfManagedIssuer` defaults true for a self-contained install;
+set it false only when a separately managed issuer already owns the required resource.
 
 Every Certificate that will reference this Issuer in THIS chart is a SINGLE, non-wildcard
 hostname (see docs/agents/cluster-architecture.md → "Tenancy Model"): the opencrane-ui's own

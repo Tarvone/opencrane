@@ -103,7 +103,7 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: 'Hosting & deployment', link: '/operators/hosting' },
-          { text: 'Fleet and silo operating model', link: '/operators/fleet-silo-model' },
+          { text: 'Control-plane operating model', link: '/operators/fleet-silo-model' },
           { text: 'Silo deployment model', link: '/operators/silo-deployment' },
           { text: 'ClusterTenant manager configuration', link: '/operators/clustertenantmanager-config' },
           { text: 'DNS configuration', link: '/operators/dns-config' },

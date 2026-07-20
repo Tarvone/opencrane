@@ -83,7 +83,7 @@ UserTenant pods are **not** exposed on their own public host.
   not the org's identity.
 
 > **Note (June 2026):** the operator derives per-org DNS records via `DefaultOrgDomainProvisioner`
-> (`apps/fleet-operator/src/cluster-tenants/internal/org-domain.provisioner.ts`); the platform
+> (`libs/backend/server/cluster-tenants/main/src/core/org-domain.provisioner.ts`); the platform
 > cert-manager `Certificate` covers `*.<base>` + apex + the opencrane-api host
 > (`cluster-issuer.yaml`); the opencrane-api host is wired by `opencrane-api-ingress.yaml`.
 > `*.<base>` matches **org hosts** `<org>.<base>` — one label — which is sufficient because
@@ -120,7 +120,8 @@ without an exact owner or direct deletion decision fails `scripts/phase-b-topolo
 
 All planes are **ClusterIP-only** (no external LB) — external traffic arrives through Ingress. Internal DNS is `<release>-<plane>.<namespace>.svc`. Each plane is independently release-local (`instance`) or `shared` via `values.yaml` (`sharedPlatform.*`).
 
-- **operator** → Kubernetes API only. Watches Tenant/AccessPolicy/ClusterTenant CRs; injects the other planes' URLs into tenant pods. Deep-dive: [`apps/fleet-operator.md`](./apps/fleet-operator.md).
+- **operator** → Kubernetes API only. Watches Tenant/AccessPolicy/ClusterTenant CRs and injects
+  the other planes' URLs into tenant pods. Deep-dive: [`apps/opencrane.md`](./apps/opencrane.md).
 - **opencrane-api** (`:8080`) → Postgres + K8s API + Cognee + LiteLLM. The hub everything else talks to. Deep-dive: [`apps/opencrane.md`](./apps/opencrane.md).
 - **mcp-gateway / Obot** (`:8080`) → holds downstream MCP credentials and executes MCP tools;
   tenant pods reach MCP servers through it (projected token `aud=obot-gateway`). OpenCrane remains
@@ -163,8 +164,8 @@ auto-renewed; it requires no per-org action.
 When an org is created (`POST /api/v1/cluster-tenants`), the control plane persists desired state and
 hands off the cluster-side side effects to the ClusterTenant operator/CR watcher. The interface the
 reconciler calls is `OrgDomainProvisioner.provisionOrgDomain(...)`
-(`apps/fleet-operator/src/cluster-tenants/internal/org-domain-provisioner.types.ts`), implemented by
-`DefaultOrgDomainProvisioner` (`apps/fleet-operator/src/cluster-tenants/internal/org-domain.provisioner.ts`):
+(`libs/backend/server/cluster-tenants/main/src/core/org-domain-provisioner.types.ts`), implemented by
+`DefaultOrgDomainProvisioner` (`libs/backend/server/cluster-tenants/main/src/core/org-domain.provisioner.ts`):
 it **declares** the explicit `<org>.<base>` A record as a namespaced external-dns `DNSEndpoint` custom
 resource (`externaldns.k8s.io/v1alpha1`); the external-dns controller reconciles it into whatever DNS
 provider the platform runs (Cloud DNS, Route53, …) — no cloud SDK in the operator. When a `vanityDomain`
@@ -184,7 +185,8 @@ reconciler (in the operator) does (fail-closed, API-first).
 | `dedicatedNodes` | Namespace + a tainted node pool; operator stamps `nodeSelector`+`tolerations` (from `compute.mode=dedicated`, `compute.nodePool`). | ✅ Built |
 | `dedicatedCluster` | Customer gets its own kube-apiserver via an **external provisioner** (webhook seam, AGPL-clean; Kamaji-shaped). | ⏸️ **Parked** — opencrane-api validates and rejects with `422 TIER_UNAVAILABLE` unless a provisioner is registered. |
 
-The provisioner seam is a registry (`libs/backend/server/tenancy/cluster-tenants/main/src/core/`) with a built-in shared provisioner plus an optional external webhook (`CLUSTER_TENANT_PROVISIONER_WEBHOOK_*`).
+The provisioner seam is currently limited to the built-in shared provisioner. A future external
+provisioner must establish a workload-identity contract before it is introduced.
 
 ## Multi-Instance Cluster Shape
 

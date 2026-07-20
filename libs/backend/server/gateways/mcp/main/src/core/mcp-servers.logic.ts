@@ -1,4 +1,4 @@
-import { GrantAccess, GrantScope, GrantSubjectType, McpCredentialBrokeringMode, McpServerStatus, McpServerTransport, type Grant, type McpServer, type McpServerCredential } from "@opencrane/contracts";
+import { GrantAccess, GrantScope, GrantSubjectType, McpServerStatus, McpServerTransport, type Grant, type McpServer, type McpServerCredential } from "@opencrane/contracts";
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import type { McpServerCredentialInput, McpServerGrantInput, McpServerRouteAccess, McpServerRouteScope, McpServerRouteStatus, McpServerRouteSubjectType, McpServerRouteTransport, McpServerWriteRequest } from "../routes/mcp-servers.types.js";
@@ -58,24 +58,6 @@ const _PRISMA_MCP_SERVER_STATUS = {
   Degraded: "Degraded",
   Draft: "Draft",
 } as const;
-
-/** Typed Prisma brokering-mode values used during runtime lookups. */
-const _PRISMA_MCP_BROKERING_MODE = {
-  StaticFallback: "StaticFallback",
-  PerUserObo: "PerUserObo",
-} as const;
-
-/** Prisma brokering-mode lookup keyed by route values. */
-const _PRISMA_BROKERING_BY_ROUTE = {
-  static: _PRISMA_MCP_BROKERING_MODE.StaticFallback,
-  obo: _PRISMA_MCP_BROKERING_MODE.PerUserObo,
-};
-
-/** Route (contract) brokering-mode lookup keyed by Prisma enum values. */
-const _ROUTE_BROKERING_BY_PRISMA = {
-  [_PRISMA_MCP_BROKERING_MODE.StaticFallback]: McpCredentialBrokeringMode.StaticFallback,
-  [_PRISMA_MCP_BROKERING_MODE.PerUserObo]: McpCredentialBrokeringMode.PerUserObo,
-};
 
 /** Typed Prisma payload value used for MCP grants persisted in Prisma. */
 const _PRISMA_MCP_SERVER_PAYLOAD_TYPE = "McpServer";
@@ -330,9 +312,8 @@ export async function listMcpServerCredentials(prisma: PrismaClient, serverId: s
  *
  * @param prisma - Prisma client used for persistence.
  * @param serverId - Server identifier from the route.
- * @param input - Credential payload to validate and persist.
+ * @param input - OBO credential metadata to persist.
  * @returns The created credential response, or null when the server is absent.
- * @throws {McpCredentialValidationError} When the payload breaks a custody rule.
  */
 export async function addMcpServerCredential(prisma: PrismaClient, serverId: string, input: McpServerCredentialInput): Promise<McpServerCredentialResponse | null>
 {
@@ -344,7 +325,7 @@ export async function addMcpServerCredential(prisma: PrismaClient, serverId: str
     return null;
   }
 
-  // 2. Validate the brokering-mode custody rules and build the persisted row.
+  // 2. Normalize the OBO-only credential metadata before persistence.
   const row = _NormalizeCredentialInput(serverId, input);
   const created = await prisma.mcpServerCredential.create({ data: row });
 
@@ -353,7 +334,7 @@ export async function addMcpServerCredential(prisma: PrismaClient, serverId: str
     data: {
       action: "Created",
       resource: `McpServerCredential/${created.id}`,
-      message: `MCP credential ${created.displayName} (${input.brokeringMode ?? "static"}) added to server ${serverId}`,
+      message: `OBO MCP credential ${created.displayName} added to server ${serverId}`,
     },
   });
 
@@ -394,61 +375,19 @@ export async function deleteMcpServerCredential(prisma: PrismaClient, serverId: 
 }
 
 /**
- * Raised when a credential write payload violates the brokering-mode custody
- * rules (e.g. a static credential without a secret, or an OBO credential that
- * authors a static secret). Routes translate this into a 400 response.
- */
-export class McpCredentialValidationError extends Error
-{
-  /**
-   * @param message - Human-readable explanation surfaced to the API caller.
-   */
-  constructor(message: string)
-  {
-    super(message);
-    this.name = "McpCredentialValidationError";
-  }
-}
-
-/**
- * Validate a credential write payload and build its Prisma createMany row.
- *
- * Enforces the P4D.1 custody rules per brokering mode: a `static` credential
- * must carry a `secretRef` (the per-tenant/per-server fallback secret), while
- * an `obo` credential must NOT — the gateway brokers a per-user RFC 8693 token,
- * so no static secret is authored centrally.
+ * Normalize an OBO-only credential write payload for persistence.
  *
  * @param serverId - Owning MCP server identifier.
  * @param credential - Raw credential payload from the route body.
  * @returns Prisma createMany input for the credential row.
- * @throws {McpCredentialValidationError} When the payload breaks a custody rule.
  */
 export function _NormalizeCredentialInput(serverId: string, credential: McpServerCredentialInput): Prisma.McpServerCredentialCreateManyInput
 {
-  // 1. Default the mode so pre-P4D.1 payloads (no brokeringMode) stay valid.
-  const routeMode = credential.brokeringMode ?? "static";
-
-  // 2. Normalise the secret reference, treating blank strings as absent so a
-  //    whitespace-only value can never masquerade as a real static secret.
-  const trimmedSecret = credential.secretRef?.trim();
-  const secretRef = trimmedSecret && trimmedSecret.length > 0 ? trimmedSecret : null;
-
-  // 3. Enforce the per-mode custody invariant before persistence.
-  if (routeMode === "obo" && secretRef !== null)
-  {
-    throw new McpCredentialValidationError(`OBO credential "${credential.displayName}" must not carry a static secretRef; Obot brokers a per-user token`);
-  }
-
-  if (routeMode === "static" && secretRef === null)
-  {
-    throw new McpCredentialValidationError(`static credential "${credential.displayName}" requires a non-empty secretRef`);
-  }
-
+  // 1. Store only an operator-facing label: every credential is brokered with
+  // a short-lived user-delegated OBO token, never a static secret reference.
   return {
     mcpServerId: serverId,
     displayName: credential.displayName,
-    brokeringMode: _PRISMA_BROKERING_BY_ROUTE[routeMode] as Prisma.McpServerCredentialCreateManyInput["brokeringMode"],
-    secretRef,
   };
 }
 
@@ -552,8 +491,6 @@ function _MapCredentialResponse(credential: _McpServerRow["credentials"][number]
   return {
     id: credential.id,
     displayName: credential.displayName,
-    brokeringMode: _ROUTE_BROKERING_BY_PRISMA[credential.brokeringMode],
-    secretRef: credential.secretRef,
   };
 }
 

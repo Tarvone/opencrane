@@ -50,19 +50,13 @@ export const defaultConfig: OpenClawTenantOperatorConfig = {
   controlPlaneInternalServiceUrl: "http://opencrane-opencrane-server.default.svc:8081",
   projectedTokenTtlSeconds: 600,
   linkerdMeshEnabled: false,
-  // Fleet-managed baseline fixture (#151 item 4): tests exercising the standalone path opt in
-  // via a config override (deploymentMode: "standalone", etc).
-  deploymentMode: "fleet-managed",
+  deploymentMode: "standalone",
   standaloneSeedName: "",
   standaloneSeedDisplayName: "",
   standaloneSeedOwnerEmail: "",
   standaloneSeedOwnerSubject: "",
   standaloneSeedTier: "shared",
-  // Production default: the fleet-manager owns per-org namespace creation, so the silo does not
-  // attempt it. Tests exercising the standalone create path opt in via a config override.
-  manageTenantNamespaces: false,
-  // Fleet-managed baseline: the external fleet owns per-org domain provisioning. Tests
-  // exercising the standalone domain-provisioning path opt in via a config override.
+  manageTenantNamespaces: true,
   manageOwnDomain: false,
 };
 

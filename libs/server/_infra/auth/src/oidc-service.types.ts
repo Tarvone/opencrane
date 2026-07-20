@@ -4,7 +4,7 @@ import type { OwnedOrg } from "./org-membership.types.js";
 import type { AuthUser } from "./session.types.js";
 
 /** Auth mode exposed to the UI so it can decide whether login is required. */
-export type ManagerAuthMode = "development" | "oidc" | "token";
+export type ManagerAuthMode = "development" | "oidc";
 
 /**
  * Authenticated user as returned by `/auth/me`: the cached session identity plus the

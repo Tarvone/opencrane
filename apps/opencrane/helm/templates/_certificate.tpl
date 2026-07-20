@@ -7,9 +7,9 @@ The silo serves its control plane at the ORG host (`ingress.controlPlaneHost` =
 `<cluster-tenant>.<base>`, set by the silo deploy profile). A Kubernetes Ingress can only
 reference a TLS secret in its OWN namespace — so each silo must issue its own cert here, into
 the secret the opencrane-server Ingress references. The Issuer it references
-(`certManager.issuerName`) is either created by THIS chart (cluster-issuer.yaml, #151 item 2 —
-the standalone default, `certManager.selfManagedIssuer=true`) or by an external fleet chart in
-a fleet-managed topology (`certManager.selfManagedIssuer=false`) — either way the kind
+(`certManager.issuerName`) is normally created by THIS chart
+(`certManager.selfManagedIssuer=true`), or is a separately managed issuer when that flag is
+false — either way the kind
 (ClusterIssuer vs. namespaced Issuer) follows the SAME `opencrane.namespacedCertIssuer` helper
 the operator's CERT_MANAGER_ISSUER_KIND env var derives from, so they can never disagree.
 */ -}}

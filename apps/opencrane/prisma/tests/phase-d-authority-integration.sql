@@ -90,10 +90,10 @@ SELECT pg_temp.expect_failure(
     'AgentRun silo must match its AgentService silo',
     $statement$
         INSERT INTO "agent_runs" (
-            "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+            "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
             "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
         ) VALUES (
-            'run-wrong-silo', 'silo-other', 'svc-main', 'rev-published', 'interactive',
+            'run-wrong-silo', 'silo-other', 'svc-main', 'rev-published', 'thread-wrong-silo', 'interactive',
             'request-wrong-silo', 'run-wrong-silo', 'sha256:' || repeat('e', 64), 'sha256:' || repeat('f', 64)
         )
     $statement$,
@@ -114,11 +114,11 @@ SELECT pg_temp.expect_failure(
     'AgentRun creation on a non-current revision is rejected',
     $statement$
         INSERT INTO "agent_runs" (
-            "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+            "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
             "request_idempotency_key", "root_run_id", "effective_contract_digest",
             "input_snapshot_digest"
         ) VALUES (
-            'run-unpublished', 'silo-1', 'svc-main', 'rev-draft', 'interactive',
+            'run-unpublished', 'silo-1', 'svc-main', 'rev-draft', 'thread-unpublished', 'interactive',
             'request-unpublished', 'run-unpublished', 'sha256:' || repeat('c', 64),
             'sha256:' || repeat('d', 64)
         )
@@ -130,11 +130,11 @@ SELECT pg_temp.expect_failure(
     'new AgentRun cannot bypass the initial state',
     $statement$
         INSERT INTO "agent_runs" (
-            "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+            "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
             "request_idempotency_key", "root_run_id", "attempt", "state",
             "effective_contract_digest", "input_snapshot_digest", "finished_at", "terminal_reason"
         ) VALUES (
-            'run-terminal-insert', 'silo-1', 'svc-main', 'rev-published', 'interactive',
+            'run-terminal-insert', 'silo-1', 'svc-main', 'rev-published', 'thread-terminal-insert', 'interactive',
             'request-terminal-insert', 'run-terminal-insert', 1, 'completed',
             'sha256:' || repeat('c', 64), 'sha256:' || repeat('d', 64), clock_timestamp(), 'success'
         )
@@ -202,12 +202,14 @@ INSERT INTO "agent_revisions" (
 UPDATE "agent_services"
 SET "active_revision_id" = 'rev-run-retirement', "state" = 'active'
 WHERE "id" = 'svc-run-retirement';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('thread-retry-retirement', 'silo-1', 'svc-run-retirement', clock_timestamp());
 INSERT INTO "agent_runs" (
-    "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+    "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
     "request_idempotency_key", "root_run_id", "effective_contract_digest",
     "input_snapshot_digest"
 ) VALUES (
-    'run-retry-retirement', 'silo-1', 'svc-run-retirement', 'rev-run-retirement', 'interactive',
+    'run-retry-retirement', 'silo-1', 'svc-run-retirement', 'rev-run-retirement', 'thread-retry-retirement', 'interactive',
     'request-retry-retirement', 'run-retry-retirement', 'sha256:' || repeat('1', 64),
     'sha256:' || repeat('2', 64)
 );
@@ -222,11 +224,11 @@ SELECT pg_temp.expect_failure(
     'new AgentRun after service retirement is rejected',
     $statement$
         INSERT INTO "agent_runs" (
-            "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+            "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
             "request_idempotency_key", "root_run_id", "effective_contract_digest",
             "input_snapshot_digest"
         ) VALUES (
-            'run-after-retirement', 'silo-1', 'svc-run-retirement', 'rev-run-retirement', 'interactive',
+            'run-after-retirement', 'silo-1', 'svc-run-retirement', 'rev-run-retirement', 'thread-after-retirement', 'interactive',
             'request-after-retirement', 'run-after-retirement', 'sha256:' || repeat('3', 64),
             'sha256:' || repeat('4', 64)
         )
@@ -264,12 +266,14 @@ INSERT INTO "agent_revisions" (
 UPDATE "agent_services"
 SET "active_revision_id" = 'rev-run-rollover-1', "state" = 'active'
 WHERE "id" = 'svc-run-rollover';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('thread-retry-rollover', 'silo-1', 'svc-run-rollover', clock_timestamp());
 INSERT INTO "agent_runs" (
-    "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+    "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
     "request_idempotency_key", "root_run_id", "effective_contract_digest",
     "input_snapshot_digest"
 ) VALUES (
-    'run-retry-rollover', 'silo-1', 'svc-run-rollover', 'rev-run-rollover-1', 'interactive',
+    'run-retry-rollover', 'silo-1', 'svc-run-rollover', 'rev-run-rollover-1', 'thread-retry-rollover', 'interactive',
     'request-retry-rollover', 'run-retry-rollover', 'sha256:' || repeat('5', 64),
     'sha256:' || repeat('6', 64)
 );
@@ -284,11 +288,11 @@ SELECT pg_temp.expect_failure(
     'new AgentRun on a superseded Published revision is rejected',
     $statement$
         INSERT INTO "agent_runs" (
-            "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+            "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
             "request_idempotency_key", "root_run_id", "effective_contract_digest",
             "input_snapshot_digest"
         ) VALUES (
-            'run-superseded-revision', 'silo-1', 'svc-run-rollover', 'rev-run-rollover-1', 'interactive',
+            'run-superseded-revision', 'silo-1', 'svc-run-rollover', 'rev-run-rollover-1', 'thread-superseded-revision', 'interactive',
             'request-superseded-revision', 'run-superseded-revision', 'sha256:' || repeat('7', 64),
             'sha256:' || repeat('8', 64)
         )
@@ -308,14 +312,17 @@ SELECT pg_temp.expect_failure(
     'requires the exact silo and active revision of an Active AgentService'
 );
 
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at") VALUES
+    ('thread-run-state', 'silo-1', 'svc-main', clock_timestamp()),
+    ('thread-run-action', 'silo-1', 'svc-main', clock_timestamp());
 INSERT INTO "agent_runs" (
-    "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+    "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
     "request_idempotency_key", "root_run_id", "effective_contract_digest",
     "input_snapshot_digest"
 ) VALUES (
-    'run-state', 'silo-1', 'svc-main', 'rev-published', 'interactive',
+    'run-state', 'silo-1', 'svc-main', 'rev-published', 'thread-run-state', 'interactive',
     'request-state', 'run-state', 'sha256:' || repeat('1', 64),
-    'sha256:' || repeat('2', 64)
+    'sha256:' || repeat('a', 64)
 );
 
 UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-state';
@@ -364,13 +371,13 @@ SELECT pg_temp.expect_failure(
 );
 
 INSERT INTO "agent_runs" (
-    "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+    "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
     "request_idempotency_key", "root_run_id", "effective_contract_digest",
     "input_snapshot_digest"
 ) VALUES (
-    'run-action', 'silo-1', 'svc-main', 'rev-published', 'interactive',
+    'run-action', 'silo-1', 'svc-main', 'rev-published', 'thread-run-action', 'interactive',
     'request-action', 'run-action', 'sha256:' || repeat('3', 64),
-    'sha256:' || repeat('4', 64)
+    'sha256:' || repeat('b', 64)
 );
 
 UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-action';
@@ -938,5 +945,17 @@ SELECT pg_temp.assert_true(
     'workload audit evidence accepts the exact non-empty PEP audience',
     EXISTS (SELECT 1 FROM "audit_decisions" WHERE "id" = 'audit-1' AND "audience" = 'service:email-send')
 );
+
+INSERT INTO "run_input_snapshots" (
+    "run_id", "snapshot_version", "silo_id", "agent_service_id", "agent_revision_id",
+    "effective_contract_digest", "thread_id", "memory_facts", "identity_snapshot", "model_route",
+    "memory_query_policy", "budget_policy", "capability_set_digest", "prompt_compiler_version", "input_digest"
+)
+SELECT
+    "id", 1, "silo_id", "agent_service_id", "agent_revision_id", "effective_contract_digest",
+    "thread_id", '[]', '{}', '{}', '{}', '{}', 'sha256:' || repeat('0', 64), 'prompt-v1', "input_snapshot_digest"
+FROM "agent_runs"
+WHERE "id" IN ('run-retry-retirement', 'run-retry-rollover', 'run-state', 'run-action');
+SET CONSTRAINTS ALL IMMEDIATE;
 
 ROLLBACK;

@@ -14,7 +14,7 @@ import { _IsDevAuthMode } from "./auth-mode.js";
  *
  * Posture, mirroring `_RequireOrgAdmin` / `_IsDevAuthMode`:
  *   1. No established session — FAIL OPEN under dev mode (no OIDC and no
- *      `OPENCRANE_API_TOKEN`); FAIL CLOSED otherwise (403) — a real deployment must never
+ *      OIDC); FAIL CLOSED otherwise (403) — a real deployment must never
  *      let an unauthenticated or token-only caller reach a superadmin action.
  *   2. Session present — allow iff `isPlatformOperator`; else 403.
  *

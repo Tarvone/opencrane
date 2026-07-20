@@ -30,9 +30,9 @@ The non-obvious shape of the system (verified June 2026). Read this before touch
 **Target identity is purpose-specific**, with non-interchangeable credentials: (1) OIDC session
 cookies for human operators and (2) **projected SA tokens** for in-cluster workloads
 (audience-bound, short-lived, rotated, and never handed to a browser). Delete the static
-`OPENCRANE_API_TOKEN` path and the temporary `POST /api/v1/auth/pod-token` preflight route when
-their replacement slice lands. Do not reproduce either mechanism in the new product. Emergency
-access, if approved, is short-lived, IAM-backed, and audited.
+legacy static-token and temporary pod-token preflight mechanisms. Do not reproduce either
+mechanism in the new product. Emergency access, if approved, is short-lived, IAM-backed, and
+audited.
 
 **Two facts that catch agents out:**
 

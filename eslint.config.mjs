@@ -85,7 +85,6 @@ export default [
                 "scope:tenant-hosting",
               ],
             },
-            { sourceTag: "scope:access-tokens", onlyDependOnLibsWithTags: ["scope:access-tokens", "scope:shared"] },
             {
               sourceTag: "scope:agent-services",
               onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:audit", "scope:authorization", "scope:shared"],
@@ -94,7 +93,6 @@ export default [
               sourceTag: "scope:api-spec",
               onlyDependOnLibsWithTags: [
                 "scope:api-spec",
-                "scope:access-tokens",
                 "scope:audit",
                 "scope:awareness",
                 "scope:grants",

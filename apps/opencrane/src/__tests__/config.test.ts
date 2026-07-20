@@ -216,31 +216,22 @@ describe("_LoadOperatorConfig manageOwnDomain standalone-domain-ownership defaul
 		process.env = _saved;
 	});
 
-	it("defaults manageOwnDomain to true when FLEET_INTERNAL_URL is unset (standalone: no fleet to own the domain)", function _standalone()
+	it("defaults manageOwnDomain to true for the self-contained control plane", function _standalone()
 	{
 		process.env.WATCH_NAMESPACE = "oc-acme";
 		const config = _LoadOperatorConfig();
 		expect(config.manageOwnDomain).toBe(true);
 	});
 
-	it("defaults manageOwnDomain to false when FLEET_INTERNAL_URL is set (fleet-managed: fleet owns the domain)", function _fleetManaged()
+	it("an explicit MANAGE_OWN_DOMAIN=false disables domain management", function _explicitOverride()
 	{
 		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
+		process.env.MANAGE_OWN_DOMAIN = "false";
 		const config = _LoadOperatorConfig();
 		expect(config.manageOwnDomain).toBe(false);
 	});
 
-	it("an explicit MANAGE_OWN_DOMAIN overrides the FLEET_INTERNAL_URL-derived default", function _explicitOverride()
-	{
-		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
-		process.env.MANAGE_OWN_DOMAIN = "true";
-		const config = _LoadOperatorConfig();
-		expect(config.manageOwnDomain).toBe(true);
-	});
-
-	it("an explicit MANAGE_OWN_DOMAIN=false wins even when standalone (no FLEET_INTERNAL_URL)", function _explicitOverrideFalse()
+	it("an explicit MANAGE_OWN_DOMAIN=false wins over the local default", function _explicitOverrideFalse()
 	{
 		process.env.WATCH_NAMESPACE = "oc-acme";
 		process.env.MANAGE_OWN_DOMAIN = "false";
@@ -249,7 +240,7 @@ describe("_LoadOperatorConfig manageOwnDomain standalone-domain-ownership defaul
 	});
 });
 
-describe("_LoadOperatorConfig deploymentMode single switch (#151 item 4)", function _deploymentModeSuite()
+describe("_LoadOperatorConfig clean control-plane topology", function _deploymentModeSuite()
 {
 	let _saved: NodeJS.ProcessEnv;
 
@@ -264,7 +255,7 @@ describe("_LoadOperatorConfig deploymentMode single switch (#151 item 4)", funct
 		process.env = _saved;
 	});
 
-	it("derives standalone when neither DEPLOYMENT_MODE nor FLEET_INTERNAL_URL is set", function _derivedStandalone()
+	it("always uses standalone lifecycle ownership", function _standalone()
 	{
 		process.env.WATCH_NAMESPACE = "oc-acme";
 		const config = _LoadOperatorConfig();
@@ -273,39 +264,9 @@ describe("_LoadOperatorConfig deploymentMode single switch (#151 item 4)", funct
 		expect(config.manageOwnDomain).toBe(true);
 	});
 
-	it("derives fleet-managed when FLEET_INTERNAL_URL is set", function _derivedFleetManaged()
+	it("MANAGE_TENANT_NAMESPACES / MANAGE_OWN_DOMAIN still override the local defaults", function _individualOverridesStillWin()
 	{
 		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
-		const config = _LoadOperatorConfig();
-		expect(config.deploymentMode).toBe("fleet-managed");
-		expect(config.manageTenantNamespaces).toBe(false);
-		expect(config.manageOwnDomain).toBe(false);
-	});
-
-	it("an explicit DEPLOYMENT_MODE=fleet-managed wins even with no FLEET_INTERNAL_URL", function _explicitFleetManaged()
-	{
-		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.DEPLOYMENT_MODE = "fleet-managed";
-		const config = _LoadOperatorConfig();
-		expect(config.deploymentMode).toBe("fleet-managed");
-		expect(config.manageTenantNamespaces).toBe(false);
-		expect(config.manageOwnDomain).toBe(false);
-	});
-
-	it("an explicit DEPLOYMENT_MODE=standalone wins even with FLEET_INTERNAL_URL set", function _explicitStandalone()
-	{
-		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.FLEET_INTERNAL_URL = "http://fleet-manager.fleet.svc:8080";
-		process.env.DEPLOYMENT_MODE = "standalone";
-		const config = _LoadOperatorConfig();
-		expect(config.deploymentMode).toBe("standalone");
-	});
-
-	it("MANAGE_TENANT_NAMESPACES / MANAGE_OWN_DOMAIN still override the deploymentMode-derived default", function _individualOverridesStillWin()
-	{
-		process.env.WATCH_NAMESPACE = "oc-acme";
-		process.env.DEPLOYMENT_MODE = "standalone";
 		process.env.MANAGE_TENANT_NAMESPACES = "false";
 		process.env.MANAGE_OWN_DOMAIN = "false";
 		const config = _LoadOperatorConfig();

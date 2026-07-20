@@ -4,11 +4,6 @@
   "description": "Fail-fast guards for the demo-able shared-tier install (S1 / task_bbafd7e9). Deliberately PERMISSIVE: only the keys below are constrained, every other value passes through untouched. Helm validates the MERGED values on every install/template/lint, so an incoherent overlay (e.g. gatewayProxy enabled with no ingress IP) is rejected before the rollout half-installs.",
   "type": "object",
   "properties": {
-    "deploymentMode": {
-      "type": "string",
-      "enum": ["", "standalone", "fleet-managed"],
-      "description": "Single topology switch (#151 item 4). \"\" (default) derives from clustertenantManager.fleetInternalUrl emptiness, exactly as before this switch existed. \"standalone\" or \"fleet-managed\" fail-fast validates the combination below via the allOf guards."
-    },
     "ingress": {
       "type": "object",
       "properties": {
@@ -75,7 +70,7 @@
     },
     "crds": {
       "type": "object",
-      "description": "Chart self-sufficiency (#151 item 3): install the ClusterTenant/Tenant/AccessPolicy CRDs via templates/crds/. Default true (self-contained); set false in a fleet-managed topology where the fleet already installed the same CRDs cluster-wide.",
+      "description": "Install the ClusterTenant/Tenant/AccessPolicy CRDs via templates/crds/. Default true; set false only when a shared CRD bundle already owns the same cluster-scoped resources.",
       "properties": {
         "install": {
           "type": "boolean",
@@ -93,12 +88,6 @@
           "description": "Only gcp-secret-manager has a provider block implemented today; azure-key-vault/aws-secrets-manager fail fast at render time until their provider block is added."
         },
         "serviceAccountAnnotations": { "type": "object" }
-      }
-    },
-    "clustertenantManager": {
-      "type": "object",
-      "properties": {
-        "fleetInternalUrl": { "type": "string" }
       }
     },
     "networkPolicy": {
@@ -180,44 +169,6 @@
                 "type": "string",
                 "minLength": 1
               }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "required": ["deploymentMode"],
-        "properties": {
-          "deploymentMode": { "const": "fleet-managed" }
-        }
-      },
-      "then": {
-        "description": "deploymentMode=fleet-managed needs an external fleet's internal API to mirror membership from — otherwise this is caught only at render time by the chart's own Helm `fail` guard, one step later than schema validation.",
-        "required": ["clustertenantManager"],
-        "properties": {
-          "clustertenantManager": {
-            "required": ["fleetInternalUrl"],
-            "properties": {
-              "fleetInternalUrl": { "type": "string", "minLength": 1 }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "required": ["deploymentMode"],
-        "properties": {
-          "deploymentMode": { "const": "standalone" }
-        }
-      },
-      "then": {
-        "description": "deploymentMode=standalone means no external fleet anywhere, so fleetInternalUrl (which would point the membership mirror at one) must stay empty — a non-empty value contradicts the declared topology.",
-        "properties": {
-          "clustertenantManager": {
-            "properties": {
-              "fleetInternalUrl": { "const": "" }
             }
           }
         }

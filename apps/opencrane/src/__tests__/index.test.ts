@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import express from "express";
 import type { Express } from "express";
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
@@ -26,10 +26,7 @@ function _buildHealthApp(dbHealthy: boolean): Express
 }
 
 /**
- * Build a minimal Express app with the auth middleware constructed after env setup —
- * the factory snapshots OPENCRANE_API_TOKEN when called, so each test gets a fresh read.
- * No Prisma client is passed so DB-token validation is skipped; these tests
- * only exercise the env-var token and dev-mode bypass paths.
+ * Build a minimal Express app that exercises OIDC/session or development auth.
  * @returns An Express app wired for auth testing
  */
 function _buildAuthApp(): Express
@@ -38,7 +35,6 @@ function _buildAuthApp(): Express
   app.use(express.json());
   // Mirror production middleware order: the per-IP limiter is mounted before auth + routes.
   app.use(_RateLimit());
-  // Prisma omitted intentionally — tests target the env-var and dev-mode paths.
   app.use(___AuthMiddleware());
 
   app.get("/healthz", function _healthz(req, res)
@@ -76,72 +72,16 @@ describe("Control Plane", () =>
 
   describe("auth middleware", () =>
   {
-    let originalToken: string | undefined;
-
-    beforeEach(() =>
+    it("allows all requests when OIDC is not configured (development mode)", async () =>
     {
-      originalToken = process.env.OPENCRANE_API_TOKEN;
-    });
-
-    afterEach(() =>
-    {
-      if (originalToken)
-      {
-        process.env.OPENCRANE_API_TOKEN = originalToken;
-      }
-      else
-      {
-        delete process.env.OPENCRANE_API_TOKEN;
-      }
-    });
-
-    it("rejects requests without Authorization header when token is configured", async () =>
-    {
-      process.env.OPENCRANE_API_TOKEN = "test-secret";
-      const app = _buildAuthApp();
-
-      const res = await request(app).get("/api/test");
-      expect(res.status).toBe(401);
-      expect(res.body).toEqual({ error: "Missing Authorization header" });
-    });
-
-    it("rejects requests with wrong token", async () =>
-    {
-      process.env.OPENCRANE_API_TOKEN = "test-secret";
-      const app = _buildAuthApp();
-
-      const res = await request(app)
-        .get("/api/test")
-        .set("Authorization", "Bearer wrong-token");
-
-      expect(res.status).toBe(403);
-      expect(res.body).toEqual({ error: "Invalid token" });
-    });
-
-    it("allows requests with correct token", async () =>
-    {
-      process.env.OPENCRANE_API_TOKEN = "test-secret";
-      const app = _buildAuthApp();
-
-      const res = await request(app)
-        .get("/api/test")
-        .set("Authorization", "Bearer test-secret");
-
-      expect(res.status).toBe(200);
-    });
-
-    it("allows all requests when no token is configured (dev mode)", async () =>
-    {
-      delete process.env.OPENCRANE_API_TOKEN;
       const app = _buildAuthApp();
 
       const res = await request(app).get("/api/test");
       expect(res.status).toBe(200);
     });
 
-    it("healthz bypasses auth even with token configured", async () =>
+    it("healthz bypasses auth", async () =>
     {
-      process.env.OPENCRANE_API_TOKEN = "test-secret";
       const app = _buildAuthApp();
 
       const res = await request(app).get("/healthz");

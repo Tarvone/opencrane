@@ -220,8 +220,16 @@ describe("modelRoutingDefaultsRouter", function _suite()
 
   it("scope guard fails closed under real auth: no session -> 403 (AIR.0b)", async function _failClosed()
   {
-    const prev = process.env.OPENCRANE_API_TOKEN;
-    process.env.OPENCRANE_API_TOKEN = "ci-token"; // a real auth mode → dev open-auth bypass is OFF
+    const previousOidc = {
+      issuerUrl: process.env.OIDC_ISSUER_URL,
+      clientId: process.env.OIDC_CLIENT_ID,
+      redirectUri: process.env.OIDC_REDIRECT_URI,
+      sessionSecret: process.env.OIDC_SESSION_SECRET,
+    };
+    process.env.OIDC_ISSUER_URL = "https://issuer.example.test";
+    process.env.OIDC_CLIENT_ID = "opencrane";
+    process.env.OIDC_REDIRECT_URI = "https://opencrane.example.test/auth/callback";
+    process.env.OIDC_SESSION_SECRET = "test-session-secret";
     try
     {
       const res = await request(_buildApp(_mockPrisma(new Map())))
@@ -233,7 +241,10 @@ describe("modelRoutingDefaultsRouter", function _suite()
     }
     finally
     {
-      if (prev === undefined) { delete process.env.OPENCRANE_API_TOKEN; } else { process.env.OPENCRANE_API_TOKEN = prev; }
+      if (previousOidc.issuerUrl === undefined) { delete process.env.OIDC_ISSUER_URL; } else { process.env.OIDC_ISSUER_URL = previousOidc.issuerUrl; }
+      if (previousOidc.clientId === undefined) { delete process.env.OIDC_CLIENT_ID; } else { process.env.OIDC_CLIENT_ID = previousOidc.clientId; }
+      if (previousOidc.redirectUri === undefined) { delete process.env.OIDC_REDIRECT_URI; } else { process.env.OIDC_REDIRECT_URI = previousOidc.redirectUri; }
+      if (previousOidc.sessionSecret === undefined) { delete process.env.OIDC_SESSION_SECRET; } else { process.env.OIDC_SESSION_SECRET = previousOidc.sessionSecret; }
     }
   });
 });

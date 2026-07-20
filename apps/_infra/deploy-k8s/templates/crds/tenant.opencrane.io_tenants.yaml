@@ -3,9 +3,9 @@
 
   Namespaced; the silo's TenantOperator watches + reconciles Tenants directly in the silo's
   own namespace (full CRUD via clustertenantManagerRbacRules). Gated the same way as the
-  ClusterTenant CRD: set `crds.install=false` in a fleet-managed topology where the fleet
-  chart already installed this CRD cluster-wide, so this release does not fight the fleet's
-  release for ownership. `helm.sh/resource-policy: keep` so `helm uninstall` of one silo never
+  ClusterTenant CRD: set `crds.install=false` when a shared CRD bundle already owns this CRD
+  cluster-wide, so this release does not contend for ownership. `helm.sh/resource-policy: keep`
+  so `helm uninstall` of one silo never
   deletes a CRD every other silo's Tenant CRs depend on. Body copied verbatim from
   `git show main:apps/fleet-platform/crds/tenant.opencrane.io_tenants.yaml`.
 */ -}}

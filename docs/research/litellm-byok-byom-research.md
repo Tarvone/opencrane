@@ -297,7 +297,10 @@ Caveats: the KMS key must be in the **same location** as the cluster; CMEK prote
 
 **Inject end-user id server-side.** A client can self-declare the `user` body field; set `x-litellm-end-user-id` at the gateway (headers win) and ensure no client path overrides it.
 
-**The "auth is OPEN on dev" prerequisite.** `apps/opencrane-api/src/infra/middleware/auth.middleware.ts:117` falls through to a dev bypass when no OIDC/`OPENCRANE_API_TOKEN`, and there is **no per-route RBAC** (`docs/agents/architecture.md:35`). The credential/model mutation routes handle live secrets and **must get ClusterTenant-scoped route authz before BYOK ships** — the single most important security prerequisite, and it's an OpenCrane opencrane-api change.
+**Authorization prerequisite.** Credential/model mutation routes handle live secrets and must
+have ClusterTenant-scoped route authorisation before BYOK ships. The target accepts an OIDC
+session for human management and dedicated workload identity at internal boundaries; it has no
+static-token or dev-bypass management path.
 
 **If using the optional `/credentials` DB store:** set `LITELLM_SALT_KEY` **before** adding anything and **never rotate it** (rows become unrecoverable). Cached prompts/DB logs are **not** encrypted — fine here, since keys are resolved server-side and never appear in bodies.
 

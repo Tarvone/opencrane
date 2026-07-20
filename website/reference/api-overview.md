@@ -20,18 +20,9 @@ Use the OpenAPI document as the authoritative contract. This reference provides 
 
 ## Authentication
 
-All endpoints (except the auth and OpenAPI routes listed below) require a bearer token.
+Human operators authenticate through `GET /api/v1/auth/login` → callback → an OIDC session cookie. The browser client sends that same-origin cookie with management API requests.
 
-**Header format:**
-```
-Authorization: Bearer <token>
-```
-
-**Current paths:**
-- **Bearer token** — send `Authorization: Bearer <token>` from automation or a generated client. This is the automation and break-glass path.
-- **OIDC** — human operators authenticate via `GET /api/v1/auth/login` → callback → session cookie. See the [Auth](#auth) section below.
-
-Projected ServiceAccount tokens are the current in-cluster authentication mechanism for pod-to-opencrane-api calls. Each tenant pod presents an audience-bound projected token that is validated via the Kubernetes TokenReview API (`/api/internal/contract`, `/api/internal/awareness/participation`). Static bearer tokens remain the automation and break-glass path for operators outside the cluster.
+In-cluster workloads use audience-bound projected ServiceAccount tokens at their dedicated internal trust boundaries. Tenant pod tokens are validated through Kubernetes TokenReview at `/api/internal/contract` and `/api/internal/awareness/participation`.
 
 ---
 
@@ -111,14 +102,6 @@ All API routes are prefixed with `/api/v1`. Infrastructure routes (`/healthz`, `
 | `GET` | `/third-party-sources/{id}` | Get a source |
 | `PUT` | `/third-party-sources/{id}` | Update a source |
 | `DELETE` | `/third-party-sources/{id}` | Remove a source |
-
-### Access Tokens
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/access-tokens` | List access tokens |
-| `POST` | `/access-tokens` | Create an access token |
-| `DELETE` | `/access-tokens/{id}` | Revoke an access token |
 
 ### Provider Keys
 

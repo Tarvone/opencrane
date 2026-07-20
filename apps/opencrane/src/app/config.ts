@@ -33,19 +33,10 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     _readEnvValue<string>("GATEWAY_TRUSTED_PROXIES", "string", false, ""),
   ));
 
-  // 2c. Single deployment-mode switch (#151 item 4). DEPLOYMENT_MODE wins when it is one of
-  //     the two valid values; otherwise derive from the SAME signal every standalone default
-  //     already used before this switch existed — an empty FLEET_INTERNAL_URL (no external
-  //     fleet configured) — so a deployment that sets neither env var is unaffected by this
-  //     switch's introduction. Every other standalone-vs-fleet-managed default below
-  //     (manageOwnDomain, manageTenantNamespaces, the standalone boot-seed gate in index.ts)
-  //     derives from THIS one value, not from FLEET_INTERNAL_URL directly, so an explicit
-  //     DEPLOYMENT_MODE override cascades coherently everywhere.
-  const deploymentModeRaw = _readEnvValue<string>("DEPLOYMENT_MODE", "string", false, "");
-  const deploymentMode: "standalone" | "fleet-managed" = deploymentModeRaw === "standalone" || deploymentModeRaw === "fleet-managed"
-    ? deploymentModeRaw
-    : (process.env["FLEET_INTERNAL_URL"]?.trim() ? "fleet-managed" : "standalone");
-  const isStandalone = deploymentMode === "standalone";
+  // 2c. The clean target is a self-contained control plane. An installation always owns
+  //     its ClusterTenant lifecycle; no environment variable can switch it back to an
+  //     external-fleet topology.
+  const deploymentMode = "standalone" as const;
 
   // 3. Build the typed config from env, applying namespace-derived fallbacks for the
   //    runtime-plane URLs so no value silently points at another instance.
@@ -104,11 +95,8 @@ export function _LoadOperatorConfig(): OpenClawTenantOperatorConfig
     standaloneSeedOwnerEmail: _readEnvValue<string>("CLUSTER_TENANT_SEED_OWNER_EMAIL", "string", false, ""),
     standaloneSeedOwnerSubject: _readEnvValue<string>("CLUSTER_TENANT_SEED_OWNER_SUBJECT", "string", false, ""),
     standaloneSeedTier: _readEnvValue<string>("CLUSTER_TENANT_SEED_TIER", "string", false, "shared"),
-    // Both derive from `deploymentMode` (not FLEET_INTERNAL_URL directly) so an explicit
-    // DEPLOYMENT_MODE override cascades to them coherently; MANAGE_TENANT_NAMESPACES /
-    // MANAGE_OWN_DOMAIN still let an operator force one independently of the mode.
-    manageTenantNamespaces: _readEnvValue<boolean>("MANAGE_TENANT_NAMESPACES", "boolean", false, isStandalone),
-    manageOwnDomain: _readEnvValue<boolean>("MANAGE_OWN_DOMAIN", "boolean", false, isStandalone),
+    manageTenantNamespaces: _readEnvValue<boolean>("MANAGE_TENANT_NAMESPACES", "boolean", false, true),
+    manageOwnDomain: _readEnvValue<boolean>("MANAGE_OWN_DOMAIN", "boolean", false, true),
   };
 
   // 4. Fail closed in multi-instance mode: refuse to watch the whole cluster when

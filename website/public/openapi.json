@@ -3,7 +3,7 @@
   "info": {
     "title": "OpenCrane Control Plane API",
     "version": "1.0.0",
-    "description": "Multi-tenant AI agent platform management API.\n\n**Authentication**\n\n- *Human operators* — OIDC browser flow via `GET /auth/login` → `/auth/callback`. Session cookie is set server-side.\n- *API clients* — Bearer tokens created through the authenticated access-token API.\n- *Automation / CI* — Bearer token via the `OPENCRANE_TOKEN` environment variable, validated against the `OPENCRANE_API_TOKEN` server-side env var.\n- Endpoints tagged *Auth* and *Meta* (`/auth/*`, `/openapi.json`) require no credentials."
+    "description": "Multi-tenant AI agent platform management API.\n\n**Authentication**\n\n- *Human operators* — OIDC browser flow via `GET /auth/login` → `/auth/callback`. Session cookie is set server-side.\n- In-cluster workloads use short-lived, audience-bound projected service-account tokens at their dedicated internal trust boundaries.\n- Endpoints tagged *Auth* and *Meta* (`/auth/*`, `/openapi.json`) require no credentials."
   },
   "servers": [
     {
@@ -168,21 +168,6 @@
           "displayName": {
             "type": "string",
             "description": "Operator-facing label."
-          },
-          "brokeringMode": {
-            "type": "string",
-            "enum": [
-              "static",
-              "obo"
-            ],
-            "description": "Brokering strategy: 'static' (per-tenant/per-server secret fallback) or 'obo' (per-user RFC 8693 exchange brokered server-side; no static secret)."
-          },
-          "secretRef": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Secret reference for 'static' brokering; null for 'obo'."
           }
         }
       },
@@ -793,32 +778,6 @@
           },
           "message": {
             "type": "string"
-          }
-        }
-      },
-      "AccessToken": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "owner": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "lastUsedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -1631,20 +1590,8 @@
           }
         }
       }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "Static bearer token. Pass as Authorization: Bearer <token>."
-      }
     }
   },
-  "security": [
-    {
-      "bearerAuth": []
-    }
-  ],
   "paths": {
     "/awareness/rollout": {
       "get": {
@@ -3038,18 +2985,6 @@
                   "displayName": {
                     "type": "string",
                     "description": "Operator-facing label."
-                  },
-                  "brokeringMode": {
-                    "type": "string",
-                    "enum": [
-                      "static",
-                      "obo"
-                    ],
-                    "description": "Defaults to 'static'. 'static' requires secretRef; 'obo' must omit it."
-                  },
-                  "secretRef": {
-                    "type": "string",
-                    "description": "Required for 'static' brokering; omit for 'obo'."
                   }
                 }
               }
@@ -4653,117 +4588,6 @@
         }
       }
     },
-    "/access-tokens": {
-      "get": {
-        "operationId": "listAccessTokens",
-        "summary": "List all issued access tokens (hashes only, never plaintext)",
-        "tags": [
-          "Access Tokens"
-        ],
-        "responses": {
-          "200": {
-            "description": "Token list.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AccessToken"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "createAccessToken",
-        "summary": "Create a new access token. Returns plaintext token once — store it securely.",
-        "tags": [
-          "Access Tokens"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "owner": {
-                    "type": "string"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Token created. The plainTextToken field will not be returned again.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "plainTextToken"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "plainTextToken": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/access-tokens/{id}": {
-      "delete": {
-        "operationId": "deleteAccessToken",
-        "summary": "Revoke and delete an access token",
-        "tags": [
-          "Access Tokens"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Token deleted."
-          },
-          "404": {
-            "description": "Token not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/providers/keys": {
       "get": {
         "operationId": "listProviderKeys",
@@ -6246,8 +6070,7 @@
                       "type": "string",
                       "enum": [
                         "development",
-                        "oidc",
-                        "token"
+                        "oidc"
                       ],
                       "description": "Active authentication mode for this instance."
                     },

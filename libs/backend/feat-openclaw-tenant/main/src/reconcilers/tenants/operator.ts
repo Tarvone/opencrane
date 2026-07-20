@@ -76,7 +76,7 @@ export class TenantOperator
    * Per-org DNS/vanity-TLS provisioner (#151 item 2). Invoked from
    * {@link enforceClusterTenantIsolation} ONLY when `config.manageOwnDomain` is true
    * (standalone: no external fleet to own the org's domain); a no-op reference is still
-   * wired in fleet-managed mode, but never called.
+   * wired for deployments that delegate namespace provisioning, but never called.
    */
   private domainProvisioner: OrgDomainProvisioner;
 
@@ -658,7 +658,7 @@ export class TenantOperator
     //    Linkerd gate is on (S5) it is also annotated for mesh injection so workloads
     //    pick up the sidecar/identity; the annotation is inert on a Linkerd-less cluster.
     //
-    //    Ownership is explicit (not inferred from a 403): in the fleet-managed topology the
+    //    Ownership is explicit (not inferred from a 403): when namespace provisioning is
     //    fleet-manager creates and owns each org's namespace and the silo SA holds NO
     //    cluster-scoped `namespaces` RBAC, so the silo must SKIP the create entirely — it is
     //    `manageTenantNamespaces=false`. Only an all-in-one / standalone silo that has been
@@ -730,11 +730,11 @@ export class TenantOperator
     }
 
     // 4. Org domain (DNS + vanity TLS) provisioning — STANDALONE ONLY (#151 item 2). In the
-    //    fleet-managed topology the external fleet's own ClusterTenantOperator already calls
+    //    delegated, the external namespace provisioner already calls
     //    the equivalent provisioner against its own CR watch, so this silo must stay a no-op
     //    here or the two planes would double-apply (and disagree on ownership) the same
     //    DNSEndpoint/Certificate. `manageOwnDomain` defaults to the same standalone signal as
-    //    `manageTenantNamespaces` (FLEET_INTERNAL_URL unset). Best-effort: the provisioner
+    //    `manageTenantNamespaces`. Best-effort: the provisioner
     //    itself never throws (fail-closed skip on absent cert-manager/external-dns), but the
     //    call is still wrapped so an unexpected error never blocks the tenant pod from coming
     //    up — the namespace boundary, not the domain record, is the openclaw-attachment gate.

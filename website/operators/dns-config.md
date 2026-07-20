@@ -104,22 +104,11 @@ credential. Per-org vanity certs use HTTP-01 — no provider token needed for th
 
 ## Configure it
 
-### Authenticated API
+### Authenticated management session
 
-```bash
-jq -n --rawfile token ./cloudflare-token.txt '{
-  provider: "cloudflare",
-  zone: "ai.example.com",
-  email: "you@example.com",
-  apiToken: ($token | rtrimstr("\n"))
-}' > dns-configuration.json
-
-curl --fail-with-body \
-  --request PUT "$OPENCRANE_FLEET_URL/api/v1/platform/dns" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data-binary @dns-configuration.json
-```
+Configure the DNS-01 solver from the management UI after signing in through OIDC. The browser
+sends the configuration through its same-origin session and never asks an operator to create a
+reusable management API token.
 
 | Field | Required | Meaning |
 |-------|----------|---------|
@@ -131,16 +120,8 @@ curl --fail-with-body \
 | `apiToken` | token providers | Provider API token |
 | `solverConfig` | other providers | Raw provider solver object |
 
-Build the request body from a protected file, as above, so the token never lands in
-shell history or process arguments. Delete `dns-configuration.json` after the request.
-
-Inspect the current configuration at any time:
-
-```bash
-curl --fail-with-body \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_FLEET_URL/api/v1/platform/dns"
-```
+Inspect the active configuration from the same management view. The DNS provider credential is
+stored in a Kubernetes Secret and is not returned by the API.
 
 ### Providers
 

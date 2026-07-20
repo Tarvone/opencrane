@@ -22,7 +22,6 @@ import { _McpOpenapiPaths } from "@opencrane/backend/server/gateways/mcp";
 import { _GrantsOpenapiPaths } from "@opencrane/backend/server/iam/grants";
 import { _GroupsOpenapiPaths } from "@opencrane/backend/server/iam/groups";
 import { _RetrievalOpenapiPaths } from "@opencrane/backend/server/knowledge/retrieval";
-import { _AccessTokensOpenapiPaths } from "@opencrane/backend/server/iam/access-tokens";
 import { _ProvidersOpenapiPaths } from "@opencrane/backend/server/gateways/providers";
 import { _ModelRoutingOpenapiPaths } from "@opencrane/backend/server/gateways/model-routing";
 import { _SpendOpenapiPaths } from "@opencrane/backend/server/reporting/spend";
@@ -163,15 +162,6 @@ const McpServerCredentialSchema = {
   properties: {
     id: { type: "string", description: "Stable credential identifier." },
     displayName: { type: "string", description: "Operator-facing label." },
-    brokeringMode: {
-      type: "string",
-      enum: ["static", "obo"],
-      description: "Brokering strategy: 'static' (per-tenant/per-server secret fallback) or 'obo' (per-user RFC 8693 exchange brokered server-side; no static secret).",
-    },
-    secretRef: {
-      type: ["string", "null"],
-      description: "Secret reference for 'static' brokering; null for 'obo'.",
-    },
   },
 };
 
@@ -180,12 +170,6 @@ const McpServerCredentialInputSchema = {
   required: ["displayName"],
   properties: {
     displayName: { type: "string", description: "Operator-facing label." },
-    brokeringMode: {
-      type: "string",
-      enum: ["static", "obo"],
-      description: "Defaults to 'static'. 'static' requires secretRef; 'obo' must omit it.",
-    },
-    secretRef: { type: "string", description: "Required for 'static' brokering; omit for 'obo'." },
   },
 };
 
@@ -405,18 +389,6 @@ const AuditEntrySchema = {
     action: { type: "string" },
     resource: { type: "string" },
     message: { type: "string" },
-  },
-};
-
-const AccessTokenSchema = {
-  type: "object" as const,
-  properties: {
-    id: { type: "string" },
-    name: { type: "string" },
-    owner: { type: "string" },
-    createdAt: { type: "string", format: "date-time" },
-    expiresAt: { type: "string", format: "date-time" },
-    lastUsedAt: { type: "string", format: "date-time" },
   },
 };
 
@@ -641,7 +613,7 @@ export const spec = {
   info: {
     title: "OpenCrane Control Plane API",
     version: "1.0.0",
-    description: "Multi-tenant AI agent platform management API.\n\n**Authentication**\n\n- *Human operators* — OIDC browser flow via `GET /auth/login` → `/auth/callback`. Session cookie is set server-side.\n- *API clients* — Bearer tokens created through the authenticated access-token API.\n- *Automation / CI* — Bearer token via the `OPENCRANE_TOKEN` environment variable, validated against the `OPENCRANE_API_TOKEN` server-side env var.\n- Endpoints tagged *Auth* and *Meta* (`/auth/*`, `/openapi.json`) require no credentials.",
+    description: "Multi-tenant AI agent platform management API.\n\n**Authentication**\n\n- *Human operators* — OIDC browser flow via `GET /auth/login` → `/auth/callback`. Session cookie is set server-side.\n- In-cluster workloads use short-lived, audience-bound projected service-account tokens at their dedicated internal trust boundaries.\n- Endpoints tagged *Auth* and *Meta* (`/auth/*`, `/openapi.json`) require no credentials.",
   },
   servers: [
     { url: "/api/v1", description: "Versioned API prefix" },
@@ -695,7 +667,6 @@ export const spec = {
         required: ["groupId", "resourceType", "resourceId", "members"],
       },
       AuditEntry: AuditEntrySchema,
-      AccessToken: AccessTokenSchema,
       ProviderKey: ProviderKeySchema,
       ByokProviderKeyStatus: ByokProviderKeyStatusSchema,
       ProviderKeySetRequest: ProviderKeySetRequestSchema,
@@ -791,15 +762,7 @@ export const spec = {
         },
       },
     },
-    securitySchemes: {
-      bearerAuth: {
-        type: "http",
-        scheme: "bearer",
-        description: "Static bearer token. Pass as Authorization: Bearer <token>.",
-      },
-    },
   },
-  security: [{ bearerAuth: [] }],
   paths: {
     // Compose domain paths in order — order matters for JSON serialization byte-identity
     ..._AwarenessOpenapiPaths,
@@ -810,7 +773,6 @@ export const spec = {
     ..._GrantsOpenapiPaths,
     ..._GroupsOpenapiPaths,
     ..._RetrievalOpenapiPaths,
-    ..._AccessTokensOpenapiPaths,
     ..._ProvidersOpenapiPaths,
     ..._ModelRoutingOpenapiPaths,
     ..._SpendOpenapiPaths,
@@ -820,7 +782,6 @@ export const spec = {
     // ------------------------------------------------------------------
     // Auth — OIDC browser flow and session introspection
     // Human operators: OIDC browser flow.
-    // CI / automation: OPENCRANE_TOKEN env var (static bearer, no UI needed).
     // ------------------------------------------------------------------
 
     "/auth/me": {
@@ -835,7 +796,7 @@ export const spec = {
             type: "object",
             required: ["mode", "authenticated"],
             properties: {
-              mode: { type: "string", enum: ["development", "oidc", "token"], description: "Active authentication mode for this instance." },
+              mode: { type: "string", enum: ["development", "oidc"], description: "Active authentication mode for this instance." },
               authenticated: { type: "boolean" },
               user: {
                 type: "object",

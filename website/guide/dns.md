@@ -35,16 +35,9 @@ automatic HTTPS are your responsibility.
 
 OpenCrane issues a wildcard TLS certificate for you using Let's Encrypt. Because the
 certificate is a wildcard, it's validated through your DNS provider — so OpenCrane
-needs permission to create a temporary verification record. Configure it through the
-authenticated Fleet Manager API:
-
-```bash
-curl --fail-with-body \
-  --request PUT "$OPENCRANE_FLEET_URL/api/v1/platform/dns" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data @dns-configuration.json
-```
+needs permission to create a temporary verification record. Configure it from the
+authenticated management UI. It sends the DNS configuration through the same-origin OIDC
+session rather than a reusable terminal token.
 
 The JSON body selects the provider and zone, gives Let's Encrypt a renewal email, and
 includes a provider token scoped to edit that zone. Build it from a protected file so

@@ -24,7 +24,7 @@ export { _BuildOrgDomain, _BuildOrgWildcard, _BuildUserHost } from "./domain-top
 export { GrantAccess, GrantScope, GrantSubjectType, type Grant } from "./grant.types.js";
 export { type Group } from "./group.types.js";
 export { MemoryMutationKind, type MemoryDatasetIdentity, type MemoryFactReference, type MemoryMutationRequest, type MemoryProvenance } from "./memory.types.js";
-export { McpCredentialBrokeringMode, McpServerStatus, McpServerTransport, type McpServer, type McpServerCredential } from "./mcp-server.types.js";
+export { McpServerStatus, McpServerTransport, type McpServer, type McpServerCredential } from "./mcp-server.types.js";
 export {
   McpApprovalStatus,
   McpConnectionStatus,

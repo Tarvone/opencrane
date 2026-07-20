@@ -9,8 +9,8 @@ The workspace uses npm workspaces with integrated NX for task coordination.
 - Install deps: `npm ci`
 - Build all: `npm run build` (runs `npx nx run-many -t build`)
 - Test all: `npm run test` (runs `npx nx run-many -t test`)
-- Build single app: `npm run build -w @opencrane/fleet-operator` (or `npx nx run fleet-operator:build`)
-- Test single app: `npm run test -w @opencrane/server` (or `npx nx run opencrane-api:test`)
+- Build single app: `npm run build -w @opencrane/server` (or `npx nx run opencrane:build`)
+- Test single app: `npm run test -w @opencrane/server` (or `npx nx run opencrane:test`)
 - Test only affected packages (PR): `npx nx affected -t test build lint --base=origin/main`
 
 ### NX Cloud (Remote Caching & Distributed CI)
@@ -33,7 +33,9 @@ Verified June 2026:
 - **GCS buckets are provisioned in-operator at reconcile time via Workload Identity, NOT by Terraform.** Terraform sets up cloud IAM/networking; per-UserTenant storage is a runtime operator concern.
 - **Deploy scripts.** The fleet (multi-tenant) deploys via `apps/fleet-platform/deploy.sh`, each silo via `apps/_infra/deploy-k8s/deploy.sh`, and one seeded org via `apps/_infra/deploy-k8s/platform/deploy-single-tenant.sh` (fleet + one silo in two passes). All drive the shared engine `apps/_infra/deploy-k8s/platform/k8s-deploy.sh` (+ `configure-oidc.sh`). **Provisioning is built into the multi/single deploy scripts:** `--provision local|gke|vps` (sourced from `apps/_infra/deploy-k8s/platform/provision.sh`) creates + targets a k3d / GKE-via-Terraform / k3s-VM cluster before installing; without it they deploy onto the current kubectl context. (This absorbed the old standalone `install.sh` / `gke-deploy.sh` / `vps-deploy.sh`; the `deploy.sh` dispatcher + `wizard.sh` were removed as stale routers. `platform/` no longer exists.) Local dev iteration still uses the k3d harness `apps/_infra/deploy-k8s/platform/tests/k3d-local.sh` with value profiles in the same dir: `values-k3d-local.yaml` (fast), `-strict.yaml` (prod-like), `-e2e.yaml`.
 - **`apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh` validates isolation statically** via `helm template` (no live cluster) — checks per-instance `WATCH_NAMESPACE`, namespaced RBAC, absence of cross-instance cluster-scoped issuers/stores, and default-deny NetworkPolicies. Run it after touching Helm RBAC/scope logic.
-- **`apps/_infra/deploy-k8s`'s `deploymentMode` switch (#151 item 4)** picks the silo's topology — `standalone` (no fleet anywhere; the silo self-seeds its own `ClusterTenant` + owns namespace/domain provisioning) or `fleet-managed` (an external fleet owns `ClusterTenant` lifecycle; requires `clustertenantManager.fleetInternalUrl`). `values/standalone.yaml` is the documented single-tenant standalone preset (`helm install ... -f apps/_infra/deploy-k8s/values/standalone.yaml`, no `FLEET_CHART_DIR`/fleet checkout needed) — see [`apps/opencrane.md` → "Deployment modes"](./apps/opencrane.md) for the full walkthrough. `values.schema.json` + a Helm `fail` guard reject an explicit `deploymentMode` that contradicts `fleetInternalUrl`.
+- **`apps/_infra/deploy-k8s` uses one local ClusterTenant authority topology.** It self-seeds
+  the ClusterTenant and owns namespace/domain provisioning. `values/standalone.yaml` remains a
+  concise local-install profile; see [`apps/opencrane.md` → "Deployment topology"](./apps/opencrane.md).
 
 ## Infrastructure Layout
 

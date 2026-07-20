@@ -94,25 +94,14 @@ In the Zitadel console, navigate to the service account that the control plane u
 
 Do **not** revoke the old key yet. Both keys are valid at this point.
 
-### Step 2 — rotate through the API
+### Step 2 — rotate through the management UI
 
 ::: tip Keep the key out of arguments
-Construct the request body from the downloaded file. Do not paste private key material
-into shell history or a process argument.
+Upload the downloaded JSON in the OIDC-authenticated management UI. Do not paste private-key
+material into shell history or a process argument.
 :::
 
-```bash
-jq -n --slurpfile key /path/to/new-key.json \
-  '{serviceAccountKey: $key[0]}' > zitadel-key-rotation.json
-
-curl --fail-with-body \
-  --request POST "$OPENCRANE_FLEET_URL/api/v1/admin/zitadel/sa-key:rotate" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data-binary @zitadel-key-rotation.json
-```
-
-Delete `zitadel-key-rotation.json` immediately after the request. On success the API returns:
+On success the API returns:
 
 ```json
 {

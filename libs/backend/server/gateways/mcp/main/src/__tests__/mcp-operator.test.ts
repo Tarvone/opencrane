@@ -13,8 +13,17 @@ import { mcpOperatorRouter } from "../routes/mcp-operator.js";
  * response ever serialises credential material.
  */
 
-/** Auth env that decides `_IsDevAuthMode`; cleared/restored around each test. */
-const _AUTH_ENV = ["OPENCRANE_API_TOKEN", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "OIDC_SESSION_SECRET"] as const;
+/** OIDC env that decides `_IsDevAuthMode`; cleared/restored around each test. */
+const _AUTH_ENV = ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "OIDC_SESSION_SECRET"] as const;
+
+/** Configure a complete OIDC setup so no-session guards must fail closed. */
+function _enableOidc(): void
+{
+  process.env.OIDC_ISSUER_URL = "https://issuer.example.test";
+  process.env.OIDC_CLIENT_ID = "opencrane";
+  process.env.OIDC_REDIRECT_URI = "https://opencrane.example.test/auth/callback";
+  process.env.OIDC_SESSION_SECRET = "test-session-secret";
+}
 
 /** Session user shape seeded onto the request (mirrors the OIDC session). */
 interface _SessionUser
@@ -91,7 +100,7 @@ describe("mcp-operator router", function _suite()
   {
     it("denies GET /servers for a non-admin session", async function _denyList()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma, spies } = _mockPrisma();
       const res = await request(_buildApp(prisma, { sub: "u1", isOrgAdmin: false })).get("/api/v1/mcp/servers");
 
@@ -102,7 +111,7 @@ describe("mcp-operator router", function _suite()
 
     it("denies PUT /servers/:id/access for a non-admin session", async function _denyAccess()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma, spies } = _mockPrisma();
       const res = await request(_buildApp(prisma, { sub: "u1", isOrgAdmin: false }))
         .put("/api/v1/mcp/servers/srv-1/access").send({ everyoneInOrg: true, groups: [], users: [] });
@@ -113,7 +122,7 @@ describe("mcp-operator router", function _suite()
 
     it("denies GET /directory for a non-admin session", async function _denyDirectory()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma } = _mockPrisma();
       const res = await request(_buildApp(prisma, { sub: "u1", isOrgAdmin: false })).get("/api/v1/mcp/directory");
 
@@ -122,7 +131,7 @@ describe("mcp-operator router", function _suite()
 
     it("lets an org-admin session through GET /servers to the handler", async function _allowList()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma, spies } = _mockPrisma();
       const res = await request(_buildApp(prisma, { sub: "admin", isOrgAdmin: true })).get("/api/v1/mcp/servers");
 
@@ -149,7 +158,7 @@ describe("mcp-operator router", function _suite()
 
     it("returns only the servers the caller is entitled to", async function _filters()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma } = _mockPrisma({ "mcpServer.findMany": function _findMany() { return Promise.resolve(_servers); } });
       const res = await request(_buildApp(prisma, { sub: "user-1", groups: [], isOrgAdmin: false })).get("/api/v1/mcp/catalog");
 
@@ -160,7 +169,7 @@ describe("mcp-operator router", function _suite()
 
     it("entitles a caller via a matching group claim", async function _group()
     {
-      process.env.OPENCRANE_API_TOKEN = "ci-token";
+      _enableOidc();
       const { prisma } = _mockPrisma({ "mcpServer.findMany": function _findMany() { return Promise.resolve(_servers); } });
       const res = await request(_buildApp(prisma, { sub: "user-2", groups: ["other-group"], isOrgAdmin: false })).get("/api/v1/mcp/catalog");
 

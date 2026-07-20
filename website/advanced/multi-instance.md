@@ -310,28 +310,8 @@ is needed to enforce this.
 
 ### 5.3 Managing cluster tenants (API-first)
 
-ClusterTenant lifecycle is on the Fleet Manager API (`/api/v1/cluster-tenants`). The
-frontend and custom integrations are clients of the same authenticated routes, never
-privileged paths:
-
-```bash
-curl --fail-with-body \
-  --request POST "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants" \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "name":"acme",
-    "displayName":"Acme Corp",
-    "isolationTier":"dedicatedNodes",
-    "compute":{"mode":"dedicated","nodePool":"acme-pool"},
-    "resources":{"quota":{"cpu":"8","memory":"16Gi","pods":40}}
-  }'
-
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants/acme"
-curl --fail-with-body --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_FLEET_URL/api/v1/cluster-tenants/acme/status"
-```
+ClusterTenant lifecycle is available from the management UI and its same-origin OIDC session.
+The frontend uses the public API contract; no privileged path or reusable bearer token exists.
 
 ### 5.4 Plugging in a `dedicatedCluster` backend without forking (AGPL-clean)
 
@@ -343,25 +323,14 @@ A private vendor (e.g. a hosted-opencrane-api product) implements that contract 
 service; nothing vendor-specific lives in the AGPL tree. See
 `enterprise-needs.md` for the licensing rationale and the Kamaji parking note.
 
-Configure it via Helm — leave it unset and `dedicatedCluster` stays unavailable (fail-closed):
-
-```yaml
-clusterTenant:
-  provisionerWebhook:
-    url: https://provisioner.internal.example/api   # must be https:// — refused otherwise
-    id: my-backend
-    existingSecret: cluster-tenant-provisioner
-    secretKey: CLUSTER_TENANT_PROVISIONER_WEBHOOK_TOKEN
-```
-
-The control plane refuses a non-`https://` URL at startup so the bearer token is never sent in
-plaintext.
+The direct external-webhook configuration has been removed from the clean target. Until a
+workload-identity-backed provisioner contract is designed, `dedicatedCluster` stays unavailable
+and fails closed.
 
 ### 5.5 Validation
 
-`helm template` proves the opt-in gate statically: with no flags the chart renders the
-`ClusterTenant` CRD but **no** provisioner env on the opencrane-api Deployment; setting
-`clusterTenant.provisionerWebhook.url` renders the env block. The per-`ClusterTenant` namespace,
+`helm template` proves the default posture statically: the chart renders the `ClusterTenant` CRD
+without a provisioner credential path. The per-`ClusterTenant` namespace,
 quota, and scheduling are reconciled at runtime by the operator (the live-infra seam), and the
 conformance script (`apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh`) carries the in-cluster
 assertions for them (CT.5a–CT.5d).

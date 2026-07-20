@@ -13,17 +13,9 @@ Kubernetes underneath.
 
 ## Connect to the management API
 
-The guides use the authenticated REST API. Point requests at your control plane and
-confirm the token before making changes:
-
-```bash
-export OPENCRANE_URL=https://<your-domain>
-export OPENCRANE_TOKEN=<your-access-token>
-
-curl --fail-with-body \
-  --header "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "$OPENCRANE_URL/api/v1/auth/me"
-```
+The management UI signs operators in through OIDC and makes same-origin requests with its
+session cookie. There is no static API token to copy into a terminal. Use the UI for operator
+actions and the [interactive API reference](/reference/api) to inspect the same contract.
 
 For TypeScript integrations, use the generated client described in the
 [Contracts SDK](/integrators/contracts-sdk).

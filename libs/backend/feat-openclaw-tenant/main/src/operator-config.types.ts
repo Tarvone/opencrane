@@ -89,8 +89,8 @@ export interface OpenClawTenantOperatorConfig
   linkerdMeshEnabled: boolean;
   /** Whether the silo may create tenant namespaces. */
   manageTenantNamespaces: boolean;
-  /** Silo topology mode. */
-  deploymentMode: "standalone" | "fleet-managed";
+  /** The clean control plane owns its ClusterTenant lifecycle. */
+  deploymentMode: "standalone";
   /** Standalone ClusterTenant seed name. */
   standaloneSeedName: string;
   /** Standalone ClusterTenant display name. */

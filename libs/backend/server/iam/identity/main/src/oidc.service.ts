@@ -5,7 +5,6 @@ import type { PrismaClient } from "@prisma/client";
 
 import { OidcAuthServiceBase, _ClusterTenantFromHost, _OrgScope, _RequestHost, _ResolvePerOrgClient, type AuthUser, type LoginClient } from "@opencrane/server/_infra/auth";
 
-import type { FleetMembershipWriter } from "@opencrane/backend/server/tenancy/projection";
 import { _AdoptMemberOnLogin } from "./adopt-member.js";
 import { _MirrorGroupsOnLogin } from "./mirror-groups.js";
 import { _ResolveCallerClusterTenant } from "@opencrane/backend/server/tenancy/cluster-tenants";
@@ -41,12 +40,6 @@ export class OidcAuthService extends OidcAuthServiceBase
   private watchNamespace: string;
 
   /**
-   * Writer to the fleet's authoritative `OrgMembership` for first-login adoption; null in a
-   * standalone silo (#151), where adoption writes to the local read-model instead.
-   */
-  private fleetWriter: FleetMembershipWriter | null;
-
-  /**
    * @param log            - Parent logger; a child scoped to `oidc-auth` is derived by the base.
    * @param prisma         - Prisma client (also the base's `OrgMembership` read surface + the
    *                         `/auth/me` email→tenant lookup).
@@ -55,15 +48,13 @@ export class OidcAuthService extends OidcAuthServiceBase
    *                         then always uses the masters client).
    * @param watchNamespace - The TenantOperator's watch namespace; where first-login member
    *                         workspaces are seeded (parity with the owner-default seed).
-   * @param fleetWriter    - Writer to the fleet's authoritative membership; null ⇒ standalone silo.
    */
-  constructor(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null, watchNamespace = "default", fleetWriter: FleetMembershipWriter | null = null)
+  constructor(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null, watchNamespace = "default")
   {
     super(log, prisma);
     this.prisma = prisma;
     this.customApi = customApi;
     this.watchNamespace = watchNamespace;
-    this.fleetWriter = fleetWriter;
   }
 
   /**
@@ -107,7 +98,6 @@ export class OidcAuthService extends OidcAuthServiceBase
       host: _RequestHost(req),
       subject: authUser.sub,
       email: authUser.email,
-      fleetWriter: this.fleetWriter,
       log: this.log,
     });
 
@@ -124,9 +114,8 @@ export class OidcAuthService extends OidcAuthServiceBase
  * @param customApi      - Kubernetes custom-objects client for per-org login CR reads (null in dev/test).
  * @param watchNamespace - The TenantOperator's watch namespace, where first-login member workspaces
  *                         are seeded (defaults to `"default"` for dev/test).
- * @param fleetWriter    - Writer to the fleet's authoritative membership for adoption; null ⇒ standalone.
  */
-export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null, watchNamespace = "default", fleetWriter: FleetMembershipWriter | null = null): OidcAuthService
+export function ___CreateOidcAuthService(log: Logger, prisma: PrismaClient, customApi: k8s.CustomObjectsApi | null = null, watchNamespace = "default"): OidcAuthService
 {
-  return new OidcAuthService(log, prisma, customApi, watchNamespace, fleetWriter);
+  return new OidcAuthService(log, prisma, customApi, watchNamespace);
 }

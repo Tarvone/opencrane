@@ -20,10 +20,7 @@ import { ___CreatePrismaClient } from "./infra/db/db.js";
 import { _CreateArtifactUploadGateway } from "./infra/artifacts/artifact-upload.factory.js";
 import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
-import { ProjectionLifecycle, _BuildHttpFleetMembershipWriter } from "@opencrane/backend/server/tenancy/projection";
 import { OpenClawTenantLifecycle } from "@opencrane/backend/feat-openclaw-tenant";
-import { _CutTenant } from "@opencrane/backend/server/tenancy/connections";
-import { _SetTenantSuspended } from "@opencrane/backend/server/tenancy/tenants";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
 // namespace, so a silo stands on its own; the fleet-manager watches only the cluster-scoped
@@ -50,11 +47,8 @@ export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi,
   // First-login member workspaces are seeded into the TenantOperator's watch namespace
   // (WATCH_NAMESPACE) — the same target as the owner-default seed — falling back to NAMESPACE
   // then "default" for dev/test. It is deliberately NOT the projection-repair namespace.
-  // Member adoption writes THROUGH to the fleet's authoritative membership when FLEET_INTERNAL_URL
-  // is set (fleet-managed); the writer is null for a standalone silo, where adoption writes local.
   const authWatchNamespace = process.env.WATCH_NAMESPACE ?? process.env.NAMESPACE ?? "default";
-  const authFleetWriter = _BuildHttpFleetMembershipWriter(process.env.FLEET_INTERNAL_URL?.trim() ?? "", process.env.OPENCRANE_API_TOKEN?.trim() ?? "", log);
-  const authService = ___CreateOidcAuthService(log, prisma, customApi, authWatchNamespace, authFleetWriter);
+  const authService = ___CreateOidcAuthService(log, prisma, customApi, authWatchNamespace);
 
   // Middleware
   app.set("trust proxy", 1);
@@ -85,9 +79,7 @@ export function createApp(prisma: PrismaClient, customApi: k8s.CustomObjectsApi,
   // listener is what stops them being reachable from the internet under the org
   // ingress's `/api` path (they take no auth by design — NetworkPolicy is their gate).
 
-  // Pass prisma so DB-issued access tokens from POST /access-tokens are validated
-  // in addition to the env-var token.
-  app.use(___AuthMiddleware(prisma));
+  app.use(___AuthMiddleware());
 
   // Register API routes
   _RegisterRoutes(app, prisma, customApi, coreApi, authApi);
@@ -167,39 +159,6 @@ const internalServer = internalApp.listen(internalPort, function _onInternalList
   log.info({ internalPort }, "control plane internal API listening");
 });
 
-/** Namespace and cadence for the app-composed projection lifecycle. */
-const projectionNamespace = process.env.NAMESPACE ?? "default";
-const projectionIntervalMs = Number(process.env.OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS ?? "60") * 1000;
-
-/** Adapt the connection-domain cut operation to the projection enforcement port. */
-async function _cutMembershipTenant(tenant: string, namespace: string, reason: string): Promise<void>
-{
-  await _CutTenant(coreApi, { tenant, namespace, reason });
-}
-
-/** Adapt the tenant-domain suspension operation to the projection enforcement port. */
-async function _setMembershipTenantSuspended(tenant: string, suspended: boolean): Promise<void>
-{
-  await _SetTenantSuspended(customApi, projectionNamespace, tenant, suspended);
-}
-
-/** Projection loops composed from app-owned clients and explicit tenant mutation ports. */
-const projectionLifecycle = new ProjectionLifecycle({
-  customApi,
-  prisma,
-  namespace: projectionNamespace,
-  intervalMs: projectionIntervalMs,
-  fleetInternalUrl: process.env.FLEET_INTERNAL_URL?.trim() ?? "",
-  fleetInternalToken: process.env.OPENCRANE_API_TOKEN?.trim() ?? "",
-  log,
-  enforcement: {
-    namespace: projectionNamespace,
-    cutTenant: _cutMembershipTenant,
-    setTenantSuspended: _setMembershipTenantSuspended,
-  },
-});
-projectionLifecycle.start();
-
 /** Frozen-blue OpenClaw tenant runtime composed behind its library lifecycle contract. */
 const openClawTenantLifecycle = new OpenClawTenantLifecycle({
   kubeConfig: kc,
@@ -227,8 +186,7 @@ async function _shutdown(signal: string): Promise<void>
   const hardExit = setTimeout(function _force() { process.exit(1); }, 10_000);
   hardExit.unref();
 
-  // Stop the projection-repair loops + in-silo controllers so no sweep races the disconnect below.
-  projectionLifecycle.stop();
+  // Stop the in-silo controller before disconnecting its database dependencies.
   await openClawTenantLifecycle.stop();
 
   try

@@ -58,6 +58,9 @@ schema/migration ownership in [`prisma.md`](./prisma.md).
 Personal-agent product capabilities use the `backend-agents-personal-<d>` NX namespace under
 `libs/backend/agents/personal/<d>/main`: personas, conversations, runs, and memory. They own a
 person's approved persona, conversation events, run lifecycle, and memory catalogue respectively.
+The sibling `session/main` package owns the single assembler that turns those authorities into an
+immutable `RunInputSnapshot`; it is session orchestration, not a second source of persona or run
+truth.
 Fleet membership, proof-bound authorization, and agent-service publication remain in
 `libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
 A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.

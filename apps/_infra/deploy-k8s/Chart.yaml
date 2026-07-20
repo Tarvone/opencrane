@@ -32,6 +32,9 @@ dependencies:
   - name: opencrane-channel-proxy
     version: 0.1.0
     repository: "file://../../channel-proxy/helm"
+  - name: opencrane-agent-runtime
+    version: 0.1.0
+    repository: "file://../../agent-runtime/helm"
   - name: opencrane-artifact-service
     version: 0.1.0
     repository: "file://../../artifact-service/helm"

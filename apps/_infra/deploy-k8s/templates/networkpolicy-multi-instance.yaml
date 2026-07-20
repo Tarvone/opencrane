@@ -38,8 +38,14 @@ metadata:
     {{- include "opencrane.labels" $ | nindent 4 }}
     app.kubernetes.io/component: cross-instance-isolation
 spec:
-  # Empty podSelector → applies to every pod in this instance namespace.
-  podSelector: {}
+  # ArtifactStore and agent-runtime own stricter app-specific policies. Exclude them here:
+  # NetworkPolicies are additive, and this generic same-instance allowance would otherwise widen
+  # their deliberately tiny ingress/egress surfaces under the multi-CT profile.
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: NotIn
+        values: [artifact-service, agent-runtime]
   policyTypes:
     - Ingress
     - Egress

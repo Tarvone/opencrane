@@ -17,7 +17,71 @@ import { tenantsRouter } from "@opencrane/backend/server/tenancy/tenants";
 import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/retrieval";
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
+import { _RegisterInternalAgentRuntimeStream, type RuntimeCommandStreamAuthority, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
 import { spec } from "@opencrane/backend/server/api-spec";
+
+/** Fixed projected-token audience for the outbound-only personal runtime shell. */
+const _AGENT_RUNTIME_TOKEN_AUDIENCE = "opencrane-agent-runtime";
+
+/** Extract and validate the exact Kubernetes ServiceAccount subject grammar. */
+function _ParseRuntimeSubject(subject: string, expectedNamespace: string, expectedServiceAccount: string, podUid: string | null): RuntimeWorkloadIdentity | null
+{
+  const parts = subject.split(":");
+	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || parts[3] !== expectedServiceAccount || !podUid)
+  {
+    return null;
+  }
+	return { subject, namespace: expectedNamespace, serviceAccountName: expectedServiceAccount, podUid };
+}
+
+/** Read the pod UID claim Kubernetes attaches to a bound projected ServiceAccount token. */
+function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): string | null
+{
+	const podUid = extra?.["authentication.kubernetes.io/pod-uid"]?.[0];
+	return typeof podUid === "string" && podUid.length > 0 ? podUid : null;
+}
+
+/** Build the app-owned Kubernetes TokenReview adapter for a runtime projected token. */
+function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
+{
+  const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
+  const expectedServiceAccount = process.env.AGENT_RUNTIME_SERVICE_ACCOUNT_NAME?.trim();
+  return {
+    async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
+    {
+      if (!expectedServiceAccount)
+      {
+        return null;
+      }
+      const body = new k8s.V1TokenReview();
+      body.spec = new k8s.V1TokenReviewSpec();
+      body.spec.token = token;
+      body.spec.audiences = [_AGENT_RUNTIME_TOKEN_AUDIENCE];
+      const review = await authApi.createTokenReview({ body });
+      const status = review.status;
+      if (!status?.authenticated || !status.audiences?.includes(_AGENT_RUNTIME_TOKEN_AUDIENCE))
+      {
+        return null;
+      }
+		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, expectedServiceAccount, _ReadReviewedPodUid(status.user?.extra));
+    },
+  };
+}
+
+/**
+ * Deliberately empty composition until the next controller slice owns durable runtime assignments.
+ * It permits an authenticated shell to stay connected but accepts no candidate and issues no command.
+ */
+const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
+  async __NextCommand(): Promise<null>
+  {
+    return null;
+  },
+  async __AdmitCandidate(): Promise<{ accepted: false; reason: string }>
+  {
+    return { accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" };
+  },
+};
 
 /**
  * Registers all API routes on the given Express application instance.
@@ -50,6 +114,15 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
   // Note: /api/internal/contract enforces per-tenant identity via TokenReview — not NetworkPolicy-only.
   app.use("/api/internal/contract", _RegisterInternalTenantContract(prisma, authApi));
   app.use("/api/internal/awareness/participation", _RegisterInternalParticipation(prisma, authApi));
+  // The runtime opens this internal SSE connection itself. TokenReview is the identity
+  // boundary; the intentionally empty authority below cannot issue commands or persist data.
+  app.use("/api/internal/agent-runtime", _RegisterInternalAgentRuntimeStream({
+    tokenReviewer: _CreateRuntimeTokenReviewer(authApi),
+    authority: _NoRuntimeAssignmentAuthority,
+    maxBodyBytes: 64 * 1024,
+    heartbeatMilliseconds: 15_000,
+    commandPollMilliseconds: 1_000,
+  }));
 }
 
 /**

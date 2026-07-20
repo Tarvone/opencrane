@@ -23,6 +23,8 @@ coverage/
 .vscode/
 .idea/
 *.log
+__pycache__/
+*.py[cod]
 
 # Dev (root-level scratch dir only; anchored so it doesn't swallow nested dirs
 # like apps/_infra/deploy-k8s/platform/terraform/environments/dev/)

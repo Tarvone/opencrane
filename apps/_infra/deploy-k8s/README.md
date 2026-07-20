@@ -24,7 +24,8 @@ wires the pieces and the per-silo networking together.
  ┌────────────────────────────────────────────────────────────┐
  │  opencrane-silo umbrella chart  ◄── HERE                     │
  │    composes app-owned template libraries into one release:   │
- │    server · opencrane-ui · channel-proxy · artifact-service  │
+ │    server · opencrane-ui · channel-proxy · agent-runtime     │
+ │    · artifact-service                                        │
  │    · database-schema Job · cognee · litellm · obot · langfuse│
  └────────────────────────────────────────────────────────────┘
         │  requires (external prerequisites, NOT installed here)
@@ -34,6 +35,7 @@ wires the pieces and the per-silo networking together.
 
 **In this flow:** [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
 · [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+· [agent-runtime](../../agent-runtime/README.md)
 · [postgres](../../postgres/README.md) · [cognee](../cognee/README.md) · [litellm](../litellm/README.md)
 · [obot](../obot/README.md) · [langfuse](../langfuse/README.md)
 
@@ -81,7 +83,8 @@ package imports it.
 
 - Parent index: [_infra](../README.md)
 - Composed apps: [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
-  · [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+· [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+· [agent-runtime](../../agent-runtime/README.md)
   · [postgres](../../postgres/README.md)
 - Composed infra: [cognee](../cognee/README.md) · [litellm](../litellm/README.md) ·
   [obot](../obot/README.md) · [langfuse](../langfuse/README.md)

@@ -10,6 +10,17 @@ export const AGENT_RUNTIME_PROTOCOL_V1 = "opencrane.agent-runtime/v1";
 /** Exact protocol version literal carried by every runtime frame. */
 export type AgentRuntimeProtocolVersion = typeof AGENT_RUNTIME_PROTOCOL_V1;
 
+/** Initial message sent by a runtime after it opens its control-plane stream. */
+export interface RuntimeStreamOpen
+{
+	/** Versioned protocol the runtime is prepared to receive. */
+	readonly protocolVersion: AgentRuntimeProtocolVersion;
+	/** Ephemeral process identifier generated at runtime start. */
+	readonly runtimeInstanceId: string;
+	/** Downward-API pod UID which must agree with the reviewed projected-token identity. */
+	readonly podUid: string;
+}
+
 /** Immutable command coordinates shared by every runtime-directed command. */
 export interface RuntimeCommandCoordinates
 {

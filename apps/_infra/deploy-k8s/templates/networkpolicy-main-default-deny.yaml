@@ -33,13 +33,13 @@ metadata:
     {{- include "opencrane.labels" . | nindent 4 }}
     app.kubernetes.io/component: platform-default-deny
 spec:
-  # ArtifactStore has an app-owned, server-only policy. Excluding it here prevents the generic
-  # platform allow-list from widening its ingress/egress through Kubernetes' additive semantics.
+  # ArtifactStore and the runtime shell have app-owned policies. Excluding them here prevents the
+  # generic platform allow-list from widening their ingress/egress through additive semantics.
   podSelector:
     matchExpressions:
       - key: app.kubernetes.io/component
         operator: NotIn
-        values: [artifact-service]
+        values: [artifact-service, agent-runtime]
   policyTypes:
     - Ingress
     - Egress

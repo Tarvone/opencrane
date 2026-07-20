@@ -151,6 +151,9 @@
       "@opencrane/server/_infra/channel-proxy": [
         "./libs/server/_infra/channel-proxy/src/index.ts"
       ],
+      "@opencrane/server/_infra/agent-runtime-stream": [
+        "./libs/server/_infra/agent-runtime-stream/src/index.ts"
+      ],
       "@opencrane/server/_infra/http": [
         "./libs/server/_infra/http/src/index.ts"
       ],

@@ -58,7 +58,7 @@ describe("personal-runtime attempt Job resources", function _Suite()
 
 		expect(resources.job.kind).toBe("Job");
 		expect(resources.job.spec).toMatchObject({ suspend: true, parallelism: 1, completions: 1, backoffLimit: 0, activeDeadlineSeconds: 900, ttlSecondsAfterFinished: 300 });
-		expect(podSpec).toMatchObject({ automountServiceAccountToken: false, enableServiceLinks: false, restartPolicy: "Never", securityContext: { runAsNonRoot: true, seccompProfile: { type: "RuntimeDefault" } } });
+		expect(podSpec).toMatchObject({ automountServiceAccountToken: false, enableServiceLinks: false, restartPolicy: "Never", securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, fsGroupChangePolicy: "OnRootMismatch", seccompProfile: { type: "RuntimeDefault" } } });
 		expect(runtime?.securityContext).toMatchObject({ allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } });
 		expect(podSpec?.serviceAccountName).toBe("agent-runtime-personal");
 		expect(resources).not.toHaveProperty("serviceAccount");
@@ -70,9 +70,11 @@ describe("personal-runtime attempt Job resources", function _Suite()
 		const resources = __BuildSuspendedAgentRuntimeJobResources(_Assignment(), _Profile());
 		const volumes = resources.job.spec?.template.spec?.volumes;
 		const tokenProjection = volumes?.find(volume => volume.name === "runtime-token")?.projected?.sources?.[0]?.serviceAccountToken;
+		const tokenMode = volumes?.find(volume => volume.name === "runtime-token")?.projected?.defaultMode;
 		const serialized = JSON.stringify(resources);
 
 		expect(tokenProjection).toMatchObject({ audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: 600, path: "runtime.token" });
+		expect(tokenMode).toBe(0o440);
 		expect(volumes?.find(volume => volume.name === "scratch")?.emptyDir).toEqual({ sizeLimit: "64Mi" });
 		expect(serialized).not.toContain("persistentVolumeClaim");
 		expect(serialized).not.toContain("secretKeyRef");

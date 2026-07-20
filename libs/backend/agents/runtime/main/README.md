@@ -4,13 +4,18 @@
 
 ## What it owns
 
-This package is the control-plane authority for the language-neutral
-`AgentRuntimeProtocol v1`. It validates command and candidate frames against the immutable run
-attempt, dispatch assignment, snapshot digest, stream sequence, expiry, and lease fence before a
-runtime can affect canonical state.
+This package is the checkpoint between OpenCrane and the process that executes a personal agent. The
+executor may be implemented in any language; it receives commands and proposes results, but it does
+not get to decide what is current or authoritative. This package owns that decision through the
+language-neutral `AgentRuntimeProtocol v1`.
+
+Before a command reaches an executor, it checks that the command belongs to the currently assigned
+run attempt, carries the exact frozen input snapshot, arrives in order, and is still inside its lease.
+When the executor proposes an event or outside action, it performs the mirror check before another
+domain may persist or execute that proposal.
 
 ```
- immutable run snapshot
+ OpenCrane run authority + immutable snapshot
           │ command + assignment + fence
           ▼
  ┌──────────────────────────────┐
@@ -18,13 +23,14 @@ runtime can affect canonical state.
  └──────────────────────────────┘
           │ accepted candidate only
           ▼
- run and conversation authorities
+ run / conversation / action authorities decide and persist the proposal
 ```
 
 **In this flow:** [personal/runs](../../personal/runs/main/README.md) · [personal/conversations](../../personal/conversations/main/README.md)
 
-Invariant: a runtime can only propose a result for one dispatched, unexpired command and a live
-attempt lease. Duplicate candidates report the earlier result; everything else is denied.
+Invariant: an executor can only propose a result for a command OpenCrane already accepted for the
+exact current attempt and lease. Duplicate command or candidate identifiers are idempotent; stale,
+expired, out-of-order, malformed, or mismatched frames are denied with a stable reason.
 
 It intentionally owns no HTTP listener, Kubernetes resource, model driver, provider credential,
 tool execution, or direct persistence adapter. The app composes it with the stream transport and
@@ -35,7 +41,10 @@ authorities to accept or reject.
 
 - `__AdmitRuntimeCommand` — validates a control-plane command before stream delivery.
 - `__AdmitRuntimeCandidate` — validates a runtime-proposed event or deferred action.
-- `RuntimeAttemptAuthority` — exact durable facts needed at the final acceptance fence.
+- `RuntimeAttemptAuthority` — exact durable facts the owning run authority must supply at the final
+  acceptance fence.
+- `RuntimeCommandAdmission*` / `RuntimeCandidateAdmission*` — typed allow, idempotent, or fail-closed
+  decisions and their input ports.
 
 ## Boundary
 

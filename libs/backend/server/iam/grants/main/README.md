@@ -33,7 +33,12 @@ Cognee — the org-memory service — in sync with those awareness grants.
 
 Invariant: the compiler is deterministic — the same grants always produce the same decision, with a
 defined precedence so overlaps never resolve ambiguously. Derived dataset membership is a projection
-of the grants, never a second source of truth.
+of the grants, never a second source of truth. Share creation, listing and revocation derive the
+sharer only from the authenticated OpenID Connect (OIDC) session subject (falling back to the email
+stored in that authenticated session when no subject is present), never from a request-body
+identity; missing identity fails with `401`. The API accepts only its explicit scope, recipient and
+allow semantics; generated database enum objects are not a second runtime contract, so packaging
+changes cannot silently widen who receives access.
 
 ## Public surface
 

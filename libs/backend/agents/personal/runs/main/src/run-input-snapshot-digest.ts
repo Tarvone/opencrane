@@ -2,7 +2,11 @@ import { __DigestCanonicalJson } from "@opencrane/backend/server/iam/authorizati
 import type { RunInputSnapshot } from "@opencrane/contracts";
 import type { JsonValue } from "@opencrane/util";
 
-/** Produces the canonical digest for a fully assembled input snapshot without its self-reference. */
+/**
+ * Produces the content identity of every authority-frozen runtime input without hashing the digest
+ * into itself. Callers must canonicalise set-like source arrays before invoking it; ordered message
+ * history and provenance remain deliberately order-sensitive where their order carries meaning.
+ */
 export function __DigestRunInputSnapshot(snapshot: Omit<RunInputSnapshot, "digest">): string
 {
 	return __DigestCanonicalJson({

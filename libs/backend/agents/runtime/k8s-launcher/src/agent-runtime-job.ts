@@ -44,7 +44,11 @@ function _ParseCpuMillis(value: string): number | null
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-/** Validate the immutable profile before it reaches a Kubernetes API adapter. */
+/**
+ * Validate every deployment-owned runtime limit before the profile reaches Kubernetes.
+ * The checks keep an authority bug from widening network reach, selecting a moving image, mounting
+ * unbounded scratch, or granting a per-user identity through a supposedly bounded profile.
+ */
 function _AssertProfile(profile: AgentRuntimeJobProfile): void
 {
 	// 1. Pin the image and stream to the exact in-cluster endpoint the policy will admit.
@@ -119,7 +123,10 @@ function _AssertSameNamespace(assignment: AgentRuntimeJobAssignment, profile: Ag
 	}
 }
 
-/** Derive the stable Kubernetes name shared by one run attempt's resources. */
+/**
+ * Derive the stable Kubernetes name shared by one run attempt's resources.
+ * Attempt coordinates are NUL-delimited before hashing so concatenation cannot create aliases.
+ */
 function _AttemptResourceName(assignment: AgentRuntimeJobAssignment): string
 {
 	const digest = createHash("sha256").update(`${assignment.siloId}\u0000${assignment.runId}\u0000${assignment.attempt}`).digest("hex").slice(0, 24);
@@ -220,6 +227,12 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
  * Build the exact Kubernetes resource set for one personal-runtime attempt. The returned Job is
  * always suspended; the controller may unsuspend it only after persisting the Job UID together
  * with the PendingPod assignment and one-time bootstrap in the same authority transition.
+ *
+ * This function is pure and returns the policy and Job as one inseparable projection so callers
+ * cannot accidentally launch a workload without first establishing its deny-by-default network.
+ * @param assignment - Durable run coordinates that become workload annotations and identity.
+ * @param profile - Bounded deployment-owned image, ServiceAccount, network, and resource limits.
+ * @returns Deterministically named policy and still-suspended one-attempt Job.
  */
 export function __BuildSuspendedAgentRuntimeJobResources(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile): AgentRuntimeJobResources
 {

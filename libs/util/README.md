@@ -14,12 +14,17 @@ It owns two things:
 - **Collection helpers** — `___SortBy` (stable sort by an optional key), `___SomeArray` and
   `___SomeRecord` (typed "does any element/value match?" checks). Small, but shared so the same
   behaviour is used everywhere rather than re-implemented.
-- **Canonical JSON** — `___CanonicalizeJson` serialises a JSON value to the one canonical string
+- **Canonical JSON and digest grammar** — `___CanonicalizeJson` serialises a JSON value to the one
+  canonical string
   form defined by RFC 8785 (JSON Canonicalization Scheme): object keys sorted, whitespace and number
   formatting fixed. Two values that are equal produce byte-identical text, which is what makes a
-  stable hash possible. The type `CanonicalJsonSha256Digest` is the template-literal string type
+  stable hash possible. `___CloneCanonicalJson` round-trips through that form to produce a detached,
+  JSON-equivalent value; callers must canonicalise again when deterministic bytes or key order matter.
+  The type `CanonicalJsonSha256Digest` is the template-literal string type
   `` `sha256:${string}` `` — an explicitly encoded digest, so a hash of canonical bytes is never
   confused with an arbitrary string.
+- **Digest grammar** — `___IsSha256Digest` accepts only `sha256:` plus 64 lowercase hexadecimal
+  characters, keeping digests exchanged between authorities in one fail-closed spelling.
 
 Widely used where a **deterministic** result matters — most importantly the authorization model,
 which digests capability catalogues and request arguments so a signature can bind to exact bytes.
@@ -30,12 +35,15 @@ platform-wide API. Invariant: purity and determinism — no hidden inputs, same 
 
 - `___SortBy`, `___SomeArray`, `___SomeRecord` — collection helpers.
 - `___CanonicalizeJson` — RFC 8785 canonical JSON serialisation.
+- `___CloneCanonicalJson` — detached deep copy through the canonical JSON representation.
+- `___IsSha256Digest` — strict validator for the platform's lowercase SHA-256 digest grammar.
 - `JsonValue`, `JsonPrimitive`, `CanonicalJsonSha256Digest` — JSON and digest types.
 
 ## Boundary
 
-Pure and dependency-free: it may not import any other package, and it does no I/O. It provides
-building blocks; hashing the canonical bytes and any storage stay with the caller.
+Pure and dependency-free: it may not import any other package, and it does no I/O. It validates
+digest spelling but does not decide what a digest means; hashing canonical bytes and persistence
+remain with the owning domain.
 
 ## Dependency direction
 

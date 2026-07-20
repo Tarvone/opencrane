@@ -42,6 +42,11 @@ A silo installs **only** its own namespaced app releases. Cluster-wide controlle
 external-dns, CloudNativePG, cert-manager) are external prerequisites a silo never installs. Dependencies
 resolve from `Chart.lock` via `helm dep build` (pinned, reproducible) — never from open version ranges.
 
+The personal `agent-runtime` image is deliberately absent from this static rollup. It is not a
+long-lived silo service: this slice defines the bounded Job contract that the next agent-controller
+slice will create for each authorised run attempt. Workload lifetime and Kubernetes identity will
+therefore remain tied to that attempt rather than to a release.
+
 ## Public surface
 
 `Entrypoint: deploy.sh` — the per-ClusterTenant silo deploy profile, a thin wrapper over the shared

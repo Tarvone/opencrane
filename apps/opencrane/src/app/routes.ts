@@ -35,7 +35,14 @@ function _ReadBoundedSeconds(name: string, fallbackSeconds: number, minimumSecon
 	return seconds * 1_000;
 }
 
-/** Extract and validate the exact Kubernetes ServiceAccount subject grammar. */
+/**
+ * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
+ *
+ * The expected namespace comes from server-owned deployment configuration. The reviewed
+ * ServiceAccount must satisfy the same bounded runtime-profile grammar used when building Jobs, and
+ * the Pod UID must come from TokenReview. Returning `null` on every mismatch keeps subject parsing
+ * from silently broadening which runtime workloads the server trusts.
+ */
 function _ParseRuntimeSubject(subject: string, expectedNamespace: string, podUid: string | null): RuntimeWorkloadIdentity | null
 {
   const parts = subject.split(":");
@@ -47,14 +54,24 @@ function _ParseRuntimeSubject(subject: string, expectedNamespace: string, podUid
 	return { subject, namespace: expectedNamespace, serviceAccountName, podUid };
 }
 
-/** Read the pod UID claim Kubernetes attaches to a bound projected ServiceAccount token. */
+/**
+ * Read the Pod UID claim Kubernetes attaches to a bound projected ServiceAccount token.
+ *
+ * The UID is required because a ServiceAccount name identifies a workload class, not the exact Pod
+ * assigned to one run attempt. Missing or malformed TokenReview extras therefore fail closed.
+ */
 function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): string | null
 {
 	const podUid = extra?.["authentication.kubernetes.io/pod-uid"]?.[0];
 	return typeof podUid === "string" && podUid.length > 0 ? podUid : null;
 }
 
-/** Submit one audience-bound projected token and return only an authenticated accepted review. */
+/**
+ * Submit one audience-bound projected token and expose only an authenticated accepted review.
+ *
+ * The raw credential remains local to this traced Kubernetes call. A valid signature without the
+ * exact requested audience is collapsed into the same denial as any other failed TokenReview.
+ */
 async function _ReviewProjectedToken(authApi: k8s.AuthenticationV1Api, token: string, audience: string): Promise<k8s.V1TokenReviewStatus | null>
 {
 	return ___DoWithTrace("kubernetes.projected_token.review", { audience }, async function _reviewToken(): Promise<k8s.V1TokenReviewStatus | null>
@@ -69,7 +86,14 @@ async function _ReviewProjectedToken(authApi: k8s.AuthenticationV1Api, token: st
 	});
 }
 
-/** Build the app-owned Kubernetes TokenReview adapter for a runtime projected token. */
+/**
+ * Build the app-owned Kubernetes TokenReview adapter for runtime projected credentials.
+ *
+ * Kubernetes remains the issuer and verifier. This adapter fixes the audience and namespace, then
+ * validates the reviewed ServiceAccount against the shared runtime-profile grammar and exposes only
+ * the workload identity needed by the transport. It never forwards the raw token or TokenReview
+ * response; a valid signature without all bindings is still unauthorised.
+ */
 function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
 {
   const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
@@ -83,7 +107,10 @@ function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeT
   };
 }
 
-/** Parse the exact fixed agent-controller ServiceAccount subject in one silo namespace. */
+/**
+ * Parse only the fixed agent-controller ServiceAccount subject in one silo namespace.
+ * A valid token for any other namespaced identity must never inherit controller dispatch authority.
+ */
 function _ParseAgentControllerSubject(username: string, expectedNamespace: string, audiences: readonly string[]): ReviewedAgentControllerIdentity | null
 {
 	const expectedUsername = `system:serviceaccount:${expectedNamespace}:${AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME}`;
@@ -91,7 +118,11 @@ function _ParseAgentControllerSubject(username: string, expectedNamespace: strin
 	return { username, namespace: expectedNamespace, serviceAccountName: AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, audiences };
 }
 
-/** Build the app-owned Kubernetes TokenReview adapter for agent-controller calls. */
+/**
+ * Build the app-owned TokenReview adapter for the sole agent-controller identity.
+ * The adapter fixes audience, namespace, and ServiceAccount before exposing a reviewed identity to
+ * the run-dispatch router; no caller-provided coordinate can widen those bindings.
+ */
 function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api): AgentControllerTokenReviewer
 {
 	const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
@@ -109,10 +140,12 @@ function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api): 
  * It permits an authenticated shell to stay connected but accepts no candidate and issues no command.
  */
 const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
+  /** Refuse to invent commands before durable assignment authority is connected. */
   async __NextCommand(): Promise<null>
   {
     return null;
   },
+  /** Refuse all runtime output before a run/attempt authority can validate and persist it. */
   async __AdmitCandidate(): Promise<{ accepted: false; reason: string }>
   {
     return { accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" };

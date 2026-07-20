@@ -1,11 +1,15 @@
+import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
 import { __VerifyCurrentFleetMembershipEvidence, PrismaFleetMembershipAuthorityRepository } from "@opencrane/backend/server/iam/membership";
 import type { FleetMembershipAdmissionExpectation, FleetMembershipSignatureVerifier } from "@opencrane/backend/server/iam/membership";
 import { ___IsSha256Digest } from "@opencrane/util";
 
 import type { CapabilitySetDigestSource, IdentityEnvelopeInput, IdentityEnvelopeSource, SessionAssemblyCommand, SessionAssemblyLoad } from "./session-assembly.types.js";
-import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
 
-/** Identity source that derives its snapshot evidence only from a signed membership revision accepted in the admission transaction. */
+/**
+ * Identity source that derives snapshot evidence only from a signed membership revision accepted in
+ * the admission transaction. It never accepts caller-assembled identity fields: membership evidence,
+ * capability digest, and the run either commit together or all roll back.
+ */
 export class FleetMembershipIdentityEnvelopeSource implements IdentityEnvelopeSource
 {
 	/** Signed fleet membership expectation configured by the owning control-plane composition. */

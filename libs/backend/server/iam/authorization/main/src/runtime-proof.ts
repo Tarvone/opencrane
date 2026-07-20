@@ -97,7 +97,15 @@ function _receiptMatchesIntent<TResult>(receipt: CapabilityActionReceipt<TResult
 		&& receipt.replayMode === intent.replayMode;
 }
 
-/** Validates and atomically consumes a one-time runtime bootstrap claim. */
+/**
+ * Validate and atomically consume a one-time runtime bootstrap claim.
+ * Cryptographic key shape and every independently observed workload coordinate are checked before
+ * persistence; a replay or repository conflict remains a denial and never returns prior authority.
+ * @param repository - Durable single-consumption and public-proof-key binding authority.
+ * @param claim - Candidate bootstrap and runtime-generated public proof key.
+ * @param expectation - Trusted assignment, TokenReview identity, attempt, and server time.
+ * @returns A receipt only for the first exact bootstrap consumption, otherwise a typed denial.
+ */
 export async function __ConsumeRuntimeBootstrap(repository: RuntimeBootstrapRepository, claim: RuntimeBootstrapClaim, expectation: RuntimeBootstrapExpectation): Promise<ConsumeRuntimeBootstrapResult>
 {
 	const failure = _validateBootstrap(claim, expectation);

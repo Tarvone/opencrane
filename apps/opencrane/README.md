@@ -45,11 +45,12 @@ of that API. This server is where those endpoints live. It plays two roles at on
 reconcilers it composes)* · [opencrane-ui](../opencrane-ui/README.md) *(the main API client)* ·
 [deploy-k8s](../_infra/deploy-k8s/README.md) *(the silo umbrella chart that deploys it)*
 
-Invariant: the public API and the workload-facing internal API are served on **two separate listeners**
-(ports 8080 and 8081). Keeping the internal listener off the public ingress is the first boundary;
-each sensitive workload route then verifies its own projected Kubernetes identity with TokenReview,
-while the few explicitly network-only routes remain confined by NetworkPolicy. If either layer were
-collapsed, platform-only reconciliation or runtime authority could become publicly reachable.
+Invariant: the public API and workload-facing internal API are served on **two separate listeners**
+(ports 8080 and 8081). Keeping the internal listener off the public ingress is the first boundary.
+Sensitive Pod routes, including the personal-agent runtime stream, additionally verify short-lived
+projected Kubernetes identity through TokenReview; explicitly network-only routes remain confined by
+NetworkPolicy. If either layer were collapsed, platform-only or runtime authority could become
+internet-facing.
 
 ## Public surface
 
@@ -60,7 +61,7 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 - `createApp(prisma, customApi, coreApi, authApi)` — builds the public Express app (mounts every domain
   router). Exported so tests can drive it with injected clients.
 - `createInternalApp(prisma, authApi)` — builds the internal-only Express app; each mounted route
-  declares either projected-workload TokenReview or explicit NetworkPolicy-only trust.
+  declares projected-workload TokenReview or explicit NetworkPolicy-only trust.
 
 The internal controller routes TokenReview only the fixed `agent-controller` ServiceAccount and
 `opencrane-agent-controller` audience. They let that process claim a database-fenced run attempt and
@@ -68,6 +69,8 @@ commit only the immutable UID of the suspended Job it created. The runtime strea
 the `opencrane-agent-runtime` audience and bounded runtime-profile ServiceAccount grammar. Durable
 assignment remains the authority for the exact ServiceAccount, Job, Pod, run, and revision; a
 ServiceAccount name alone is never sufficient.
+The runtime stream still injects an empty command authority, so a verified Pod may maintain a
+heartbeat connection but cannot receive commands or persist candidate output yet.
 
 ## Boundary
 
@@ -84,8 +87,11 @@ import back into it.
 ## Data & persistence
 
 Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, with applied migrations
-under `prisma/migrations/`. The migrate init-container runs `prisma migrate deploy` from this package
-root at rollout. This is the one place the silo's database shape is defined.
+under `prisma/migrations/`. The runs slice binds every `AgentRun` to exactly one immutable
+`RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
+and commits its initial acceptance and dispatch events in the same transaction. A partial or
+mismatched admission therefore cannot commit. The migrate init-container runs `prisma migrate deploy`
+from this package root at rollout; this is the one place the silo's database shape is defined.
 
 ## Runtime & config
 

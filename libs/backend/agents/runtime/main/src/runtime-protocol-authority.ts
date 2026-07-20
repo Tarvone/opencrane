@@ -14,15 +14,23 @@ function _hasPositiveCounter(value: unknown): value is number
 	return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-/** Returns a parsed ISO timestamp only when the input is a valid wire timestamp. */
+/**
+ * Parses only the canonical millisecond UTC wire spelling used by signed and digested frames.
+ * Permissive JavaScript date spellings are rejected so two runtimes cannot encode one instant
+ * differently while still passing the expiry fence.
+ */
 function _parseTime(value: unknown): number | null
 {
-	if (typeof value !== "string") return null;
+	if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)) return null;
 	const epochMs = Date.parse(value);
-	return Number.isFinite(epochMs) ? epochMs : null;
+	return Number.isFinite(epochMs) && new Date(epochMs).toISOString() === value ? epochMs : null;
 }
 
-/** Admits one runtime command only when its stream, attempt, expiry, fence, and snapshot still match. */
+/**
+ * Admits one runtime command only when its stream, attempt, expiry, fence, and snapshot still match.
+ * This is a pure decision boundary: acceptance grants no write and the caller must durably advance
+ * sequence/idempotency authority before delivering the command to an executor.
+ */
 export function __AdmitRuntimeCommand(input: RuntimeCommandAdmissionInput): RuntimeCommandAdmission
 {
 	const { authority, command } = input;
@@ -60,7 +68,11 @@ export function __AdmitRuntimeCommand(input: RuntimeCommandAdmissionInput): Runt
 	return { outcome: "accepted", nextCommandSequence: authority.nextCommandSequence + 1 };
 }
 
-/** Admits a runtime candidate only when it remains bound to the live attempt and lease fence. */
+/**
+ * Admits a runtime proposal only when it remains bound to an accepted command and live attempt fence.
+ * Acceptance is not permission to perform the proposed effect; the owning event or action authority
+ * must still validate and persist it, while duplicate candidate identifiers remain idempotent.
+ */
 export function __AdmitRuntimeCandidate(input: RuntimeCandidateAdmissionInput): RuntimeCandidateAdmission
 {
 	const { authority, candidate } = input;

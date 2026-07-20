@@ -27,7 +27,9 @@ single-Pod Job using a controller-selected ServiceAccount from the bounded runti
 
 Invariant: the returned Job is always suspended, has one completion and no retry, and cannot receive
 provider credentials or durable storage. Invalid authority coordinates or an unpinned, cross-namespace,
-or externally routed profile fail before any Kubernetes adapter can perform input/output (I/O).
+or externally routed profile fail before any Kubernetes adapter can perform input/output (I/O). The
+default ServiceAccount token is disabled; the only workload credential is a short-lived token for the
+`opencrane-agent-runtime` audience, mounted read-only for the non-root runtime group.
 
 ## Public surface
 
@@ -54,7 +56,9 @@ contracts. It never imports an application entrypoint or an OpenCrane-server inf
 
 There are no environment variables or I/O. The caller supplies a digest-pinned image, same-namespace
 runtime-stream URL, bounded zero-RBAC ServiceAccount, exact release and server selectors, a 600–3600
-second token lifetime, finite deadline, at most 1 GiB scratch, and explicit CPU/memory resources.
+second token lifetime, finite deadline, at most 1 GiB scratch, and explicit CPU/memory resources. The
+rendered Pod runs as UID/GID 65532 with `fsGroup: 65532`; projected token mode `0440` therefore remains
+readable without making it world-readable.
 
 ## See also
 

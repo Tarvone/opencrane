@@ -66,6 +66,8 @@ describe("_ResolvePerOrgClient — host→ClusterTenant CR→per-org client (Opt
       clusterTenant: "acme",
       clientId: "client-acme",
       orgId: "org-acme",
+      ownerEmail: null,
+      ownerSubject: null,
       redirectUri: "https://acme.dev.opencrane.ai/api/v1/auth/callback",
     });
     // The CR is read by the host's first DNS label — never request-supplied input.

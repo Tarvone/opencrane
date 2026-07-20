@@ -89,9 +89,12 @@ initializer at `prisma/migrations/0001_target_baseline/migration.sql`. The runs 
 `RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
 and commits its initial acceptance and dispatch events in the same transaction. A partial or
 mismatched admission therefore cannot commit. The initializer includes the reviewed PostgreSQL
-functions and triggers that enforce authority invariants Prisma cannot express. The migrate
-init-container applies it to a new database with `prisma migrate deploy`; OpenCrane does not carry an
-upgrade path or data migration from an older product schema.
+functions and triggers that enforce authority invariants Prisma cannot express.
+The migrate init-container applies it to a new database with `prisma migrate deploy`. During a CNPG
+restore it waits at most three wall-clock minutes for the PostgreSQL Service endpoint to accept a TCP
+connection, then runs Prisma exactly once. Schema, permissions, and migration-history errors still
+fail immediately. OpenCrane does not carry an upgrade path or data migration from an older product
+schema.
 
 ## Runtime & config
 

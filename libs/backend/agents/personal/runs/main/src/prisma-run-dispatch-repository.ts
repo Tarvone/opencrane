@@ -13,7 +13,13 @@ interface SnapshotExecutionIdentity
 	readonly fleetMembershipTrustedUntilEpochMilliseconds: number;
 }
 
-/** Prisma-backed run dispatch authority for suspended personal-runtime Jobs. */
+/**
+ * Prisma-backed authority for handing one accepted personal run to the Kubernetes controller.
+ *
+ * Claims use database time plus a monotonically increasing delivery generation, so a controller
+ * whose lease expired cannot publish an assignment after a newer replica reclaimed the event. Every
+ * commit locks service, run, and outbox authority before creating the immutable PendingPod binding.
+ */
 export class PrismaRunDispatchRepository implements RunDispatchRepository
 {
 	/** Canonical OpenCrane product-authority database client. */

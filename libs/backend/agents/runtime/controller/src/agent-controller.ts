@@ -80,6 +80,10 @@ async function _Wait(milliseconds: number, signal: AbortSignal): Promise<void>
 
 /**
  * Reconcile at most one claimed run attempt into a durable, still-suspended assignment.
+ *
+ * Kubernetes is deliberately changed before the database commit only because the rendered Job is
+ * suspended. A crash anywhere before the final commit therefore leaves an inert deterministic object
+ * that a later reconciliation may exact-adopt; it cannot leave unrecorded agent code executing.
  * @param options - Fixed controller authority, namespace, profiles, and adapters.
  * @param signal - Process shutdown signal propagated to OpenCrane HTTP calls.
  * @returns Idle or the exact durable assignment outcome.
@@ -135,6 +139,9 @@ export async function __ReconcileNextAgentRuntimeAttempt(options: AgentControlle
 
 /**
  * Poll OpenCrane until shutdown, retrying failed claims without mutating any existing workload.
+ *
+ * Reconciliation failures are isolated to one poll and logged structurally. The loop never repairs,
+ * replaces, or deletes a mismatching Kubernetes object because doing so would hide authority drift.
  * @param options - Fixed controller authority, namespace, profiles, adapters, and logger.
  * @param signal - Process shutdown signal.
  */

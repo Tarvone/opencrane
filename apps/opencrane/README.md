@@ -45,10 +45,11 @@ of that API. This server is where those endpoints live. It plays two roles at on
 reconcilers it composes)* · [opencrane-ui](../opencrane-ui/README.md) *(the main API client)* ·
 [deploy-k8s](../_infra/deploy-k8s/README.md) *(the silo umbrella chart that deploys it)*
 
-Invariant: the public API and the tokenless internal API are served on **two separate listeners**
-(ports 8080 and 8081). The internal routes take no session/token auth — they are gated at the network
-layer — so keeping them off the public socket is what stops the internet-facing ingress ever reaching
-them. If that split were wrong, platform-only routes would become publicly reachable.
+Invariant: the public API and the workload-facing internal API are served on **two separate listeners**
+(ports 8080 and 8081). Keeping the internal listener off the public ingress is the first boundary;
+each sensitive workload route then verifies its own projected Kubernetes identity with TokenReview,
+while the few explicitly network-only routes remain confined by NetworkPolicy. If either layer were
+collapsed, platform-only reconciliation or runtime authority could become publicly reachable.
 
 ## Public surface
 
@@ -58,11 +59,15 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 
 - `createApp(prisma, customApi, coreApi, authApi)` — builds the public Express app (mounts every domain
   router). Exported so tests can drive it with injected clients.
-- `createInternalApp(prisma, authApi)` — builds the tokenless internal-only Express app.
+- `createInternalApp(prisma, authApi)` — builds the internal-only Express app; each mounted route
+  declares either projected-workload TokenReview or explicit NetworkPolicy-only trust.
 
-The internal runtime stream TokenReviews only the fixed `opencrane-agent-runtime` audience and a
-bounded runtime-profile ServiceAccount name. Durable assignment remains the authority for the exact
-ServiceAccount, Job, Pod, run, and revision; the ServiceAccount name alone is never sufficient.
+The internal controller routes TokenReview only the fixed `agent-controller` ServiceAccount and
+`opencrane-agent-controller` audience. They let that process claim a database-fenced run attempt and
+commit only the immutable UID of the suspended Job it created. The runtime stream separately accepts
+the `opencrane-agent-runtime` audience and bounded runtime-profile ServiceAccount grammar. Durable
+assignment remains the authority for the exact ServiceAccount, Job, Pod, run, and revision; a
+ServiceAccount name alone is never sufficient.
 
 ## Boundary
 
@@ -89,9 +94,11 @@ Read from the environment at startup.
 | Variable | Purpose | Default |
 |---|---|---|
 | `PORT` | Public listener port | `8080` |
-| `INTERNAL_PORT` | Tokenless internal listener port | `8081` |
+| `INTERNAL_PORT` | Workload-facing internal listener port | `8081` |
 | `DATABASE_URL` | Postgres connection string (Prisma) | *(required)* |
 | `NAMESPACE` | Silo namespace the reconcilers act on | `default` |
+| `AGENT_CONTROLLER_CLAIM_LEASE_SECONDS` | Database-owned lease for one controller delivery attempt | `30` |
+| `AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS` | Hard lifetime of a pending runtime workload assignment | `3600` |
 | `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |
 | `FLEET_INTERNAL_URL` | Fleet membership write-through URL; empty = standalone silo | *(empty)* |
 | `OPENCRANE_API_TOKEN` | Token for fleet-internal calls | *(empty)* |

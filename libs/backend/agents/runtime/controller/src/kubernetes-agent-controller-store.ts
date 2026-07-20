@@ -129,6 +129,10 @@ function _AssertExactSuspendedJob(current: V1Job, expected: V1Job): void
 
 /**
  * Create the only Kubernetes adapter used by the reduced agent-controller slice.
+ *
+ * Creation is the sole mutation. An AlreadyExists response becomes an exact owned-contract check,
+ * never a patch or replacement, so a colliding or externally changed object stops reconciliation
+ * instead of being silently adopted as the authorised run attempt.
  * @param options - Batch and Networking clients constrained by namespaced get/create RBAC.
  * @returns Exact-adoption operations for attempt policies and suspended Jobs.
  */

@@ -9,6 +9,10 @@ customer **silo**, meaning that customer's isolated namespace. It has no inbound
 OpenCrane for authorised desired state, creates only a NetworkPolicy and suspended Job, and reports
 the Job's Kubernetes-issued identity back to OpenCrane.
 
+Keeping this work in a separate, narrowly privileged process prevents the API server and the runtime
+itself from becoming general Kubernetes workload launchers. OpenCrane decides *what* may run; this app
+only projects that decision into the one namespace named by its RoleBinding.
+
 ```
  OpenCrane internal API ........ durable run attempt + named profile
              │  outbound claim

@@ -8,6 +8,11 @@ This package is the narrow reconciliation step between OpenCrane's durable run a
 Kubernetes execution state. It claims one authorised attempt through OpenCrane, resolves its named
 runtime profile, and creates the policy and still-suspended Job for that attempt.
 
+The split exists because a database transaction and a Kubernetes create cannot commit together. The
+controller therefore orders the two authorities so every recoverable partial state is harmless: a
+crash may leave an exact suspended Job to adopt later, but never an executing Job whose UID was not
+accepted by OpenCrane.
+
 ```
  OpenCrane run outbox ........ claims one authorised attempt
               │

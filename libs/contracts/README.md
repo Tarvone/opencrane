@@ -52,14 +52,21 @@ after any API change so the two never silently diverge.
   plane. The audience constant fixes that workload identity to `opencrane-agent-runtime`; the shared
   validator keeps Job issuance and TokenReview admission on one bounded ServiceAccount grammar.
   These frames are not a browser or OpenAPI contract.
+- `AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE`, `AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME`, and
+  `AgentControllerRunAttempt*` — the private controller handshake for claiming one authorised run,
+  reporting the Kubernetes-issued Job identity, and committing that identity under the same database
+  lease. These types deliberately expose only the immutable coordinates needed to create a suspended
+  workload; they never expose the run-input body or give the controller authority to choose a user,
+  revision, namespace, or runtime profile.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary
 
-The one contract surface for the control-plane API; frontends import it instead of hard-coding URLs
-or shapes. It defines types and builds a client — it holds no business logic, no persistence, and no
-server state. External proprietary frontends should generate their own client from the released spec
-(see below) rather than importing this package, keeping a clean process/network boundary.
+The one contract surface for control-plane and first-party workload protocols; callers import it
+instead of duplicating wire shapes. It defines types and builds a client — it holds no business logic,
+no persistence, and no server state. The controller DTOs are internal workload contracts rather than
+public browser endpoints. External proprietary frontends should generate their own client from the
+released spec (see below) rather than importing this package, keeping a clean process/network boundary.
 
 ## Licensing
 

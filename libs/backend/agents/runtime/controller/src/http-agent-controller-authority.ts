@@ -124,6 +124,9 @@ function _BaseUrl(value: string): URL
 
 /**
  * Create the projected-token-authenticated OpenCrane desired-state adapter.
+ *
+ * The token file is reread for every exchange to honour kubelet rotation. Responses are size-bounded
+ * and rebound to the submitted run/attempt/UID before the controller may treat them as authority.
  * @param options - Internal URL, rotating token path, timeout, and optional test seams.
  * @returns An authority that claims attempts and commits only exact Job UIDs.
  */

@@ -4,7 +4,13 @@ import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACC
 
 import type { AgentControllerRunDispatchRouterDependencies, ReviewedAgentControllerIdentity } from "./run-dispatch.types.js";
 
-/** Build the workload-authenticated internal run-dispatch API for the sole agent controller. */
+/**
+ * Build the workload-authenticated internal run-dispatch API for the sole agent controller.
+ *
+ * The router accepts no caller-selected policy or time. It first verifies the dedicated projected
+ * ServiceAccount token, then delegates all lease, membership, attempt, and assignment decisions to
+ * the repository so HTTP parsing can never become a second run authority.
+ */
 export function __CreateAgentControllerRunDispatchRouter(dependencies: AgentControllerRunDispatchRouterDependencies): Router
 {
 	const router = Router();

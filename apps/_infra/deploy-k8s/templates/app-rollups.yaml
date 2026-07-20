@@ -18,8 +18,6 @@
 ---
 {{ include "opencrane.channelProxy.resources" . }}
 ---
-{{ include "opencrane.agentRuntime.resources" . }}
----
 {{ include "opencrane.artifactService.resources" . }}
 ---
 {{ include "opencrane.databaseSchema.job" . }}

@@ -7,8 +7,14 @@ import type { RuntimeAssignment } from "./runtime-assignment.types.js";
 /** The only wire-protocol version accepted by the initial runtime boundary. */
 export const AGENT_RUNTIME_PROTOCOL_V1 = "opencrane.agent-runtime/v1";
 
+/** Sole projected-token audience accepted from first-party personal-agent runtimes. */
+export const AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE = "opencrane-agent-runtime";
+
 /** Exact protocol version literal carried by every runtime frame. */
 export type AgentRuntimeProtocolVersion = typeof AGENT_RUNTIME_PROTOCOL_V1;
+
+/** Exact audience literal for a personal-agent runtime's projected ServiceAccount token. */
+export type AgentRuntimeProjectedTokenAudience = typeof AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE;
 
 /** Initial message sent by a runtime after it opens its control-plane stream. */
 export interface RuntimeStreamOpen

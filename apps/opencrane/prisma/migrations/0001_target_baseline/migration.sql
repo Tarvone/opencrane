@@ -3720,7 +3720,7 @@ ALTER TABLE "run_input_snapshots" ADD CONSTRAINT "run_input_snapshots_nonempty_c
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_attempt_check" CHECK ("attempt" > 0);
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_nonempty_check" CHECK (
         btrim("agent_service_id") <> '' AND btrim("agent_revision_id") <> '' AND btrim("silo_id") <> '' AND
-        btrim("subject_id") <> '' AND "audience" = 'opencrane' AND btrim("service_account_name") <> '' AND
+        btrim("subject_id") <> '' AND "audience" = 'opencrane-agent-runtime' AND btrim("service_account_name") <> '' AND
         btrim("namespace") <> '' AND btrim("workload_uid") <> ''
     );
 ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_expiry_check" CHECK ("expires_at" > "created_at");
@@ -3731,7 +3731,7 @@ ALTER TABLE "workload_assignments" ADD CONSTRAINT "workload_assignments_state_ch
     );
 ALTER TABLE "workload_bootstraps" ADD CONSTRAINT "workload_bootstraps_expiry_check" CHECK ("expires_at" > "created_at");
 ALTER TABLE "workload_bootstraps" ADD CONSTRAINT "workload_bootstraps_claim_digest_check" CHECK ("claim_digest" ~ '^sha256:[0-9a-f]{64}$');
-ALTER TABLE "workload_bootstraps" ADD CONSTRAINT "workload_bootstraps_audience_check" CHECK ("audience" = 'opencrane');
+ALTER TABLE "workload_bootstraps" ADD CONSTRAINT "workload_bootstraps_audience_check" CHECK ("audience" = 'opencrane-agent-runtime');
 ALTER TABLE "workload_bootstraps" ADD CONSTRAINT "workload_bootstraps_consumption_check" CHECK (
         ("consumed_at" IS NULL AND "consumed_by_pod_uid" IS NULL AND "receipt_id" IS NULL) OR
         ("consumed_at" IS NOT NULL AND "consumed_by_pod_uid" IS NOT NULL AND btrim("consumed_by_pod_uid") <> '' AND "receipt_id" IS NOT NULL AND btrim("receipt_id") <> '')

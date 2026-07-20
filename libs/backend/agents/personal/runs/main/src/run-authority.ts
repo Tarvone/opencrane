@@ -1,9 +1,7 @@
 import type { AgentRun } from "@opencrane/models/agents";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
 
 import type { AgentRunAuthorityRepository, RunWorkloadAssignment, RunWorkloadAssignmentDecision, RunWorkloadAssignmentExpectation, StartNextRunAttemptCommand, StartNextRunAttemptResult } from "./run-authority.types.js";
-
-/** Sole audience accepted for projected workload identity tokens. */
-const _PROJECTED_TOKEN_AUDIENCE = "opencrane";
 
 /** Returns whether a run is in a retryable terminal state. */
 function _isRetryable(run: AgentRun): boolean
@@ -11,10 +9,10 @@ function _isRetryable(run: AgentRun): boolean
 	return run.state === "failed" || run.state === "cancelled";
 }
 
-/** Returns whether a value is one of the two accepted controller workload kinds. */
-function _isWorkloadKind(value: string): value is "job" | "deployment"
+/** Return whether the personal-run workload is the sole accepted one-attempt Job kind. */
+function _isWorkloadKind(value: string): value is "job"
 {
-	return value === "job" || value === "deployment";
+	return value === "job";
 }
 
 /**
@@ -40,7 +38,7 @@ export function __ValidateRunWorkloadAssignment(assignment: RunWorkloadAssignmen
 	if (assignment.attempt !== expectation.attempt) return { outcome: "denied", reason: "attempt_mismatch" };
 	if (assignment.agentRevisionId !== expectation.agentRevisionId) return { outcome: "denied", reason: "revision_mismatch" };
 	if (assignment.siloId !== expectation.siloId) return { outcome: "denied", reason: "silo_mismatch" };
-	if (assignment.audience !== _PROJECTED_TOKEN_AUDIENCE || expectation.audience !== _PROJECTED_TOKEN_AUDIENCE) return { outcome: "denied", reason: "projected_token_audience_mismatch" };
+	if (assignment.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE || expectation.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE) return { outcome: "denied", reason: "projected_token_audience_mismatch" };
 	if (assignment.subjectId !== expectation.subjectId) return { outcome: "denied", reason: "subject_mismatch" };
 	if (assignment.serviceAccountName !== expectation.serviceAccountName) return { outcome: "denied", reason: "service_account_mismatch" };
 	if (assignment.namespace !== expectation.namespace) return { outcome: "denied", reason: "namespace_mismatch" };

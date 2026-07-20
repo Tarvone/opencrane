@@ -60,6 +60,10 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
   router). Exported so tests can drive it with injected clients.
 - `createInternalApp(prisma, authApi)` — builds the tokenless internal-only Express app.
 
+The internal runtime stream TokenReviews only the fixed `opencrane-agent-runtime` audience and a
+bounded runtime-profile ServiceAccount name. Durable assignment remains the authority for the exact
+ServiceAccount, Job, Pod, run, and revision; the ServiceAccount name alone is never sufficient.
+
 ## Boundary
 
 Composition only: it must not contain business logic — that belongs in `libs/backend/*`. Reusable

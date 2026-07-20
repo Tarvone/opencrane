@@ -45,27 +45,6 @@
         "projectedTokenTtlSeconds": { "type": "integer", "minimum": 600, "maximum": 3600 }
       }
     },
-    "agentRuntime": {
-      "type": "object",
-      "required": ["enabled", "image", "projectedTokenTtlSeconds"],
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "image": {
-          "type": "object",
-          "required": ["repository", "tag", "pullPolicy"],
-          "properties": {
-            "repository": { "type": "string", "minLength": 1 },
-            "tag": { "type": "string", "minLength": 1 },
-            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
-          }
-        },
-        "openCraneRuntimeStreamUrl": {
-          "type": "string",
-          "pattern": "^$|^http://[a-z0-9.-]+(?::[0-9]+)?/api/internal/agent-runtime$"
-        },
-        "projectedTokenTtlSeconds": { "type": "integer", "minimum": 600, "maximum": 3600 }
-      }
-    },
     "gatewayProxy": {
       "type": "object",
       "properties": {

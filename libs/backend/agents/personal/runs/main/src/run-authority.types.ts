@@ -1,4 +1,5 @@
 import type { AgentRevisionId, AgentRun, AgentRunId, AgentServiceId, AgentServiceState, SiloId } from "@opencrane/models/agents";
+import type { AgentRuntimeProjectedTokenAudience } from "@opencrane/contracts";
 
 /** Workload assignment bound to exactly one logical run attempt. */
 export interface RunWorkloadAssignment
@@ -14,7 +15,7 @@ export interface RunWorkloadAssignment
 	/** Silo containing the run and workload. */
 	readonly siloId: SiloId;
 	/** Fixed control-plane audience for the projected workload token. */
-	readonly audience: string;
+	readonly audience: AgentRuntimeProjectedTokenAudience;
 	/** Human or service subject authorized to cause the action. */
 	readonly subjectId: string;
 	/** Expected projected Kubernetes service account. */
@@ -22,8 +23,8 @@ export interface RunWorkloadAssignment
 	/** Exact namespace containing the runtime Job. */
 	readonly namespace: string;
 	/** Controller-managed workload kind assigned to the run. */
-	readonly workloadKind: "job" | "deployment";
-	/** Exact immutable UID of the assigned Job or Deployment. */
+	readonly workloadKind: "job";
+	/** Exact immutable UID of the assigned one-attempt Job. */
 	readonly workloadUid: string;
 	/** Exact immutable runtime Pod UID. */
 	readonly podUid: string;
@@ -45,7 +46,7 @@ export interface RunWorkloadAssignmentExpectation
 	/** Expected silo. */
 	readonly siloId: SiloId;
 	/** Fixed control-plane audience expected from the projected workload token. */
-	readonly audience: string;
+	readonly audience: AgentRuntimeProjectedTokenAudience;
 	/** Expected authorization subject. */
 	readonly subjectId: string;
 	/** Expected projected Kubernetes service account. */
@@ -53,8 +54,8 @@ export interface RunWorkloadAssignmentExpectation
 	/** Expected Kubernetes namespace. */
 	readonly namespace: string;
 	/** Expected controller-managed workload kind. */
-	readonly workloadKind: "job" | "deployment";
-	/** Expected immutable Job or Deployment UID. */
+	readonly workloadKind: "job";
+	/** Expected immutable one-attempt Job UID. */
 	readonly workloadUid: string;
 	/** Expected runtime Pod UID. */
 	readonly podUid: string;

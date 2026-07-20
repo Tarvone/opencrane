@@ -18,20 +18,19 @@ import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/ret
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { _RegisterInternalAgentRuntimeStream, type RuntimeCommandStreamAuthority, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
 
-/** Fixed projected-token audience for the outbound-only personal runtime shell. */
-const _AGENT_RUNTIME_TOKEN_AUDIENCE = "opencrane-agent-runtime";
-
 /** Extract and validate the exact Kubernetes ServiceAccount subject grammar. */
-function _ParseRuntimeSubject(subject: string, expectedNamespace: string, expectedServiceAccount: string, podUid: string | null): RuntimeWorkloadIdentity | null
+function _ParseRuntimeSubject(subject: string, expectedNamespace: string, podUid: string | null): RuntimeWorkloadIdentity | null
 {
   const parts = subject.split(":");
-	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || parts[3] !== expectedServiceAccount || !podUid)
+	const serviceAccountName = parts[3];
+	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || !serviceAccountName || !/^agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(serviceAccountName) || serviceAccountName.length > 63 || !podUid)
   {
     return null;
   }
-	return { subject, namespace: expectedNamespace, serviceAccountName: expectedServiceAccount, podUid };
+	return { subject, namespace: expectedNamespace, serviceAccountName, podUid };
 }
 
 /** Read the pod UID claim Kubernetes attaches to a bound projected ServiceAccount token. */
@@ -45,25 +44,20 @@ function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): strin
 function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
 {
   const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
-  const expectedServiceAccount = process.env.AGENT_RUNTIME_SERVICE_ACCOUNT_NAME?.trim();
   return {
     async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
     {
-      if (!expectedServiceAccount)
-      {
-        return null;
-      }
       const body = new k8s.V1TokenReview();
       body.spec = new k8s.V1TokenReviewSpec();
       body.spec.token = token;
-      body.spec.audiences = [_AGENT_RUNTIME_TOKEN_AUDIENCE];
+		body.spec.audiences = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE];
       const review = await authApi.createTokenReview({ body });
       const status = review.status;
-      if (!status?.authenticated || !status.audiences?.includes(_AGENT_RUNTIME_TOKEN_AUDIENCE))
+		if (!status?.authenticated || !status.audiences?.includes(AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE))
       {
         return null;
       }
-		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, expectedServiceAccount, _ReadReviewedPodUid(status.user?.extra));
+		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, _ReadReviewedPodUid(status.user?.extra));
     },
   };
 }

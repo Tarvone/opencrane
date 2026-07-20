@@ -45,9 +45,11 @@ after any API change so the two never silently diverge.
   `McpServer*`/`Mcp*` operator types (MCP — the Model Context Protocol for connecting external tools),
   model-routing types, `Memory*`, `Approval`, `ThirdPartySource*`, `RuntimeAssignment`,
   `RunInputSnapshot`, `TenantModelSet`, domain-topology host builders.
-- `AGENT_RUNTIME_PROTOCOL_V1`, `RuntimeCommandEnvelope`, and `RuntimeCandidate` — transport-neutral
+- `AGENT_RUNTIME_PROTOCOL_V1`, `AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE`,
+  `RuntimeCommandEnvelope`, and `RuntimeCandidate` — transport-neutral
   command and candidate frames for a runtime that opens its own authenticated stream to the control
-  plane; these frames are not a browser or OpenAPI contract.
+  plane. The audience constant fixes that workload identity to `opencrane-agent-runtime`; these
+  frames are not a browser or OpenAPI contract.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

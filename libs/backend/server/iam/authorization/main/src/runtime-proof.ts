@@ -1,12 +1,10 @@
 import type { CapabilityProofExpectation } from "@opencrane/models/authorization";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
 import type { JsonValue } from "@opencrane/util";
 
 import { __ComputeEs256JwkThumbprint, __NormalizeDpopTargetUri, __VerifyCapabilityProof } from "./capability-proof.js";
 import { __DigestCanonicalJson } from "./canonical-json-digest.js";
 import type { CapabilityActionExecutor, CapabilityActionIntent, CapabilityActionReceipt, CapabilityActionReceiptRepository, ConsumeRuntimeBootstrapResult, ExecuteCapabilityActionCommand, ExecuteCapabilityActionResult, RuntimeBootstrapClaim, RuntimeBootstrapExpectation, RuntimeBootstrapFailureReason, RuntimeBootstrapRepository } from "./runtime-proof.types.js";
-
-/** Sole audience accepted for projected workload identity tokens. */
-const _PROJECTED_TOKEN_AUDIENCE = "opencrane";
 
 /** Returns whether a value is one of the two accepted controller workload kinds. */
 function _isWorkloadKind(value: string): value is "job" | "deployment"
@@ -45,7 +43,7 @@ function _validateBootstrap(claim: RuntimeBootstrapClaim, expectation: RuntimeBo
 
 	// 3. Compare every assignment and run-attempt field, then enforce the hard expiry.
 	if (claim.siloId !== expectation.siloId) return "silo_mismatch";
-	if (claim.audience !== _PROJECTED_TOKEN_AUDIENCE || expectation.audience !== _PROJECTED_TOKEN_AUDIENCE) return "projected_token_audience_mismatch";
+	if (claim.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE || expectation.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE) return "projected_token_audience_mismatch";
 	if (claim.subjectId !== expectation.subjectId) return "subject_mismatch";
 	if (claim.serviceAccountName !== expectation.serviceAccountName) return "service_account_mismatch";
 	if (claim.namespace !== expectation.namespace) return "namespace_mismatch";

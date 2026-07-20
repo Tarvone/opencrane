@@ -60,10 +60,6 @@ spec:
             # Second (internal-only) listener for /api/internal/*.
             - name: INTERNAL_PORT
               value: {{ .Values.clustertenantManager.service.internalPort | quote }}
-            # Exact ServiceAccount subject accepted by the runtime-stream TokenReview route.
-            # The runtime token itself is never mounted into this control-plane pod.
-            - name: AGENT_RUNTIME_SERVICE_ACCOUNT_NAME
-              value: {{ printf "%s-agent-runtime" (include "opencrane.fullname" .) | quote }}
             {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "opencrane-server") | nindent 12 }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}

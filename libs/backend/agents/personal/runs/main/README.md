@@ -34,8 +34,9 @@ re-checking every one of those facts — closing the race where two retries fire
 transaction it appends a `RunAttemptRequested` event to the **outbox** (a durable table the dispatcher
 polls) so a started attempt can never be lost between deciding and launching.
 
-`__ValidateRunWorkloadAssignment` is the mirror check at launch time: it confirms the workload's full
-identity (who / where / which attempt) matches the expected authority exactly and has not expired.
+`__ValidateRunWorkloadAssignment` is the mirror check at launch time: it accepts only a one-attempt
+Job, confirms the workload's full identity (who / where / which attempt) matches the expected authority exactly, uses the fixed
+`opencrane-agent-runtime` projected-token audience, and has not expired.
 
 Invariant: one logical run keeps one identity; attempts only ever move forward under optimistic
 concurrency (detect conflicts at commit time); and any mismatch or staleness is a fail-closed denial with a precise reason.

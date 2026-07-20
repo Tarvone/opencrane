@@ -1,18 +1,66 @@
-# agent-runtime — outbound-only personal-agent shell
+# agent-runtime — outbound-only personal-agent process
 
 > [apps](../README.md) › agent-runtime
 
-This is the first-party process boundary for a user's personal agent. It opens a single
-projected-token-authenticated stream to the OpenCrane server and has **no listener, Service,
-Ingress, Kubernetes RBAC, model provider, tool implementation, artifact client, or persistent
-tenant mount**. It is disabled by default. The only writable mount is bounded `emptyDir` scratch.
+## What it owns
 
-The shell deliberately does not execute a received command yet. The server transport verifies its
-identity and emits only authority-owned commands; a later controller/executor slice will bind the
-current assignment, command dispatcher, and candidate admission to the durable run authority.
+This app owns the process image that executes one attempt of a user's personal agent. The dedicated
+agent controller creates a fresh, initially suspended Kubernetes Job for each attempt; after durable assignment
+is committed, the Job starts this process and it opens one authenticated stream back to the server.
+
+```
+ durable run attempt
+        │  controller creates and assigns a suspended Job
+        ▼
+ ┌──────────────────────────────┐
+ │  agent-runtime  ◄── HERE      │  outbound command stream; no listener
+ └──────────────┬───────────────┘
+                │ candidate events and action requests
+                ▼
+ OpenCrane server authority
+```
+
+**In this flow:** [OpenCrane server](../opencrane/README.md) ·
+[runtime resource builder](../../libs/backend/agents/runtime/k8s-launcher/README.md) ·
+[runtime stream](../../libs/server/_infra/agent-runtime-stream/README.md)
+
+Invariant: the process has no durable tenant storage or independent authority. A failed or retried
+attempt receives a different Job and identity; runtime-local files disappear with its bounded scratch
+volume.
+
+## Public surface
+
+`Entrypoint: src/runtime.py` — reads the projected runtime token, opens the server command stream,
+and emits bounded protocol frames. `deploy/Dockerfile` packages that process as the runtime image.
+
+## Boundary
+
+The process has **no listener, Service, Ingress, Kubernetes role-based access control (RBAC), model
+provider credential, tool implementation, artifact credential, or persistent tenant mount**. It does
+not decide which run it may execute; the server validates the exact Job, Pod, ServiceAccount, attempt,
+and revision before admitting work.
+
+## Dependency direction
+
+Tagged `type:app`, `layer:entrypoint`, `scope:agent-runtime`. It consumes the wire contract over HTTP
+and does not import another app or own backend business logic.
+
+## Runtime & config
+
+- `OPENCRANE_RUNTIME_STREAM_URL` — required in-cluster server endpoint.
+- `OPENCRANE_RUNTIME_TOKEN_PATH` — required path to the audience-bound projected token.
+- `POD_UID` — required Kubernetes Pod identity supplied through the downward API.
+- Writable storage is only an `emptyDir` capped at 1 GiB and mounted at `/tmp`.
+
+## Status
+
+The current image proves the identity and outbound-stream boundary but deliberately ignores command
+frames. Durable dispatch and the selected model/tool executor are the next Phase E slices; this app
+cannot yet complete an agent run.
 
 ## See also
 
-- Server transport: [`libs/server/_infra/agent-runtime-stream`](../../libs/server/_infra/agent-runtime-stream/README.md)
-- Runtime protocol: [`libs/contracts`](../../libs/contracts/README.md)
-- Deployment composer: [`apps/_infra/deploy-k8s`](../_infra/deploy-k8s/README.md)
+- Parent index: [apps](../README.md)
+- Server transport: [agent-runtime-stream](../../libs/server/_infra/agent-runtime-stream/README.md)
+- Per-attempt resources: [runtime/k8s-launcher](../../libs/backend/agents/runtime/k8s-launcher/README.md)
+- Runtime protocol: [contracts](../../libs/contracts/README.md)

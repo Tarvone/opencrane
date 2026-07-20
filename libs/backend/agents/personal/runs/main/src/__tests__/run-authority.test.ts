@@ -128,7 +128,7 @@ function _assignment(): RunWorkloadAssignment
 		attempt: 2,
 		agentRevisionId: "revision-1",
 		siloId: "silo-1",
-		audience: "opencrane",
+		audience: "opencrane-agent-runtime",
 		subjectId: "user-1",
 		serviceAccountName: "agent-runtime",
 		namespace: "silo-1",
@@ -211,8 +211,9 @@ describe("single AgentRun authority", function _suite()
 		expect(__ValidateRunWorkloadAssignment(_assignment(), _expectation())).toEqual({ outcome: "trusted" });
 		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), runId: "run-other" }, _expectation())).toEqual({ outcome: "denied", reason: "run_mismatch" });
 		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), agentServiceId: "service-other" }, _expectation())).toEqual({ outcome: "denied", reason: "agent_service_mismatch" });
-		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), audience: "artifact-service" }, _expectation())).toEqual({ outcome: "denied", reason: "projected_token_audience_mismatch" });
-		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), audience: "artifact-service" }, { ..._expectation(), audience: "artifact-service" })).toEqual({ outcome: "denied", reason: "projected_token_audience_mismatch" });
+		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), audience: "artifact-service" as RunWorkloadAssignment["audience"] }, _expectation())).toEqual({ outcome: "denied", reason: "projected_token_audience_mismatch" });
+		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), audience: "artifact-service" as RunWorkloadAssignment["audience"] }, { ..._expectation(), audience: "artifact-service" as RunWorkloadAssignmentExpectation["audience"] })).toEqual({ outcome: "denied", reason: "projected_token_audience_mismatch" });
+		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), workloadKind: "deployment" as RunWorkloadAssignment["workloadKind"] }, _expectation())).toEqual({ outcome: "denied", reason: "invalid_workload_kind" });
 		expect(__ValidateRunWorkloadAssignment({ ..._assignment(), attempt: 3 }, _expectation())).toEqual({ outcome: "denied", reason: "attempt_mismatch" });
 	});
 });

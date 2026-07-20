@@ -1,9 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
+import type { AuthenticationV1Api } from "@kubernetes/client-node";
 import express from "express";
 import type { Express } from "express";
 import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, AGENT_RUNTIME_PROTOCOL_V1, type RuntimeCandidate } from "@opencrane/contracts";
 import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
 import { _CheckDbHealth, _RateLimit } from "@opencrane/server/_infra/http";
 
@@ -48,6 +50,46 @@ function _buildAuthApp(): Express
   });
 
   return app;
+}
+
+/** Build the internal runtime candidate route around one mocked TokenReview identity. */
+async function _BuildRuntimeCandidateApp(username: string, audiences: string[] = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE]): Promise<Express>
+{
+  const { _RegisterInternalRoutes } = await import("../app/routes.js");
+  const prisma = {} as PrismaClient;
+  const authApi = {
+    createTokenReview: vi.fn().mockResolvedValue({
+      status: {
+        authenticated: true,
+        audiences,
+        user: {
+          username,
+          extra: { "authentication.kubernetes.io/pod-uid": ["11111111-1111-4111-8111-111111111111"] },
+        },
+      },
+    }),
+  } as unknown as AuthenticationV1Api;
+  const app = express();
+  app.use(express.json());
+  _RegisterInternalRoutes(app, prisma, authApi);
+  return app;
+}
+
+/** Create a syntactically valid runtime event candidate for identity-bound route tests. */
+function _RuntimeCandidate(): RuntimeCandidate
+{
+  return {
+    protocolVersion: AGENT_RUNTIME_PROTOCOL_V1,
+    runtimeInstanceId: "runtime-1",
+    commandId: "command-1",
+    candidateId: "candidate-1",
+    runId: "run-1",
+    attempt: 1,
+    fence: 1,
+    kind: "event",
+    eventType: "run.started",
+    payload: {},
+  };
 }
 
 describe("Control Plane", () =>
@@ -116,6 +158,28 @@ describe("Control Plane", () =>
       expect(internal.status).toBe(200);
       expect(internal.body).toEqual({ models: [], defaultModel: null });
       expect(gateRan).toBe(false);
+    });
+
+    it("accepts only the bounded runtime-profile ServiceAccount naming contract", async function _RuntimeServiceAccountIdentity()
+    {
+      const acceptedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:default:agent-runtime-personal");
+      const rejectedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:default:opencrane-agent-runtime");
+
+      const accepted = await request(acceptedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+      const rejected = await request(rejectedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+
+      expect(accepted.status).toBe(409);
+      expect(accepted.body).toEqual({ accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" });
+      expect(rejected.status).toBe(401);
+    });
+
+    it("rejects a reviewed token when Kubernetes omits the runtime audience", async function _RuntimeAudienceMismatch()
+    {
+      const app = await _BuildRuntimeCandidateApp("system:serviceaccount:default:agent-runtime-personal", ["opencrane"]);
+
+      const response = await request(app).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+
+      expect(response.status).toBe(401);
     });
   });
 });

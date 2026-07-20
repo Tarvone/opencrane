@@ -656,6 +656,8 @@ metadata:
   name: ${job_name}
   namespace: ${NAMESPACE}
 spec:
+  # The in-container SQL readiness loop owns the full bounded retry window.
+  # Do not let Kubernetes multiply that window with replacement Pods.
   backoffLimit: 0
   template:
     metadata:
@@ -670,6 +672,14 @@ spec:
           command: ["/bin/sh", "-ceu"]
           args:
             - |
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for ${database_name} PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
               psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE TABLE IF NOT EXISTS backup_restore_smoke (marker text PRIMARY KEY);'
               psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO backup_restore_smoke(marker) VALUES ('${BACKUP_MARKER}-${database_name}') ON CONFLICT (marker) DO NOTHING;"
           env:

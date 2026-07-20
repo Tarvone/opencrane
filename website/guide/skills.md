@@ -28,8 +28,11 @@ revision pins the skill revisions it was reviewed with.
 
 Skills move from draft to shared ability through a governed pipeline:
 
-1. **Author.** The personal assistant (or a person) creates a candidate skill bundle from a
-   conversation or from scratch.
+1. **Author.** Every personal assistant carries **skill-builder** as a tool: ask it to turn a
+   working conversation — a procedure you refined together, a prompt that finally worked — into
+   a candidate skill bundle, or draft one from scratch. Invoking skill-builder starts this
+   pipeline; it never shortcuts it. Drafting is cheap and conversational, but the draft holds no
+   authority until it has passed the steps below.
 2. **Isolated authoring job.** A dedicated Job with only a draft-workspace capability — no
    production MCP credentials, default-deny egress — runs formatting, types and tests,
    dependency and licence checks, secret and malware scans, and policy validation.

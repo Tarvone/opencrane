@@ -103,6 +103,9 @@
       "@opencrane/backend/agents/personal/runs": [
         "./libs/backend/agents/personal/runs/main/src/index.ts"
       ],
+      "@opencrane/backend/agents/runtime": [
+        "./libs/backend/agents/runtime/main/src/index.ts"
+      ],
       "@opencrane/backend/server/agents/skills": [
         "./libs/backend/server/agents/skills/main/src/index.ts"
       ],

@@ -14,10 +14,12 @@ It owns two things:
 - **Collection helpers** — `___SortBy` (stable sort by an optional key), `___SomeArray` and
   `___SomeRecord` (typed "does any element/value match?" checks). Small, but shared so the same
   behaviour is used everywhere rather than re-implemented.
-- **Canonical JSON** — `___CanonicalizeJson` serialises a JSON value to the one canonical string
+- **Canonical JSON and digest grammar** — `___CanonicalizeJson` serialises a JSON value to the one canonical string
   form defined by RFC 8785 (JSON Canonicalization Scheme): object keys sorted, whitespace and number
   formatting fixed. Two values that are equal produce byte-identical text, which is what makes a
-  stable hash possible. The type `CanonicalJsonSha256Digest` is the template-literal string type
+  stable hash possible. `___CloneCanonicalJson` creates a detached copy through that canonical form,
+  while `___IsSha256Digest` recognises the one lowercase, algorithm-prefixed spelling the platform
+  accepts. The type `CanonicalJsonSha256Digest` is the template-literal string type
   `` `sha256:${string}` `` — an explicitly encoded digest, so a hash of canonical bytes is never
   confused with an arbitrary string.
 
@@ -30,12 +32,15 @@ platform-wide API. Invariant: purity and determinism — no hidden inputs, same 
 
 - `___SortBy`, `___SomeArray`, `___SomeRecord` — collection helpers.
 - `___CanonicalizeJson` — RFC 8785 canonical JSON serialisation.
+- `___CloneCanonicalJson` — deterministic deep copy for JSON crossing an ownership boundary.
+- `___IsSha256Digest` — fail-closed validator for canonical `sha256:` digest strings.
 - `JsonValue`, `JsonPrimitive`, `CanonicalJsonSha256Digest` — JSON and digest types.
 
 ## Boundary
 
 Pure and dependency-free: it may not import any other package, and it does no I/O. It provides
-building blocks; hashing the canonical bytes and any storage stay with the caller.
+building blocks; calculating a hash and any storage stay with the caller. The clone accepts only JSON
+values, and the digest helper validates spelling rather than proving that a digest matches content.
 
 ## Dependency direction
 

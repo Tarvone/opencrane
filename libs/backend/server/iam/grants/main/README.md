@@ -33,7 +33,9 @@ Cognee — the org-memory service — in sync with those awareness grants.
 
 Invariant: the compiler is deterministic — the same grants always produce the same decision, with a
 defined precedence so overlaps never resolve ambiguously. Derived dataset membership is a projection
-of the grants, never a second source of truth.
+of the grants, never a second source of truth. Share creation accepts only the API's explicit scope,
+recipient, and allow semantics; generated database enum objects are not treated as a second runtime
+contract, so a packaging change cannot silently widen who receives access.
 
 ## Public surface
 

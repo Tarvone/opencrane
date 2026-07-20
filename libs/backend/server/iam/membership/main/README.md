@@ -46,17 +46,23 @@ expired, is not stale, and is the newest accepted. If any check is uncertain, th
 
 - `__VerifyCurrentFleetMembership` — verifies the newest signed membership revision and, on success,
   atomically records its acceptance; returns a trusted window or a denial with a reason.
+- `__VerifyCurrentFleetMembershipEvidence` — performs the same verification but returns the exact
+  signed issuer, key, assertion, subject, payload digest, revision, and trust window that a run may
+  freeze into its input snapshot.
 - `PrismaFleetMembershipAuthorityRepository` — the database-backed store of signed revisions and the
   highest-accepted high-water mark, with the atomic accept-if-newer write.
 - Contract types: `VerifyFleetMembershipCommand`/`Result`, `FleetMembershipAuthorityRepository`,
-  `FleetMembershipSignatureVerifier`, `FleetMembershipAcceptance`/`Result`.
+  `FleetMembershipSignatureVerifier`, `FleetMembershipAcceptance`/`Result`,
+  `FleetMembershipAdmissionExpectation`, and `TrustedFleetMembershipEvidence`.
 
 ## Boundary
 
 Consumed by [authorization](../../authorization/main/README.md) as its `AuthorizationMembershipAuthority`
 first gate. The signature verifier itself is a port supplied by the caller — this package orchestrates
 the decision but does not own the cryptography. Fail-closed: a missing revision, a verifier that
-throws, a failed check, or a concurrent-acceptance conflict all return "denied".
+throws, a failed check, or a concurrent-acceptance conflict all return "denied". A caller that already
+owns a Prisma transaction may pass that transaction to the repository so membership acceptance and
+run admission commit or roll back together; the repository never opens a nested independent write.
 
 ## Dependency direction
 

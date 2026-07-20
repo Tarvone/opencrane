@@ -129,7 +129,10 @@ blocker; do not hide it behind an interface.
    scaffolding. Also record the intended integration target (`origin/main` or the explicitly chosen
    protected feature integration branch).
 4. Implement the selected slice(s), including tests and any required docs/config
-   updates, following AGENTS.md conventions as you write — not as a cleanup pass.
+   updates, following AGENTS.md conventions as you write — not as a cleanup pass. When a slice
+   changes a package's public surface, boundary, invariant, owned models, or config, update that
+   package's `README.md` in the same slice; when it adds a package, create the README from
+   `docs/agents/README-TEMPLATE.md` and add it to the parent index (see `docs/agents/package-docs.md`).
 5. **Reap before validation or commit.** Delegate `POST-SLICE DIRECT-REPLACEMENT`, apply every
    proven DELETE/REWRITE and resolve every `FORBIDDEN-REPLACEMENT` item. Run the resulting
    diff through `architecture` and resolve every BLOCK.

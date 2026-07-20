@@ -75,10 +75,11 @@ import back into it.
 ## Data & persistence
 
 Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, with applied migrations
-under `prisma/migrations/`. The run slice stores one immutable `RunInputSnapshot` beside each logical
-run and commits its initial acceptance and dispatch events in the same transaction, so the runtime
-never observes a partly assembled input. The migrate init-container runs `prisma migrate deploy` from
-this package root at rollout. This is the one place the silo's database shape is defined.
+under `prisma/migrations/`. The runs slice binds every `AgentRun` to exactly one immutable
+`RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
+and commits its initial acceptance and dispatch events in the same transaction. A partial or
+mismatched admission therefore cannot commit. The migrate init-container runs `prisma migrate deploy`
+from this package root at rollout; this is the one place the silo's database shape is defined.
 
 ## Runtime & config
 

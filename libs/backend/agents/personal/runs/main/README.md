@@ -5,31 +5,35 @@
 ## What it owns
 
 This package is part of the **personal-agent product**. A **run** is one logical execution of a
-user's agent. A run can fail or be cancelled and then be retried — but each retry is a new **attempt**
-of the *same* run, not a new run. This package is the authority over that attempt lifecycle: it decides
-whether the first run may be admitted, freezes its complete input snapshot, decides when a retry may
-start, keeps a single run identity across all attempts, and validates that the Kubernetes workload
-actually doing the work is the one authorised for the current attempt.
+user's agent, while an **attempt** is one try at completing that run. This package owns both ends of
+that lifecycle: it admits the first run together with the immutable input snapshot it will always
+use, then governs later attempts without changing the logical run or its frozen inputs.
 
 ```
- request + current authorities ──► immutable input snapshot + accepted run
-                                      │
- a terminal run (failed / cancelled)  │  + retry request (expectedAttempt)
-          │
+ run request + idempotency key
+          │  session assembles inputs inside this package's transaction
           ▼
- ┌──────────────────────────────────────┐
- │   runs  ◄── HERE                       │  retryable? service active? revision current?
- │   · PrismaRunAdmissionRepository       │  one run + snapshot + outbox transaction
- │   · __StartNextRunAttempt              │  compare-and-swap attempt N → N+1
- │   · __ValidateRunWorkloadAssignment    │  Job/Pod identity == this attempt?
- └──────────────────────────────────────┘
-          │  started (attempt++, outbox event) / trusted assignment / denied
+ ┌──────────────────────────────────────────┐
+ │   runs  ◄── HERE                          │  run + one snapshot + ordered outbox
+ │   · PrismaRunAdmissionRepository          │  duplicate returns the first snapshot
+ │   · __StartNextRunAttempt                 │  terminal run: attempt N → N+1
+ │   · __ValidateRunWorkloadAssignment       │  Job/Pod identity == current attempt?
+ └──────────────────────────────────────────┘
+          │  accepted / retry started / assignment trusted / denied
           ▼
- run-owned outbox  ── dispatch picks up "RunAttemptRequested" and launches the workload
+ run-owned outbox  ── dispatcher launches the exact pinned revision and snapshot
 ```
 
-**In this flow:** [conversations](../../conversations/main/README.md) *(the started attempt appends its events there)* ·
-dispatcher *(polls the outbox and launches the workload)*
+**In this flow:** [session](../../session/main/README.md) *(assembles the snapshot through this
+package's admission boundary)* · [conversations](../../conversations/main/README.md) *(stores the
+run's ordered user-visible events)* · dispatcher *(polls the outbox and launches the workload)*
+
+Initial admission serialises the silo and request idempotency key before compiling any mutable
+input. A duplicate request therefore returns the first durable snapshot instead of recompiling at a
+later time. A new request locks the AgentService, lets the session assembler revalidate every input
+inside that transaction, and commits the `AgentRun`, its only `RunInputSnapshot`, and the ordered
+`RunAccepted` and `RunAttemptRequested` outbox events together. The canonical digest covers every
+snapshot field except its own digest.
 
 `__StartNextRunAttempt` is a **compare-and-swap** retry state machine: it reads the run and its
 AgentService authority as one snapshot, refuses unless the run is in a retryable terminal state and the
@@ -41,35 +45,32 @@ polls) so a started attempt can never be lost between deciding and launching.
 `__ValidateRunWorkloadAssignment` is the mirror check at launch time: it confirms the workload's full
 identity (who / where / which attempt) matches the expected authority exactly and has not expired.
 
-Initial admission is also all-or-nothing. `PrismaRunAdmissionRepository` serialises a user's
-idempotency key, lets the session assembler re-read every authority inside that transaction, and then
-persists the logical run, its only `RunInputSnapshot`, and its ordered acceptance/dispatch events
-together. A duplicate returns the original frozen snapshot instead of compiling against newer state.
-
-Invariant: one logical run keeps one identity; attempts only ever move forward under optimistic
-concurrency (detect conflicts at commit time); and any mismatch or staleness is a fail-closed denial with a precise reason.
+Invariant: a logical run either commits with exactly one digest-sealed snapshot and its dispatch
+event, or does not exist. Retries retain that run and snapshot identity, attempts only move forward
+under optimistic concurrency, and any authority, workload or persistence uncertainty fails closed.
 
 ## Public surface
 
 - `__StartNextRunAttempt(repository, command)` — start the next attempt of a run via compare-and-swap.
 - `__ValidateRunWorkloadAssignment(assignment, expectation)` — confirm a workload is the one authorised for this attempt.
+- `__DigestRunInputSnapshot(snapshot)` — compute the canonical SHA-256 identity of all frozen run
+  inputs without digesting the self-referential `digest` field.
+- `PrismaRunAdmissionRepository` — serialise duplicate requests and atomically persist the initial
+  run, snapshot and ordered outbox events around a caller-supplied assembly callback.
+- `RunAdmissionRepository`, `RunAdmissionCommand`, `RunAdmissionTransaction`,
+  `RunAdmissionBuildResult` and `RunAdmissionResult` — the transaction-fenced initial-admission port
+  and its input/output vocabulary.
 - `PrismaAgentRunAuthorityRepository` — the Prisma-backed adapter implementing the persistence port (atomic retry + outbox append).
-- `PrismaRunAdmissionRepository` — atomically deduplicates and persists the first run, its immutable
-  input snapshot, and both initial outbox events.
-- `__DigestRunInputSnapshot` — computes the canonical SHA-256 identity of every frozen runtime input.
-- `RunAdmissionRepository` and its command/result types — transaction boundary used by the session
-  assembler to load and commit against one authority view.
 - `AgentRunAuthorityRepository` / `AgentRunAuthoritySnapshot` — the persistence port and its consistent read shape.
 - `StartNextRunAttemptCommand` / `StartNextRunAttemptResult`, `AtomicStartNextRunAttemptCommand` / `AtomicRunAttemptResult` — retry request/result and their atomic commit forms.
 - `RunWorkloadAssignment` / `RunWorkloadAssignmentExpectation` / `RunWorkloadAssignmentDecision` — the workload-identity check inputs and verdict.
 
 ## Boundary
 
-Consumed by the session-assembly, run-dispatch, and workload-admission paths. It does not choose
-persona, memory, tools, models, or budgets and does not run or schedule the agent; those inputs arrive
-through other authorities and this package only seals and persists their accepted coordinates. Unlike its sibling
-authorities it ships its own Prisma adapter, so the atomic increment and outbox append stay in one
-transaction; pure use cases still accept an injected port for testing.
+Consumed by the [session assembler](../../session/main/README.md), run-dispatch and workload-
+admission paths. It does not choose persona, memory, tools, budgets or membership evidence; session
+supplies those through the transaction callback. It does not run the agent or schedule a Pod. It
+owns only the durable admission/attempt boundary and the outbox facts downstream execution consumes.
 
 ## Dependency direction
 
@@ -78,12 +79,12 @@ Tagged `scope:personal-runs`: it may depend only on `scope:agents` (shared run m
 
 ## Data & persistence
 
-Owns `AgentRun`, `RunInputSnapshot`, the attempt counter, and the run outbox in
-`apps/opencrane/prisma/schema/runs.prisma`. Initial admission commits the first run, snapshot,
-`RunAccepted`, and `RunAttemptRequested` together; retry commits the next attempt and request event
-together. A failed transaction exposes none of those rows.
+Owns `AgentRun`, its one `RunInputSnapshot`, and run-domain outbox rows in
+`apps/opencrane/prisma/schema/runs.prisma`. Initial admission commits the run, snapshot,
+`RunAccepted`, and first `RunAttemptRequested` event together; later retries atomically advance the
+attempt counter and append another `RunAttemptRequested` event.
 
 ## See also
 
 - Parent index: [agents](../../../README.md)
-- Siblings: [conversations](../../conversations/main/README.md) · [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)
+- Siblings: [session](../../session/main/README.md) · [conversations](../../conversations/main/README.md) · [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)

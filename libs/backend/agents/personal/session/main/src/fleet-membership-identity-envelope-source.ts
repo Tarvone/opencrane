@@ -1,9 +1,9 @@
+import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
 import { __VerifyCurrentFleetMembershipEvidence, PrismaFleetMembershipAuthorityRepository } from "@opencrane/backend/server/iam/membership";
 import type { FleetMembershipAdmissionExpectation, FleetMembershipSignatureVerifier } from "@opencrane/backend/server/iam/membership";
 import { ___IsSha256Digest } from "@opencrane/util";
 
 import type { CapabilitySetDigestSource, IdentityEnvelopeInput, IdentityEnvelopeSource, SessionAssemblyCommand, SessionAssemblyLoad } from "./session-assembly.types.js";
-import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
 
 /**
  * Identity source that derives snapshot evidence only from a signed membership revision accepted in

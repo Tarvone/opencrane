@@ -163,18 +163,26 @@ own no runtime flow, skip the diagram or use a one-line "used by" sketch.
 ## Depth profiles by package type
 
 Right-size the README to the package — do not pad a pure-type package to look like an authority.
+**Judge size by prose density, not total lines:** aim for 1–4 lines of prose per section, and let the
+total fall where it falls once the mandatory structure (breadcrumb, the fixed section order, and — for
+a package in a runtime flow — the ~10-line diagram + "In this flow:" legend) is in place. The
+physical-line ranges below are the realistic totals *including* that structure, not a budget to trim
+to; a backend authority with a diagram lands near the top of its range and that is correct.
 
-| Type | Where | Emphasise | Rough size |
-|------|-------|-----------|-----------|
-| Backend domain authority | `libs/backend/server/*`, `libs/backend/agents/personal/*`, `libs/backend/artifacts/*` | the invariant it enforces, its persistence boundary, fail-closed reasons | 24–38 lines |
-| Pure model / util | `libs/models/*`, `libs/util`, `libs/observability` | "pure, no I/O", the types/helpers it defines, who depends on it | 8–15 lines |
-| Frontend feature / element | `libs/frontend/features/*`, `libs/frontend/elements/*` | the route/UI slice it owns, its store dependencies, `scope:web` rule, consumer | 8–18 lines |
-| Frontend state (port/adapter) | `libs/frontend/state/*` | the gateway port it defines/implements, the HTTP surface it adapts, write-only invariants, consumer | 10–15 lines |
-| Frontend core / platform | `libs/frontend/{core,platform}` | the cross-cutting primitives it holds, FORK-shared status | 15–25 lines |
-| Deployable app | `apps/opencrane-ui`, `apps/channel-proxy`, `apps/artifact-service` | what it composes, trust/runtime posture, entrypoint, deploy unit | 20–40 lines |
-| Vendored infra app | `apps/_infra/{cognee,litellm,obot,langfuse}`, `apps/postgres` | upstream link, **why we run it**, pinned image/version, config knobs, what OpenCrane owns vs the vendor | 15–25 lines |
-| Server infra lib | `libs/server/_infra/*` | the runtime seam it owns, its sole consumer, what it must not import | 12–20 lines |
-| Group / area index | grouping dirs | the child map table + the tier dependency rule + a child diagram | 15–30 lines |
+| Type | Where | Emphasise | Realistic total |
+|------|-------|-----------|-----------------|
+| Backend domain authority | `libs/backend/server/*`, `libs/backend/agents/personal/*`, `libs/backend/artifacts/*` | the invariant it enforces, its persistence boundary, fail-closed reasons | 55–85 lines |
+| Pure model / util | `libs/models/*`, `libs/util`, `libs/observability` | "pure, no I/O", the types/helpers it defines, who depends on it | 15–35 lines |
+| Frontend feature / element | `libs/frontend/features/*`, `libs/frontend/elements/*` | the route/UI slice it owns, its store dependencies, `scope:web` rule, consumer | 30–55 lines |
+| Frontend state (port/adapter) | `libs/frontend/state/*` | the gateway port it defines/implements, the HTTP surface it adapts, write-only invariants, consumer | 30–50 lines |
+| Frontend core / platform | `libs/frontend/{core,platform}` | the cross-cutting primitives it holds, FORK-shared status | 30–55 lines |
+| Deployable app | `apps/opencrane-ui`, `apps/channel-proxy`, `apps/artifact-service` | what it composes, trust/runtime posture, entrypoint, deploy unit | 45–80 lines |
+| Vendored infra app | `apps/_infra/{cognee,litellm,obot,langfuse}`, `apps/postgres` | upstream link, **why we run it**, pinned image/version, config knobs, what OpenCrane owns vs the vendor | 30–55 lines |
+| Server infra lib | `libs/server/_infra/*` | the runtime seam it owns, its sole consumer, what it must not import | 30–50 lines |
+| Group / area index | grouping dirs | the child map table + the tier dependency rule + a child diagram | 25–45 lines |
+
+If a README runs well past the top of its range, the fix is tighter prose per section (and dropping
+optional sections that do not apply), never dropping a mandatory section or the diagram.
 
 ## Template
 

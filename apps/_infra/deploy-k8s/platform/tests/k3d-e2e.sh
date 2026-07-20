@@ -31,6 +31,10 @@ NAMESPACE="${NAMESPACE:-opencrane-system}"
 # stay <release>-<component> (nameOverride "opencrane" is a prefix of the release
 # name, so opencrane.fullname == the release name).
 RELEASE_NAME="${RELEASE_NAME:-opencrane-silo}"
+ARTIFACT_NAMESPACE="${ARTIFACT_NAMESPACE:-${NAMESPACE}-artifacts}"
+ARTIFACT_CATALOG_KEY_SECRET="${ARTIFACT_CATALOG_KEY_SECRET:-opencrane-artifact-catalog-keys}"
+ARTIFACT_SERVICE_KEY_SECRET="${ARTIFACT_SERVICE_KEY_SECRET:-opencrane-artifact-service-keys}"
+ARTIFACT_KEY_DIR=""
 KEEP_CLUSTER="${KEEP_CLUSTER:-0}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-240}"
 DB_STORAGE_GB="${DB_STORAGE_GB:-20}"
@@ -141,30 +145,37 @@ function _require_free_space()
 function _cleanup()
 {
   local exit_code=$?
+  local diagnostic_namespace
+
+  if [[ -n "$ARTIFACT_KEY_DIR" ]]; then
+    rm -rf "$ARTIFACT_KEY_DIR" 2>/dev/null || true
+  fi
 
   # On a failed run, dump cluster diagnostics BEFORE the teardown deletes the (otherwise lost)
   # cluster — pod/job states, recent events, and each pod's describe + current/previous logs
   # across both containers. Without this a CI failure in the deploy phase is undebuggable.
   if [[ "$exit_code" -ne 0 ]]; then
     echo "[e2e] ===== FAILURE (exit $exit_code): cluster diagnostics ====="
-    kubectl get pods,jobs -n "$NAMESPACE" -o wide 2>/dev/null || true
+    kubectl get pods,jobs -A -o wide 2>/dev/null || true
     echo "[e2e] --- cluster services / network policies ---"
     kubectl get svc,endpoints,endpointslices -A -o wide 2>/dev/null || true
     kubectl get networkpolicies -A -o wide 2>/dev/null || true
     echo "[e2e] --- clustertenants / tenants ---"
     kubectl get clustertenants,tenants -A 2>/dev/null || true
     echo "[e2e] --- recent events ---"
-    kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp 2>/dev/null | tail -40 || true
-    for p in $(kubectl get pods -n "$NAMESPACE" -o name 2>/dev/null); do
-      local log_tail=80
-      if [[ "$p" == *"opencrane-server"* ]]; then
-        log_tail=240
-      fi
-      echo "[e2e] ### describe $p"
-      kubectl describe "$p" -n "$NAMESPACE" 2>/dev/null | tail -30 || true
-      echo "[e2e] ### logs $p"
-      kubectl logs "$p" -n "$NAMESPACE" --all-containers --tail="$log_tail" 2>/dev/null || true
-      kubectl logs "$p" -n "$NAMESPACE" --all-containers --previous --tail="$log_tail" 2>/dev/null || true
+    kubectl get events -A --sort-by=.lastTimestamp 2>/dev/null | tail -60 || true
+    for diagnostic_namespace in "$NAMESPACE" "$ARTIFACT_NAMESPACE"; do
+      for p in $(kubectl get pods -n "$diagnostic_namespace" -o name 2>/dev/null); do
+        local log_tail=80
+        if [[ "$p" == *"opencrane-server"* ]]; then
+          log_tail=240
+        fi
+        echo "[e2e] ### describe $diagnostic_namespace/$p"
+        kubectl describe "$p" -n "$diagnostic_namespace" 2>/dev/null | tail -30 || true
+        echo "[e2e] ### logs $diagnostic_namespace/$p"
+        kubectl logs "$p" -n "$diagnostic_namespace" --all-containers --tail="$log_tail" 2>/dev/null || true
+        kubectl logs "$p" -n "$diagnostic_namespace" --all-containers --previous --tail="$log_tail" 2>/dev/null || true
+      done
     done
     echo "[e2e] ===== end diagnostics ====="
   fi
@@ -252,6 +263,11 @@ _require_cmd docker
 _require_cmd kubectl
 _require_cmd helm
 _require_cmd k3d
+_require_cmd openssl
+if [[ "$ARTIFACT_NAMESPACE" == "$NAMESPACE" ]]; then
+  echo "[e2e] ARTIFACT_NAMESPACE must differ from NAMESPACE so private key authorities stay isolated."
+  exit 1
+fi
 _require_docker_healthy
 _require_free_space
 
@@ -262,6 +278,12 @@ _retry 3 docker build -f "$ROOT_DIR/apps/opencrane/deploy/Dockerfile" -t opencra
 
 echo "[e2e] Building tenant image"
 _retry 3 docker build -f "$ROOT_DIR/apps/feat-openclaw-tenant/deploy/Dockerfile" -t opencrane/tenant:e2e "$ROOT_DIR"
+
+echo "[e2e] Building channel-proxy image"
+_retry 3 docker build -f "$ROOT_DIR/apps/channel-proxy/deploy/Dockerfile" -t opencrane/channel-proxy:e2e "$ROOT_DIR"
+
+echo "[e2e] Building artifact-service image"
+_retry 3 docker build -f "$ROOT_DIR/apps/artifact-service/deploy/Dockerfile" -t opencrane/artifact-service:e2e "$ROOT_DIR"
 
 # 3. Create a fresh cluster for deterministic test runs.
 echo "[e2e] Recreating k3d cluster '$CLUSTER_NAME'"
@@ -279,6 +301,8 @@ _retry 3 docker pull "$MINIO_CLIENT_IMAGE"
 echo "[e2e] Importing images into k3d"
 k3d image import opencrane/opencrane-server:e2e --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:e2e --cluster "$CLUSTER_NAME"
+k3d image import opencrane/channel-proxy:e2e --cluster "$CLUSTER_NAME"
+k3d image import opencrane/artifact-service:e2e --cluster "$CLUSTER_NAME"
 k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
 k3d image import "$MINIO_IMAGE" --cluster "$CLUSTER_NAME"
 k3d image import "$MINIO_CLIENT_IMAGE" --cluster "$CLUSTER_NAME"
@@ -970,6 +994,36 @@ _assert_distinct_cnpg_app_credentials "$OPENCRANE_POSTGRES_APP_SECRET" "$OBOT_PO
 _copy_cnpg_uri_secret "$OBOT_POSTGRES_APP_SECRET" "${RELEASE_NAME}-obot" dsn
 _copy_cnpg_uri_secret "$LITELLM_POSTGRES_APP_SECRET" opencrane-litellm-db DATABASE_URL
 
+# ArtifactStore crosses a real namespace and key-authority boundary. Reproduce the deploy
+# engine's two-key arrangement in the disposable cluster so the smoke exercises the same
+# topology: OpenCrane signs leases and verifies receipts, while artifact-service verifies
+# leases and signs receipts. Private keys never share a Secret or namespace.
+function _create_artifact_keys()
+{
+  kubectl create namespace "$ARTIFACT_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+  ARTIFACT_KEY_DIR="$(mktemp -d)"
+
+  openssl genpkey -algorithm ED25519 -out "$ARTIFACT_KEY_DIR/lease-private.pem"
+  openssl pkey -in "$ARTIFACT_KEY_DIR/lease-private.pem" -pubout -out "$ARTIFACT_KEY_DIR/lease-public.pem"
+  openssl genpkey -algorithm ED25519 -out "$ARTIFACT_KEY_DIR/receipt-private.pem"
+  openssl pkey -in "$ARTIFACT_KEY_DIR/receipt-private.pem" -pubout -out "$ARTIFACT_KEY_DIR/receipt-public.pem"
+
+  kubectl create secret generic "$ARTIFACT_CATALOG_KEY_SECRET" \
+    -n "$NAMESPACE" \
+    --from-file=lease-private.pem="$ARTIFACT_KEY_DIR/lease-private.pem" \
+    --from-file=receipt-public.pem="$ARTIFACT_KEY_DIR/receipt-public.pem" \
+    --dry-run=client \
+    -o yaml | kubectl apply -f -
+  kubectl create secret generic "$ARTIFACT_SERVICE_KEY_SECRET" \
+    -n "$ARTIFACT_NAMESPACE" \
+    --from-file=lease-public.pem="$ARTIFACT_KEY_DIR/lease-public.pem" \
+    --from-file=receipt-private.pem="$ARTIFACT_KEY_DIR/receipt-private.pem" \
+    --dry-run=client \
+    -o yaml | kubectl apply -f -
+}
+
+_create_artifact_keys
+
 # Boot-time BYOK bootstrap key — seeds a model so the default-tenant seed's ≥1-model gate passes.
 kubectl create secret generic "$BOOTSTRAP_SECRET_NAME" \
   -n "$NAMESPACE" \
@@ -997,6 +1051,9 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db" \
   --set "litellm.databaseSecretKey=DATABASE_URL" \
   --set "bootstrap.providerKey.existingSecret=$BOOTSTRAP_SECRET_NAME" \
+  --set-string "artifactService.namespace=$ARTIFACT_NAMESPACE" \
+  --set-string "artifactService.keys.catalogExistingSecret=$ARTIFACT_CATALOG_KEY_SECRET" \
+  --set-string "artifactService.keys.serviceExistingSecret=$ARTIFACT_SERVICE_KEY_SECRET" \
   --set "certManager.enabled=false"
 
 # Wait for the opencrane-server (skip helm --wait because local-path PVCs don't bind until a pod
@@ -1004,6 +1061,14 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
 # by the release name because nameOverride (opencrane) is a prefix of it, so
 # opencrane.fullname == the release name → <release>-<component>.
 kubectl rollout status "deployment/${RELEASE_NAME}-opencrane-server" -n "$NAMESPACE" --timeout=180s
+kubectl rollout status "deployment/${RELEASE_NAME}-channel-proxy" -n "$NAMESPACE" --timeout=180s
+kubectl rollout status "deployment/${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" --timeout=180s
+
+# The canonical bytes must live on their own mounted PVC behind the isolated Service and
+# ingress/egress policy. These assertions keep the greenfield durability boundary in the smoke.
+kubectl get pvc "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/dev/null
+kubectl get service "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/dev/null
+kubectl get networkpolicy "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/dev/null
 
 # Wait for LiteLLM (a silo plane) when cost routing is enabled by chart values.
 if kubectl get "deployment/${RELEASE_NAME}-litellm" -n "$NAMESPACE" >/dev/null 2>&1; then

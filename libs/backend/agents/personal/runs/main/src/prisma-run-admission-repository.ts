@@ -1,6 +1,7 @@
 import { Prisma, RunOutboxEventKind, type PrismaClient } from "@prisma/client";
 
 import type { RunInputSnapshot } from "@opencrane/contracts";
+import { ___CreateLogger, type Logger } from "@opencrane/observability";
 import { ___CloneCanonicalJson } from "@opencrane/util";
 import type { JsonValue } from "@opencrane/util";
 
@@ -17,12 +18,20 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 	private readonly prisma: PrismaClient;
 	/** Server-owned clock that freezes an admission instant only after a non-duplicate request reaches this boundary. */
 	private readonly clock: RunAdmissionClock;
+	/** Structured persistence-failure signal with process-wide secret redaction. */
+	private readonly log: Logger;
 
-	/** Creates an initial-admission repository over canonical Postgres. */
-	constructor(prisma: PrismaClient, clock: RunAdmissionClock = { now: function _now(): Date { return new Date(); } })
+	/**
+	 * Creates an initial-admission repository over canonical Postgres.
+	 * @param prisma - Canonical product-authority database client.
+	 * @param clock - Server-owned admission clock, replaceable only for deterministic tests.
+	 * @param log - Structured redacting logger for otherwise fail-closed persistence failures.
+	 */
+	constructor(prisma: PrismaClient, clock: RunAdmissionClock = { now: function _now(): Date { return new Date(); } }, log: Logger = ___CreateLogger("personal-run-admission"))
 	{
 		this.prisma = prisma;
 		this.clock = clock;
+		this.log = log;
 	}
 
 	/**
@@ -62,10 +71,19 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 		{
 			if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
 			{
-				const existing = await this.prisma.agentRun.findUnique({ where: { siloId_requestIdempotencyKey: { siloId: command.siloId, requestIdempotencyKey: command.requestIdempotencyKey } } });
-				const existingSnapshot = existing === null ? null : await this.prisma.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
-				if (existingSnapshot !== null) return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+				try
+				{
+					const existing = await this.prisma.agentRun.findUnique({ where: { siloId_requestIdempotencyKey: { siloId: command.siloId, requestIdempotencyKey: command.requestIdempotencyKey } } });
+					const existingSnapshot = existing === null ? null : await this.prisma.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
+					if (existingSnapshot !== null) return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+				}
+				catch (recoveryError)
+				{
+					this.log.error({ err: recoveryError, runId: command.runId, siloId: command.siloId, agentServiceId: command.agentServiceId, failureKind: "duplicate_recovery_failed" }, "personal run admission persistence failed");
+					return { outcome: "denied", reason: "persistence_unavailable" };
+				}
 			}
+			this.log.error({ err: error, runId: command.runId, siloId: command.siloId, agentServiceId: command.agentServiceId, failureKind: "transaction_failed" }, "personal run admission persistence failed");
 			return { outcome: "denied", reason: "persistence_unavailable" };
 		}
 	}

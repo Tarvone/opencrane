@@ -46,10 +46,11 @@ reconcilers it composes)* · [opencrane-ui](../opencrane-ui/README.md) *(the mai
 [deploy-k8s](../_infra/deploy-k8s/README.md) *(the silo umbrella chart that deploys it)*
 
 Invariant: the public API and workload-facing internal API are served on **two separate listeners**
-(ports 8080 and 8081). The internal listener has no browser-session middleware: sensitive pod routes
-verify their own projected Kubernetes identity with TokenReview, while explicitly network-only routes
-remain confined by NetworkPolicy. Keeping that listener off the public ingress prevents either trust
-mode from becoming internet-facing.
+(ports 8080 and 8081). Keeping the internal listener off the public ingress is the first boundary.
+Sensitive Pod routes, including the personal-agent runtime stream, additionally verify short-lived
+projected Kubernetes identity through TokenReview; explicitly network-only routes remain confined by
+NetworkPolicy. If either layer were collapsed, platform-only or runtime authority could become
+internet-facing.
 
 ## Public surface
 
@@ -65,6 +66,8 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 The internal runtime stream TokenReviews only the fixed `opencrane-agent-runtime` audience and a
 bounded runtime-profile ServiceAccount name. Durable assignment remains the authority for the exact
 ServiceAccount, Job, Pod, run, and revision; the ServiceAccount name alone is never sufficient.
+The current composition injects an empty command authority, so a verified Pod may maintain a
+heartbeat connection but cannot receive commands or persist candidate output yet.
 
 ## Boundary
 
@@ -81,8 +84,11 @@ import back into it.
 ## Data & persistence
 
 Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, with applied migrations
-under `prisma/migrations/`. The migrate init-container runs `prisma migrate deploy` from this package
-root at rollout. This is the one place the silo's database shape is defined.
+under `prisma/migrations/`. The runs slice binds every `AgentRun` to exactly one immutable
+`RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
+and commits its initial acceptance and dispatch events in the same transaction. A partial or
+mismatched admission therefore cannot commit. The migrate init-container runs `prisma migrate deploy`
+from this package root at rollout; this is the one place the silo's database shape is defined.
 
 ## Runtime & config
 

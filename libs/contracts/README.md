@@ -36,7 +36,10 @@ Two halves:
 **In this flow:** [models/agents](../models/agents/main/README.md) · [models/authorization](../models/authorization/main/README.md) *(re-exported DTOs)* · the `apps/opencrane` server *(spec producer)*
 
 Invariant: the client's types are a faithful projection of the server's published spec — regenerate
-after any API change so the two never silently diverge.
+after any API change so the two never silently diverge. `RunInputSnapshot` is the cross-domain
+record of one run's frozen persona, transcript, memory references, tools, budgets, model route and
+verified identity provenance; it carries only immutable coordinates and canonical JSON, never
+provider credentials or mutable source objects.
 
 ## Public surface
 
@@ -44,22 +47,27 @@ after any API change so the two never silently diverge.
 - Hand-written DTOs/enums: `Grant`/`GrantScope`/`GrantAccess`, `Group`, `ClusterTenant*`,
   `McpServer*`/`Mcp*` operator types (MCP — the Model Context Protocol for connecting external tools),
   model-routing types, `Memory*`, `Approval`, `ThirdPartySource*`, `RuntimeAssignment`,
-  `RunInputSnapshot`, `TenantModelSet`, domain-topology host builders.
+  `RunInputSnapshot`/`RunInputSnapshotIdentity`, `MemoryFactReference`, `TenantModelSet`, and
+  domain-topology host builders. A memory fact reference pins an immutable content digest and its
+  provenance rather than a mutable revision counter.
 - `AGENT_RUNTIME_PROTOCOL_V1`, `AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE`,
-  `___IsAgentRuntimeServiceAccountName`,
-  `RuntimeCommandEnvelope`, and `RuntimeCandidate` — transport-neutral
-  command and candidate frames for a runtime that opens its own authenticated stream to the control
-  plane. The audience constant fixes that workload identity to `opencrane-agent-runtime`; the shared
-  validator keeps Job issuance and TokenReview admission on one bounded ServiceAccount grammar.
-  These frames are not a browser or OpenAPI contract.
+  `___IsAgentRuntimeServiceAccountName`, `RuntimeStreamOpen`, `RuntimeCommandEnvelope`, and
+  `RuntimeCandidate`
+  — the private workload protocol for a personal-agent process that opens its own authenticated
+  stream to the control plane. The opening frame binds the ephemeral runtime instance to the Pod UID
+  independently verified from its Kubernetes credential. The audience constant fixes workload
+  identity to `opencrane-agent-runtime`, and the shared validator keeps Job issuance and TokenReview
+  admission on one bounded ServiceAccount grammar. Later commands and candidate output retain that
+  identity. These frames are not a browser or OpenAPI contract.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary
 
-The one contract surface for the control-plane API; frontends import it instead of hard-coding URLs
-or shapes. It defines types and builds a client — it holds no business logic, no persistence, and no
-server state. External proprietary frontends should generate their own client from the released spec
-(see below) rather than importing this package, keeping a clean process/network boundary.
+The one contract surface for public control-plane calls and first-party workload protocols; callers
+import it instead of duplicating wire shapes. It defines types and builds a client — it holds no
+business logic, persistence, or server state. Runtime frames remain private internal contracts;
+external proprietary frontends should generate their client from the released spec (see below)
+rather than importing this package, keeping a clean process/network boundary.
 
 ## Licensing
 

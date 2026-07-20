@@ -24,6 +24,7 @@
 #   BRACE             opening { not on its own line for a multi-line fn/class (heuristic)
 #   MISSING-README    new/changed package (project.json) with no sibling README.md
 #   README-SECTIONS   leaf package README missing a mandatory package-docs section
+#   TEST-LOCATION     *.test.ts file not placed under a __tests__ directory
 
 set -euo pipefail
 
@@ -93,6 +94,17 @@ for f in "${DOC_FILES[@]:-}"; do
 					_report "$f" 1 ERROR README-SECTIONS "missing mandatory section '${section}' — see docs/agents/package-docs.md"
 				fi
 			done
+# TEST-LOCATION — every *.test.ts must live under a __tests__ directory,
+# never co-located next to the source file it tests. Runs against the raw
+# FILES list since test files are otherwise excluded from CHECKABLE below.
+for f in "${FILES[@]:-}"; do
+	[[ -z "$f" || ! -f "$f" ]] && continue
+	case "$f" in
+		*.test.ts)
+			case "$f" in
+				*/__tests__/*) : ;;
+				*) _report "$f" 1 ERROR TEST-LOCATION "test file not under __tests__/ — move it there and fix relative imports" ;;
+			esac
 			;;
 	esac
 done

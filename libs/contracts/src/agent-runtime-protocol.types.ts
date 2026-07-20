@@ -37,7 +37,7 @@ export interface RuntimeCommandCoordinates
 	/** ISO-8601 instant from which this command may be processed. */
 	readonly issuedAt: string;
 	/** ISO-8601 hard expiry after which this command is invalid. */
-	expiresAt: string;
+	readonly expiresAt: string;
 	/** Proof-bound workload assignment allowed to receive this command. */
 	readonly assignment: RuntimeAssignment;
 }

@@ -45,6 +45,7 @@ export function __AdmitRuntimeCommand(input: RuntimeCommandAdmissionInput): Runt
 		return { outcome: "denied", reason: "invalid_frame" };
 	}
 	if (command.protocolVersion !== AGENT_RUNTIME_PROTOCOL_V1) return { outcome: "denied", reason: "unsupported_protocol" };
+	if (nowEpochMs < issuedAtEpochMs) return { outcome: "denied", reason: "not_yet_valid" };
 	if (nowEpochMs >= expiresAtEpochMs || nowEpochMs >= assignmentExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
 	if (!Number.isSafeInteger(authority.leaseExpiresAtEpochMs) || nowEpochMs >= authority.leaseExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
 	if (authority.terminal) return { outcome: "denied", reason: "terminal_run" };

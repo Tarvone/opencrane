@@ -9,7 +9,7 @@ across domain packages. "Pure" means every function returns a value computed onl
 arguments — no database, no network, no clock, no global state — so the results are identical every
 time and safe to call anywhere.
 
-It owns two things:
+It owns three things:
 
 - **Collection helpers** — `___SortBy` (stable sort by an optional key), `___SomeArray` and
   `___SomeRecord` (typed "does any element/value match?" checks). Small, but shared so the same

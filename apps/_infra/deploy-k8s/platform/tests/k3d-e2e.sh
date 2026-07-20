@@ -772,14 +772,23 @@ spec:
           args:
             - |
               deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
-              until psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc 'SELECT 1' >/dev/null 2>&1; do
+              while true; do
+                if restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT marker FROM backup_restore_smoke WHERE marker = '${BACKUP_MARKER}'")"; then
+                  break
+                else
+                  psql_status="\$?"
+                fi
+                # psql status 2 is a connection loss. SQL/schema failures use another status and
+                # must fail immediately instead of being disguised as transient readiness.
+                if [ "\$psql_status" -ne 2 ]; then
+                  exit "\$psql_status"
+                fi
                 if [ "\$(date +%s)" -ge "\$deadline" ]; then
                   echo "[e2e] Timed out waiting for recovered PostgreSQL to accept SQL connections" >&2
                   exit 1
                 fi
                 sleep 2
               done
-              restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT marker FROM backup_restore_smoke WHERE marker = '${BACKUP_MARKER}'")"
               test "\$restored_marker" = "${BACKUP_MARKER}"
           env:
             - name: DATABASE_URL
@@ -803,6 +812,8 @@ metadata:
   name: ${job_name}
   namespace: ${NAMESPACE}
 spec:
+  # The restored cluster may restart once while CNPG applies every logical database.
+  # Keep that transient retry inside one bounded Pod instead of multiplying attempts.
   backoffLimit: 0
   template:
     metadata:
@@ -817,7 +828,24 @@ spec:
           command: ["/bin/sh", "-ceu"]
           args:
             - |
-              restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT marker FROM backup_restore_smoke WHERE marker = '${BACKUP_MARKER}-${database_name}'")"
+              deadline="\$(( \$(date +%s) + ${TIMEOUT_SECONDS} ))"
+              while true; do
+                if restored_marker="\$(psql "\$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "SELECT marker FROM backup_restore_smoke WHERE marker = '${BACKUP_MARKER}-${database_name}'")"; then
+                  break
+                else
+                  psql_status="\$?"
+                fi
+                # psql status 2 is a connection loss. SQL/schema failures use another status and
+                # must fail immediately instead of being disguised as transient readiness.
+                if [ "\$psql_status" -ne 2 ]; then
+                  exit "\$psql_status"
+                fi
+                if [ "\$(date +%s)" -ge "\$deadline" ]; then
+                  echo "[e2e] Timed out waiting for recovered ${database_name} PostgreSQL to accept SQL connections" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
               test "\$restored_marker" = "${BACKUP_MARKER}-${database_name}"
           env:
             - name: DATABASE_URL

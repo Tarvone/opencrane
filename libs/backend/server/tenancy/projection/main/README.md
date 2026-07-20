@@ -4,7 +4,7 @@
 
 ## What it owns
 
-This package is part of **Tenancy** — the domain that connects fleet state to a single silo. The
+This package is part of **Tenancy** — the domain that connects fleet state to a single silo (one tenant's isolated running environment). The
 authoritative record of a workspace is a Kubernetes custom resource (`CR`) — a `Tenant` CRD, an
 `AccessPolicy` CRD — but the silo's own API reads a **projection**: a mirror of those CRDs kept as
 Postgres rows so queries are fast and do not hit the cluster. **Drift** is when the two disagree

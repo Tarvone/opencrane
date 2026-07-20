@@ -33,8 +33,8 @@ on — folded into the operator process rather than run as its own deployment.
 
 `GatewayProxyServer` runs its own HTTP server on a dedicated port with `/healthz` and `/readyz`
 probes, validates the request **origin** (which site opened the connection), applies a fixed-window
-per-subject rate limit, and **delegates every auth and routing decision to the control plane** — it
-holds no Kubernetes client and no secrets. It strips the external `/gateway` path prefix so the
+per-subject rate limit, and **delegates every auth and routing decision to the control plane** (the central server that makes
+auth/routing decisions) — it holds no Kubernetes client and no secrets. It strips the external `/gateway` path prefix so the
 upstream pod (whose gateway listens at `/`) sees the path it expects. Invariant: no connection
 reaches a pod without passing the origin, rate, and delegated-auth checks.
 

@@ -20,7 +20,7 @@ Three ideas run through it:
 - A **proof of possession** is how a running workload proves it is the one entitled to act. The
   types describe a short-lived, signed request-binding envelope (DPoP-style: a signature that ties
   the request to a key the workload holds) carrying the exact silo, service account, pod, run, and
-  argument digest the policy-enforcement point must independently match.
+  argument digest the policy-enforcement point (the component that checks the proof and enforces the decision) must independently match.
 
 The load-bearing function is `__DecideAuthorization(request, grants)`. It is **fail-closed and
 deterministic**: it filters grants to those that structurally match the request, rejects any with

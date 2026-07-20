@@ -42,7 +42,7 @@ Mounted at `/api/v1/policies`.
   cluster and keeps them converged.
 - `PolicyResourceBuilder` — renders an `AccessPolicy`/`AccessPolicySpec` into the concrete cluster
   resources.
-- `_PoliciesOpenapiPaths` — the OpenAPI path fragment this domain contributes to the aggregated spec.
+- `_PoliciesOpenapiPaths` — the OpenAPI (REST API description) path fragment this domain contributes to the aggregated spec.
 
 ## Boundary
 

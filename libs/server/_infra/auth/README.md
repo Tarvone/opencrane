@@ -23,8 +23,8 @@ It is the first runtime seam every protected request passes through:
  _infra/http router  →  backend domain route
 ```
 
-**In this flow:** [http](../http/README.md) *(mounts the middleware)* · the IAM/tenancy backend
-domains *(read the resolved identity)*
+**In this flow:** [http](../http/README.md) *(mounts the middleware)* · the IAM (identity and access
+management)/tenancy backend domains *(read the resolved identity)*
 
 `___AuthMiddleware` resolves auth in a fixed priority order — public-path bypass, OIDC session,
 env-var token (for CI), per-user database token, then a dev-mode bypass only when nothing is
@@ -32,7 +32,7 @@ configured. Around it the library owns: environment-driven OIDC config (`___Load
 session lifecycle helpers (`_saveSession`, `_regenerateSession`, `_destroySession`, safe return-to
 sanitising), identity-claim resolution, organisation **membership** facts (which orgs a user belongs
 to / owns), a **per-org login client** seam (each organisation can have its own OIDC settings), silo
-resolution from the request host, and the authorization gates `_RequirePlatformOperator` /
+(one tenant's isolated running environment) resolution from the request host, and the authorization gates `_RequirePlatformOperator` /
 `_RequireOrgAdmin`. It applies an `express-session` type augmentation so `req.session.authUser` is
 typed everywhere. Invariant: **fail-closed** — anything missing, malformed, or unverified becomes a
 401/403; the server never treats an unauthenticated request as trusted.

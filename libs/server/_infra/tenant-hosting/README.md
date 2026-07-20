@@ -13,7 +13,7 @@ the provider.
 It defines the `HostingAdapter` contract and the concrete adapters that implement it:
 
 ```
- tenant reconciler / hosting factory  (needs storage + a pod state volume)
+ tenant reconciler (the controllers that keep cluster state matching desired config) / hosting factory  (needs storage + a pod state volume)
           │  provisionTenantStorage · buildStateVolume · buildServiceAccountIdentity
           ▼
  ┌────────────────────────────┐

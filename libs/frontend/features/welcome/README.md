@@ -7,7 +7,7 @@
 This is a frontend **feature** package (a lazy-loaded route plus its components — the browser only
 downloads its code when the route is first opened). It owns first-run onboarding: the guided welcome
 shown the first time an authenticated user or customer admin lands in the workspace. It is distinct
-from the fleet app's self-serve **signup** funnel, which stays in the WeOwnAI repo. This flow writes
+from the fleet app (the platform-operator front-end)'s self-serve **signup** funnel, which stays in the WeOwnAI repo. This flow writes
 nothing to the server.
 
 It drives a short funnel, a PrimeNG Stepper stepped by a `WelcomeStep` enum:

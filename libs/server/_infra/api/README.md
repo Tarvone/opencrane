@@ -13,7 +13,7 @@ place that knows how to read, write, and watch those objects; it holds no busine
 It sits directly on the runtime seam between the server's controllers and the Kubernetes API server:
 
 ```
- a reconciler / router  (wants to apply or watch a custom resource)
+ a reconciler (the controllers that keep cluster state matching desired config) / router  (wants to apply or watch a custom resource)
           │
           ▼
  ┌────────────────────────────┐

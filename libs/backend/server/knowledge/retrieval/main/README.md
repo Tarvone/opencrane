@@ -8,7 +8,7 @@ This package is part of **Knowledge** — what an organisation's agents can retr
 memory. That memory lives in **Cognee**, the external service OpenCrane runs to ingest an org's
 documents and answer similarity searches over them. This package owns two things at the front of
 that read path: the **registry of where org content comes from** (the third-party sources — Slack,
-Confluence, git repositories, the Model Context Protocol registry, skill bundles — and the
+Confluence, git repositories, the Model Context Protocol (agent tool-connection standard) registry, skill bundles — and the
 inventory of items discovered in each), and the **canonical dataset-scope ordering** every reader
 and authorization check shares.
 
@@ -20,7 +20,7 @@ contract, and the scope-aware retrieval plugin can never disagree.
 
 ```
  agent asks a question
-        │  retrieval query (tenant, dataset scope)
+        │  retrieval query (tenant — one customer's isolated workspace — and dataset scope)
         ▼
  ┌──────────────────────────────────────────┐
  │  retrieval   ◄── HERE                      │  scope precedence Personal→…→Org

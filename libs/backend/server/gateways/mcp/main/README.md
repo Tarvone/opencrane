@@ -32,7 +32,7 @@ Invariant: a user only ever sees and installs servers permitted by the access po
 server's approval state (pending review → approved → published, or disabled). Credential values are
 held for brokering but never echoed back on reads — the API returns connection status, not secrets.
 Route handlers stay thin; the registry, entitlement filtering, and approval transitions live in the
-service layer (`src/core/`), and the HTTP surface is generated into the OpenAPI paths.
+service layer (`src/core/`), and the HTTP surface is generated into the OpenAPI (REST API description) paths.
 
 ## Public surface
 

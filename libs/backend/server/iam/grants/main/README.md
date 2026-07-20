@@ -43,7 +43,7 @@ of the grants, never a second source of truth.
 - `core/cognee-awareness-sync` — keeps Cognee's awareness grants aligned with the compiled state.
 - The share routes (`routes/shares`, `routes/resource-shares`) and their types — the inter-user and
   direct-resource sharing APIs.
-- `_GrantsOpenapiPaths` — the OpenAPI path fragment this domain contributes to the aggregated spec.
+- `_GrantsOpenapiPaths` — the OpenAPI (REST API description) path fragment this domain contributes to the aggregated spec.
 
 ## Boundary
 

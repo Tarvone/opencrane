@@ -40,7 +40,7 @@ the deep sub-doc [`reconcilers/tenants/README.md`](./src/reconcilers/tenants/REA
 
 `OpenClawTenantLifecycle` is the entry the app root starts: it loads config, provisions an optional
 bootstrap provider key, seeds standalone ClusterTenant / default-workspace resources, ensures the
-singleton Cognee identity and its LiteLLM key, starts the idle-suspension and policy loops, optionally
+singleton Cognee (the memory service) identity and its LiteLLM (the model-router) key, starts the idle-suspension and policy loops, optionally
 starts an in-process channel proxy, and then runs the tenant watch loop. Boot is deliberately
 fail-soft: if bootstrap throws, the silo API stays up but logs that the tenant runtime is not
 reconciling.
@@ -75,7 +75,7 @@ the channel-proxy infra lib through the app root.
 Driven by the app-owned operator environment (`OpenClawTenantOperatorConfig`): watch namespace,
 deployment mode (standalone vs fleet-managed), standalone seed identity, Cognee endpoint, and the
 optional in-process gateway proxy (`GATEWAY_PROXY_ENABLED`). A boot-time `OPENCRANE_BOOTSTRAP_OPENAI_KEY`
-provisions an optional BYOK provider key.
+provisions an optional BYOK (bring-your-own-key) provider key.
 
 ## See also
 

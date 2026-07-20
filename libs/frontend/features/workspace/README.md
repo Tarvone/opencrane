@@ -24,7 +24,7 @@ between them.
 [features/settings](../settings/README.md) · [features/tools](../tools/README.md)
 
 The root of the workspace opens a blank "new session" composer; sending the first message mints a
-session id and deep-links to `session/:id`. In-process A2UI canvas rendering is provided here (on
+session id and deep-links to `session/:id`. In-process A2UI (agent-drawn interactive UI) canvas rendering is provided here (on
 the lazy route) so its vendored code stays out of the initial bundle.
 
 ## Public surface

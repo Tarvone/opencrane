@@ -16,7 +16,7 @@ renders `TOOLS.md` — the machine-readable file the agent reads to know its too
 
 ```
  tenant pod polls  /api/internal/contract  (projected ServiceAccount token)
-        │  TokenReview verifies the pod's own identity
+        │  TokenReview (Kubernetes' API for checking a pod's own identity token) verifies the pod's own identity
         ▼
  ┌───────────────────────────────────────────────┐
  │  contract   ◄── HERE                            │

@@ -4,7 +4,7 @@
 
 ## What it owns
 
-This package is part of **Tenancy** — the domain that connects fleet state to a single silo, and it
+This package is part of **Tenancy** — the domain that connects fleet state to a single silo (one tenant's isolated running environment), and it
 is the centre of that domain: the lifecycle of a **tenant**, one customer's isolated workspace. It
 owns creating, reading, updating, suspending, and deleting a tenant, the dataset memberships that
 say which slices of org memory that tenant may see, and the inputs the effective contract compiles
@@ -29,13 +29,13 @@ and the projection row on create — and drives the whole lifecycle:
  [connections]      [projection]         [spend]        → [contract] compiles from this
 ```
 
-**In this flow:** [connections](../../connections/main/README.md) · [projection](../../projection/main/README.md) · [spend](../../../reporting/spend/main/README.md) · [contract](../../contract/main/README.md) · [grants](../../../iam/grants/main/README.md)
+**In this flow:** [connections](../../connections/main/README.md) · [projection](../../projection/main/README.md) · [spend](../../../reporting/spend/main/README.md) · [contract](../../contract/main/README.md) · [grants](../../../iam/grants/main/README.md) *(permission records)*
 
 Invariant: the CRD is the source of truth; the projection is repaired to match it, never the
 reverse. Suspension is a `spec.suspended` merge-patch that leaves the rest of the spec untouched
 (the operator scales the Deployment to zero and back) — it keeps the workspace, it does not tear it
 down. Teardown is the one destructive path and fans out to its neighbours: cut the pod, revoke the
-LiteLLM key, delete the CRD. Dataset membership is *derived* from grants, so the retrieval scope a
+LiteLLM (the model-router) key, delete the CRD. Dataset membership is *derived* from grants, so the retrieval scope a
 tenant sees always follows its actual entitlements.
 
 ## Public surface

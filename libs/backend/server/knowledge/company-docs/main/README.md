@@ -34,7 +34,7 @@ overwriting anyone silently:
 Invariant: versions are append-only and immutable, and the new version row plus the
 `currentVersion` bump happen in one database transaction so they can never diverge. The L0 guard
 runs **before any write** and fail-closed rejects content that tries to assert platform mechanics
-(managed mode, gateway routing, the effective-contract loop). If that guard were wrong, company or
+(core platform behaviour). If that guard were wrong, company or
 tenant prose could try to redefine core behaviour — futile, since L0 is re-stamped anyway, but it
 is refused regardless.
 

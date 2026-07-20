@@ -36,7 +36,7 @@ be reversed into a working key. Mounted at `/api/v1/access-tokens`.
 ## Public surface
 
 - `accessTokensRouter` — the Express router for creating, listing, and revoking personal access tokens.
-- `_AccessTokensOpenapiPaths` — the OpenAPI path fragment this domain contributes to the aggregated spec.
+- `_AccessTokensOpenapiPaths` — the OpenAPI (REST API description) path fragment this domain contributes to the aggregated spec.
 
 ## Boundary
 

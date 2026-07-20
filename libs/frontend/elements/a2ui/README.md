@@ -12,7 +12,7 @@ half of that feature: it takes the agent's canvas payload and draws it, and it h
 clicks and field edits back out so the host can return them to the agent.
 
 ```
- agent canvas message  (A2UI payload: JSONL / JSON array / parsed actions)
+ agent canvas message  (A2UI payload: JSONL (newline-delimited JSON) / JSON array / parsed actions)
           │
           ▼
  ┌──────────────────────────────────┐
@@ -41,7 +41,7 @@ intentionally unproduced.
 
 ## Boundary
 
-Consumed by the workspace shell, which calls `provideWoA2ui()` on its lazy route so the vendored
+Consumed by the workspace shell, which calls `provideWoA2ui()` on its lazy route so the vendored (copied-in third-party code)
 A2UI code stays out of the initial bundle. It only renders and emits — it does not fetch canvas
 payloads or talk to the API; returning an action to the agent is the host's job.
 

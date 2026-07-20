@@ -16,7 +16,7 @@ ClusterTenant (one customer's tenancy) default taking precedence over the platfo
 It also holds per-tenant model allowlists and the maths for evaluating candidate routing policies.
 
 ```
- provider BYOK key set   →   models registered in LiteLLM
+ provider BYOK (bring-your-own-key) key set   →   models registered in LiteLLM
         │
         ▼
  ┌────────────────────────────────────┐
@@ -36,7 +36,7 @@ and never calls LiteLLM; an empty ClusterTenant default never shadows a usable G
 nothing resolves it returns `null` so the pod falls back to its own configured default. The
 off-policy-evaluation (OPE) and savings helpers are likewise pure estimators used to decide, in
 shadow mode, whether a cheaper candidate model would hold quality before it ever routes live
-traffic. The BYOK model catalogue (`_BYOK_PROVIDER_CATALOG`) is data, tuned as providers ship models.
+traffic. The BYOK (bring-your-own-key) model catalogue (`_BYOK_PROVIDER_CATALOG`) is data, tuned as providers ship models.
 
 ## Public surface
 

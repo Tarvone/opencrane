@@ -37,7 +37,7 @@ sync with what actually happened: if the decision rolls back, so does its record
 - `__AppendAuditDecision` — append one immutable authorisation-decision record through the caller's
   active transaction (the write half used by the deciding domains).
 - `auditRouter` and its route types — the read-only `/api/v1/audit` trail API.
-- `_AuditOpenapiPaths` — the OpenAPI path fragment this domain contributes to the aggregated spec.
+- `_AuditOpenapiPaths` — the OpenAPI (REST API description) path fragment this domain contributes to the aggregated spec.
 - `AuditDecisionRecord` and related contract types.
 
 ## Boundary

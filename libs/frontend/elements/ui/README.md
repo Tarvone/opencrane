@@ -16,7 +16,7 @@ templates and styles live in sibling files.
 
 ## Public surface
 
-The barrel re-exports the components directly:
+The package's index file (barrel) re-exports the components directly:
 
 - `ScopeChipComponent` — a coloured chip labelling a data scope.
 - `CollapsibleSectionComponent` — an expandable titled section.

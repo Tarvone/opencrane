@@ -24,12 +24,12 @@ a feature never calls `fetch` directly and never guesses a request or response s
 
 ## Public surface
 
-- `lib/models/*.types.ts` — shared DTOs, enums, and colour/label maps (`scope`, `session`, `thread`,
+- `lib/models/*.types.ts` — shared data models (DTOs), enums, and colour/label maps (`scope`, `session`, `thread`,
   `context`, `notification`, `settings`, `mcp`, `plan`).
 - `lib/data/*.data.ts` — demo fixtures, temporary until the live API replaces them.
 - `ControlPlaneApiService` + `FleetManagerApiService` — the typed HTTP clients, plus their
   `CONTROL_PLANE_BASE_URL` / `FLEET_MANAGER_BASE_URL` injection tokens.
-- `WeOwnAiPreset` (`lib/theme/weownai-preset`) — the PrimeNG theme preset.
+- `WeOwnAiPreset` (`lib/theme/weownai-preset`) — the PrimeNG (the component library) theme preset.
 - `lib/utils/*` — framework-agnostic helpers (`_ToggleId`, collection helpers).
 
 ## Boundary

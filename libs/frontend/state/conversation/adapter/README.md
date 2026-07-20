@@ -37,7 +37,7 @@ are wrong the connection fails closed to a visible status; it never fabricates t
 
 ## Public surface
 
-- `OpenClawConnection` — the TypeBox-validated Gateway v4 WebSocket client.
+- `OpenClawConnection` — the TypeBox-validated (runtime schema-checked) Gateway v4 WebSocket client.
 - `OpenClawConversationGateway` — the live `ConversationGateway` implementation bound in `state/gateways`.
 - `gateway-protocol.schema` / `gateway-protocol.types` — the validated v4 frame/event shapes.
 - `history.util`, `pod-token.util`, `session-list.util` — pure helpers (history windowing, pod-token failure → status, session mapping).

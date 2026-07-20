@@ -10,7 +10,7 @@ content). Writing one is a two-party dance between OpenCrane and a separate uplo
 (`artifact-service`), and neither side trusts the other's raw claims. This package owns the two signed
 tokens that make that trust concrete.
 
-A **write lease** is a short-lived signed permission slip: "this silo may write this artifact, up to
+A **write lease** is a short-lived signed permission slip: "this silo (one tenant's isolated running environment) may write this artifact, up to
 this size, matching this hash, until this moment." A **promotion receipt** is the signed proof that
 comes back: "the bytes with this hash and length were stored." Both are compact signed tokens (JWS
 using EdDSA, a standard signature scheme) that only OpenCrane's keys can produce and verify.

@@ -38,7 +38,7 @@ compiles the group's members against its grants. Mounted at `/api/v1/groups`.
 - `groupsRouter` and its route types — the `/api/v1/groups` management API.
 - The group logic in `core/groups.logic` — create, update, and grant-attachment operations, plus the
   response shapes.
-- `_GroupsOpenapiPaths` — the OpenAPI path fragment this domain contributes to the aggregated spec.
+- `_GroupsOpenapiPaths` — the OpenAPI (REST API description) path fragment this domain contributes to the aggregated spec.
 
 ## Boundary
 

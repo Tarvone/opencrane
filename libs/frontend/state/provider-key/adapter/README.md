@@ -22,7 +22,7 @@ enum), sets/refreshes a key, and deletes one.
  OpenCraneProviderKeyGateway  ◄── HERE
         │ HTTP: GET/PUT/DELETE /providers/byok[/{provider}]
         ▼
- OpenCrane Control Plane API  ──►  writes k8s Secret + LiteLLM credential
+ OpenCrane Control Plane API  ──►  writes a Kubernetes (k8s) secret + LiteLLM (the model-router) credential
 ```
 
 **In this flow:** [gateways](../../gateways/README.md) · [features/tools](../../../features/tools/README.md)

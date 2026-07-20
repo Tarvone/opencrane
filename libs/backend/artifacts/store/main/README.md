@@ -26,11 +26,11 @@ guards every step relies on. It defines *what* a store must do; it does not touc
 **In this flow:** [authorization](../../authorization/main/README.md) *(verifies the lease, signs the receipt)* ·
 [filesystem](../../filesystem/main/README.md) *(the on-disk `ArtifactStore` this protocol drives)*
 
-`__PromoteArtifactUpload` is the orchestrator: it verifies the caller's lease *before* reading any
+`__PromoteArtifactUpload` is the orchestrator: it verifies the caller's lease (a short-lived signed write permit) *before* reading any
 untrusted bytes, rejects a declared body larger than the lease allows, and bounds the whole
 stage-then-promote sequence by both a process deadline and the lease's own expiry — cancelling the
 byte source if either passes, so a slow or oversized upload cannot hold resources open. Only a
-completed canonical promotion produces a signed receipt.
+completed canonical promotion produces a signed receipt (the signed proof the bytes were stored).
 
 The `__Validate*` guards are the store's fail-closed gatekeepers: they check that a lease, a stage
 command, a staged handle, and a promotion result each carry a well-formed content address (strict

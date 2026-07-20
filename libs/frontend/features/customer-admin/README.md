@@ -26,7 +26,7 @@ capability, which only hides controls — the server API remains the real enforc
 
 Mounted by `apps/opencrane-ui`. It reads the UserTenant **store** (a client-side state holder — a
 singleton that keeps the browser app's copy of the tenant list and exposes it as signals) and the session
-store; suspend/resume go through the store's optimistic mutators. It does not enforce access itself.
+store; suspend/resume go through the store's optimistic mutators (they update the UI first, then reconcile with the server). It does not enforce access itself.
 
 ## Dependency direction
 

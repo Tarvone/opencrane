@@ -42,7 +42,7 @@ but never corrupts the stored key.
 
 - `providerByokRouter`, `providerCredentialsRouter`, `providerKeysRouter`, `modelRegistryRouter` —
   the routers, mounted at `/api/v1/providers/*` and `/api/v1/models`.
-- `_ProvidersOpenapiPaths` — the OpenAPI path fragments for this surface.
+- `_ProvidersOpenapiPaths` — the OpenAPI (REST API description) path fragments for this surface.
 
 ## Boundary
 

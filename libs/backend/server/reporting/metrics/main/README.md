@@ -28,7 +28,7 @@ Prometheus text format:
  [projection]                     [awareness]
 ```
 
-**In this flow:** [projection](../../../tenancy/projection/main/README.md) · [awareness](../../awareness/main/README.md)
+**In this flow:** [projection](../../../tenancy/projection/main/README.md) *(the database mirror of the cluster's source-of-truth records)* · [awareness](../../awareness/main/README.md)
 
 Invariant: reporting must never blank on a partial failure. The Prometheus route emits the core
 opencrane-server metrics first, then best-effort appends the awareness SLO block (service-level

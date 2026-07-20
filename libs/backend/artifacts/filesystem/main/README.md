@@ -26,7 +26,7 @@ else. It owns the durability and integrity of the write, and the safety of every
 ```
 
 **In this flow:** [store](../../store/main/README.md) *(defines the `ArtifactStore` port and validates every command)* ·
-[authorization](../../authorization/main/README.md) *(issues the lease whose id seeds the staging path)*
+[authorization](../../authorization/main/README.md) *(issues the lease — a short-lived signed write permit — whose id seeds the staging path)*
 
 Staging writes untrusted bytes to a private per-lease file (mode `0600`) under a `staging/`
 directory, hashing and `fsync`-ing them as it goes, and rejects the upload if the computed digest or

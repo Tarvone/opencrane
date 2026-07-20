@@ -1,24 +1,41 @@
-# @opencrane/features/conversation
+# @opencrane/features/conversation — the centre conversation pane
 
-The centre pane: thread header, message stream, and composer.
+> [frontend](../../README.md) › [features](../README.md) › conversation
 
-## Import
+## What it owns
 
-```ts
-import { ConversationViewComponent } from "@opencrane/features/conversation";
-```
+This is a frontend **feature** package: it owns one UI slice — the centre pane of the workspace
+console — and exports the component the shell drops into that slot. That pane is the conversation
+itself: a thread header (department, model, files, share, plus a sync and scope rail), the scrolling
+message stream, and the composer where the user types.
 
-## Contents
+It reads the current thread and its messages from the conversation **store** (a client-side state
+holder: a singleton service that keeps the browser app's copy of the conversation and exposes it as signals)
+and renders them. Agent messages can carry text, an observation/policy/action ledger, a decision, or
+an image; markdown prose is turned into safe HTML through the shared render pipeline.
 
-- `conversation-view` — header (dept/model/files/share, sync + scope rail),
-  message stream, composer. `messages`/`typing`/`shareOpen` are `linkedSignal`s
-  that reset on thread switch.
-- `components/message-item` — renders one message: user bubble or assistant card
-  stack (text, observation/policy/action ledger, decide, image). Prose parsing
-  lives in `message-item.utils.ts`.
-- `components/share-panel` — invite-people / share-canvas popover.
+## Public surface
 
-## Dependencies
+- `ConversationViewComponent` — the pane: header, message stream, composer. Its `messages`,
+  `typing`, and `shareOpen` signals reset when the user switches thread.
+- `FilePanelComponent` — the attached-files side panel.
+- `FilePreviewService` — resolves a preview for an attached file.
 
-`core` (threads/scope models + data) and `elements/ui` (ledger card). Must not
-import other feature libs.
+## Boundary
+
+Consumed by `features/workspace`, which hosts it as the centre pane. It must not import other
+feature packages; shared visuals come from `elements/ui`. It renders conversation state and raises
+composer events — it does not own the transport that streams messages to and from the agent.
+
+## Dependency direction
+
+Tagged `scope:web` (the frontend dependency tier): it may import only other `scope:web` packages
+and `scope:shared` contracts. It depends on `@opencrane/core` (thread and scope models),
+`@opencrane/state/core` (the conversation store), `@opencrane/state/conversation/render` (safe
+markdown rendering), and `@opencrane/elements/ui` (ledger card).
+
+## See also
+
+- Parent index: [features](../README.md)
+- Consumer: [features/workspace](../workspace/README.md)
+- Render pipeline: [state/conversation/render](../../state/conversation/render/README.md)

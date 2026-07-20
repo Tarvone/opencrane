@@ -189,7 +189,7 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 					automountServiceAccountToken: false,
 					enableServiceLinks: false,
 					restartPolicy: "Never",
-					securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: { type: "RuntimeDefault" } },
+					securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, fsGroupChangePolicy: "OnRootMismatch", seccompProfile: { type: "RuntimeDefault" } },
 					containers: [{
 						name: _COMPONENT_LABEL,
 						image: profile.image,
@@ -207,7 +207,7 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 						resources: structuredClone(profile.resources),
 					}],
 					volumes: [
-						{ name: "runtime-token", projected: { defaultMode: 0o400, sources: [{ serviceAccountToken: { path: "runtime.token", audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
+						{ name: "runtime-token", projected: { defaultMode: 0o440, sources: [{ serviceAccountToken: { path: "runtime.token", audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
 						{ name: "scratch", emptyDir: { sizeLimit: profile.scratchSize } },
 					],
 				},

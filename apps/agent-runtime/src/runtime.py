@@ -43,7 +43,12 @@ def _read_projected_token(token_path: str) -> str:
 
 
 def _open_stream(control_plane_url: str, token: str, runtime_instance_id: str, pod_uid: str) -> int:
-    """Initiate one SSE stream and consume only control-plane heartbeats or future commands."""
+    """Open one authenticated stream without treating received commands as executable authority.
+
+    This shell validates only the transport boundary. It reads bounded frames so deployment and
+    identity wiring can be exercised, but intentionally ignores command bodies until a later slice
+    binds them to a durable run assignment and executor.
+    """
     body = json.dumps({"protocolVersion": _PROTOCOL_VERSION, "runtimeInstanceId": runtime_instance_id, "podUid": pod_uid}).encode("utf-8")
     request = Request(
         f"{control_plane_url.rstrip('/')}/stream",
@@ -71,7 +76,12 @@ def _retry_delay(attempt: int) -> float:
 
 
 def run_forever(open_stream: Callable[[str, str, str, str], int] = _open_stream) -> None:
-    """Maintain the one runtime-initiated outbound stream for this pod lifetime."""
+    """Maintain the sole outbound control stream for this Pod's lifetime.
+
+    The projected token is reread for each connection so kubelet rotation takes effect without a
+    process restart. Failures are logged without credential contents and retried with bounded jitter;
+    this function never falls back to a static token or local durable queue.
+    """
     control_plane_url = _environment("OPENCRANE_RUNTIME_STREAM_URL")
     token_path = _environment("OPENCRANE_RUNTIME_TOKEN_PATH", _DEFAULT_TOKEN_PATH)
     pod_uid = _environment("POD_UID")

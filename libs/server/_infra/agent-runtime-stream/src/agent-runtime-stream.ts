@@ -71,7 +71,11 @@ function _IsRuntimeCandidate(value: unknown): value is RuntimeCandidate
 		&& "arguments" in candidate;
 }
 
-/** Return an authenticated runtime identity or respond without leaking TokenReview details. */
+/**
+ * Delegate credential verification without allowing transport code to interpret Kubernetes policy.
+ * Returning `null` deliberately collapses every missing or rejected credential into the same public
+ * denial so TokenReview detail cannot become an identity oracle.
+ */
 async function _AuthenticateRuntime(
 	token: string | null,
 	options: RuntimeStreamTransportOptions,
@@ -84,22 +88,30 @@ async function _AuthenticateRuntime(
 	return options.tokenReviewer.__Review(token);
 }
 
-/** Write one SSE event using JSON data only; frames are bounded before entering this transport. */
+/**
+ * Write one server-sent event using JSON data only.
+ * Callers must validate and bound authority-owned frames before they reach this framing helper.
+ */
 function _WriteEvent(response: Response, event: string, data: unknown): void
 {
 	response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-/** Wait a bounded interval before asking the injected authority for another command. */
+/** Wait the deployment-owned bounded interval before polling the injected authority again. */
 function _Wait(milliseconds: number): Promise<void>
 {
 	return new Promise(function _schedule(resolve) { setTimeout(resolve, milliseconds); });
 }
 
 /**
- * Build the runtime-initiated internal transport. The adapter owns only token verification,
- * bounded HTTP/SSE framing, and tracing; durable assignments, command ordering, and candidate
- * admission remain injected authority concerns.
+ * Build the runtime-initiated internal transport.
+ *
+ * The adapter owns token verification, bounded HTTP/SSE framing, heartbeats, and tracing. Durable
+ * assignments, command creation, command ordering, and candidate admission remain injected domain
+ * concerns. This separation ensures a wire-format bug cannot grant work or make runtime output
+ * durable by itself.
+ * @param options - Fixed framing limits plus the identity and domain-authority ports.
+ * @returns An Express router for the internal stream and candidate endpoints.
  */
 export function _RegisterInternalAgentRuntimeStream(options: RuntimeStreamTransportOptions): Router
 {

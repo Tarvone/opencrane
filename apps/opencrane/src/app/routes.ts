@@ -23,7 +23,13 @@ import { spec } from "@opencrane/backend/server/api-spec";
 /** Fixed projected-token audience for the outbound-only personal runtime shell. */
 const _AGENT_RUNTIME_TOKEN_AUDIENCE = "opencrane-agent-runtime";
 
-/** Extract and validate the exact Kubernetes ServiceAccount subject grammar. */
+/**
+ * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
+ *
+ * The expected namespace and ServiceAccount come from server-owned deployment configuration; the
+ * caller may supply only its reviewed subject and Pod UID. Returning `null` on every mismatch keeps
+ * authentication parsing from silently broadening which runtime workloads the server trusts.
+ */
 function _ParseRuntimeSubject(subject: string, expectedNamespace: string, expectedServiceAccount: string, podUid: string | null): RuntimeWorkloadIdentity | null
 {
   const parts = subject.split(":");
@@ -34,14 +40,25 @@ function _ParseRuntimeSubject(subject: string, expectedNamespace: string, expect
 	return { subject, namespace: expectedNamespace, serviceAccountName: expectedServiceAccount, podUid };
 }
 
-/** Read the pod UID claim Kubernetes attaches to a bound projected ServiceAccount token. */
+/**
+ * Read the Pod UID claim Kubernetes attaches to a bound projected ServiceAccount token.
+ *
+ * The UID is required because a ServiceAccount name identifies a workload class, not the exact Pod
+ * assigned to one run attempt. Missing or malformed TokenReview extras therefore fail closed.
+ */
 function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): string | null
 {
 	const podUid = extra?.["authentication.kubernetes.io/pod-uid"]?.[0];
 	return typeof podUid === "string" && podUid.length > 0 ? podUid : null;
 }
 
-/** Build the app-owned Kubernetes TokenReview adapter for a runtime projected token. */
+/**
+ * Build the app-owned Kubernetes TokenReview adapter for runtime projected credentials.
+ *
+ * Kubernetes remains the issuer and verifier. This adapter fixes the expected audience, namespace,
+ * and ServiceAccount from deployment configuration, then exposes only the authenticated workload
+ * identity needed by the transport; it never forwards the raw token or TokenReview response.
+ */
 function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
 {
   const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
@@ -73,10 +90,12 @@ function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeT
  * It permits an authenticated shell to stay connected but accepts no candidate and issues no command.
  */
 const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
+  /** Refuse to invent commands before durable assignment authority is connected. */
   async __NextCommand(): Promise<null>
   {
     return null;
   },
+  /** Refuse all runtime output before a run/attempt authority can validate and persist it. */
   async __AdmitCandidate(): Promise<{ accepted: false; reason: string }>
   {
     return { accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" };

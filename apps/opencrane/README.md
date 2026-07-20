@@ -45,10 +45,11 @@ of that API. This server is where those endpoints live. It plays two roles at on
 reconcilers it composes)* · [opencrane-ui](../opencrane-ui/README.md) *(the main API client)* ·
 [deploy-k8s](../_infra/deploy-k8s/README.md) *(the silo umbrella chart that deploys it)*
 
-Invariant: the public API and the tokenless internal API are served on **two separate listeners**
-(ports 8080 and 8081). The internal routes take no session/token auth — they are gated at the network
-layer — so keeping them off the public socket is what stops the internet-facing ingress ever reaching
-them. If that split were wrong, platform-only routes would become publicly reachable.
+Invariant: the public API and the workload-facing internal API are served on **two separate
+listeners** (ports 8080 and 8081). Keeping the internal listener off the public ingress is the first
+boundary. Sensitive workload routes, including the personal-agent runtime stream, additionally
+verify a short-lived projected Kubernetes identity before accepting a request. If either layer were
+collapsed, platform-only reconciliation or runtime authority could become publicly reachable.
 
 ## Public surface
 
@@ -58,7 +59,9 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 
 - `createApp(prisma, customApi, coreApi, authApi)` — builds the public Express app (mounts every domain
   router). Exported so tests can drive it with injected clients.
-- `createInternalApp(prisma, authApi)` — builds the tokenless internal-only Express app.
+- `createInternalApp(prisma, authApi)` — builds the internal-only Express app. The personal-agent
+  runtime route verifies the calling Pod and currently injects an empty authority, so it can maintain
+  a heartbeat connection but cannot receive commands or persist output.
 
 ## Boundary
 
@@ -85,7 +88,7 @@ Read from the environment at startup.
 | Variable | Purpose | Default |
 |---|---|---|
 | `PORT` | Public listener port | `8080` |
-| `INTERNAL_PORT` | Tokenless internal listener port | `8081` |
+| `INTERNAL_PORT` | Workload-facing internal listener port | `8081` |
 | `DATABASE_URL` | Postgres connection string (Prisma) | *(required)* |
 | `NAMESPACE` | Silo namespace the reconcilers act on | `default` |
 | `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |

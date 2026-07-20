@@ -59,9 +59,11 @@ they are, works on their behalf, and keeps their conversations and files private
 hood that assistant is a structured model with a set of durable conversations rather than a
 long-lived process, so a restart or scale-down never erases the relationship.
 
-- **Knows who you are**: Every run starts with your approved persona, your permitted company
-  context, a selected model, a budget, and the tools it may use. Those inputs are frozen for
-  that run, so a later policy or skill change does not rewrite work already underway.
+- **Knows who you are**: Every run draws on an agent persona trained on your needs, working
+  style, and communication preferences—one that keeps learning and improving the more you use
+  it—plus your permitted company context, budget, and tools. The model may change between runs
+  as routing or cost policy improves, but every other input is frozen for the run already
+  underway, so a later policy or skill change never rewrites work in progress.
 - **Stays yours**: Conversations and files are private to their owner. Team agents and
   scheduled company services run on the same foundation—without ever gaining access to a
   person's private conversations or files.

@@ -40,7 +40,11 @@ function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): strin
 	return typeof podUid === "string" && podUid.length > 0 ? podUid : null;
 }
 
-/** Build the app-owned Kubernetes TokenReview adapter for a runtime projected token. */
+/**
+ * Build the app-owned Kubernetes TokenReview adapter for a runtime projected token.
+ * It fixes the audience and silo namespace before parsing the full ServiceAccount subject and the
+ * bound Pod UID; a valid signature without those exact bindings is still unauthorised.
+ */
 function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
 {
   const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";

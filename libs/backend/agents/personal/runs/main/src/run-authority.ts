@@ -17,6 +17,8 @@ function _isWorkloadKind(value: string): value is "job"
 
 /**
  * Validates that a workload assignment belongs to the exact logical run attempt and Pod identity.
+ * The projected ServiceAccount is only transport identity; trust is returned only when it intersects
+ * the server-owned run, revision, Job, Pod, subject, namespace, audience, and expiry facts.
  * @param assignment - Proof-bound workload assignment presented by the runtime.
  * @param expectation - Current authority and trusted identity facts.
  * @returns Trusted only when every field and the hard expiry match.
@@ -56,6 +58,8 @@ export function __ValidateRunWorkloadAssignment(assignment: RunWorkloadAssignmen
 
 /**
  * Starts a fresh attempt without minting a second logical AgentRun authority.
+ * The read is advisory; the repository receives every observed service and revision coordinate again
+ * so its atomic compare-and-swap closes concurrent retries and AgentService rollover races.
  * @param repository - Concurrency-capable run authority repository.
  * @param command - Compare-and-swap command carrying the observed attempt.
  * @returns Newly started attempt or a fail-closed conflict.

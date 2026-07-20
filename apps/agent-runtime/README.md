@@ -31,7 +31,8 @@ volume.
 ## Public surface
 
 `Entrypoint: src/runtime.py` — reads the projected runtime token, opens the server command stream,
-and emits bounded protocol frames. `deploy/Dockerfile` packages that process as the runtime image.
+and consumes its bounded event framing without executing commands yet. `deploy/Dockerfile` packages
+that process as the runtime image.
 
 ## Boundary
 
@@ -39,6 +40,10 @@ The process has **no listener, Service, Ingress, Kubernetes role-based access co
 provider credential, tool implementation, artifact credential, or persistent tenant mount**. It does
 not decide which run it may execute; the server validates the exact Job, Pod, ServiceAccount, attempt,
 and revision before admitting work.
+
+It also has no static Helm workload. Installing one shared Deployment would blur user and attempt
+identity, so the image may run only as the fresh Job defined by this slice. The next controller slice
+will create that Job from durable run authority; this slice does not submit it to Kubernetes.
 
 ## Dependency direction
 

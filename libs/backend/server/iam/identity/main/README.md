@@ -53,7 +53,7 @@ are best-effort by contract: a failure there is logged and never breaks the logi
 - `OidcAuthService` — the sign-in service: OIDC login, token exchange, claim validation, session
   lifecycle, and the `/auth/me` enrichment that adds the caller's resolved ClusterTenant.
 - `___AuthRouter` — the Express routes: session introspection (`/me`), the OpenClaw (agent-runtime)
-  pod-connection broker (`/pod-token`), and the OIDC browser flow (`/login`, `/callback`, `/logout`).
+  pod-connection broker, and the OIDC browser flow (`/login`, `/callback`, `/logout`).
 - `_AdoptMemberOnLogin` — adopts a verified user into their org and seeds their workspace on first login.
 - `_MirrorGroupsOnLogin` — projects the login token's groups into the silo's stored `Group.members`.
 - Workflow contract types from `identity-workflows.types`.

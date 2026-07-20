@@ -9,7 +9,7 @@
 
 This app is **blue** — part of the frozen legacy OpenClaw platform that OpenCrane is replacing. It is
 a **deletion target**: it takes maintenance-only changes and is removed wholesale when the owned
-TypeScript runtime lands (the R9/R10 cutover). Do not extend it or build new capabilities on it. New
+TypeScript runtime replacement lands. Do not extend it or build new capabilities on it. New
 runtime work belongs on the green (replacement) side, not here.
 
 ## What it owns

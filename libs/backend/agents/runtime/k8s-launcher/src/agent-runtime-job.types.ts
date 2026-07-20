@@ -15,7 +15,7 @@ export interface AgentRuntimeReleaseSelectorLabels
 /** Immutable release profile applied to every personal-runtime attempt Job. */
 export interface AgentRuntimeJobProfile
 {
-	/** Immutable runtime image reference, including digest or release tag. */
+	/** Immutable runtime image reference pinned by a SHA-256 digest. */
 	readonly image: string;
 	/** Kubernetes image pull behavior. */
 	readonly imagePullPolicy: AgentRuntimeImagePullPolicy;

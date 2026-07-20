@@ -2,9 +2,9 @@
 
 > [backend](../../README.md) › [agents](../README.md) › runtime
 
-The runtime group contains the authority that admits commands and candidates plus the Kubernetes
-projection used by the separate agent-controller process. It does not contain a model driver or
-durable transcript store.
+The runtime group contains the authority that admits commands/candidates plus the pure Kubernetes
+projection contract the next agent-controller slice will consume. It does not yet contain that
+controller, a model driver, or a durable transcript store.
 
 ## Map
 
@@ -16,7 +16,7 @@ durable transcript store.
 ```
  durable run authority ──► main ──► accepted command/candidate
                             │
-                            └────► k8s-launcher ──► suspended attempt Job
+                            └────► k8s-launcher ──► suspended Job contract
 ```
 
 The domain authority stays dependency-light. The launcher is a separate `layer:infra` package so

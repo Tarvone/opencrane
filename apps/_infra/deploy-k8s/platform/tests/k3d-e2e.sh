@@ -1019,6 +1019,14 @@ _assert_cross_database_denied langfuse "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" l
 _migrate_opencrane_database
 _run_backup_restore_smoke
 
+# The standalone product must boot from the recovered authority, not quietly fall back to the
+# source cluster that supplied the backup. Rebind every application consumer to its restored
+# connection Secret before asserting credentials and installing the silo release.
+OPENCRANE_POSTGRES_APP_SECRET="${RESTORE_DB_RELEASE_NAME}-opencrane-app"
+OBOT_POSTGRES_APP_SECRET="${RESTORE_DB_RELEASE_NAME}-obot-app"
+LITELLM_POSTGRES_APP_SECRET="${RESTORE_DB_RELEASE_NAME}-litellm-app"
+LANGFUSE_POSTGRES_APP_SECRET="${RESTORE_DB_RELEASE_NAME}-langfuse-app"
+
 function _assert_distinct_cnpg_app_credentials()
 {
   local app_secrets=("$@")

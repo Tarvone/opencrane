@@ -122,6 +122,58 @@ function _retry()
   done
 }
 
+# k3d 5.x can report a successful import even when its shared tarball disappears before one
+# containerd node opens it. Verify the canonical image reference on every workload node and retry
+# the whole import; otherwise a later Job silently falls back to an unpublished registry tag.
+function _import_k3d_image()
+{
+  local image="$1"
+  local canonical="$image"
+  local registry="${image%%/*}"
+  local attempt
+  local listing
+  local node
+  local nodes
+  local missing
+
+  if [[ "$image" != */* ]]; then
+    canonical="docker.io/library/$image"
+  elif [[ "$registry" != *.* && "$registry" != *:* && "$registry" != "localhost" ]]; then
+    canonical="docker.io/$image"
+  fi
+
+  nodes="$(docker ps --filter "label=k3d.cluster=$CLUSTER_NAME" --filter "label=k3d.role=server" --format '{{.Names}}')"
+  nodes="$nodes $(docker ps --filter "label=k3d.cluster=$CLUSTER_NAME" --filter "label=k3d.role=agent" --format '{{.Names}}')"
+  if [[ -z "${nodes//[[:space:]]/}" ]]; then
+    echo "[e2e] no k3d workload nodes found for cluster $CLUSTER_NAME"
+    return 1
+  fi
+
+  for attempt in 1 2 3; do
+    if ! k3d image import "$image" --cluster "$CLUSTER_NAME"; then
+      echo "[e2e] k3d import command failed for $image on attempt $attempt/3"
+    fi
+
+    missing=0
+    for node in $nodes; do
+      if ! listing="$(docker exec "$node" ctr --namespace k8s.io images list --quiet)"; then
+        listing=""
+      fi
+      if ! grep -Fxq "$canonical" <<<"$listing"; then
+        echo "[e2e] $canonical is still absent from $node after import attempt $attempt/3"
+        missing=1
+      fi
+    done
+    if [[ "$missing" -eq 0 ]]; then
+      return 0
+    fi
+    sleep "$(( attempt * 2 ))"
+  done
+
+  echo "[e2e] image import did not converge on every workload node: $canonical"
+  return 1
+}
+
 function _require_free_space()
 {
   local free_kb
@@ -277,11 +329,11 @@ _retry 3 docker pull "$MINIO_CLIENT_IMAGE"
 
 # 4b. Import images into the k3d cluster runtime.
 echo "[e2e] Importing images into k3d"
-k3d image import opencrane/opencrane-server:e2e --cluster "$CLUSTER_NAME"
-k3d image import opencrane/tenant:e2e --cluster "$CLUSTER_NAME"
-k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
-k3d image import "$MINIO_IMAGE" --cluster "$CLUSTER_NAME"
-k3d image import "$MINIO_CLIENT_IMAGE" --cluster "$CLUSTER_NAME"
+_import_k3d_image opencrane/opencrane-server:e2e
+_import_k3d_image opencrane/tenant:e2e
+_import_k3d_image ghcr.io/cloudnative-pg/postgresql:17.5
+_import_k3d_image "$MINIO_IMAGE"
+_import_k3d_image "$MINIO_CLIENT_IMAGE"
 
 # 5. Install the pinned external CNPG test substrate. The Barman plugin must run in
 # the same namespace as the CNPG operator and requires cert-manager for its mTLS

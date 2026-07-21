@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, signal, inject, resource } from "@angular/core";
 
-import { ActiveConnectorMutation, Connector, ConnectorCategory, ConnectorFeedback, ConnectorFeedbackKind, ConnectorMutation, ConnectorMutationKind, ConnectorMutationOutcome, DestructiveActionPhase, DestructiveActionState } from "@opencrane/core";
-import { CONNECTOR_CATEGORIES_FIXTURE, CONNECTOR_SUCCESS_MUTATIONS_FIXTURE, CONNECTORS_FIXTURE, MockConnectorMutation } from "@opencrane/core/testing";
+import { ActiveConnectorMutation, Connector, ConnectorCategory, ConnectorFeedback, ConnectorFeedbackKind, ConnectorMutationKind, DestructiveActionPhase, DestructiveActionState } from "@opencrane/core";
 import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { _settledValue } from "../../resource.util.js";
 
 /** Mock-only Workspace Connectors section and its route-owned marketplace view. */
 @Component({
@@ -15,11 +16,19 @@ import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
 })
 export class ConnectorsSectionComponent
 {
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+
 	/** Connector catalogue backing installed and marketplace views. */
-	public readonly connectors = signal<readonly Connector[]>(structuredClone(CONNECTORS_FIXTURE));
+	public readonly connectorsResource = resource({
+		loader: () => this._gateway.getConnectors()
+	});
+	public readonly connectors = computed(() => _settledValue(this.connectorsResource) ?? []);
 
 	/** Marketplace categories in canonical handoff order. */
-	public readonly categories = CONNECTOR_CATEGORIES_FIXTURE;
+	public readonly categoriesResource = resource({
+		loader: () => this._gateway.getConnectorCategories()
+	});
+	public readonly categories = computed(() => _settledValue(this.categoriesResource) ?? []);
 
 	/** Whether the route-owned marketplace sub-page is active. */
 	public readonly marketplaceOpen = signal(false);
@@ -44,9 +53,6 @@ export class ConnectorsSectionComponent
 
 	/** External state consumed by the shared destructive-confirmation dialog. */
 	public readonly destructiveState = signal<DestructiveActionState>({ phase: DestructiveActionPhase.Idle });
-
-	/** Deterministic fixture boundary; component tests may replace its outcome queue. */
-	public mutation: ConnectorMutation = new MockConnectorMutation(CONNECTOR_SUCCESS_MUTATIONS_FIXTURE);
 
 	/** Connector categories exposed to the external template. */
 	public readonly ConnectorCategory = ConnectorCategory;
@@ -190,22 +196,21 @@ export class ConnectorsSectionComponent
 	{
 		if (this.activeMutation() !== null) return;
 
-		// 1. Lock every lifecycle action so concurrent clicks cannot duplicate fixture mutations.
 		this.feedback.set(null);
 		this.activeMutation.set({ connectorId: connector.id, kind });
 
 		try
 		{
-			// 2. Resolve the deterministic outcome before changing the visible connector catalogue.
-			const result = await this.mutation.mutate({ connectorId: connector.id, kind });
-			if (result.outcome === ConnectorMutationOutcome.RecoverableError)
-			{
-				this.feedback.set({ kind: ConnectorFeedbackKind.Error, message: result.message });
-				return;
+			if (kind === ConnectorMutationKind.Toggle) {
+				await this._gateway.updateConnector(connector.id, { enabled: !connector.enabled });
+			} else if (kind === ConnectorMutationKind.Install) {
+				await this._gateway.updateConnector(connector.id, { installed: true, enabled: true });
+			} else if (kind === ConnectorMutationKind.Uninstall) {
+				await this._gateway.updateConnector(connector.id, { installed: false, enabled: false });
 			}
-
-			// 3. Apply a successful operation atomically and announce the resulting user-visible state.
-			this._applySuccessfulMutation(connector, kind);
+			
+			this.connectorsResource.reload();
+			this.feedback.set({ kind: ConnectorFeedbackKind.Success, message: this._successMessage(connector, kind) });
 		}
 		catch
 		{
@@ -215,23 +220,6 @@ export class ConnectorsSectionComponent
 		{
 			this.activeMutation.set(null);
 		}
-	}
-
-	/** Apply one successful fixture-backed connector lifecycle mutation. */
-	private _applySuccessfulMutation(connector: Connector, kind: ConnectorMutationKind): void
-	{
-		const updated = this.connectors().map(function update(candidate): Connector
-		{
-			if (candidate.id !== connector.id) return candidate;
-			switch (kind)
-			{
-				case ConnectorMutationKind.Toggle: return { ...candidate, enabled: !candidate.enabled };
-				case ConnectorMutationKind.Install: return { ...candidate, installed: true, enabled: true };
-				case ConnectorMutationKind.Uninstall: return { ...candidate, installed: false, enabled: false };
-			}
-		});
-		this.connectors.set(updated);
-		this.feedback.set({ kind: ConnectorFeedbackKind.Success, message: this._successMessage(connector, kind) });
 	}
 
 	/** Build operation-specific success feedback for assistive and visual users. */

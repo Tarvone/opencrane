@@ -5,6 +5,10 @@ import { resolve } from "node:path";
 
 import { ɵresolveComponentResources } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { signal } from "@angular/core";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { MockSettingsGateway } from "@opencrane/state/gateways/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { compileString } from "sass";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -17,11 +21,18 @@ function _componentResource(resourceUrl: string): string
 	return readFileSync(resolve(process.cwd(), "src/lib/sections/skills-section", resourceUrl.replace(/^\.\//, "")), "utf8");
 }
 
-/** Render the fixture-backed Skills section. */
-function _render(): ComponentFixture<SkillsSectionComponent>
+async function _render(): Promise<ComponentFixture<SkillsSectionComponent>>
 {
-	TestBed.configureTestingModule({ imports: [SkillsSectionComponent] });
+	TestBed.configureTestingModule({ 
+		imports: [SkillsSectionComponent],
+		providers: [
+			{ provide: SETTINGS_GATEWAY, useValue: new MockSettingsGateway() },
+			{ provide: ActiveTenantStore, useValue: { tenant: signal("elewa-default") } }
+		]
+	});
 	const fixture = TestBed.createComponent(SkillsSectionComponent);
+	fixture.detectChanges();
+	await fixture.whenStable();
 	fixture.detectChanges();
 	return fixture;
 }
@@ -48,9 +59,10 @@ afterAll(function releaseAngularSkills(): void
 
 describe("SkillsSectionComponent", function skillsSectionSuite(): void
 {
-	it("renders the current handoff heading, ordered collections, and fixtures", function rendersFixtures(): void
+	it("renders the current handoff heading, ordered collections, and fixtures", async function rendersFixtures(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const fixture = await _render();
+		const root = fixture.nativeElement as HTMLElement;
 
 		expect(root.querySelector("h2")?.textContent?.trim()).toBe("Skills");
 		expect(root.querySelector(".wo-skills__header p")?.textContent?.trim()).toBe("What your agents know how to do. The Admin badge means you can manage the skill.");
@@ -60,9 +72,10 @@ describe("SkillsSectionComponent", function skillsSectionSuite(): void
 		]);
 	});
 
-	it("distinguishes admin, access, MCP, and direct-tool badges", function rendersTagKinds(): void
+	it("distinguishes admin, access, MCP, and direct-tool badges", async function rendersTagKinds(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const fixture = await _render();
+		const root = fixture.nativeElement as HTMLElement;
 		const labels = function labels(selector: string): string[]
 		{
 			return Array.from(root.querySelectorAll(selector)).map(function text(element): string { return element.textContent?.trim() ?? ""; });
@@ -74,9 +87,9 @@ describe("SkillsSectionComponent", function skillsSectionSuite(): void
 		expect(labels(".wo-skills__tag--tool")).toEqual(["GitHub"]);
 	});
 
-	it("filters every collection case-insensitively by description and shows scoped empty states", function filtersCatalogue(): void
+	it("filters every collection case-insensitively by description and shows scoped empty states", async function filtersCatalogue(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const input = fixture.nativeElement.querySelector("input[type='search']") as HTMLInputElement;
 		input.value = "LOGGED TIME";
 		input.dispatchEvent(new Event("input"));
@@ -94,9 +107,10 @@ describe("SkillsSectionComponent", function skillsSectionSuite(): void
 		expect(root.querySelectorAll(".wo-skills__card")).toHaveLength(0);
 	});
 
-	it("keeps mock-only actions semantic and unavailable", function rendersDisabledActions(): void
+	it("keeps mock-only actions semantic and unavailable", async function rendersDisabledActions(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const fixture = await _render();
+		const root = fixture.nativeElement as HTMLElement;
 		const menus = Array.from(root.querySelectorAll(".wo-skills__menu")) as HTMLButtonElement[];
 		const addButtons = Array.from(root.querySelectorAll(".wo-skills__add")) as HTMLButtonElement[];
 

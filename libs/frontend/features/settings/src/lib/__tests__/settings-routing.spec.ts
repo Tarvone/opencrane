@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 import { LocationStrategy } from "@angular/common";
 import { MockLocationStrategy } from "@angular/common/testing";
-import { ɵresolveComponentResources } from "@angular/core";
+import { signal, ɵresolveComponentResources } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
@@ -14,6 +14,10 @@ import { RouterTestingHarness } from "@angular/router/testing";
 import { filter, firstValueFrom, take } from "rxjs";
 import { compileString } from "sass";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { MockSettingsGateway } from "@opencrane/state/gateways/testing";
 
 import { PERSONAL_SETTINGS_NAVIGATION, WORKSPACE_SETTINGS_NAVIGATION, _SettingsNavigationForUrl, _SettingsScopeFromUrl } from "../settings-navigation.js";
 import { SettingsScope, SettingsSectionId } from "../settings-navigation.types.js";
@@ -101,7 +105,12 @@ beforeAll(async function prepareAngularRouter(): Promise<void>
 beforeEach(function configureRouter(): void
 {
 	TestBed.configureTestingModule({
-		providers: [provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }], withComponentInputBinding()), { provide: LocationStrategy, useClass: MockLocationStrategy }]
+		providers: [
+			provideRouter([{ path: "settings", children: _testableRoutes(SETTINGS_ROUTES) }], withComponentInputBinding()),
+			{ provide: LocationStrategy, useClass: MockLocationStrategy },
+			{ provide: SETTINGS_GATEWAY, useClass: MockSettingsGateway },
+			{ provide: ActiveTenantStore, useValue: { tenant: signal("elewa-default") } }
+		]
 	});
 });
 
@@ -238,6 +247,8 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("activates Workspace Budgets at its stable route", async function budgetsRoute(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/budgets");
+		await harness.fixture.whenStable();
+		harness.detectChanges();
 		const budgets = harness.fixture.debugElement.query(By.directive(BudgetsSectionComponent)).componentInstance as BudgetsSectionComponent;
 
 		expect(harness.fixture.debugElement.query(By.directive(BudgetsSectionComponent))).not.toBeNull();
@@ -261,6 +272,8 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("activates LLM Providers at its stable route", async function llmProvidersRoute(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/provider-keys");
+		await harness.fixture.whenStable();
+		harness.detectChanges();
 		const providers = harness.fixture.debugElement.query(By.directive(LlmProvidersSectionComponent)).componentInstance as LlmProvidersSectionComponent;
 
 		expect(harness.fixture.debugElement.query(By.directive(LlmProvidersSectionComponent))).not.toBeNull();
@@ -273,6 +286,8 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("activates Agents at its stable route", async function agentsRoute(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/agents");
+		await harness.fixture.whenStable();
+		harness.detectChanges();
 		const agents = harness.fixture.debugElement.query(By.directive(AgentsSectionComponent)).componentInstance as AgentsSectionComponent;
 
 		expect(harness.fixture.debugElement.query(By.directive(AgentsSectionComponent))).not.toBeNull();
@@ -285,6 +300,8 @@ describe("settings route contract", function settingsRoutesSuite(): void
 	it("updates route-derived navigation and destroys the previous leaf component", async function routedLifecycle(): Promise<void>
 	{
 		const harness = await RouterTestingHarness.create("/settings/workspace/members");
+		await harness.fixture.whenStable();
+		harness.detectChanges();
 		const router = TestBed.inject(Router);
 		const firstMembers = harness.fixture.debugElement.query(By.directive(MembersSectionComponent)).componentInstance as MembersSectionComponent;
 		const firstActiveLink = harness.fixture.nativeElement.querySelector(".wo-settings__nav-item[aria-current='page']") as HTMLAnchorElement | null;
@@ -292,7 +309,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		const navigationIcons = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-item svg")) as SVGElement[];
 		const brandFacets = Array.from(harness.fixture.nativeElement.querySelectorAll(".wo-settings__nav-title polygon")) as SVGPolygonElement[];
 
-		expect(firstMembers.members).toHaveLength(5);
+		expect(firstMembers.members()).toHaveLength(5);
 		expect(harness.fixture.nativeElement.querySelector(".wo-members__header")?.textContent).toContain("5 of 10");
 		expect(harness.fixture.nativeElement.querySelector("[role='tab'][aria-selected='true']")?.textContent?.trim()).toBe("People");
 		expect(firstActiveLink?.getAttribute("href")).toBe("/settings/workspace/members");
@@ -341,6 +358,7 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		expect(harness.fixture.nativeElement.querySelector("[role='tabpanel'] .wo-members__table")).not.toBeNull();
 
 		await harness.navigateByUrl("/settings/workspace/members/edit/team/be?tab=org");
+		await harness.fixture.whenStable();
 		harness.detectChanges();
 		expect((harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement).value).toBe("Backend");
 		expect((harness.fixture.nativeElement.querySelector("#members-editor-department") as HTMLSelectElement).value).toBe("Engineering");
@@ -358,11 +376,13 @@ describe("settings route contract", function settingsRoutesSuite(): void
 		vi.unstubAllGlobals();
 
 		await harness.navigateByUrl("/settings/workspace/members/edit/project/p3?tab=org");
+		await harness.fixture.whenStable();
 		harness.detectChanges();
 		expect((harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement).value).toBe("Data Pipeline");
 		expect((harness.fixture.nativeElement.querySelector("#members-editor-status") as HTMLSelectElement).value).toBe("Draft");
 
 		await harness.navigateByUrl("/settings/workspace/members/edit/department/new?tab=org");
+		await harness.fixture.whenStable();
 		harness.detectChanges();
 		const newName = harness.fixture.nativeElement.querySelector("#members-editor-name") as HTMLInputElement;
 		const saveButton = harness.fixture.nativeElement.querySelector(".wo-members__save-button") as HTMLButtonElement;

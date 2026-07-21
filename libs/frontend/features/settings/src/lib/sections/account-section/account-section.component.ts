@@ -50,7 +50,7 @@ export class AccountSectionComponent
 			{
 				this.formState.update(s => s.phase === SettingsFormPhase.Pristine ? _CreateSettingsFormState({ fullName: profile.fullName }) : s);
 			}
-		}, { allowSignalWrites: true });
+		});
 	}
 
 	/** Avatar initials computed from form draft fullName. */

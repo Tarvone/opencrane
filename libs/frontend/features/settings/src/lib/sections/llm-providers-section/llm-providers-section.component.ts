@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, signal, inject, resource, effect, untracked } from "@angular/core";
 
-import { DestructiveActionPhase, DestructiveActionState, LlmProviderFeedback, LlmProviderId, LlmProviderOption, ModelRouteCategory, ProviderConnectionOutcome, ProviderMutationOutcome, WorkspaceLlmProvider, WorkspaceLlmProviderMutation } from "@opencrane/core";
-import { LLM_ANALYSIS_MODEL_OPTIONS_FIXTURE, LLM_MODEL_OPTIONS_FIXTURE, LLM_PROVIDER_OPTIONS_FIXTURE, MODEL_ROUTE_CATEGORIES_FIXTURE, MockWorkspaceLlmProviderMutation, WORKSPACE_LLM_PROVIDERS_FIXTURE } from "@opencrane/core/testing";
+import { DestructiveActionPhase, DestructiveActionState, LlmProviderFeedback, LlmProviderId, LlmProviderOption, ModelRouteCategory, WorkspaceLlmProvider } from "@opencrane/core";
 import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { _settledValue } from "../../resource.util.js";
 
 /** Mounted-only interaction phases for testing a transient provider key. */
 type ConnectionPhase = "idle" | "testing" | "valid" | "invalid";
@@ -18,22 +20,38 @@ type ConnectionPhase = "idle" | "testing" | "valid" | "invalid";
 })
 export class LlmProvidersSectionComponent
 {
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant = inject(ActiveTenantStore).tenant;
+
 	/** Safe configured-provider metadata; never contains credential text. */
-	public readonly providers = signal<readonly WorkspaceLlmProvider[]>(structuredClone(WORKSPACE_LLM_PROVIDERS_FIXTURE));
+	public readonly providersResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceLlmProviders(params ?? "")
+	});
+	public readonly providers = computed(() => _settledValue(this.providersResource) ?? []);
 
 	/** Complete Add Provider Key catalogue. */
-	public readonly providerOptions = LLM_PROVIDER_OPTIONS_FIXTURE;
+	public readonly providerOptionsResource = resource({
+		loader: () => this._gateway.getLlmProviderOptions()
+	});
+	public readonly providerOptions = computed(() => _settledValue(this.providerOptionsResource) ?? []);
 
 	/** Answer-model options used by every category selector. */
-	public readonly modelOptions = LLM_MODEL_OPTIONS_FIXTURE;
+	public readonly modelOptionsResource = resource({
+		loader: () => this._gateway.getLlmModelOptions()
+	});
+	public readonly modelOptions = computed(() => _settledValue(this.modelOptionsResource) ?? []);
 
 	/** Fast classification models used by prompt analysis. */
-	public readonly analysisModelOptions = LLM_ANALYSIS_MODEL_OPTIONS_FIXTURE;
+	public readonly analysisModelOptionsResource = resource({
+		loader: () => this._gateway.getLlmAnalysisModelOptions()
+	});
+	public readonly analysisModelOptions = computed(() => _settledValue(this.analysisModelOptionsResource) ?? []);
 
 	/** Mounted-only route-owned Add Provider Key sub-page state. */
 	public readonly addPageOpen = signal(false);
 
-	/** Provider selected on the add sub-page. */
+	/** Provider currently being configured in the Add sub-page. */
 	public readonly selectedProviderId = signal<LlmProviderId | null>(null);
 
 	/** Raw input exists only while this mounted component owns the add flow. */
@@ -61,22 +79,44 @@ export class LlmProvidersSectionComponent
 	public readonly destructiveState = signal<DestructiveActionState>({ phase: DestructiveActionPhase.Idle });
 
 	/** Selected fast classifier model. */
-	public readonly analysisModel = signal(this.analysisModelOptions[0] ?? "");
+	public readonly analysisModel = signal("");
 
 	/** Mounted-only route-category assignments. */
-	public readonly routeCategories = signal<readonly ModelRouteCategory[]>(structuredClone(MODEL_ROUTE_CATEGORIES_FIXTURE));
-
-	/** Deterministic fixture boundary replaceable by focused tests. */
-	public mutation: WorkspaceLlmProviderMutation = new MockWorkspaceLlmProviderMutation();
+	public readonly routeCategoriesResource = resource({
+		loader: () => this._gateway.getModelRouteCategories()
+	});
+	public readonly routeCategories = signal<readonly ModelRouteCategory[]>([]);
 
 	/** Monotonic identity source for mounted-only categories added by the user. */
-	private _nextCategoryId = MODEL_ROUTE_CATEGORIES_FIXTURE.length + 1;
+	private _nextCategoryId = 1;
+	private _categoriesLoaded = false;
+
+	constructor()
+	{
+		effect(() => {
+			const options = this.analysisModelOptions();
+			if (options.length > 0 && !untracked(() => this.analysisModel())) {
+				this.analysisModel.set(options[0] ?? "");
+			}
+		});
+
+		effect(() => {
+			const categories = this.routeCategoriesResource.value();
+			if (categories && !untracked(() => this._categoriesLoaded)) {
+				untracked(() => {
+					this._categoriesLoaded = true;
+					this.routeCategories.set(structuredClone(categories));
+					this._nextCategoryId = categories.length + 1;
+				});
+			}
+		});
+	}
 
 	/** Selected provider metadata, derived without storing a second mutable copy. */
 	public readonly selectedProvider: Signal<LlmProviderOption | null> = computed((): LlmProviderOption | null =>
 	{
 		const providerId = this.selectedProviderId();
-		return this.providerOptions.find(function matches(option): boolean { return option.id === providerId; }) ?? null;
+		return this.providerOptions().find(function matches(option): boolean { return option.id === providerId; }) ?? null;
 	});
 
 	/** Open the authoritative sub-page with pristine transient state. */
@@ -119,23 +159,16 @@ export class LlmProvidersSectionComponent
 	{
 		const providerId = this.selectedProviderId();
 		const key = this.keyDraft();
-		if (providerId === null || key.trim() === "" || this.connectionPhase() === "testing" || this.savePending()) return;
+		const tenant = this._tenant();
+		if (providerId === null || !tenant || key.trim() === "" || this.connectionPhase() === "testing" || this.savePending()) return;
 
 		this.connectionPhase.set("testing");
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.testConnection(providerId, key);
-			if (result.outcome === ProviderConnectionOutcome.Valid)
-			{
-				this.connectionPhase.set("valid");
-				this.feedback.set({ kind: "success", message: result.message });
-			}
-			else
-			{
-				this.connectionPhase.set("invalid");
-				this.feedback.set({ kind: "error", message: result.message });
-			}
+			await this._gateway.testWorkspaceLlmProviderConnection(tenant, providerId, key);
+			this.connectionPhase.set("valid");
+			this.feedback.set({ kind: "success", message: "Connection successful." });
 		}
 		catch
 		{
@@ -149,30 +182,19 @@ export class LlmProvidersSectionComponent
 	{
 		const provider = this.selectedProvider();
 		const key = this.keyDraft();
-		if (provider === null || key.trim() === "" || this.connectionPhase() === "testing" || this.savePending()) return;
+		const tenant = this._tenant();
+		if (provider === null || !tenant || key.trim() === "" || this.connectionPhase() === "testing" || this.savePending()) return;
 
 		this.savePending.set(true);
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.save(provider.id, key);
-			if (result.outcome === ProviderMutationOutcome.RecoverableError)
-			{
-				this.feedback.set({ kind: "error", message: result.message });
-				return;
-			}
-
-			this.providers.update(function addOrRefresh(rows): readonly WorkspaceLlmProvider[]
-			{
-				const next = { ...provider, added: "Just now", lastUsed: "Not yet" };
-				return rows.some(function same(row): boolean { return row.id === provider.id; })
-					? rows.map(function replace(row): WorkspaceLlmProvider { return row.id === provider.id ? next : row; })
-					: [...rows, next];
-			});
+			await this._gateway.addWorkspaceLlmProvider(tenant, { id: provider.id, name: provider.name, models: provider.models });
+			this.providersResource.reload();
 			this._clearTransientKey();
 			this.selectedProviderId.set(null);
 			this.addPageOpen.set(false);
-			this.feedback.set({ kind: "success", message: result.message });
+			this.feedback.set({ kind: "success", message: "Provider key saved successfully." });
 		}
 		catch
 		{
@@ -204,21 +226,17 @@ export class LlmProvidersSectionComponent
 	public async confirmRemove(): Promise<void>
 	{
 		const target = this.removeTarget();
-		if (target === null || this.destructiveState().phase === DestructiveActionPhase.Pending) return;
+		const tenant = this._tenant();
+		if (target === null || !tenant || this.destructiveState().phase === DestructiveActionPhase.Pending) return;
 		this.destructiveState.set({ phase: DestructiveActionPhase.Pending });
 		try
 		{
-			const result = await this.mutation.remove(target.id);
-			if (result.outcome === ProviderMutationOutcome.RecoverableError)
-			{
-				this.destructiveState.set({ phase: DestructiveActionPhase.Error, message: result.message });
-				return;
-			}
+			await this._gateway.removeWorkspaceLlmProvider(tenant, target.id);
 			this.removeFocusTarget.set(this.removeSuccessFocusTarget());
-			this.providers.update(function withoutTarget(rows): readonly WorkspaceLlmProvider[] { return rows.filter(function keep(row): boolean { return row.id !== target.id; }); });
+			this.providersResource.reload();
 			this.destructiveState.set({ phase: DestructiveActionPhase.Success });
 			this.removeTarget.set(null);
-			this.feedback.set({ kind: "success", message: result.message });
+			this.feedback.set({ kind: "success", message: "Provider key removed successfully." });
 		}
 		catch
 		{

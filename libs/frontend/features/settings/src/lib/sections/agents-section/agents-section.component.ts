@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnDestroy, Signal, computed, signal, effect, inject, resource } from "@angular/core";
 
-import { AgentSettingsFeedback, AgentSettingsMutation, AgentSettingsMutationKind, AgentSettingsMutationOutcome, DestructiveActionPhase, DestructiveActionState, WorkspaceAgent, WorkspaceAgentChannel, WorkspaceAgentChannelType, WorkspaceAgentTrigger } from "@opencrane/core";
-import { MockAgentSettingsMutation, WORKSPACE_AGENT_CHANNELS_FIXTURE, WORKSPACE_AGENT_CHANNEL_TYPES_FIXTURE, WORKSPACE_AGENT_SCOPE_OPTIONS_FIXTURE, WORKSPACE_AGENTS_FIXTURE } from "@opencrane/core/testing";
+import { AgentSettingsFeedback, AgentSettingsMutationKind, DestructiveActionPhase, DestructiveActionState, WorkspaceAgent, WorkspaceAgentChannel, WorkspaceAgentChannelType, WorkspaceAgentTrigger } from "@opencrane/core";
 import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { _settledValue } from "../../resource.util.js";
 
 /** Mounted views owned by the stable `/settings/workspace/agents` route. */
 type AgentsView = "list" | "editor" | "add-channel" | "configure-channel";
@@ -21,26 +23,72 @@ type ChannelConnectionPhase = "idle" | "testing" | "valid" | "invalid";
 })
 export class AgentsSectionComponent implements OnDestroy
 {
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant = inject(ActiveTenantStore).tenant;
+
 	/** Monotonic mounted-only identity for newly created agents. */
-	private _nextAgentIdentity = WORKSPACE_AGENTS_FIXTURE.length + 1;
+	private _nextAgentIdentity = 1;
 
 	/** Monotonic mounted-only identity for newly connected channels. */
-	private _nextChannelIdentity = WORKSPACE_AGENT_CHANNELS_FIXTURE.length + 1;
+	private _nextChannelIdentity = 1;
 
 	/** Stable focus destination used after a destructive sub-page closes. */
 	private _destructiveSuccessFocusTarget: HTMLElement | null = null;
 
-	/** Mounted-only workspace agent catalogue. */
-	public readonly agents = signal<readonly WorkspaceAgent[]>(structuredClone(WORKSPACE_AGENTS_FIXTURE));
+	/** Resource-backed agents list. */
+	public readonly agentsResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceAgents(params ?? "")
+	});
 
-	/** Safe connected-channel metadata. */
-	public readonly channels = signal<readonly WorkspaceAgentChannel[]>(structuredClone(WORKSPACE_AGENT_CHANNELS_FIXTURE));
+	/** Safe mounted-only workspace agent catalogue, initialized from resource. */
+	public readonly agents = signal<readonly WorkspaceAgent[]>([]);
 
-	/** Add Channel choices in handoff order. */
-	public readonly channelTypes = WORKSPACE_AGENT_CHANNEL_TYPES_FIXTURE;
+	/** Resource-backed connected-channel metadata. */
+	public readonly channelsResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceAgentChannels(params ?? "")
+	});
 
-	/** Scope options available to the editor. */
-	public readonly scopeOptions = WORKSPACE_AGENT_SCOPE_OPTIONS_FIXTURE;
+	/** Safe connected-channel metadata, initialized from resource. */
+	public readonly channels = signal<readonly WorkspaceAgentChannel[]>([]);
+
+	constructor()
+	{
+		effect(() =>
+		{
+			const loadedAgents = _settledValue(this.agentsResource);
+			if (loadedAgents) this.agents.set(structuredClone(loadedAgents));
+		});
+
+		effect(() =>
+		{
+			const loadedChannels = _settledValue(this.channelsResource);
+			if (loadedChannels) this.channels.set(structuredClone(loadedChannels));
+		});
+
+		effect(() => {
+			const agents = this.agentsResource.value();
+			if (agents) this._nextAgentIdentity = agents.length + 1;
+		});
+		effect(() => {
+			const channels = this.channelsResource.value();
+			if (channels) this._nextChannelIdentity = channels.length + 1;
+		});
+	}
+
+	/** Complete channel connection catalogue. */
+	public readonly channelTypesResource = resource({
+		loader: () => this._gateway.getWorkspaceAgentChannelTypes()
+	});
+	public readonly channelTypes = computed(() => _settledValue(this.channelTypesResource) ?? []);
+
+	/** Scope choices shown by the handoff editor. */
+	public readonly scopeOptionsResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceAgentScopeOptions(params ?? "")
+	});
+	public readonly scopeOptions = computed(() => _settledValue(this.scopeOptionsResource) ?? []);
 
 	/** Current route-owned view. */
 	public readonly view = signal<AgentsView>("list");
@@ -86,9 +134,6 @@ export class AgentsSectionComponent implements OnDestroy
 	/** Invoker restored when a destructive dialog closes. */
 	public readonly destructiveFocusTarget = signal<HTMLElement | null>(null);
 
-	/** Deterministic mutation boundary replaceable by focused tests. */
-	public mutation: AgentSettingsMutation = new MockAgentSettingsMutation();
-
 	/** Trigger enum exposed to the external template. */
 	public readonly WorkspaceAgentTrigger = WorkspaceAgentTrigger;
 
@@ -103,7 +148,7 @@ export class AgentsSectionComponent implements OnDestroy
 	public readonly selectedChannelType: Signal<WorkspaceAgentChannelType | null> = computed((): WorkspaceAgentChannelType | null =>
 	{
 		const id = this.selectedChannelTypeId();
-		return this.channelTypes.find(function matches(type): boolean { return type.id === id; }) ?? null;
+		return this.channelTypes().find(function matches(type): boolean { return type.id === id; }) ?? null;
 	});
 
 	/** Channel owned by the configure sub-page. */
@@ -208,7 +253,8 @@ export class AgentsSectionComponent implements OnDestroy
 	public async saveAgent(): Promise<void>
 	{
 		const agent = this.selectedAgent();
-		if (agent === null || this.pendingKind() !== null) return;
+		const tenantName = this._tenant();
+		if (agent === null || this.pendingKind() !== null || !tenantName) return;
 		if (this.nameDraft().trim() === "")
 		{
 			this.feedback.set({ kind: "error", message: "Agent name is required." });
@@ -220,15 +266,14 @@ export class AgentsSectionComponent implements OnDestroy
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.mutate(AgentSettingsMutationKind.SaveAgent, agent.id);
-			if (result.outcome !== AgentSettingsMutationOutcome.Success)
-			{
-				this.feedback.set({ kind: "error", message: result.message });
-				return;
+			if (agent.id.startsWith("agent-")) {
+				await this._gateway.addWorkspaceAgent(tenantName, { ...agent, ...drafts });
+			} else {
+				await this._gateway.updateWorkspaceAgent(tenantName, agent.id, drafts);
 			}
-			const next = { ...agent, ...drafts };
-			this.agents.update(function replace(agents): readonly WorkspaceAgent[] { return agents.map(function update(candidate): WorkspaceAgent { return candidate.id === agent.id ? next : candidate; }); });
-			this.feedback.set({ kind: "success", message: result.message });
+			
+			this.agentsResource.reload();
+			this.feedback.set({ kind: "success", message: "Agent saved." });
 		}
 		catch
 		{
@@ -291,28 +336,21 @@ export class AgentsSectionComponent implements OnDestroy
 	{
 		const type = this.selectedChannelType();
 		const credential = this.credentialDraft();
-		if (type === null || credential.trim() === "" || this.pendingKind() !== null) return;
+		const tenantName = this._tenant();
+		if (type === null || credential.trim() === "" || this.pendingKind() !== null || !tenantName) return;
 		this.pendingKind.set(AgentSettingsMutationKind.TestChannel);
 		this.connectionPhase.set("testing");
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.mutate(AgentSettingsMutationKind.TestChannel, type.id, credential);
-			if (result.outcome === AgentSettingsMutationOutcome.Success)
-			{
-				this.connectionPhase.set("valid");
-				this.feedback.set({ kind: "success", message: result.message });
-			}
-			else
-			{
-				this.connectionPhase.set("invalid");
-				this.feedback.set({ kind: "error", message: result.message });
-			}
+			await this._gateway.testWorkspaceAgentChannel(tenantName, type.id, credential);
+			this.connectionPhase.set("valid");
+			this.feedback.set({ kind: "success", message: "Connection successful." });
 		}
-		catch
+		catch (error)
 		{
 			this.connectionPhase.set("invalid");
-			this.feedback.set({ kind: "error", message: "The channel connection could not be tested." });
+			this.feedback.set({ kind: "error", message: error instanceof Error ? error.message : "The channel connection could not be tested." });
 		}
 		finally
 		{
@@ -326,25 +364,22 @@ export class AgentsSectionComponent implements OnDestroy
 		const type = this.selectedChannelType();
 		const agent = this.selectedAgent();
 		const credential = this.credentialDraft();
-		if (type === null || agent === null || credential.trim() === "" || this.pendingKind() !== null) return;
+		const tenantName = this._tenant();
+		if (type === null || agent === null || credential.trim() === "" || this.pendingKind() !== null || !tenantName) return;
 		this.pendingKind.set(AgentSettingsMutationKind.AddChannel);
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.mutate(AgentSettingsMutationKind.AddChannel, type.id, credential);
-			if (result.outcome !== AgentSettingsMutationOutcome.Success)
-			{
-				this.feedback.set({ kind: "error", message: result.message });
-				return;
-			}
-			const channel: WorkspaceAgentChannel = { id: `${type.id}-${this._nextChannelIdentity}`, typeId: type.id, name: type.name, handle: "Connected workspace channel", status: "active" };
-			this._nextChannelIdentity += 1;
-			this.channels.update(function append(channels): readonly WorkspaceAgentChannel[] { return [...channels, channel]; });
-			this.agents.update(function connect(agents): readonly WorkspaceAgent[] { return agents.map(function update(candidate): WorkspaceAgent { return candidate.id === agent.id ? { ...candidate, channelIds: [...candidate.channelIds, channel.id] } : candidate; }); });
+			const channel = await this._gateway.addWorkspaceAgentChannel(tenantName, type.id, credential);
+			await this._gateway.updateWorkspaceAgent(tenantName, agent.id, { channelIds: [...agent.channelIds, channel.id] });
+			
+			this.channelsResource.reload();
+			this.agentsResource.reload();
+			
 			this._clearCredential();
 			this.selectedChannelTypeId.set(null);
 			this.view.set("editor");
-			this.feedback.set({ kind: "success", message: result.message });
+			this.feedback.set({ kind: "success", message: "Channel connected." });
 		}
 		catch
 		{
@@ -360,20 +395,18 @@ export class AgentsSectionComponent implements OnDestroy
 	public async saveChannel(): Promise<void>
 	{
 		const channel = this.configuredChannel();
-		if (channel === null || this.pendingKind() !== null) return;
+		const tenantName = this._tenant();
+		if (channel === null || this.pendingKind() !== null || !tenantName) return;
 		this.pendingKind.set(AgentSettingsMutationKind.SaveChannel);
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.mutate(AgentSettingsMutationKind.SaveChannel, channel.id, this.credentialDraft() || undefined);
-			if (result.outcome !== AgentSettingsMutationOutcome.Success)
-			{
-				this.feedback.set({ kind: "error", message: result.message });
-				return;
-			}
+			await this._gateway.updateWorkspaceAgentChannel(tenantName, channel.id, this.credentialDraft() || undefined);
+			
+			this.channelsResource.reload();
 			this._clearCredential();
 			this.view.set("editor");
-			this.feedback.set({ kind: "success", message: result.message });
+			this.feedback.set({ kind: "success", message: "Channel updated." });
 		}
 		catch
 		{
@@ -421,7 +454,8 @@ export class AgentsSectionComponent implements OnDestroy
 	public async confirmDestructive(): Promise<void>
 	{
 		const kind = this.destructiveKind();
-		if (kind === null || this.pendingKind() !== null) return;
+		const tenantName = this._tenant();
+		if (kind === null || this.pendingKind() !== null || !tenantName) return;
 		const mutationKind = kind === "retire" ? AgentSettingsMutationKind.RetireAgent : AgentSettingsMutationKind.DisconnectChannel;
 		const entityId = kind === "retire" ? this.selectedAgent()?.id : this.configuredChannel()?.id;
 		if (entityId === undefined) return;
@@ -429,18 +463,27 @@ export class AgentsSectionComponent implements OnDestroy
 		this.destructiveState.set({ phase: DestructiveActionPhase.Pending });
 		try
 		{
-			const result = await this.mutation.mutate(mutationKind, entityId);
-			if (result.outcome !== AgentSettingsMutationOutcome.Success)
-			{
-				this.destructiveState.set({ phase: DestructiveActionPhase.Error, message: result.message });
-				return;
+			if (kind === "retire") {
+				await this._gateway.removeWorkspaceAgent(tenantName, entityId);
+				this._retireAgent(entityId);
+				this.agentsResource.reload();
+			} else {
+				// Need to update the agent to remove the channel ID, but mock doesn't do it perfectly without knowing the agent.
+				// In this UI context we know the selected agent
+				const agent = this.selectedAgent();
+				if (agent) {
+					await this._gateway.updateWorkspaceAgent(tenantName, agent.id, { channelIds: agent.channelIds.filter(id => id !== entityId) });
+				}
+				await this._gateway.removeWorkspaceAgentChannel(tenantName, entityId);
+				this._disconnectChannel(entityId);
+				this.channelsResource.reload();
+				this.agentsResource.reload();
 			}
+			
 			this.destructiveFocusTarget.set(this._destructiveSuccessFocusTarget);
-			if (kind === "retire") this._retireAgent(entityId);
-			else this._disconnectChannel(entityId);
 			this.destructiveState.set({ phase: DestructiveActionPhase.Success });
 			this.destructiveKind.set(null);
-			this.feedback.set({ kind: "success", message: result.message });
+			this.feedback.set({ kind: "success", message: kind === "retire" ? "Agent retired." : "Channel disconnected." });
 		}
 		catch
 		{

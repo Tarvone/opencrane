@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, signal, inject, effect, resource } from "@angular/core";
 
-import { SettingsFormPhase, SettingsFormState, SettingsMutation, SettingsMutationOutcome, SettingsNavigationDecision, SettingsUnsavedNavigationConfirmation, _ConfirmSettingsNavigation, _CreateSettingsFormState, _EditSettingsForm, _ReloadLatestSettingsForm, _ResolveSettingsForm, _ReturnToEditingSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
+import { SettingsFormPhase, SettingsFormState, SettingsMutationOutcome, SettingsNavigationDecision, SettingsUnsavedNavigationConfirmation, _ConfirmSettingsNavigation, _CreateSettingsFormState, _EditSettingsForm, _ReloadLatestSettingsForm, _ResetSettingsForm, _ResolveSettingsForm, _ReturnToEditingSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
 import { SaveButtonComponent } from "@opencrane/elements/ui";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { SETTINGS_GATEWAY, WorkspaceBudgetDraft, WorkspaceBudgetMember, WorkspaceBudgetRow, WorkspaceBudgetStatus, WorkspaceBudgetTotals } from "@opencrane/state/settings/adapter";
 
-import { WORKSPACE_BUDGET_DRAFT_FIXTURE, WORKSPACE_BUDGET_MEMBERS_FIXTURE, WORKSPACE_BUDGET_RESET_DATE_FIXTURE, WORKSPACE_BUDGET_SUCCESS_MUTATION } from "./budgets-section.fixtures.js";
-import { WorkspaceBudgetDraft, WorkspaceBudgetMember, WorkspaceBudgetRow, WorkspaceBudgetStatus, WorkspaceBudgetTotals } from "./budgets-section.types.js";
 import { _WorkspaceBudgetTotals, _WorkspaceBudgetUsage, _WorkspaceBudgetValidationErrors } from "./budgets-section.utils.js";
+import { _settledValue } from "../../resource.util.js";
 
 /** Fixture-backed Workspace Budgets form matching the authoritative handoff. */
 @Component({
@@ -18,29 +19,55 @@ import { _WorkspaceBudgetTotals, _WorkspaceBudgetUsage, _WorkspaceBudgetValidati
 })
 export class BudgetsSectionComponent
 {
-	/** Immutable member identity and spend fixtures. */
-	public readonly members: readonly WorkspaceBudgetMember[] = WORKSPACE_BUDGET_MEMBERS_FIXTURE;
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant: Signal<string | undefined> = inject(ActiveTenantStore).tenant;
 
-	/** Handoff reset date. */
-	public readonly resetDate = WORKSPACE_BUDGET_RESET_DATE_FIXTURE;
+	/** Immutable member identity and spend fixtures. */
+	public readonly membersResource = resource({
+		params: (): string | undefined => this._tenant(),
+		loader: ({ params }): Promise<WorkspaceBudgetMember[]> => this._gateway.getWorkspaceBudgetMembers(params ?? "")
+	});
+	public readonly members = computed(() => _settledValue(this.membersResource) ?? []);
+
+	/** Reset date displayed in the organization summary. */
+	public readonly resetDateResource = resource({
+		params: (): string | undefined => this._tenant(),
+		loader: ({ params }): Promise<string> => this._gateway.getWorkspaceBudgetResetDate(params ?? "")
+	});
+	public readonly resetDate = computed(() => _settledValue(this.resetDateResource) ?? "");
+
+	/** Resource-backed budget draft. */
+	public readonly draftResource = resource({
+		params: (): string | undefined => this._tenant(),
+		loader: ({ params }): Promise<WorkspaceBudgetDraft> => this._gateway.getWorkspaceBudgetDraft(params ?? "")
+	});
 
 	/** Controlled lifecycle for every editable monthly limit. */
-	public readonly formState = signal<SettingsFormState<WorkspaceBudgetDraft>>(_CreateSettingsFormState(WORKSPACE_BUDGET_DRAFT_FIXTURE));
+	public readonly formState = signal<SettingsFormState<WorkspaceBudgetDraft>>(_CreateSettingsFormState({ limits: {} }));
 
-	/** Deterministic mutation boundary replaceable by focused tests. */
-	public mutation: SettingsMutation<WorkspaceBudgetDraft> = WORKSPACE_BUDGET_SUCCESS_MUTATION;
+	constructor()
+	{
+		effect(() =>
+		{
+			const draftData = _settledValue(this.draftResource);
+			if (draftData)
+			{
+				this.formState.update(s => s.phase === SettingsFormPhase.Pristine ? _CreateSettingsFormState(draftData) : s);
+			}
+		});
+	}
 
 	/** Budget status enum exposed to the external template. */
 	public readonly WorkspaceBudgetStatus = WorkspaceBudgetStatus;
 
 	/** Organization totals recomputed from immutable spend and the current draft. */
-	public readonly totals: Signal<WorkspaceBudgetTotals> = computed((): WorkspaceBudgetTotals => _WorkspaceBudgetTotals(this.members, this.formState().draft));
+	public readonly totals: Signal<WorkspaceBudgetTotals> = computed((): WorkspaceBudgetTotals => _WorkspaceBudgetTotals(this.members(), this.formState().draft));
 
 	/** Member rows projected with safe progress and threshold status. */
 	public readonly rows: Signal<readonly WorkspaceBudgetRow[]> = computed((): readonly WorkspaceBudgetRow[] =>
 	{
 		const draft = this.formState().draft;
-		return this.members.map(function memberRow(member): WorkspaceBudgetRow
+		return this.members().map(function memberRow(member): WorkspaceBudgetRow
 		{
 			const limit = draft.limits[member.id] ?? 0;
 			return { ...member, limit, ..._WorkspaceBudgetUsage(member.spent, limit) };
@@ -67,10 +94,23 @@ export class BudgetsSectionComponent
 		const pending = _SubmitSettingsForm(current);
 		if (pending.phase !== SettingsFormPhase.Pending) return;
 		this.formState.set(pending);
+
+		const tenantName = this._tenant();
+		if (!tenantName)
+		{
+			this.formState.update(state => _ResolveSettingsForm(state, { outcome: SettingsMutationOutcome.RecoverableError, message: "No active tenant." }));
+			return;
+		}
+
 		try
 		{
-			const result = await this.mutation.mutate(pending.pendingDraft);
-			this.formState.update(function resolve(state): SettingsFormState<WorkspaceBudgetDraft> { return _ResolveSettingsForm(state, result); });
+			const acceptedDraft = await this._gateway.updateWorkspaceBudgetDraft(tenantName, pending.pendingDraft);
+			
+			this.draftResource.reload();
+			
+			this.formState.update(function resolve(state): SettingsFormState<WorkspaceBudgetDraft> { 
+				return _ResolveSettingsForm(state, { outcome: SettingsMutationOutcome.Success, accepted: acceptedDraft, message: "Budget changes saved." }); 
+			});
 		}
 		catch (error)
 		{

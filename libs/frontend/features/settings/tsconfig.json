@@ -18,6 +18,12 @@
     },
     {
       "path": "../../core"
+    },
+    {
+      "path": "../../state/gateways/tsconfig.lib.json"
+    },
+    {
+      "path": "../../state/settings/adapter/tsconfig.lib.json"
     }
   ]
 }

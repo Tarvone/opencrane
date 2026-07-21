@@ -1,5 +1,5 @@
 import { Injectable, Signal, computed, signal, resource } from "@angular/core";
-import { Capabilities, SessionTenant, SessionUser } from "@opencrane/state/core";
+import { Capabilities, SessionTenant, SessionUser } from "../session-store.types";
 
 /**
  * Mock SessionStore for the UI handoff.

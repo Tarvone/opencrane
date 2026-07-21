@@ -14,9 +14,9 @@ import { provideWebPlatform } from "@opencrane/platform";
 import { SessionStore } from "@opencrane/state/core";
 import { provideTestGateways } from "@opencrane/state/gateways/testing";
 
-import { environment } from "../environments/environment";
-import { APP_ROUTES } from "./app.routes";
-import { MockSessionStore } from "./mock-session.store";
+import { environment } from "../environments/environment.js";
+import { APP_ROUTES } from "./app.routes.js";
+import { MockSessionStore } from "@opencrane/state/core/testing";
 
 /**
  * Root application configuration for the WeOwnAI frontend.

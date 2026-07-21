@@ -1,5 +1,5 @@
-import { SettingsMutation, SettingsMutationFixture, SettingsMutationOutcome } from "../../models/settings-form.types.js";
-import { PodSettingsDraftFixture, PodSettingsFixture } from "./pod-settings-fixtures.types.js";
+import { SettingsMutation, SettingsMutationFixture, SettingsMutationOutcome } from "@opencrane/core";
+import { PodSettingsDraftFixture, PodSettingsFixture } from "@opencrane/state/settings/adapter";
 
 /** Authoritative visible values from the Workspace Pod handoff. */
 export const POD_SETTINGS_FIXTURE: PodSettingsFixture =

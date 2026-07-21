@@ -7,7 +7,7 @@
 		<h2 id="workspace-llm-providers-title" class="wo-llm-providers__add-title">Add Provider Key</h2>
 
 		<div class="wo-llm-providers__provider-grid" role="list" aria-label="Provider options">
-			@for (provider of providerOptions; track provider.id) {
+			@for (provider of providerOptions(); track provider.id) {
 				<button
 					type="button"
 					class="wo-llm-providers__provider-option"
@@ -77,7 +77,7 @@
 			<div class="wo-llm-providers__flow" aria-label="Prompt routing flow">
 				<div><small>Incoming prompt</small><span>Any message or agent task</span></div>
 				<b aria-hidden="true">→</b>
-				<label class="wo-llm-providers__analysis"><small>Prompt analysis model</small><select class="wo-mono" [value]="analysisModel()" (change)="updateAnalysisModel($event)">@for (model of analysisModelOptions; track model) {<option [value]="model">{{ model }}</option>}</select><span>Fast + cheap · classifies, doesn't answer</span></label>
+				<label class="wo-llm-providers__analysis"><small>Prompt analysis model</small><select class="wo-mono" [value]="analysisModel()" (change)="updateAnalysisModel($event)">@for (model of analysisModelOptions(); track model) {<option [value]="model">{{ model }}</option>}</select><span>Fast + cheap · classifies, doesn't answer</span></label>
 				<b aria-hidden="true">→</b>
 				<div><small>Category → LLM</small><span>Routed by the table below</span></div>
 			</div>
@@ -87,7 +87,7 @@
 				@for (category of routeCategories(); track category.id) {
 					<div class="wo-llm-providers__route-row">
 						<div><h5>{{ category.name }}</h5><p>{{ category.description }}</p></div>
-						<select class="wo-mono" [value]="category.model" (change)="updateCategoryModel(category.id, $event)">@for (model of modelOptions; track model) {<option [value]="model" [selected]="model === category.model">{{ model }}</option>}</select>
+						<select class="wo-mono" [value]="category.model" (change)="updateCategoryModel(category.id, $event)">@for (model of modelOptions(); track model) {<option [value]="model" [selected]="model === category.model">{{ model }}</option>}</select>
 						<button type="button" class="wo-llm-providers__trash" [attr.aria-label]="'Remove ' + category.name" (click)="removeCategory(category.id)">
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
 						</button>

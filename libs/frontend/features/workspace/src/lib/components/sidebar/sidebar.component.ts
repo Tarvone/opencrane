@@ -4,8 +4,8 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
 import { SessionSummary } from "@opencrane/core";
 import { CONVERSATION_GATEWAY, SessionStore } from "@opencrane/state/core";
 import { AvatarCircleComponent, CollapsibleSectionComponent } from "@opencrane/elements/ui";
-import { SessionRowComponent } from "../session-row/session-row.component";
-import { TenantSwitcherComponent } from "../tenant-switcher/tenant-switcher.component";
+import { SessionRowComponent } from "../session-row/session-row.component.js";
+import { TenantSwitcherComponent } from "../tenant-switcher/tenant-switcher.component.js";
 
 /** Dark navigation rail: sessions, automation runs, notifications, settings, user. */
 @Component({

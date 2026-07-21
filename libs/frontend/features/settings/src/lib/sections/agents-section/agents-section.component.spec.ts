@@ -7,43 +7,15 @@ import { ɵresolveComponentResources } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { compileString } from "sass";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { AgentSettingsMutation, AgentSettingsMutationKind, AgentSettingsMutationOutcome, AgentSettingsMutationResult, WorkspaceAgentTrigger } from "@opencrane/core";
+import { AgentSettingsMutationKind, WorkspaceAgentTrigger } from "@opencrane/core";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { MockSettingsGateway } from "@opencrane/state/gateways/testing";
+import { signal } from "@angular/core";
+import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
 import { AgentsSectionComponent } from "./agents-section.component.js";
-
-/** Controllable mutation boundary that never retains supplied credential text. */
-class TestAgentMutation implements AgentSettingsMutation
-{
-	/** Calls captured without credential arguments. */
-	public readonly calls: { kind: AgentSettingsMutationKind; entityId: string }[] = [];
-
-	/** Result returned by immediate operations. */
-	public result: AgentSettingsMutationResult = { outcome: AgentSettingsMutationOutcome.Success, message: "Updated." };
-
-	/** When true, the next operation remains pending until `complete` is called. */
-	public delayed = false;
-
-	/** Resolver for the currently delayed operation. */
-	private _resolve: ((result: AgentSettingsMutationResult) => void) | null = null;
-
-	/** Capture safe call metadata and return the configured outcome. */
-	public mutate(kind: AgentSettingsMutationKind, entityId: string, _credential?: string): Promise<AgentSettingsMutationResult>
-	{
-		this.calls.push({ kind, entityId });
-		if (!this.delayed) return Promise.resolve(this.result);
-		const mutation = this;
-		return new Promise<AgentSettingsMutationResult>(function delay(resolvePromise): void { mutation._resolve = resolvePromise; });
-	}
-
-	/** Resolve the outstanding delayed operation. */
-	public complete(): void
-	{
-		this._resolve?.(this.result);
-		this._resolve = null;
-		this.delayed = false;
-	}
-}
 
 /** Resolve external resources for the Agents section and shared confirmation dialog. */
 function _componentResource(resourceUrl: string): string
@@ -55,10 +27,29 @@ function _componentResource(resourceUrl: string): string
 }
 
 /** Render the fixture-backed Agents section. */
-function _render(): ComponentFixture<AgentsSectionComponent>
+async function _render(): Promise<ComponentFixture<AgentsSectionComponent>>
 {
-	TestBed.configureTestingModule({ imports: [AgentsSectionComponent] });
+	TestBed.configureTestingModule({ 
+		imports: [AgentsSectionComponent],
+		providers: [
+			{ provide: SETTINGS_GATEWAY, useClass: MockSettingsGateway },
+			{ provide: ActiveTenantStore, useValue: { tenant: signal("elewa-default") } }
+		]
+	});
+	
+	TestBed.overrideComponent(DestructiveConfirmationComponent, {
+		remove: { 
+			templateUrl: './destructive-confirmation.component.html',
+			styleUrl: './destructive-confirmation.component.scss'
+		},
+		add: {
+			template: ''
+		}
+	});
+	
 	const fixture = TestBed.createComponent(AgentsSectionComponent);
+	fixture.detectChanges();
+	await fixture.whenStable();
 	fixture.detectChanges();
 	return fixture;
 }
@@ -85,9 +76,10 @@ afterAll(function releaseAngularAgents(): void
 
 describe("AgentsSectionComponent", function agentsSectionSuite(): void
 {
-	it("renders the App.dc.html agent catalogue and exact primary copy", function catalogue(): void
+	it("renders the App.dc.html agent catalogue and exact primary copy", async function catalogue(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const fixture = await _render();
+		const root = fixture.nativeElement as HTMLElement;
 
 		expect(root.querySelector("h2")?.textContent?.trim()).toBe("Agents");
 		expect(root.querySelector(".wo-agents__header p")?.textContent).toContain("Automations that watch information sources");
@@ -99,18 +91,25 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("opens and saves the handoff editor through the deterministic boundary", async function editorSave(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "updateWorkspaceAgent").mockResolvedValue({ id: "scope", name: "Commercial scope reviewer", trigger: WorkspaceAgentTrigger.Schedule } as any);
+		vi.spyOn(gateway, "getWorkspaceAgents").mockResolvedValue(
+			component.agents().map(a => a.id === "scope" ? { ...a, name: "Commercial scope reviewer", trigger: WorkspaceAgentTrigger.Schedule } : a)
+		);
+		
 		component.openEditor("scope");
 		component.nameDraft.set("Commercial scope reviewer");
 		component.selectTrigger(WorkspaceAgentTrigger.Schedule);
 		await component.saveAgent();
+		await fixture.whenStable();
 		fixture.detectChanges();
 
 		expect(component.agents()[0]?.name).toBe("Commercial scope reviewer");
 		expect(component.agents()[0]?.trigger).toBe(WorkspaceAgentTrigger.Schedule);
 		expect(component.feedback()?.kind).toBe("success");
-		expect((component.mutation as { callCount: number }).callCount).toBe(1);
+		expect(gateway.updateWorkspaceAgent).toHaveBeenCalledTimes(1);
 		expect((fixture.nativeElement as HTMLElement).querySelectorAll(".wo-agents__runs > div")).toHaveLength(4);
 		component.togglePrompt();
 		fixture.detectChanges();
@@ -119,29 +118,35 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("keeps the submitted editor snapshot stable and locks duplicate saves", async function delayedEditorSave(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
-		const mutation = new TestAgentMutation();
-		mutation.delayed = true;
-		component.mutation = mutation;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		let resolveUpdate: any;
+		vi.spyOn(gateway, "updateWorkspaceAgent").mockImplementation(() => new Promise(r => resolveUpdate = r));
+		
 		component.openEditor("scope");
 		component.nameDraft.set("Submitted name");
 		const first = component.saveAgent();
 		const duplicate = component.saveAgent();
 		fixture.detectChanges();
 
-		expect(mutation.calls).toHaveLength(1);
+		expect(gateway.updateWorkspaceAgent).toHaveBeenCalledTimes(1);
 		expect(((fixture.nativeElement as HTMLElement).querySelector("[aria-label='Agent name']") as HTMLInputElement).disabled).toBe(true);
 		component.updateTextDraft("name", { target: { value: "Late name" } } as unknown as Event);
 		expect(component.nameDraft()).toBe("Submitted name");
-		mutation.complete();
+		
+		vi.spyOn(gateway, "getWorkspaceAgents").mockResolvedValue(
+			component.agents().map(a => a.id === "scope" ? { ...a, name: "Submitted name" } : a)
+		);
+		resolveUpdate({ id: "scope", name: "Submitted name" } as any);
 		await Promise.all([first, duplicate]);
+		await fixture.whenStable();
 		expect(component.selectedAgent()?.name).toBe("Submitted name");
 	});
 
-	it("creates a new draft and returns through the owned editor back control", function newAgentBack(): void
+	it("creates a new draft and returns through the owned editor back control", async function newAgentBack(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
 		component.newAgent();
 		fixture.detectChanges();
@@ -159,11 +164,11 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("locks credential editing while a connection test is pending", async function pendingCredentialLock(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
-		const mutation = new TestAgentMutation();
-		mutation.delayed = true;
-		component.mutation = mutation;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		let resolveTest: any;
+		vi.spyOn(gateway, "testWorkspaceAgentChannel").mockImplementation(() => new Promise(r => resolveTest = r));
 		component.openEditor("scope");
 		component.openAddChannel();
 		component.selectChannelType("telegram");
@@ -174,50 +179,51 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 		expect(((fixture.nativeElement as HTMLElement).querySelector("input[type='password']") as HTMLInputElement).disabled).toBe(true);
 		component.updateCredential({ target: { value: "credential B" } } as unknown as Event);
 		expect(component.credentialDraft()).toBe("credential A");
-		mutation.complete();
+		resolveTest();
 		await pending;
 		expect(component.connectionPhase()).toBe("valid");
 	});
 
 	it("keeps editor state on a recoverable save outcome", async function recoverableSave(): Promise<void>
 	{
-		const component = _render().componentInstance;
-		const mutation = new TestAgentMutation();
-		mutation.result = { outcome: AgentSettingsMutationOutcome.Conflict, message: "Agent changed elsewhere." };
-		component.mutation = mutation;
+		const fixture = await _render();
+		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "updateWorkspaceAgent").mockRejectedValue(new Error("Agent changed elsewhere."));
 		component.openEditor("scope");
 		component.nameDraft.set("Unsaved conflict name");
 		await component.saveAgent();
+		await fixture.whenStable();
 
 		expect(component.selectedAgent()?.name).toBe("Scope reviewer");
 		expect(component.nameDraft()).toBe("Unsaved conflict name");
-		expect(component.feedback()).toEqual({ kind: "error", message: "Agent changed elsewhere." });
+		expect(component.feedback()).toEqual({ kind: "error", message: "The agent could not be saved. Try again." });
 	});
 
 	it("represents invalid tests and recoverable add failures without losing input", async function channelFailures(): Promise<void>
 	{
-		const component = _render().componentInstance;
-		const mutation = new TestAgentMutation();
-		component.mutation = mutation;
+		const fixture = await _render();
+		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
 		component.openEditor("scope");
 		component.openAddChannel();
 		component.selectChannelType("slack");
 		component.credentialDraft.set("mounted input");
-		mutation.result = { outcome: AgentSettingsMutationOutcome.Invalid, message: "Credential rejected." };
+		vi.spyOn(gateway, "testWorkspaceAgentChannel").mockRejectedValue(new Error("Credential rejected."));
 		await component.testChannel();
 
 		expect(component.connectionPhase()).toBe("invalid");
 		expect(component.feedback()?.message).toBe("Credential rejected.");
-		mutation.result = { outcome: AgentSettingsMutationOutcome.RecoverableError, message: "Channel service unavailable." };
+		vi.spyOn(gateway, "addWorkspaceAgentChannel").mockRejectedValue(new Error("Channel service unavailable."));
 		await component.addChannel();
 		expect(component.view()).toBe("add-channel");
 		expect(component.credentialDraft()).toBe("mounted input");
 		expect(component.channels()).toHaveLength(2);
 	});
 
-	it("clears transient channel credentials on selection, back, and destruction", function credentialLifetime(): void
+	it("clears transient channel credentials on selection, back, and destruction", async function credentialLifetime(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
 		component.openEditor("scope");
 		component.openAddChannel();
@@ -236,12 +242,20 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("adds and disconnects a channel while keeping mounted identities unique", async function channelLifecycle(): Promise<void>
 	{
-		const component = _render().componentInstance;
+		const fixture = await _render();
+		const component = fixture.componentInstance;
 		component.openEditor("scope");
 		component.openAddChannel();
 		component.selectChannelType("discord");
 		component.credentialDraft.set("transient discord credential");
+
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "addWorkspaceAgentChannel").mockResolvedValue({ id: "sl", name: "Slack", typeId: "discord", agentId: "scope" } as any);
+		vi.spyOn(gateway, "getWorkspaceAgentChannels").mockResolvedValue([...component.channels(), { id: "sl", name: "Slack", typeId: "discord", agentId: "scope" } as any]);
+		vi.spyOn(gateway, "getWorkspaceAgents").mockResolvedValue(component.agents().map(a => a.id === "scope" ? { ...a, channelIds: [...a.channelIds, "sl"] } : a));
+
 		await component.addChannel();
+		await fixture.whenStable();
 		const added = component.channels().at(-1);
 		if (!added) throw new Error("Expected a newly added channel");
 
@@ -250,7 +264,9 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 		component.openConfigureChannel(added.id);
 		component.credentialDraft.set("replacement before disconnect");
 		component.requestDisconnect({ currentTarget: document.createElement("button") } as unknown as Event, document.createElement("section"));
+		vi.spyOn(gateway, "getWorkspaceAgentChannels").mockResolvedValue(component.channels().filter(c => c.id !== "sl"));
 		await component.confirmDestructive();
+		await fixture.whenStable();
 
 		expect(component.channels().some(function matches(channel): boolean { return channel.id === added.id; })).toBe(false);
 		expect(component.credentialDraft()).toBe("");
@@ -259,11 +275,16 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("retires an agent only after explicit confirmation", async function retirement(): Promise<void>
 	{
-		const component = _render().componentInstance;
+		const fixture = await _render();
+		const component = fixture.componentInstance;
 		component.openEditor("indexer");
 		component.requestRetire({ currentTarget: document.createElement("button") } as unknown as Event, document.createElement("section"));
+		await fixture.whenStable();
 		expect(component.agents()).toHaveLength(2);
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "getWorkspaceAgents").mockResolvedValue(component.agents().filter(a => a.id !== "indexer"));
 		await component.confirmDestructive();
+		await fixture.whenStable();
 
 		expect(component.agents().map(function identity(agent): string { return agent.id; })).toEqual(["scope"]);
 		expect(component.view()).toBe("list");
@@ -271,19 +292,21 @@ describe("AgentsSectionComponent", function agentsSectionSuite(): void
 
 	it("saves configured replacement credentials and copies the safe webhook", async function configureChannel(): Promise<void>
 	{
-		const component = _render().componentInstance;
-		const mutation = new TestAgentMutation();
+		const fixture = await _render();
+		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "updateWorkspaceAgentChannel").mockResolvedValue({ id: "tg" } as any);
 		let copied = "";
 		Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: function writeText(value: string): Promise<void> { copied = value; return Promise.resolve(); } } });
-		component.mutation = mutation;
 		component.openEditor("scope");
 		component.openConfigureChannel("tg");
 		component.credentialDraft.set("replacement credential");
 		await component.copyWebhook();
 		expect(copied).toBe("https://pod.example.com/webhook/telegram");
 		await component.saveChannel();
+		await fixture.whenStable();
 
-		expect(mutation.calls.at(-1)).toEqual({ kind: AgentSettingsMutationKind.SaveChannel, entityId: "tg" });
+		expect(gateway.updateWorkspaceAgentChannel).toHaveBeenCalledWith(expect.any(String), "tg", "replacement credential");
 		expect(component.credentialDraft()).toBe("");
 		expect(component.view()).toBe("editor");
 	});

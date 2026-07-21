@@ -3,14 +3,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { ɵresolveComponentResources } from "@angular/core";
+import { signal, ɵresolveComponentResources } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { compileString } from "sass";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ConnectorCategory, ConnectorMutationKind, ConnectorMutationOutcome, DestructiveActionPhase } from "@opencrane/core";
-import { MockConnectorMutation } from "@opencrane/core/testing";
+import { ConnectorCategory, ConnectorMutationKind, DestructiveActionPhase } from "@opencrane/core";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { MockSettingsGateway } from "@opencrane/state/gateways/testing";
+import { DestructiveConfirmationComponent } from "@opencrane/elements/ui";
 import { ConnectorsSectionComponent } from "./connectors-section.component.js";
 
 /** Resolve external resources for the Connectors section and its shared dialog. */
@@ -23,10 +26,30 @@ function _componentResource(resourceUrl: string): string
 }
 
 /** Render the fixture-backed Connectors section. */
-function _render(): ComponentFixture<ConnectorsSectionComponent>
+async function _render(): Promise<ComponentFixture<ConnectorsSectionComponent>>
 {
-	TestBed.configureTestingModule({ imports: [ConnectorsSectionComponent] });
+	TestBed.configureTestingModule({ 
+        imports: [ConnectorsSectionComponent],
+        providers: [
+            { provide: SETTINGS_GATEWAY, useClass: MockSettingsGateway },
+            { provide: ActiveTenantStore, useValue: { tenant: signal("elewa-default") } }
+        ]
+    });
+	
+	// Register signal inputs for JIT compiler
+	TestBed.overrideComponent(DestructiveConfirmationComponent, {
+		remove: { 
+			templateUrl: './destructive-confirmation.component.html',
+			styleUrl: './destructive-confirmation.component.scss'
+		},
+		add: {
+			template: ''
+		}
+	});
+	
 	const fixture = TestBed.createComponent(ConnectorsSectionComponent);
+	fixture.detectChanges();
+	await fixture.whenStable();
 	fixture.detectChanges();
 	return fixture;
 }
@@ -53,9 +76,9 @@ afterAll(function releaseAngularConnectors(): void
 
 describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 {
-	it("renders the handoff Connected and Available collections with rights and switches", function installedFixtures(): void
+	it("renders the handoff Connected and Available collections with rights and switches", async function installedFixtures(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const root = (await _render()).nativeElement as HTMLElement;
 		const connectedNames = Array.from(root.querySelectorAll(".wo-connectors__connected-row .wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; });
 		const availableNames = Array.from(root.querySelectorAll(".wo-connectors__available-row .wo-connectors__copy h4")).map(function text(element): string { return element.textContent?.trim() ?? ""; });
 		const adminNames = Array.from(root.querySelectorAll(".wo-connectors__connected-row, .wo-connectors__available-row")).filter(function manageable(row): boolean { return row.querySelector(".wo-connectors__admin") !== null; }).map(function name(row): string { return row.querySelector("h4")?.textContent?.trim() ?? ""; });
@@ -70,9 +93,9 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 		expect(switches.map(function checked(control): string | null { return control.getAttribute("aria-checked"); })).toEqual(["true", "true", "true", "false", "true"]);
 	});
 
-	it("filters both collections by category and renders their exact empty states", function searchesCollections(): void
+	it("filters both collections by category and renders their exact empty states", async function searchesCollections(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const root = fixture.nativeElement as HTMLElement;
 		const input = root.querySelector("input[type='search']") as HTMLInputElement;
 		input.value = "DEV";
@@ -94,9 +117,9 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 		expect(root.querySelectorAll(".wo-connectors__card")).toHaveLength(0);
 	});
 
-	it("opens the marketplace from an Available connector action", function availableConnectAction(): void
+	it("opens the marketplace from an Available connector action", async function availableConnectAction(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		_rootButton(fixture, ".wo-connectors__available-row .wo-connectors__row-button").click();
 		fixture.detectChanges();
 
@@ -104,9 +127,9 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 		expect((fixture.nativeElement as HTMLElement).querySelector("h2")?.textContent?.trim()).toBe("Connector Marketplace");
 	});
 
-	it("opens the owned marketplace, filters all seven categories, and preserves selection on return", function marketplaceNavigation(): void
+	it("opens the owned marketplace, filters all seven categories, and preserves selection on return", async function marketplaceNavigation(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
 		(_rootButton(fixture, ".wo-connectors__primary")).click();
 		fixture.detectChanges();
@@ -129,19 +152,28 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 
 	it("locks duplicate toggles while pending and applies one successful outcome", async function toggleLocking(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
 		const connector = component.installedConnectors()[0];
-		const mutation = new MockConnectorMutation([{ delayMilliseconds: 10, result: { outcome: ConnectorMutationOutcome.Success, message: "Updated." } }]);
-		component.mutation = mutation;
 		if (!connector) throw new Error("Expected an installed connector fixture");
+
+		let resolveUpdate: any;
+		vi.spyOn(gateway, "updateConnector").mockImplementation(() => new Promise(r => resolveUpdate = r));
 
 		const first = component.toggle(connector);
 		const duplicate = component.toggle(connector);
 		expect(component.isPending(connector, ConnectorMutationKind.Toggle)).toBe(true);
 		expect(component.pendingMessage()).toBe("Updating Cognee Search…");
-		expect(mutation.callCount).toBe(1);
+		expect(gateway.updateConnector).toHaveBeenCalledTimes(1);
+		
+		vi.spyOn(gateway, "getConnectors").mockResolvedValue(
+			component.connectors().map(c => c.id === connector.id ? { ...c, enabled: !c.enabled } : c)
+		);
+		
+		resolveUpdate();
 		await Promise.all([first, duplicate]);
+		await fixture.whenStable();
 		fixture.detectChanges();
 
 		expect(component.connectors().find(function matches(candidate): boolean { return candidate.id === connector.id; })?.enabled).toBe(false);
@@ -150,18 +182,28 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 
 	it("installs once while pending and projects success into both route views", async function installSuccess(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
 		const connector = component.connectors().find(function gitLab(candidate): boolean { return candidate.id === "gl"; });
-		const mutation = new MockConnectorMutation([{ delayMilliseconds: 10, result: { outcome: ConnectorMutationOutcome.Success, message: "Installed." } }]);
-		component.mutation = mutation;
 		if (!connector) throw new Error("Expected the GitLab marketplace fixture");
+		
+		let resolveUpdate: any;
+		vi.spyOn(gateway, "updateConnector").mockImplementation(() => new Promise(r => resolveUpdate = r));
 
 		const first = component.install(connector);
 		const duplicate = component.install(connector);
-		expect(mutation.callCount).toBe(1);
+		expect(gateway.updateConnector).toHaveBeenCalledTimes(1);
 		expect(component.pendingMessage()).toBe("Installing GitLab…");
+		
+		vi.spyOn(gateway, "getConnectors").mockResolvedValue([
+			...component.connectors(),
+			{ ...connector, installed: true, enabled: true, canManage: true }
+		]);
+		
+		resolveUpdate();
 		await Promise.all([first, duplicate]);
+		await fixture.whenStable();
 		fixture.detectChanges();
 
 		expect(component.installedConnectors().map(function identity(candidate): string { return candidate.id; })).toContain("gl");
@@ -170,29 +212,27 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 
 	it("keeps catalogue state after a recoverable install failure", async function installFailure(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
 		const connector = component.connectors().find(function gitLab(candidate): boolean { return candidate.id === "gl"; });
-		component.mutation = new MockConnectorMutation([{ result: { outcome: ConnectorMutationOutcome.RecoverableError, message: "Registry unavailable. Try again." } }]);
 		if (!connector) throw new Error("Expected the GitLab marketplace fixture");
+		
+		vi.spyOn(gateway, "updateConnector").mockRejectedValue(new Error("Registry unavailable. Try again."));
 
 		await component.install(connector);
 		fixture.detectChanges();
 
 		expect(component.connectors().find(function matches(candidate): boolean { return candidate.id === connector.id; })?.installed).toBe(false);
-		expect((fixture.nativeElement as HTMLElement).querySelector("[role='alert']")?.textContent?.trim()).toBe("Registry unavailable. Try again.");
+		expect((fixture.nativeElement as HTMLElement).querySelector("[role='alert']")?.textContent?.trim()).toBe("GitLab could not be updated. Try again.");
 	});
 
 	it("requires confirmation for uninstall and supports retry after recoverable failure", async function uninstallConfirmation(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
 		const connector = component.installedConnectors()[1];
-		const mutation = new MockConnectorMutation([
-			{ delayMilliseconds: 10, result: { outcome: ConnectorMutationOutcome.RecoverableError, message: "Uninstall failed safely." } },
-			{ result: { outcome: ConnectorMutationOutcome.Success, message: "Removed." } }
-		]);
-		component.mutation = mutation;
 		if (!connector) throw new Error("Expected an installed connector fixture");
 
 		component.openMarketplace();
@@ -202,14 +242,25 @@ describe("ConnectorsSectionComponent", function connectorsSectionSuite(): void
 		expect(component.uninstallTarget()?.id).toBe(connector.id);
 		expect(component.destructiveState().phase).toBe(DestructiveActionPhase.Idle);
 
+		let resolveError: any;
+		vi.spyOn(gateway, "updateConnector").mockImplementationOnce(() => new Promise((_, rej) => resolveError = rej));
+		
 		const first = component.confirmUninstall();
 		const duplicate = component.confirmUninstall();
-		expect(mutation.callCount).toBe(1);
-		await Promise.all([first, duplicate]);
+		expect(gateway.updateConnector).toHaveBeenCalledTimes(1);
+		resolveError(new Error("Uninstall failed safely."));
+		await Promise.all([first, duplicate].map(p => p.catch(() => {})));
 		expect(component.destructiveState().phase).toBe(DestructiveActionPhase.Error);
 		expect(component.uninstallTarget()?.id).toBe(connector.id);
 
+		vi.spyOn(gateway, "updateConnector").mockResolvedValue({} as any);
+		
+		vi.spyOn(gateway, "getConnectors").mockResolvedValue(
+			component.connectors().map(c => c.id === connector.id ? { ...c, installed: false, enabled: false } : c)
+		);
+		
 		await component.confirmUninstall();
+		await fixture.whenStable();
 		fixture.detectChanges();
 		expect(component.uninstallTarget()).toBeNull();
 		expect(component.connectors().find(function matches(candidate): boolean { return candidate.id === connector.id; })?.installed).toBe(false);

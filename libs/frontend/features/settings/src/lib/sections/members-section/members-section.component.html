@@ -31,12 +31,12 @@
 			<div class="wo-members__editor-row">
 				<label for="members-editor-department">Department</label>
 				<select id="members-editor-department" [value]="formState().draft.department" (change)="editDepartment($event)" [disabled]="formState().phase === SettingsFormPhase.Pending">
-					@for (department of departments; track department.id) { <option [value]="department.name">{{ department.name }}</option> }
+					@for (department of departments(); track department.id) { <option [value]="department.name">{{ department.name }}</option> }
 				</select>
 			</div>
 			<div class="wo-members__member-editor">
 				<h3>Members</h3>
-				@for (member of members; track member.id) {
+				@for (member of members(); track member.id) {
 					<label class="wo-members__member-option">
 						<input type="checkbox" [checked]="formState().draft.memberIds.includes(member.id)" (change)="toggleMember(member.id, $any($event.target).checked)" />
 						<span class="wo-members__avatar wo-members__avatar--small" [style.background]="member.avatarBackground">{{ member.avatar }}</span>
@@ -79,7 +79,7 @@
 		@if (selectedTab() === "people") {
 			<div role="tabpanel">
 				<div class="wo-members__people-row wo-members__table-heading"><span></span><span>Name</span><span>Role</span><span>Team</span><span>Active</span><span></span></div>
-				@for (member of members; track member.id) {
+				@for (member of members(); track member.id) {
 					<div class="wo-members__people-row">
 						<span class="wo-members__avatar" [style.background]="member.avatarBackground">{{ member.avatar }}</span>
 						<span class="wo-members__member-copy"><strong>{{ member.name }}</strong><small>{{ member.email }}</small></span>
@@ -94,7 +94,7 @@
 				<div class="wo-members__section-heading"><h3>Departments &amp; Teams</h3><button type="button" class="wo-members__row-button" (click)="openEditor('department', 'new')">+ New department</button></div>
 				<div class="wo-members__table">
 					<div class="wo-members__org-row wo-members__table-heading"><span>Name</span><span>Teams</span><span>Members</span><span></span></div>
-					@for (row of organization; track row.id) {
+					@for (row of organization(); track row.id) {
 						<div class="wo-members__org-row" [class.wo-members__org-row--department]="row.kind === 'department'" [class.wo-members__org-row--team]="row.kind === 'team'">
 							<span class="wo-members__tree-name">
 								@if (row.kind === "department") { <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4l4 4 4-4" /></svg> }
@@ -111,7 +111,7 @@
 				<div class="wo-members__section-heading wo-members__project-heading"><div><h3>Projects</h3><p>Independent of departments. Can span multiple teams.</p></div><button type="button" class="wo-members__row-button" (click)="openEditor('project', 'new')">+ New project</button></div>
 				<div class="wo-members__table">
 					<div class="wo-members__project-row wo-members__table-heading"><span>Project</span><span>Teams</span><span>Members</span><span>Status</span><span></span></div>
-					@for (project of projects; track project.id) {
+					@for (project of projects(); track project.id) {
 						<div class="wo-members__project-row"><strong>{{ project.name }}</strong><span>{{ project.teamCount }}</span><span>{{ project.memberCount }}</span><span><span class="wo-members__status" [class.wo-members__status--draft]="project.status === 'Draft'">{{ project.status }}</span></span><span class="wo-members__row-action"><button type="button" class="wo-members__row-button" (click)="openEditor('project', project.id)">Open</button></span></div>
 					}
 				</div>

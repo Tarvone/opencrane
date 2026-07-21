@@ -1,4 +1,4 @@
-import { LlmProviderId, LlmProviderOption, ModelRouteCategory, ProviderConnectionOutcome, ProviderConnectionResult, ProviderMutationOutcome, ProviderMutationResult, WorkspaceLlmProvider, WorkspaceLlmProviderMutation } from "../../models/llm-provider.types.js";
+import { LlmProviderId, LlmProviderOption, ModelRouteCategory, ProviderConnectionOutcome, ProviderConnectionResult, ProviderMutationOutcome, ProviderMutationResult, WorkspaceLlmProvider, WorkspaceLlmProviderMutation } from "@opencrane/core";
 
 /** Provider catalogue in the exact order used by the current design handoff. */
 export const LLM_PROVIDER_OPTIONS_FIXTURE: readonly LlmProviderOption[] =

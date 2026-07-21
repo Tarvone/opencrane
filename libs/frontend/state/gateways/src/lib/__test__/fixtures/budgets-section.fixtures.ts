@@ -1,6 +1,6 @@
 import { SettingsMutation, SettingsMutationOutcome } from "@opencrane/core";
 
-import { WorkspaceBudgetDraft, WorkspaceBudgetMember } from "./budgets-section.types.js";
+import { WorkspaceBudgetDraft, WorkspaceBudgetMember } from "@opencrane/state/settings/adapter";
 
 /** Exact member budget fixture from the authoritative App.dc.html handoff. */
 export const WORKSPACE_BUDGET_MEMBERS_FIXTURE: readonly WorkspaceBudgetMember[] =

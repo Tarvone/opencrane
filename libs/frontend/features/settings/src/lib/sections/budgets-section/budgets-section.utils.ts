@@ -1,6 +1,6 @@
 import { SettingsValidationErrors } from "@opencrane/core";
 
-import { WorkspaceBudgetDraft, WorkspaceBudgetMember, WorkspaceBudgetStatus, WorkspaceBudgetTotals, WorkspaceBudgetUsage } from "./budgets-section.types.js";
+import { WorkspaceBudgetDraft, WorkspaceBudgetMember, WorkspaceBudgetStatus, WorkspaceBudgetTotals, WorkspaceBudgetUsage } from "@opencrane/state/settings/adapter";
 
 /** Sum the immutable spend and editable allocations shown by the handoff summary. */
 export function _WorkspaceBudgetTotals(members: readonly WorkspaceBudgetMember[], draft: WorkspaceBudgetDraft): WorkspaceBudgetTotals

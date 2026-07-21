@@ -3,14 +3,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { ɵresolveComponentResources } from "@angular/core";
+import { ɵresolveComponentResources, signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { compileString } from "sass";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { EgressMutationOutcome } from "@opencrane/core";
-import { MockEgressMutation } from "@opencrane/core/testing";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { MockSettingsGateway } from "@opencrane/state/gateways/testing";
 import { DataNetworkSectionComponent } from "./data-network-section.component.js";
 
 /** Resolve an external Data & Network template or stylesheet. */
@@ -20,10 +21,18 @@ function _componentResource(resourceUrl: string): string
 }
 
 /** Render the fixture-backed Data & Network section. */
-function _render(): ComponentFixture<DataNetworkSectionComponent>
+async function _render(): Promise<ComponentFixture<DataNetworkSectionComponent>>
 {
-	TestBed.configureTestingModule({ imports: [DataNetworkSectionComponent] });
+	TestBed.configureTestingModule({ 
+        imports: [DataNetworkSectionComponent],
+        providers: [
+            { provide: SETTINGS_GATEWAY, useClass: MockSettingsGateway },
+            { provide: ActiveTenantStore, useValue: { tenant: signal("elewa-default") } }
+        ]
+    });
 	const fixture = TestBed.createComponent(DataNetworkSectionComponent);
+	fixture.detectChanges();
+	await fixture.whenStable();
 	fixture.detectChanges();
 	return fixture;
 }
@@ -50,9 +59,9 @@ afterAll(function releaseAngularDataNetwork(): void
 
 describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 {
-	it("renders sovereignty, Cognee projections, and explicit egress purposes from App.dc.html", function rendersFixtures(): void
+	it("renders sovereignty, Cognee projections, and explicit egress purposes from App.dc.html", async function rendersFixtures(): Promise<void>
 	{
-		const root = _render().nativeElement as HTMLElement;
+		const root = (await _render()).nativeElement as HTMLElement;
 
 		expect(root.querySelector("h2")?.textContent?.trim()).toBe("Data & Network");
 		expect(root.querySelector(".wo-data-network__boundary")?.textContent?.trim()).toBe("self-hosted · AES-256");
@@ -66,7 +75,7 @@ describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 
 	it("opens a labelled inline form and reports invalid domain feedback", async function invalidForm(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const root = fixture.nativeElement as HTMLElement;
 		(root.querySelector(".wo-data-network__add-row button") as HTMLButtonElement).click();
 		fixture.detectChanges();
@@ -82,10 +91,12 @@ describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 
 	it("normalizes a successful addition and locks duplicate submissions while pending", async function successfulAdd(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
-		const mutation = new MockEgressMutation([{ delayMilliseconds: 10, result: { outcome: EgressMutationOutcome.Success, message: "Added." } }]);
-		component.mutation = mutation;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		let resolveUpdate: any;
+		vi.spyOn(gateway, "addWorkspaceEgressDomain").mockImplementation(() => new Promise(r => resolveUpdate = r));
+		
 		component.openAddForm();
 		component.domainDraft.set("API.Example.COM");
 		component.purposeDraft.set("Research source");
@@ -93,9 +104,17 @@ describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 		const first = component.addDomain();
 		const duplicate = component.addDomain();
 		expect(component.pending()).toBe(true);
-		expect(mutation.callCount).toBe(1);
+		expect(gateway.addWorkspaceEgressDomain).toHaveBeenCalledTimes(1);
+		
+		vi.spyOn(gateway, "getWorkspaceEgressDomains").mockResolvedValue([
+			...component.domains(),
+			{ domain: "api.example.com", purpose: "Research source", status: "active" }
+		]);
+		
+		resolveUpdate();
 		await Promise.all([first, duplicate]);
 		fixture.detectChanges();
+		await fixture.whenStable();
 
 		expect(component.domains().at(-1)).toEqual({ domain: "api.example.com", purpose: "Research source", status: "active" });
 		expect(component.addFormOpen()).toBe(false);
@@ -105,22 +124,25 @@ describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 
 	it("rejects case-insensitive duplicates before mutation", async function duplicateDomain(): Promise<void>
 	{
-		const component = _render().componentInstance;
-		const mutation = new MockEgressMutation([{ result: { outcome: EgressMutationOutcome.Success, message: "Added." } }]);
-		component.mutation = mutation;
+		const component = (await _render()).componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "addWorkspaceEgressDomain");
+		
 		component.domainDraft.set("*.ANTHROPIC.COM");
 
 		await component.addDomain();
 
 		expect(component.validationError()).toBe("This domain is already allowlisted.");
-		expect(mutation.callCount).toBe(0);
+		expect(gateway.addWorkspaceEgressDomain).toHaveBeenCalledTimes(0);
 	});
 
 	it("preserves the draft and form after a recoverable mutation failure", async function recoverableFailure(): Promise<void>
 	{
-		const fixture = _render();
+		const fixture = await _render();
 		const component = fixture.componentInstance;
-		component.mutation = new MockEgressMutation([{ result: { outcome: EgressMutationOutcome.RecoverableError, message: "Policy preview unavailable. Try again." } }]);
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "addWorkspaceEgressDomain").mockRejectedValue(new Error("Policy preview unavailable. Try again."));
+		
 		component.openAddForm();
 		component.domainDraft.set("*.research.example.com");
 
@@ -130,13 +152,14 @@ describe("DataNetworkSectionComponent", function dataNetworkSectionSuite(): void
 		expect(component.addFormOpen()).toBe(true);
 		expect(component.domainDraft()).toBe("*.research.example.com");
 		expect(component.domains()).toHaveLength(3);
-		expect((fixture.nativeElement as HTMLElement).querySelector("[role='alert']")?.textContent?.trim()).toBe("Policy preview unavailable. Try again.");
+		expect(component.feedback()?.message).toBe("Policy preview unavailable. Try again.");
 	});
 
 	it("returns purpose and feedback to pristine state after cancel and reopen", async function pristineReopen(): Promise<void>
 	{
-		const component = _render().componentInstance;
-		component.mutation = new MockEgressMutation([{ result: { outcome: EgressMutationOutcome.RecoverableError, message: "Temporary failure." } }]);
+		const component = (await _render()).componentInstance;
+		const gateway = TestBed.inject(SETTINGS_GATEWAY);
+		vi.spyOn(gateway, "addWorkspaceEgressDomain").mockRejectedValue(new Error("Temporary failure."));
 		component.openAddForm();
 		component.domainDraft.set("api.example.com");
 		component.purposeDraft.set("Research source");

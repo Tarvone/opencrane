@@ -1,4 +1,4 @@
-import { Connector, ConnectorCategory, ConnectorMutation, ConnectorMutationFixture, ConnectorMutationRequest, ConnectorMutationResult, ConnectorMutationOutcome } from "../../models/connector.types.js";
+import { Connector, ConnectorCategory, ConnectorMutation, ConnectorMutationFixture, ConnectorMutationRequest, ConnectorMutationResult, ConnectorMutationOutcome } from "@opencrane/core";
 
 /** Complete connector catalogue shown by the installed list and marketplace. */
 export const CONNECTORS_FIXTURE: readonly Connector[] =

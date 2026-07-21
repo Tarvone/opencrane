@@ -1,4 +1,4 @@
-import { AgentSettingsMutation, AgentSettingsMutationKind, AgentSettingsMutationOutcome, AgentSettingsMutationResult, WorkspaceAgent, WorkspaceAgentChannel, WorkspaceAgentChannelType, WorkspaceAgentTrigger } from "../../models/agent-settings.types.js";
+import { AgentSettingsMutation, AgentSettingsMutationKind, AgentSettingsMutationOutcome, AgentSettingsMutationResult, WorkspaceAgent, WorkspaceAgentChannel, WorkspaceAgentChannelType, WorkspaceAgentTrigger } from "@opencrane/core";
 
 /** Workspace agents copied from the current App.dc.html handoff. */
 export const WORKSPACE_AGENTS_FIXTURE: readonly WorkspaceAgent[] =

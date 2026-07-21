@@ -36,7 +36,7 @@
 	}
 
 	&__empty {
-		background: #f8f5ef; /* App.dc.html:929 */
+		background: var(--oc-surface-note);
 		border: 1px solid var(--oc-border);
 		border-radius: var(--oc-radius-card);
 		padding: 48px 24px;

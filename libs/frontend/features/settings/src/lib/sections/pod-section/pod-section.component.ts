@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, signal, inject, effect, resource } from "@angular/core";
 
-import { SettingsFormPhase, SettingsFormState, SettingsMutation, SettingsMutationOutcome, SettingsNavigationDecision, SettingsUnsavedNavigationConfirmation, SettingsValidationErrors, _ConfirmSettingsNavigation, _CreateSettingsFormState, _EditSettingsForm, _ReloadLatestSettingsForm, _ResetSettingsForm, _ResolveSettingsForm, _ReturnToEditingSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
-import { POD_SETTINGS_FIXTURE, POD_SETTINGS_SUCCESS_MUTATION, PodSettingsDraftFixture } from "@opencrane/core/testing";
+import { SettingsFormPhase, SettingsFormState, SettingsMutationOutcome, SettingsNavigationDecision, SettingsUnsavedNavigationConfirmation, SettingsValidationErrors, _ConfirmSettingsNavigation, _CreateSettingsFormState, _EditSettingsForm, _ReloadLatestSettingsForm, _ResetSettingsForm, _ResolveSettingsForm, _ReturnToEditingSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { SETTINGS_GATEWAY, PodSettingsDraftFixture, PodSettingsFixture } from "@opencrane/state/settings/adapter";
 import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { _settledValue } from "../../resource.util.js";
 
 /** Validate the two required text fields without replacing valid sibling input. */
 function _validationErrors(draft: PodSettingsDraftFixture): SettingsValidationErrors
@@ -30,17 +32,36 @@ function _inputValue(event: Event): string
 })
 export class PodSectionComponent
 {
-	/** Read-only handoff values and editable baseline. */
-	public readonly pod = POD_SETTINGS_FIXTURE;
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant: Signal<string | undefined> = inject(ActiveTenantStore).tenant;
+
+	/** Resource-backed pod settings. */
+	public readonly podResource = resource({
+		params: (): string | undefined => this._tenant(),
+		loader: ({ params }): Promise<PodSettingsFixture> => this._gateway.getPodSettings(params)
+	});
+
+	/** Computed signal for template binding. */
+	public readonly pod = computed(() => _settledValue(this.podResource));
 
 	/** Controlled lifecycle for all editable Pod values. */
-	public readonly formState = signal<SettingsFormState<PodSettingsDraftFixture>>(_CreateSettingsFormState(POD_SETTINGS_FIXTURE.draft));
-
-	/** Deterministic mutation boundary replaceable by focused tests. */
-	public mutation: SettingsMutation<PodSettingsDraftFixture> = POD_SETTINGS_SUCCESS_MUTATION;
+	public readonly formState = signal<SettingsFormState<PodSettingsDraftFixture>>(_CreateSettingsFormState({ displayName: "", version: "", autoUpdate: false }));
 
 	/** Whether every form control must stay locked for the captured attempt. */
 	public readonly pending: Signal<boolean> = computed((): boolean => this.formState().phase === SettingsFormPhase.Pending);
+
+	constructor()
+	{
+		// Seed form state when pod data loads
+		effect(() =>
+		{
+			const podData = _settledValue(this.podResource);
+			if (podData)
+			{
+				this.formState.update(s => s.phase === SettingsFormPhase.Pristine ? _CreateSettingsFormState(podData.draft) : s);
+			}
+		});
+	}
 
 	/** Apply a display-name edit and derive the next validation state. */
 	public editDisplayName(event: Event): void
@@ -70,13 +91,24 @@ export class PodSectionComponent
 		if (pendingState.phase !== SettingsFormPhase.Pending) return;
 		this.formState.set(pendingState);
 
+		const tenantName = this._tenant();
+		if (!tenantName)
+		{
+			this.formState.update(state => _ResolveSettingsForm(state, { outcome: SettingsMutationOutcome.RecoverableError, message: "No active tenant." }));
+			return;
+		}
+
 		// 2. Resolve the deterministic mutation into explicit success or recovery state.
 		try
 		{
-			const result = await this.mutation.mutate(pendingState.pendingDraft);
+			const acceptedFixture = await this._gateway.updatePodSettings(tenantName, pendingState.pendingDraft);
+
+			// Re-fetch authoritative state and resolve
+			this.podResource.reload();
+			
 			this.formState.update(function resolve(state): SettingsFormState<PodSettingsDraftFixture>
 			{
-				return _ResolveSettingsForm(state, result);
+				return _ResolveSettingsForm(state, { outcome: SettingsMutationOutcome.Success, accepted: acceptedFixture.draft, message: "Pod settings saved." });
 			});
 		}
 		catch (error)

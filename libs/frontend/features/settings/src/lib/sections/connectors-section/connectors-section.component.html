@@ -10,7 +10,7 @@
 		</header>
 
 		<div class="wo-connectors__filters" role="group" aria-label="Marketplace categories">
-			@for (category of categories; track category) {
+			@for (category of categories(); track category) {
 				<button
 					type="button"
 					class="wo-connectors__filter"

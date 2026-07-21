@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { WORKSPACE_BUDGET_DRAFT_FIXTURE, WORKSPACE_BUDGET_MEMBERS_FIXTURE } from "./budgets-section.fixtures.js";
-import { WorkspaceBudgetStatus } from "./budgets-section.types.js";
+import { WORKSPACE_BUDGET_DRAFT_FIXTURE, WORKSPACE_BUDGET_MEMBERS_FIXTURE } from "@opencrane/state/gateways/testing";
+import { WorkspaceBudgetStatus } from "@opencrane/state/settings/adapter";
 import { _WorkspaceBudgetTotals, _WorkspaceBudgetUsage, _WorkspaceBudgetValidationErrors } from "./budgets-section.utils.js";
 
 describe("workspace budget utilities", function workspaceBudgetUtilities(): void

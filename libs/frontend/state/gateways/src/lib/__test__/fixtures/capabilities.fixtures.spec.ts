@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CapabilityAccessKind, CapabilityCollection, CapabilityIntegrationKind } from "../../models/capability.types.js";
-import { CAPABILITIES_FIXTURE } from "../__test__/capabilities.fixtures.js";
+import { CapabilityAccessKind, CapabilityCollection, CapabilityIntegrationKind } from "@opencrane/core";
+import { CAPABILITIES_FIXTURE } from "./capabilities.fixtures.js";
 
 describe("Workspace Skills capability fixtures", function capabilityFixturesSuite(): void
 {

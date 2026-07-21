@@ -1,10 +1,14 @@
-import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, signal, inject, resource } from "@angular/core";
 
-import { DataNetworkDataset, EgressDomain, EgressFeedback, EgressFeedbackKind, EgressMutation, EgressMutationOutcome, ScopeLevel, _ValidateEgressDomain } from "@opencrane/core";
-import { DATA_NETWORK_DATASETS_FIXTURE, EGRESS_PURPOSES_FIXTURE, EGRESS_SUCCESS_MUTATION_RESULT_FIXTURE, EGRESS_DOMAINS, MockEgressMutation } from "@opencrane/core/testing";
+import { EgressFeedback, EgressFeedbackKind, ScopeLevel, _ValidateEgressDomain } from "@opencrane/core";
+
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { _settledValue } from "../../resource.util.js";
 
 /** Pristine purpose selected whenever the Add Domain form opens. */
-const DEFAULT_EGRESS_PURPOSE = EGRESS_PURPOSES_FIXTURE[0] ?? "Custom domain";
+const EGRESS_PURPOSES: readonly string[] = ["AI provider", "Skill connector", "Research source", "Custom domain"];
+const DEFAULT_EGRESS_PURPOSE = EGRESS_PURPOSES[0] ?? "Custom domain";
 
 /** Mock-only Workspace Data & Network section from the authoritative handoff. */
 @Component({
@@ -16,14 +20,25 @@ const DEFAULT_EGRESS_PURPOSE = EGRESS_PURPOSES_FIXTURE[0] ?? "Custom domain";
 })
 export class DataNetworkSectionComponent
 {
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant = inject(ActiveTenantStore).tenant;
+
 	/** Cognee-backed scope datasets projected for this settings view. */
-	public readonly datasets = signal<readonly DataNetworkDataset[]>(structuredClone(DATA_NETWORK_DATASETS_FIXTURE));
+	public readonly datasetsResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceDataNetworks(params ?? "")
+	});
+	public readonly datasets = computed(() => _settledValue(this.datasetsResource) ?? []);
 
 	/** Mounted-only egress allowlist state. */
-	public readonly domains = signal<readonly EgressDomain[]>(structuredClone(EGRESS_DOMAINS));
+	public readonly domainsResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceEgressDomains(params ?? "")
+	});
+	public readonly domains = computed(() => _settledValue(this.domainsResource) ?? []);
 
 	/** Purpose options kept explicit in every new egress fixture row. */
-	public readonly purposes = EGRESS_PURPOSES_FIXTURE;
+	public readonly purposes = EGRESS_PURPOSES;
 
 	/** Whether the inline Add Domain form is visible. */
 	public readonly addFormOpen = signal(false);
@@ -42,9 +57,6 @@ export class DataNetworkSectionComponent
 
 	/** Accessible mutation result feedback. */
 	public readonly feedback = signal<EgressFeedback | null>(null);
-
-	/** Deterministic mutation boundary replaceable by focused tests. */
-	public mutation: EgressMutation = new MockEgressMutation([], EGRESS_SUCCESS_MUTATION_RESULT_FIXTURE);
 
 	/** Feedback kinds exposed to the external template. */
 	public readonly EgressFeedbackKind = EgressFeedbackKind;
@@ -89,34 +101,29 @@ export class DataNetworkSectionComponent
 		event?.preventDefault();
 		if (this.pending()) return;
 
-		// 1. Validate against current mounted rows so malformed and duplicate hosts never reach mutation state.
 		const validation = _ValidateEgressDomain(this.domainDraft(), this.domains().map(function domain(row): string { return row.domain; }));
 		this.validationError.set(validation.error);
 		if (validation.normalizedDomain === null) return;
 		const normalizedDomain = validation.normalizedDomain;
 
-		// 2. Lock the form while the deterministic boundary resolves to prevent duplicate additions.
 		this.pending.set(true);
 		this.feedback.set(null);
 		try
 		{
-			const result = await this.mutation.mutate(normalizedDomain);
-			if (result.outcome === EgressMutationOutcome.RecoverableError)
-			{
-				this.feedback.set({ kind: EgressFeedbackKind.Error, message: result.message });
-				return;
-			}
+			const tenant = this._tenant();
+			if (!tenant) throw new Error("No active tenant");
 
-			// 3. Commit success to mounted-only state and clear the accepted transient draft.
-			const purpose = this.purposeDraft();
-			this.domains.update(function append(domains): readonly EgressDomain[] { return [...domains, { domain: normalizedDomain, purpose, status: "active" }]; });
+			await this._gateway.addWorkspaceEgressDomain(tenant, normalizedDomain, this.purposeDraft());
+
+			this.domainsResource.reload();
 			this.domainDraft.set("");
 			this.addFormOpen.set(false);
 			this.feedback.set({ kind: EgressFeedbackKind.Success, message: `${normalizedDomain} added to the egress allowlist.` });
 		}
-		catch
+		catch (error: unknown)
 		{
-			this.feedback.set({ kind: EgressFeedbackKind.Error, message: "The domain could not be added. Try again." });
+			const message = error instanceof Error ? error.message : "The domain could not be added. Try again.";
+			this.feedback.set({ kind: EgressFeedbackKind.Error, message });
 		}
 		finally
 		{

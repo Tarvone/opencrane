@@ -1,16 +1,9 @@
 import { Route, Routes } from "@angular/router";
 
 import { SettingsPageComponent } from "./settings-page/settings-page.component.js";
-import { SettingsPlaceholderComponent } from "./settings-placeholder/settings-placeholder.component.js";
 import { _CanDeactivatePodSection } from "./sections/pod-section/pod-section.guard.js";
 import { _CanDeactivateMembersSection } from "./sections/members-section/members-section.guard.js";
 import { _CanDeactivateBudgetsSection } from "./sections/budgets-section/budgets-section.guard.js";
-
-/** Create a leaf route for a later-milestone settings section. */
-function _placeholderRoute(path: string, title: string, description: string): Route
-{
-	return { path, component: SettingsPlaceholderComponent, data: { title, description } };
-}
 
 /** Workspace-owned settings routes in the canonical navigation order. */
 const WORKSPACE_SETTINGS_ROUTES: Routes =
@@ -149,11 +142,23 @@ const PERSONAL_SETTINGS_ROUTES: Routes =
 	},
 	{
 		path: "budget",
-		loadComponent: () => import("./sections/budget-section/budget-section.component").then(m => m.BudgetSectionComponent)
+		loadComponent: function loadBudgetSection()
+		{
+			return import("./sections/budget-section/budget-section.component.js").then(function pickBudgetSection(module)
+			{
+				return module.BudgetSectionComponent;
+			});
+		}
 	},
 	{
 		path: "api-keys",
-		loadComponent: () => import("./sections/api-keys-section/api-keys-section.component").then(m => m.ApiKeysSectionComponent)
+		loadComponent: function loadApiKeysSection()
+		{
+			return import("./sections/api-keys-section/api-keys-section.component.js").then(function pickApiKeysSection(module)
+			{
+				return module.ApiKeysSectionComponent;
+			});
+		}
 	},
 	{ path: "**", redirectTo: "account" }
 ];

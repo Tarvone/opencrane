@@ -3,8 +3,8 @@ import { Router } from "@angular/router";
 
 import { ConversationViewComponent, FilePanelComponent, FilePreviewService } from "@opencrane/features/conversation";
 import { ContextPanelComponent } from "@opencrane/features/context";
-import { NewSessionRelay } from "./new-session-relay";
-import { _NewSessionId } from "./session-page.utils";
+import { NewSessionRelay } from "./new-session-relay.js";
+import { _NewSessionId } from "./session-page.utils.js";
 
 /** Session route page: the conversation stream plus its context / file side panel. */
 @Component({

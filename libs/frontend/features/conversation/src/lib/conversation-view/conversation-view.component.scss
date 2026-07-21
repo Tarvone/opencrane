@@ -1,3 +1,10 @@
+:host {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+}
+
 .wo-conv {
 	display: flex;
 	flex-direction: column;

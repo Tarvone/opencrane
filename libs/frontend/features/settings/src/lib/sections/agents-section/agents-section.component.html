@@ -42,7 +42,7 @@
 					<div class="wo-agents__avatars" aria-label="Contributors">@for (person of agent.contributors; track person.name) {<span [style.background]="person.background" [title]="person.name">{{ person.initials }}</span>}</div>
 				</div>
 				<div class="wo-agents__two-column">
-					<label><small>Scope</small><select [value]="scopeDraft()" [disabled]="pendingKind() !== null" (change)="updateScope($event)">@for (option of scopeOptions; track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>
+					<label><small>Scope</small><select [value]="scopeDraft()" [disabled]="pendingKind() !== null" (change)="updateScope($event)">@for (option of scopeOptions(); track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>
 					<div><small>Version</small><p class="wo-mono">v{{ agent.version }}</p></div>
 				</div>
 				<div class="wo-agents__groups">
@@ -63,7 +63,7 @@
 		<button type="button" class="wo-agents__back" [disabled]="pendingKind() !== null" (click)="goBack()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2L4 7l5 5"></path></svg>Agents</button>
 		<h2 id="workspace-agents-title" class="wo-agents__subpage-title">Add Channel</h2>
 		<p class="wo-agents__subpage-copy">Connect a messaging channel so this agent can send updates and receive commands.</p>
-		<div class="wo-agents__channel-grid">@for (type of channelTypes; track type.id) {<button type="button" [class.is-selected]="selectedChannelTypeId() === type.id" [attr.aria-pressed]="selectedChannelTypeId() === type.id" (click)="selectChannelType(type.id)"><span>{{ type.icon }}</span><strong>{{ type.name }}</strong><small>{{ type.description }}</small></button>}</div>
+		<div class="wo-agents__channel-grid">@for (type of channelTypes(); track type.id) {<button type="button" [class.is-selected]="selectedChannelTypeId() === type.id" [attr.aria-pressed]="selectedChannelTypeId() === type.id" (click)="selectChannelType(type.id)"><span>{{ type.icon }}</span><strong>{{ type.name }}</strong><small>{{ type.description }}</small></button>}</div>
 		@if (selectedChannelType(); as type) {
 			<form class="wo-agents__channel-form" (submit)="$event.preventDefault(); addChannel()">
 				<h3>{{ type.name }}</h3><p>{{ type.description }}</p>

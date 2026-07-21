@@ -1,4 +1,4 @@
-import { MembersEditorDraft, WorkspaceMember, WorkspaceOrgRow, WorkspaceProject } from "./members-section.types.js";
+import { MembersEditorDraft, WorkspaceMember, WorkspaceOrgRow, WorkspaceProject } from "@opencrane/state/settings/adapter";
 
 /** Deterministic member fixtures covering role and activity states. */
 export const WORKSPACE_MEMBERS_FIXTURE: readonly WorkspaceMember[] =

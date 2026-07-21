@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, signal, inject, resource } from "@angular/core";
 
 import { CapabilityAccessKind, CapabilityCollection, CapabilityIcon, CapabilityIntegrationKind, CapabilityItem } from "@opencrane/core";
-import { CAPABILITIES_FIXTURE } from "@opencrane/core/testing";
+import { SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { ActiveTenantStore } from "@opencrane/state/gateways";
+import { _settledValue } from "../../resource.util.js";
 
 /** One presentation collection rendered by the Skills route. */
 interface SkillsCollectionSection
@@ -23,8 +25,17 @@ interface SkillsCollectionSection
 })
 export class SkillsSectionComponent
 {
+	private readonly _gateway = inject(SETTINGS_GATEWAY);
+	private readonly _tenant = inject(ActiveTenantStore).tenant;
+
+	/** Resource-backed catalogue. */
+	public readonly capabilitiesResource = resource({
+		params: () => this._tenant(),
+		loader: ({ params }) => this._gateway.getWorkspaceCapabilities(params ?? "")
+	});
+
 	/** Mounted-only catalogue kept separate from connector installation state. */
-	public readonly capabilities = signal<readonly CapabilityItem[]>(CAPABILITIES_FIXTURE);
+	public readonly capabilities = computed(() => _settledValue(this.capabilitiesResource) ?? []);
 
 	/** Current case-insensitive search draft. */
 	public readonly searchDraft = signal("");

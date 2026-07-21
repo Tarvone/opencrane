@@ -1,4 +1,4 @@
-import { CapabilityAccessKind, CapabilityCollection, CapabilityIcon, CapabilityIntegrationKind, CapabilityItem } from "../../models/capability.types.js";
+import { CapabilityAccessKind, CapabilityCollection, CapabilityIcon, CapabilityIntegrationKind, CapabilityItem } from "@opencrane/core";
 
 /** Searchable Skills catalogue copied from the current App.dc.html handoff. */
 export const CAPABILITIES_FIXTURE: readonly CapabilityItem[] =

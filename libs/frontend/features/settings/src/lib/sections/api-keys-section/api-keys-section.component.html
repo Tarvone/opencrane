@@ -38,9 +38,9 @@
 }
 
 <!-- Key list (populated state) -->
-@if (keys().length > 0) {
+@if (keyList().length > 0) {
 	<div class="oc-apikeys__table">
-		@for (key of keys(); track key.id; let last = $last) {
+		@for (key of keyList(); track key.id; let last = $last) {
 			<div class="oc-apikeys__row" [class.oc-apikeys__row--last]="last">
 				<div>
 					<div class="oc-apikeys__key-name">{{ key.name }}</div>
@@ -70,7 +70,7 @@
 }
 
 <!-- Empty state -->
-@if (keys().length === 0 && createPhase() === 'idle') {
+@if (keyList().length === 0 && createPhase() === 'idle') {
 	<div class="oc-apikeys__empty">
 		<div class="oc-apikeys__empty-label">No personal API keys yet.</div>
 		<button class="oc-apikeys__primary-btn" (click)="openCreate()">Create your first key</button>

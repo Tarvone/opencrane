@@ -1,4 +1,4 @@
-import { AGENT_RUNTIME_PROTOCOL_V1, type RunInputSnapshot, type RuntimeCandidate, type RuntimeCommandEnvelope } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROTOCOL_V1, type CompiledRunInput, type RunInputSnapshot, type RuntimeCandidate, type RuntimeCommandEnvelope } from "@opencrane/contracts";
 import { describe, expect, it } from "vitest";
 
 import { __AdmitRuntimeCandidate, __AdmitRuntimeCommand } from "../index.js";
@@ -31,6 +31,12 @@ function _snapshot(): RunInputSnapshot
 	return { runId: "run-1", siloId: "silo-1", agentServiceId: "agent-1", agentRevisionId: "revision-1", snapshotVersion: 1, threadId: null, messageIds: [], personaRevisionId: null, preferenceFactIds: [], artifactRevisionIds: [], skillRevisionIds: [], memoryFacts: [], memoryQueryPolicy: {}, toolGrantIds: [], modelRoute: {}, budgetPolicy: {}, identitySnapshot: { executionSubjectId: "user-1", fleetMembershipRevision: 1, fleetMembershipIssuer: "issuer", fleetMembershipIssuerKeyId: "key-1", fleetMembershipAssertionId: "assertion-1", fleetMembershipPayloadDigest: "sha256:membership", fleetMembershipTrustedUntil: "2026-07-20T00:05:00.000Z" }, capabilitySetDigest: "sha256:capabilities", effectiveContractDigest: "sha256:contract", promptCompilerVersion: "v1", digest: "sha256:snapshot", compiledAt: "2026-07-20T00:00:00.000Z" };
 }
 
+/** Returns the compiled literal input carried alongside the snapshot on a start command. */
+function _compiledInput(): CompiledRunInput
+{
+	return { promptCompilerVersion: "v1", runId: "run-1", attempt: 1, instructions: "", messages: [], tools: [], model: { modelAlias: "silo-default", maxOutputTokens: null }, budget: { maxTotalTokens: null, maxCostUsdMicros: null, maxToolInvocations: null, wallClockDeadlineEpochMs: null }, digest: "sha256:compiled" };
+}
+
 /** Returns a valid start command bound to the current authority. */
 function _command(): RuntimeStartAttemptCommand
 {
@@ -44,7 +50,7 @@ function _command(): RuntimeStartAttemptCommand
 		expiresAt: "2026-07-20T00:05:00.000Z",
 		assignment: { runId: "run-1", attempt: 2, agentServiceId: "agent-1", agentRevisionId: "revision-1", siloId: "silo-1", subjectUserId: "user-1", fleetMembershipRevision: 1, capabilitySetDigest: "sha256:capabilities", serviceAccountName: "runtime", podUid: "pod-1", assignmentDigest: "sha256:assignment", issuedAt: "2026-07-20T00:00:00.000Z", expiresAt: "2026-07-20T00:05:00.000Z" },
 		kind: "start_attempt",
-		payload: { snapshot: _snapshot() },
+		payload: { snapshot: _snapshot(), compiledInput: _compiledInput() },
 	};
 }
 
@@ -76,7 +82,7 @@ describe("runtime protocol authority", function _describeRuntimeProtocolAuthorit
 	it("rejects stale fences and mismatched snapshots", function _rejectsStaleAuthority()
 	{
 		expect(__AdmitRuntimeCommand({ authority: _authority(), command: { ..._command(), fence: 6 }, clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "fence_mismatch" });
-		expect(__AdmitRuntimeCommand({ authority: _authority(), command: { ..._command(), payload: { snapshot: { ..._command().payload.snapshot, digest: "sha256:other" } } }, clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "snapshot_mismatch" });
+		expect(__AdmitRuntimeCommand({ authority: _authority(), command: { ..._command(), payload: { snapshot: { ..._command().payload.snapshot, digest: "sha256:other" }, compiledInput: _compiledInput() } }, clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "snapshot_mismatch" });
 	});
 
 	it("rejects non-canonical timestamp spellings even when JavaScript can parse them", function _rejectsAmbiguousTime()

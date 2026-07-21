@@ -163,7 +163,7 @@ export default [
             { sourceTag: "scope:providers", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:providers", "scope:shared"] },
             { sourceTag: "scope:retrieval", onlyDependOnLibsWithTags: ["scope:retrieval", "scope:shared"] },
             { sourceTag: "scope:personal-runs", onlyDependOnLibsWithTags: ["scope:agents", "scope:authorization", "scope:personal-runs", "scope:shared"] },
-            { sourceTag: "scope:agent-runtime", onlyDependOnLibsWithTags: ["scope:agent-runtime", "scope:agents", "scope:personal-conversations", "scope:personal-runs", "scope:authorization", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime", onlyDependOnLibsWithTags: ["scope:agent-runtime", "scope:agents", "scope:artifacts", "scope:authorization", "scope:model-routing", "scope:personal-conversations", "scope:personal-memory", "scope:personal-personas", "scope:personal-runs", "scope:shared", "scope:skills"] },
             { sourceTag: "scope:skills", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:cluster-tenants", "scope:grants", "scope:shared", "scope:skills"] },
             { sourceTag: "scope:spend", onlyDependOnLibsWithTags: ["scope:shared", "scope:spend"] },
             { sourceTag: "scope:tenant-hosting", onlyDependOnLibsWithTags: ["scope:shared", "scope:tenant-hosting"] },

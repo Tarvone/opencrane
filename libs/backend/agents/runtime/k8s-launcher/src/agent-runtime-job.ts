@@ -14,6 +14,12 @@ const _TOKEN_PATH = "/var/run/opencrane/tokens/runtime.token";
 /** Read-only directory containing the downward-API bootstrap reference. */
 const _BOOTSTRAP_MOUNT_PATH = "/var/run/opencrane/bootstrap";
 
+/** Read-only directory containing the attempt-scoped LiteLLM virtual key. */
+const _LITELLM_KEY_MOUNT_PATH = "/var/run/opencrane/litellm";
+
+/** Secret item key and mounted filename of the attempt-scoped LiteLLM virtual key. */
+const _LITELLM_KEY_FILENAME = "key";
+
 /** Pod annotation projected as the non-secret bootstrap reference file. */
 const _BOOTSTRAP_REFERENCE_ANNOTATION = "opencrane.ai/bootstrap-reference";
 
@@ -65,6 +71,13 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 		throw new Error("agent runtime profile requires a Kubernetes image pull policy");
 	}
 
+	// 1b. Pin the LiteLLM proxy to an in-cluster endpoint reached only with the attempt-scoped key.
+	const litellmUrl = URL.parse(profile.litellmBaseUrl);
+	if (!litellmUrl || (litellmUrl.protocol !== "http:" && litellmUrl.protocol !== "https:") || !litellmUrl.hostname.endsWith(".svc.cluster.local") || litellmUrl.username !== "" || litellmUrl.password !== "" || litellmUrl.hash !== "")
+	{
+		throw new Error("agent runtime profile requires an in-cluster LiteLLM base URL");
+	}
+
 	// 2. Bind the profile to one server namespace and one runtime identity class, never a per-user KSA.
 	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !___IsAgentRuntimeServiceAccountName(profile.serviceAccountName))
 	{
@@ -110,6 +123,10 @@ function _AssertAssignment(assignment: AgentRuntimeJobAssignment): void
 	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(assignment.namespace) || assignment.namespace.length > 63)
 	{
 		throw new Error("agent runtime namespace must be a valid DNS label");
+	}
+	if (!/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/.test(assignment.litellmKeySecretName) || assignment.litellmKeySecretName.length > 253)
+	{
+		throw new Error("agent runtime assignment requires a valid LiteLLM key Secret name");
 	}
 }
 
@@ -186,11 +203,14 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 						env: [
 							{ name: "OPENCRANE_RUNTIME_STREAM_URL", value: profile.runtimeStreamUrl },
 							{ name: "OPENCRANE_RUNTIME_TOKEN_PATH", value: _TOKEN_PATH },
+							{ name: "OPENCRANE_RUNTIME_LITELLM_BASE_URL", value: profile.litellmBaseUrl },
+							{ name: "OPENCRANE_RUNTIME_LITELLM_KEY_PATH", value: `${_LITELLM_KEY_MOUNT_PATH}/${_LITELLM_KEY_FILENAME}` },
 							{ name: "POD_UID", valueFrom: { fieldRef: { fieldPath: "metadata.uid" } } },
 						],
 						volumeMounts: [
 							{ name: "runtime-token", mountPath: "/var/run/opencrane/tokens", readOnly: true },
 							{ name: "runtime-bootstrap", mountPath: _BOOTSTRAP_MOUNT_PATH, readOnly: true },
+							{ name: "litellm-key", mountPath: _LITELLM_KEY_MOUNT_PATH, readOnly: true },
 							{ name: "scratch", mountPath: "/tmp" },
 						],
 						resources: structuredClone(profile.resources),
@@ -198,6 +218,9 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 					volumes: [
 						{ name: "runtime-token", projected: { defaultMode: 0o440, sources: [{ serviceAccountToken: { path: "runtime.token", audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
 						{ name: "runtime-bootstrap", downwardAPI: { defaultMode: 0o440, items: [{ path: "reference", fieldRef: { fieldPath: `metadata.annotations['${_BOOTSTRAP_REFERENCE_ANNOTATION}']` } }] } },
+						// The attempt-scoped LiteLLM key is projected group-readable (0440); never the master
+						// key, never a provider secret, and never a plaintext env var.
+						{ name: "litellm-key", projected: { defaultMode: 0o440, sources: [{ secret: { name: assignment.litellmKeySecretName, items: [{ key: _LITELLM_KEY_FILENAME, path: _LITELLM_KEY_FILENAME }] } }] } },
 						{ name: "scratch", emptyDir: { sizeLimit: profile.scratchSize } },
 					],
 				},

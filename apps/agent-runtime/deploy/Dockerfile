@@ -1,3 +1,7 @@
+# ADOPTION GATE (ADR 0010): pin this base image by digest (python:3.13-slim@sha256:<digest>) and
+# install from the hash-pinned requirements lock before the runtime is treated as supported. The
+# digest is resolved against the registry, so it is stamped by the adoption/lock step, not this
+# offline slice.
 FROM python:3.13-slim
 
 WORKDIR /app

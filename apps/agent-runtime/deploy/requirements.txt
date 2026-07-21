@@ -1,4 +1,18 @@
-# Sole runtime dependency: a maintained P-256 (ES256) key generator for the one-use bootstrap
-# exchange. The runtime generates a per-run keypair, binds its public half, and later signs
-# capability proofs; the standard library has no elliptic-curve key generation.
+# Runtime dependencies for the personal-agent runtime.
+#
+# `cryptography` — a maintained P-256 (ES256) key generator for the one-use bootstrap exchange. The
+# runtime generates a per-run keypair, binds its public half, and later signs capability proofs; the
+# standard library has no elliptic-curve key generation.
+#
+# `pydantic-ai-slim[openai]` — the exact-pinned bounded model/tool loop driven over the per-silo
+# LiteLLM proxy through an attempt-scoped virtual key (ADR 0010, first qualification candidate). The
+# `slim` distribution with only the `openai` extra deliberately excludes Harness, sessions, UI
+# adapters, hosted-tool integrations, memory/compaction, and Logfire export.
+#
+# ADOPTION GATE (ADR 0010): before the runtime is treated as supported, this file must be replaced by
+# a fully hash-pinned transitive lock (`pip-compile --generate-hashes` / `--require-hashes`) resolved
+# against the package index, together with the pinned base-image digest in deploy/Dockerfile and the
+# live-LiteLLM conformance run. That lock cannot be resolved from this offline slice, so the exact
+# top-level pins below are the qualification baseline, NOT the adopted hash-locked manifest.
 cryptography==44.0.0
+pydantic-ai-slim[openai]==2.13.0

@@ -48,10 +48,23 @@ export function __ValidateAgentControllerRuntimeProfiles(value: unknown, runtime
 		{
 			throw new Error(`agent controller profile '${name}' must keep runtime and server namespaces separate`);
 		}
-		__BuildSuspendedAgentRuntimeJob({ runId: "profile-validation", attempt: 1, agentServiceId: "profile-validation", agentRevisionId: "profile-validation", siloId: "profile-validation", namespace: runtimeNamespace, bootstrapReference: "profile-validation" }, profile);
+		__BuildSuspendedAgentRuntimeJob({ runId: "profile-validation", attempt: 1, agentServiceId: "profile-validation", agentRevisionId: "profile-validation", siloId: "profile-validation", namespace: runtimeNamespace, bootstrapReference: "profile-validation", litellmKeySecretName: "litellm-key-profilevalidation" }, profile);
 		profiles[name] = profile;
 	}
 	return profiles;
+}
+
+/**
+ * Derive the deterministic per-attempt Secret name carrying the attempt-scoped LiteLLM key.
+ *
+ * The bootstrap reference is already a stable per-attempt token, so the key Secret name is derived
+ * from it and agrees between assignment and release reconciliation without a second lookup.
+ */
+function _LitellmKeySecretName(bootstrapReference: string): string
+{
+	const prefix = "bootstrap-v1_";
+	const suffix = bootstrapReference.startsWith(prefix) ? bootstrapReference.slice(prefix.length, prefix.length + 32) : "";
+	return suffix.length === 32 ? `litellm-key-${suffix}` : "litellm-key-profilevalidation";
 }
 
 /** Require an immutable UID returned by the Kubernetes API rather than a locally derived value. */
@@ -116,6 +129,7 @@ export async function __ReconcileNextAgentRuntimeAttempt(options: AgentControlle
 		siloId: claim.attempt.siloId,
 		namespace: claim.attempt.namespace,
 		bootstrapReference: claim.attempt.bootstrapReference,
+		litellmKeySecretName: _LitellmKeySecretName(claim.attempt.bootstrapReference),
 	};
 	const job = __BuildSuspendedAgentRuntimeJob(assignment, profile);
 
@@ -186,6 +200,7 @@ export async function __ReconcileNextRuntimeRelease(options: AgentControllerOpti
 			siloId: claim.workload.siloId,
 			namespace: claim.workload.namespace,
 			bootstrapReference: claim.workload.bootstrapReference,
+			litellmKeySecretName: _LitellmKeySecretName(claim.workload.bootstrapReference),
 		}, profile);
 
 		// 3. Reject already-expired authority, then let the Kubernetes adapter reserve its I/O budget.

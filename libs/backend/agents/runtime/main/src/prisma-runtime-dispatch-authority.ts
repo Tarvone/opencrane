@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 
 import { AgentRunState as PrismaAgentRunState, Prisma, RuntimeCommandKind, WorkloadAssignmentState, type PrismaClient } from "@prisma/client";
 
-import { AGENT_RUNTIME_PROTOCOL_V1, type RunInputSnapshot, type RunInputSnapshotIdentity, type RuntimeAssignment, type RuntimeCandidate, type RuntimeCommand, type RuntimeCommandEnvelope, type RuntimeStreamOpen } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROTOCOL_V1, type CompiledRunInput, type RunInputSnapshot, type RunInputSnapshotIdentity, type RuntimeAssignment, type RuntimeCandidate, type RuntimeCommand, type RuntimeCommandEnvelope, type RuntimeStreamOpen } from "@opencrane/contracts";
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import { __AdmitRuntimeCandidate, __AdmitRuntimeCommand } from "./runtime-protocol-authority.js";
 import type { RuntimeAdmissionRunState, RuntimeAttemptAuthority, RuntimeProtocolClock } from "./runtime-protocol-authority.types.js";
-import type { RuntimeCandidateDispatchResult, RuntimeDispatchAuthorityConfig, RuntimeStreamWorkloadIdentity } from "./prisma-runtime-dispatch-authority.types.js";
+import type { RunInputCompiler, RuntimeCandidateDispatchResult, RuntimeDispatchAuthorityConfig, RuntimeStreamWorkloadIdentity } from "./prisma-runtime-dispatch-authority.types.js";
 
 /** Immutable durable facts loaded and locked for one connected runtime Pod. */
 interface RuntimeDispatchContext
@@ -84,13 +84,16 @@ export class PrismaRuntimeDispatchAuthority
 	private readonly config: RuntimeDispatchAuthorityConfig;
 	/** Trusted server clock, never a runtime-supplied time. */
 	private readonly clock: RuntimeProtocolClock;
+	/** Injected control-plane compiler that hydrates the snapshot carried on `start_attempt`. */
+	private readonly compileRunInput: RunInputCompiler;
 
 	/** Creates a dispatch adapter over canonical Postgres with a bounded command lifetime. */
-	constructor(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, clock?: RuntimeProtocolClock)
+	constructor(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, compileRunInput: RunInputCompiler, clock?: RuntimeProtocolClock)
 	{
 		if (!_configIsValid(config)) throw new Error("runtime dispatch authority requires a bounded namespace and command lifetime");
 		this.prisma = prisma;
 		this.config = config;
+		this.compileRunInput = compileRunInput;
 		this.clock = clock ?? { nowEpochMs(): number { return Date.now(); } };
 	}
 
@@ -101,9 +104,10 @@ export class PrismaRuntimeDispatchAuthority
 		const prisma = this.prisma;
 		const config = this.config;
 		const clock = this.clock;
+		const compileRunInput = this.compileRunInput;
 		return ___DoWithTrace("runtime_dispatch.command.next", { namespace: identity.namespace }, async function _traceNext(): Promise<RuntimeCommandEnvelope | null>
 		{
-			return _nextCommand(prisma, config, clock, identity, open, afterSequence);
+			return _nextCommand(prisma, config, clock, compileRunInput, identity, open, afterSequence);
 		});
 	}
 
@@ -142,7 +146,7 @@ function _configIsValid(config: RuntimeDispatchAuthorityConfig): boolean
 }
 
 /** Mint or redeliver one command for the connected runtime inside a single locked transaction. */
-async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, clock: RuntimeProtocolClock, identity: RuntimeStreamWorkloadIdentity, open: RuntimeStreamOpen, afterSequence: number): Promise<RuntimeCommandEnvelope | null>
+async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, clock: RuntimeProtocolClock, compileRunInput: RunInputCompiler, identity: RuntimeStreamWorkloadIdentity, open: RuntimeStreamOpen, afterSequence: number): Promise<RuntimeCommandEnvelope | null>
 {
 	if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) return null;
 	return prisma.$transaction(async function _dispatch(transaction: Prisma.TransactionClient): Promise<RuntimeCommandEnvelope | null>
@@ -164,7 +168,9 @@ async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthori
 		const stored = commands.find(function _atTarget(row) { return row.sequence === targetSequence; });
 		if (stored)
 		{
-			const envelope = _rebuildEnvelope(context, runtimeInstanceId, stored);
+			// Recompile the immutable snapshot so a redelivered start frame is byte-identical to its mint.
+			const compiledInput = stored.kind === RuntimeCommandKind.StartAttempt ? await compileRunInput(context.snapshot, transaction) : null;
+			const envelope = _rebuildEnvelope(context, runtimeInstanceId, stored, compiledInput);
 			const admission = __AdmitRuntimeCommand({ authority, command: envelope, clock });
 			return admission.outcome === "idempotent" ? envelope : null;
 		}
@@ -174,7 +180,8 @@ async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthori
 		const kind = _decideKind(context.runState, commands);
 		if (kind === null) return null;
 		const nowEpochMs = clock.nowEpochMs();
-		const envelope = _mintEnvelope(context, runtimeInstanceId, stream.fence, stream.nextCommandSequence, kind, nowEpochMs, config.commandTtlMilliseconds);
+		const compiledInput = kind === RuntimeCommandKind.StartAttempt ? await compileRunInput(context.snapshot, transaction) : null;
+		const envelope = _mintEnvelope(context, runtimeInstanceId, stream.fence, stream.nextCommandSequence, kind, nowEpochMs, config.commandTtlMilliseconds, compiledInput);
 		if (envelope === null) return null;
 		const admission = __AdmitRuntimeCommand({ authority, command: envelope, clock });
 		if (admission.outcome !== "accepted") return null;
@@ -324,32 +331,34 @@ function _buildAssignmentFrame(context: RuntimeDispatchContext): RuntimeAssignme
 }
 
 /** Rebuild a stored command's exact envelope for idempotent redelivery on reconnect. */
-function _rebuildEnvelope(context: RuntimeDispatchContext, runtimeInstanceId: string, row: DispatchedCommandRow): RuntimeCommandEnvelope
+function _rebuildEnvelope(context: RuntimeDispatchContext, runtimeInstanceId: string, row: DispatchedCommandRow, compiledInput: CompiledRunInput | null): RuntimeCommandEnvelope
 {
-	const command = _commandBody(context, row.kind);
+	const command = _commandBody(context, row.kind, compiledInput);
 	return { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId, commandId: row.commandId, sequence: row.sequence, fence: row.fence, issuedAt: row.issuedAt.toISOString(), expiresAt: row.expiresAt.toISOString(), assignment: _buildAssignmentFrame(context), ...command };
 }
 
 /** Mint a fresh command envelope bounded by the assignment lease, or null when it cannot be valid. */
-function _mintEnvelope(context: RuntimeDispatchContext, runtimeInstanceId: string, fence: number, sequence: number, kind: RuntimeCommandKind, nowEpochMs: number, commandTtlMilliseconds: number): RuntimeCommandEnvelope | null
+function _mintEnvelope(context: RuntimeDispatchContext, runtimeInstanceId: string, fence: number, sequence: number, kind: RuntimeCommandKind, nowEpochMs: number, commandTtlMilliseconds: number, compiledInput: CompiledRunInput | null): RuntimeCommandEnvelope | null
 {
 	// 1. Bound the command lifetime by the assignment lease so a frame never outlives its authority.
 	const expiresAtEpochMs = Math.min(nowEpochMs + commandTtlMilliseconds, context.leaseExpiresAtEpochMs);
 	if (nowEpochMs >= expiresAtEpochMs) return null;
 
 	// 2. Assemble the canonical frame; the pure authority still fences, orders, and validates it.
-	const command = _commandBody(context, kind);
+	const command = _commandBody(context, kind, compiledInput);
 	return { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId, commandId: _commandId(context, sequence), sequence, fence, issuedAt: new Date(nowEpochMs).toISOString(), expiresAt: new Date(expiresAtEpochMs).toISOString(), assignment: _buildAssignmentFrame(context), ...command };
 }
 
 /**
  * Build the kind-specific command body carried by the envelope.
  * Only `start_attempt` is dispatched in this slice; resume and cancel bodies belong to later slices.
+ * The compiled input is the control-plane-hydrated literal input required by every start frame.
  */
-function _commandBody(context: RuntimeDispatchContext, kind: RuntimeCommandKind): RuntimeCommand
+function _commandBody(context: RuntimeDispatchContext, kind: RuntimeCommandKind, compiledInput: CompiledRunInput | null): RuntimeCommand
 {
 	if (kind !== RuntimeCommandKind.StartAttempt) throw new Error("runtime dispatch mints only start_attempt in this slice");
-	return { kind: "start_attempt", payload: { snapshot: context.snapshot } };
+	if (compiledInput === null) throw new Error("runtime dispatch requires compiled input for a start_attempt frame");
+	return { kind: "start_attempt", payload: { snapshot: context.snapshot, compiledInput } };
 }
 
 /** Map the durable snapshot row into the immutable wire snapshot the runtime receives. */

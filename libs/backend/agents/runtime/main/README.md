@@ -14,6 +14,11 @@ run attempt, carries the exact frozen input snapshot, arrives in order, and is s
 When the executor proposes an event or outside action, it performs the mirror check before another
 domain may persist or execute that proposal.
 
+This package owns both that pure decision and the Prisma-backed adapter that drives it. The adapter
+loads and locks the live workload assignment for a connected runtime Pod, mints only the command the
+pure authority accepts, and durably advances the monotonic command sequence and the accepted
+candidate ids so a transport reconnect can neither reorder nor duplicate work.
+
 ```
  OpenCrane run authority + immutable snapshot
           │ command + assignment + fence
@@ -44,6 +49,11 @@ authorities to accept or reject.
 
 - `__AdmitRuntimeCommand` — validates a control-plane command before stream delivery.
 - `__AdmitRuntimeCandidate` — validates a runtime-proposed event or deferred action.
+- `PrismaRuntimeDispatchAuthority` — the durable adapter the app injects into the stream transport;
+  it loads assignment authority, mints and advances commands, admits candidates, and releases the
+  runtime-instance binding on stream loss.
+- `RuntimeStreamWorkloadIdentity` / `RuntimeCandidateDispatchResult` / `RuntimeDispatchAuthorityConfig`
+  — the identity handed in by the transport, the candidate result, and the fixed dispatch policy.
 - `RuntimeAttemptAuthority` — exact durable facts, including current run state, that the owning run
   authority must supply at the final acceptance fence.
 - `RuntimeAdmissionRunState` — run lifecycle values understood by the admission fence, including the
@@ -56,6 +66,15 @@ authorities to accept or reject.
 The runtime opens its authenticated stream outward to OpenCrane. This library makes stale,
 replayed, expired, mismatched, cancelling, and terminal frames fail closed; it does not create an
 OpenClaw compatibility path, a cancellation side authority, or a second durable event authority.
+
+## Data & persistence
+
+The adapter owns two Postgres models in `runtime.prisma`: `RuntimeCommandStream` (one per run
+attempt — the lease fence, the bound runtime instance, the next command sequence, and accepted
+candidate ids) and `RuntimeDispatchedCommand` (one row per minted command, whose ids are exactly the
+attempt's accepted command set). Migrations live under `apps/opencrane/prisma/migrations`
+(`0002_runtime_command_dispatch`). It reads the assignment, run, and immutable snapshot rows owned by
+the personal-run and conversation domains but never writes them.
 
 ## Dependency direction
 

@@ -10,19 +10,20 @@ The agent runtime is the process in which one personal-agent attempt will eventu
 runs inside the customer's dedicated runtime Kubernetes namespace, opens its own authenticated
 connection to OpenCrane in the separate server namespace, and never accepts inbound network traffic.
 
-This slice removes the shared long-lived Deployment and defines the fresh, initially suspended Job
-that contains this process for one attempt. The agent controller creates that Job from durable run
-authority, then separately releases the exact assigned Job and registers its first Pod. The runtime
-still ignores commands until later dispatch/executor authority is connected.
+The agent controller creates the fresh, initially suspended Job from durable run authority, releases
+the exact assigned Job, and registers its first Pod. This process then binds its per-run public proof
+key with a one-use bootstrap exchange, opens its command stream, and acknowledges each received
+command with a bounded lifecycle candidate. It does not yet execute a start command: the model and
+tool executor is a later Phase E slice.
 
 ```text
  durable run attempt
         │  controller creates and assigns the suspended Job
         ▼
  ┌──────────────────────────────┐
- │  agent-runtime  ◄── HERE      │  outbound command stream; no listener
+ │  agent-runtime  ◄── HERE      │  bootstrap exchange + outbound command stream; no listener
  └──────────────┬───────────────┘
-                │ later: candidate events and action requests
+                │ acknowledgement candidates (action execution comes later)
                 ▼
  OpenCrane server authority
 ```
@@ -39,10 +40,12 @@ into the OpenCrane server namespace.
 
 ## Public surface
 
-`Entrypoint: src/runtime.py` reads the mounted projected credential at connection time, opens the
-runtime-initiated stream, rejects any individual response line above 64 KiB, and reconnects safely
-when the connection ends. Commands are intentionally logged as ignored in this slice and never
-executed; full command-size admission belongs to the later executor boundary.
+`Entrypoint: src/runtime.py` generates a per-run ES256 keypair, reads the projected bootstrap
+reference, and binds the public key once via the bootstrap exchange (failing closed on any refusal).
+It then reads the mounted projected credential at connection time, opens the runtime-initiated
+stream, rejects any individual response line above 64 KiB, and acknowledges each received command
+with a bounded `event` candidate. Commands are never executed in this slice — the model and tool
+executor is the later boundary — and a dropped stream bounds any further candidate emission.
 
 ## Boundary
 
@@ -64,12 +67,17 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 
 ## Runtime & config
 
-- `OPENCRANE_RUNTIME_STREAM_URL` — exact in-cluster OpenCrane stream endpoint.
+- `OPENCRANE_RUNTIME_STREAM_URL` — exact in-cluster OpenCrane base endpoint; the process appends
+  `/bootstrap`, `/stream`, and `/candidates`.
 - `OPENCRANE_RUNTIME_TOKEN_PATH` — rotating audience-bound projected-token path.
+- `OPENCRANE_RUNTIME_BOOTSTRAP_PATH` — path of the projected bootstrap-reference file (defaults to
+  `/var/run/opencrane/bootstrap/reference`).
 - `POD_UID` — immutable Pod identity supplied through the Kubernetes downward API.
 - `/var/run/opencrane/bootstrap/reference` — read-only opaque lookup reference projected from the
   Pod annotation. It is not a credential and is never placed in an environment variable or argument.
 - Writable storage is only a per-attempt `emptyDir` capped at 1 GiB and mounted at `/tmp`.
+- The sole third-party dependency is `cryptography` (pinned in `deploy/requirements.txt`) for P-256
+  proof-key generation; the standard library covers everything else.
 
 The Job builder requires an immutable image digest plus bounded CPU, memory, deadline, and scratch.
 The container runs as numeric user and group `65532` with a read-only root filesystem. Its projected
@@ -77,11 +85,12 @@ credential is group-readable (`0440`) only by that runtime group; it is never wo
 
 ## Status
 
-The current image proves the identity and outbound-stream boundary but deliberately ignores command
-frames. The controller now creates or exact-adopts the suspended Job, conditionally releases the
-durable assignment, and registers the unique first Pod. The opaque bootstrap reference is projected,
-but authenticated one-use exchange, durable dispatch, and the selected model/tool executor remain
-later Phase E slices, so this app cannot yet complete an agent run.
+The current image proves identity, the one-use bootstrap exchange, and durable command dispatch: it
+binds its proof key, receives its fenced `start_attempt` command, and reports acknowledgement
+candidates. The controller creates or exact-adopts the suspended Job, releases the durable
+assignment, and registers the unique first Pod. The selected model and tool executor remains a later
+Phase E slice, so this app acknowledges but does not execute commands and cannot yet complete an
+agent run.
 
 ## See also
 

@@ -8,3 +8,6 @@ export { __CancelPendingRunApprovalAuthority } from "./run-approval-cancellation
 export type { CancelPendingRunApprovalAuthorityCommand, CancelPendingRunApprovalAuthorityResult } from "./run-approval-cancellation.types.js";
 export { PrismaRuntimeAuthorityRepository } from "./prisma-runtime-authority.js";
 export { PrismaAuthorizationGrantRepository } from "./prisma-authorization-grants.js";
+export { __CreateRuntimeBootstrapRouter } from "./runtime-bootstrap.router.js";
+export { PrismaRuntimeBootstrapExchange } from "./prisma-runtime-bootstrap-exchange.js";
+export type { RuntimeBootstrapClock, RuntimeBootstrapExchangeRecord, RuntimeBootstrapExchangeRepository, RuntimeBootstrapLogger, RuntimeBootstrapReviewedIdentity, RuntimeBootstrapRouterDependencies, RuntimeBootstrapSubmission, RuntimeBootstrapTokenReviewer } from "./runtime-bootstrap.types.js";

@@ -17,10 +17,12 @@ import { tenantsRouter } from "@opencrane/backend/server/tenancy/tenants";
 import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/retrieval";
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
-import { _RegisterInternalAgentRuntimeStream, type RuntimeCommandStreamAuthority, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
+import { _RegisterInternalAgentRuntimeStream, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
 import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
 import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
+import { PrismaRuntimeDispatchAuthority } from "@opencrane/backend/agents/runtime";
+import { PrismaRuntimeBootstrapExchange, __CreateRuntimeBootstrapRouter } from "@opencrane/backend/server/iam/authorization";
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import { _log } from "./log.js";
@@ -156,24 +158,6 @@ function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api, s
 }
 
 /**
- * Deliberately empty runtime-stream composition until bootstrap and command/candidate authority are
- * connected. The controller already records the suspended Job assignment; this adapter permits that
- * authenticated runtime shell to stay connected without inventing executable work or durable output.
- */
-const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
-  /** Refuse to invent commands before durable assignment authority is connected. */
-  async __NextCommand(): Promise<null>
-  {
-    return null;
-  },
-  /** Refuse all runtime output before a run/attempt authority can validate and persist it. */
-  async __AdmitCandidate(): Promise<{ accepted: false; reason: string }>
-  {
-    return { accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" };
-  },
-};
-
-/**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
  *   - The NetworkPolicy-only `tenant-models` route takes no token; access is
@@ -189,7 +173,10 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
 	const { serverNamespace, runtimeNamespace } = _ReadRuntimeNamespaceBoundary();
 	const claimLeaseMilliseconds = _ReadBoundedSeconds("AGENT_CONTROLLER_CLAIM_LEASE_SECONDS", 30, 1, 300);
 	const assignmentTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS", 3_600, 60, 86_400);
+	const commandTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_COMMAND_TTL_SECONDS", 60, 1, 300);
 	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace: runtimeNamespace, claimLeaseMilliseconds, assignmentTtlMilliseconds });
+	const runtimeTokenReviewer = _CreateRuntimeTokenReviewer(authApi, runtimeNamespace);
+	const runtimeDispatchAuthority = new PrismaRuntimeDispatchAuthority(prisma, { namespace: runtimeNamespace, commandTtlMilliseconds });
 	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi, serverNamespace), namespace: serverNamespace, repository: runDispatchRepository, logger: _log }));
   // NetworkPolicy-only (no auth/TokenReview): the operator fetches a tenant's
   // allowed model set + effective default at reconcile. Best-effort — never 404/500.
@@ -197,11 +184,20 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
   // Note: /api/internal/contract enforces per-tenant identity via TokenReview — not NetworkPolicy-only.
   app.use("/api/internal/contract", _RegisterInternalTenantContract(prisma, authApi));
   app.use("/api/internal/awareness/participation", _RegisterInternalParticipation(prisma, authApi));
-  // The runtime opens this internal SSE connection itself. TokenReview is the identity
-  // boundary; the intentionally empty authority below cannot issue commands or persist data.
+  // The runtime opens this internal SSE connection itself and performs its one-use bootstrap
+  // exchange here. TokenReview is the identity boundary for both routers; the durable dispatch
+  // authority mints fenced commands and admits candidates, and the bootstrap router binds the
+  // runtime's public proof key exactly once. Both are mounted under the same base path.
+  app.use("/api/internal/agent-runtime", __CreateRuntimeBootstrapRouter({
+    tokenReviewer: runtimeTokenReviewer,
+    namespace: runtimeNamespace,
+    repository: new PrismaRuntimeBootstrapExchange(prisma),
+    clock: { nowEpochMs(): number { return Date.now(); } },
+    logger: _log,
+  }));
   app.use("/api/internal/agent-runtime", _RegisterInternalAgentRuntimeStream({
-    tokenReviewer: _CreateRuntimeTokenReviewer(authApi, runtimeNamespace),
-    authority: _NoRuntimeAssignmentAuthority,
+    tokenReviewer: runtimeTokenReviewer,
+    authority: runtimeDispatchAuthority,
     maxBodyBytes: 64 * 1024,
     heartbeatMilliseconds: 15_000,
     commandPollMilliseconds: 1_000,

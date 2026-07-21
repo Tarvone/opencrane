@@ -30,8 +30,10 @@ Heartbeats keep an idle connection alive without inventing work.
 [wire contracts](../../../contracts/README.md)
 
 Invariant: transport syntax never becomes business authority. A token/Pod mismatch, malformed input,
-non-monotonic command, oversized request body, or unavailable injected authority fails closed. The
-package does not repair identity, choose a run, mint a command, or persist a candidate.
+non-monotonic command, oversized request body, or unavailable injected authority fails closed. When
+the connection drops it signals the loss to the injected authority through a port call — never an
+import of the backend authority package — so a lost stream can release its runtime-instance binding.
+The package does not repair identity, choose a run, mint a command, or persist a candidate.
 
 ## Public surface
 
@@ -39,8 +41,9 @@ package does not repair identity, choose a run, mint a command, or persist a can
   authenticated stream and candidate endpoints.
 - `RuntimeTokenReviewer` — port through which the OpenCrane app verifies projected Kubernetes
   credentials.
-- `RuntimeCommandStreamAuthority` — port through which the personal-agent domain supplies commands
-  and admits candidate output.
+- `RuntimeCommandStreamAuthority` — port through which the personal-agent domain supplies commands,
+  admits candidate output, and (optionally) is told when a stream was lost so it can release its
+  runtime-instance binding.
 - `RuntimeStreamTransportOptions` — fixed body, heartbeat, and polling limits plus the two authority
   ports.
 
@@ -51,9 +54,10 @@ server-sent-event framing, heartbeats, credential extraction, TokenReview delega
 It owns no Prisma client, assignment lookup, lease, command ordering source, candidate persistence,
 runtime process, or Kubernetes mutation.
 
-The current OpenCrane composition injects an idle authority, so an authenticated shell can stay
-connected but receives no command and has every candidate refused. That is an explicit greenfield
-fail-closed state, not a compatibility bridge.
+The OpenCrane composition injects the Prisma-backed durable dispatch authority, so an authenticated
+runtime now receives its fenced `start_attempt` command and has its lifecycle candidates admitted or
+refused by that authority. This transport still owns none of that decision: minting, ordering,
+candidate persistence, and the model/tool executor all live behind the injected ports.
 
 ## Dependency direction
 

@@ -1,10 +1,10 @@
 BEGIN;
 
 INSERT INTO "agent_services" (
-    "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile", "updated_at"
+    "id", "silo_id", "kind", "name", "workload_profile", "updated_at"
 ) VALUES (
     'dispatch-terminal-service', 'dispatch-terminal-silo', 'personal', 'Dispatch terminal service',
-    'user', 'dispatch-terminal-user', 'personal-default', clock_timestamp()
+    'personal-default', clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
     "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",

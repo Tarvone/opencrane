@@ -13,8 +13,8 @@ BEGIN
 END;
 $$;
 
-INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile", "updated_at")
-VALUES ('integration-service', 'silo-integrations', 'managed', 'Integration agent', 'organization', 'organization-1', 'managed-agent', clock_timestamp());
+INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "workload_profile", "updated_at")
+VALUES ('integration-service', 'silo-integrations', 'managed', 'Integration agent', 'managed-agent', clock_timestamp());
 INSERT INTO "agent_revisions" ("id", "agent_service_id", "revision", "digest", "prompt_policy_version", "model_policy_id", "budget", "authored_by")
 VALUES ('integration-revision', 'integration-service', 1, 'sha256:' || repeat('a', 64), 'prompt-v1', 'model-v1', '{}', 'user-1');
 INSERT INTO "integrations" ("id", "silo_id", "obot_catalog_entry_id", "display_name", "updated_at")

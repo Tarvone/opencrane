@@ -39,6 +39,8 @@ export interface CreateManagedAgentServiceCommand
 /** Command that appends one new draft revision editing the expected head. */
 export interface ReviseAgentRevisionCommand
 {
+	/** Silo the caller is operating within; a service in another silo must not resolve. */
+	readonly siloId: SiloId;
 	/** Service being revised. */
 	readonly agentServiceId: AgentServiceId;
 	/** Revision the author based the edit on, for optimistic concurrency. */
@@ -54,6 +56,8 @@ export interface ReviseAgentRevisionCommand
 /** Command that restores an older revision by cloning it into a new draft revision. */
 export interface RestoreAgentRevisionCommand
 {
+	/** Silo the caller is operating within; a service in another silo must not resolve. */
+	readonly siloId: SiloId;
 	/** Service being restored. */
 	readonly agentServiceId: AgentServiceId;
 	/** Older revision whose content is cloned; recorded as the source revision. */
@@ -72,6 +76,8 @@ export type AgentServiceLifecycleAction = "enable" | "pause" | "retire";
 /** Command that changes a stable AgentService state with optimistic concurrency. */
 export interface ChangeAgentServiceStateCommand
 {
+	/** Silo the caller is operating within; a service in another silo must not resolve. */
+	readonly siloId: SiloId;
 	/** Service whose state is changing. */
 	readonly agentServiceId: AgentServiceId;
 	/** State the caller observed, for optimistic concurrency. */
@@ -138,20 +144,20 @@ export interface AgentServiceHistory
 /** Concurrency-capable persistence boundary for the managed-agent definition plane. */
 export interface AgentRevisionLifecycleRepository
 {
-	/** Loads one stable service identity, or null when absent. */
-	getService(agentServiceId: AgentServiceId): Promise<AgentService | null>;
-	/** Loads one immutable revision, or null when absent. */
-	getRevision(agentRevisionId: AgentRevisionId): Promise<AgentRevision | null>;
+	/** Loads one stable service identity scoped to the caller's silo, or null when absent. */
+	getService(agentServiceId: AgentServiceId, siloId: SiloId): Promise<AgentService | null>;
+	/** Loads one immutable revision whose parent service is in the caller's silo, or null. */
+	getRevision(agentRevisionId: AgentRevisionId, siloId: SiloId): Promise<AgentRevision | null>;
 	/** Creates a managed service and its first draft revision atomically. */
 	createManagedService(command: CreateManagedAgentServiceCommand, createdAt: string): Promise<CreateManagedAgentServiceResult>;
-	/** Appends a new draft revision editing the expected head atomically. */
+	/** Appends a new draft revision editing the expected head atomically, silo-scoped. */
 	reviseRevision(command: ReviseAgentRevisionCommand, createdAt: string): Promise<AppendAgentRevisionResult>;
-	/** Clones an older revision into a new draft revision atomically. */
+	/** Clones an older revision into a new draft revision atomically, silo-scoped. */
 	restoreRevision(command: RestoreAgentRevisionCommand, createdAt: string): Promise<AppendAgentRevisionResult>;
-	/** Changes a stable service state under optimistic concurrency atomically. */
+	/** Changes a stable service state under optimistic concurrency atomically, silo-scoped. */
 	changeServiceState(command: ChangeAgentServiceStateCommand, changedAt: string): Promise<ChangeAgentServiceStateResult>;
-	/** Reads the immutable revision lineage and durable run history for one service. */
-	readHistory(agentServiceId: AgentServiceId, runLimit: number): Promise<AgentServiceHistory>;
+	/** Reads the silo-scoped revision lineage and durable run history for one service. */
+	readHistory(agentServiceId: AgentServiceId, siloId: SiloId, runLimit: number): Promise<AgentServiceHistory>;
 }
 
 /** Result of admitting one managed run-now request. */

@@ -72,10 +72,12 @@ a silent partial publish.
 ## Dependency direction
 
 Tagged `scope:agent-services`: it may depend only on `scope:agent-services`, `scope:agents` (shared
-agent models), `scope:audit`, `scope:authorization`, `scope:grants` (the grant vocabulary and
-effective-access read path behind scope attachments), and `scope:shared` — never on apps, gateways,
+agent models), `scope:audit`, `scope:authorization`, and `scope:shared` — never on apps, gateways,
 or knowledge domains. run-now and session reading are injected by the app so this package never
-imports `scope:auth` or `scope:personal-runs`.
+imports `scope:auth` or `scope:personal-runs`. Per-scope attach-authority and runtime
+effective-access enforcement over scope attachments land in slice 6 (#332); the `scope:grants`
+dependency will be re-opened then with a real import. Until then, scope attachments are shape-only,
+silo-bounded, and org-admin-gated.
 
 ## Data & persistence
 

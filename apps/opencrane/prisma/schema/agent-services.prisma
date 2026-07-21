@@ -45,7 +45,7 @@ model AgentRevision {
   revision            Int
   parentRevisionId    String?                        @map("parent_revision_id")
   sourceRevisionId    String?                        @map("source_revision_id")
-  changeMessage       String                         @map("change_message")
+  changeMessage       String                         @default("") @map("change_message")
   state               AgentRevisionState             @default(Draft)
   digest              String
   promptPolicyVersion String                         @map("prompt_policy_version")

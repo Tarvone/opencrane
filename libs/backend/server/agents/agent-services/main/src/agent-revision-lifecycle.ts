@@ -15,7 +15,17 @@ function _isPositiveInteger(value: number): boolean
 	return Number.isSafeInteger(value) && value > 0;
 }
 
-/** Returns whether executable revision content is structurally valid before persistence. */
+/** Returns whether every member of a list maps to a distinct primary key. */
+function _isUniqueBy<T>(items: readonly T[], key: (item: T) => string): boolean
+{
+	return new Set(items.map(key)).size === items.length;
+}
+
+/**
+ * Returns whether executable revision content is structurally valid before persistence.
+ * Duplicate composite keys (a skill, an integration, or an exact scope attachment) are rejected
+ * here so they surface as a 400, rather than a Prisma primary-key violation at insert time.
+ */
 function _isContentValid(content: AgentRevisionContent): boolean
 {
 	return _isPresent(content.promptPolicyVersion)
@@ -26,7 +36,10 @@ function _isContentValid(content: AgentRevisionContent): boolean
 		&& _isPositiveInteger(content.budget.maxDurationMs)
 		&& content.skills.every(skill => _isPresent(skill.skillId) && _isPresent(skill.revisionId))
 		&& content.integrationAssignments.every(assignment => _isPresent(assignment.integrationId) && _isPresent(assignment.custodyReferenceId) && assignment.allowedTools.every(_isPresent))
-		&& content.scopeAttachments.every(attachment => _isPresent(attachment.subjectId));
+		&& content.scopeAttachments.every(attachment => _isPresent(attachment.subjectId))
+		&& _isUniqueBy(content.skills, skill => skill.skillId)
+		&& _isUniqueBy(content.integrationAssignments, assignment => assignment.integrationId)
+		&& _isUniqueBy(content.scopeAttachments, attachment => `${attachment.scope}\u0000${attachment.subjectType}\u0000${attachment.subjectId}`);
 }
 
 /** Maps one lifecycle action to the target stable-service state it requests. */
@@ -64,7 +77,7 @@ export async function __CreateManagedAgentService(repository: AgentRevisionLifec
  */
 export async function __ReviseAgentRevision(repository: AgentRevisionLifecycleRepository, command: ReviseAgentRevisionCommand, createdAt: string): Promise<AppendAgentRevisionResult>
 {
-	if (!_isPresent(command.agentServiceId) || !_isPresent(command.authoredBy) || !_isPresent(command.changeMessage) || command.content.personaRevisionId !== null || !_isContentValid(command.content) || !Number.isFinite(Date.parse(createdAt)))
+	if (!_isPresent(command.siloId) || !_isPresent(command.agentServiceId) || !_isPresent(command.authoredBy) || !_isPresent(command.changeMessage) || command.content.personaRevisionId !== null || !_isContentValid(command.content) || !Number.isFinite(Date.parse(createdAt)))
 	{
 		return { outcome: "denied", reason: "invalid_command" };
 	}
@@ -81,7 +94,7 @@ export async function __ReviseAgentRevision(repository: AgentRevisionLifecycleRe
  */
 export async function __RestoreAgentRevision(repository: AgentRevisionLifecycleRepository, command: RestoreAgentRevisionCommand, createdAt: string): Promise<AppendAgentRevisionResult>
 {
-	if (!_isPresent(command.agentServiceId) || !_isPresent(command.sourceRevisionId) || !_isPresent(command.authoredBy) || !_isPresent(command.changeMessage) || !Number.isFinite(Date.parse(createdAt)))
+	if (!_isPresent(command.siloId) || !_isPresent(command.agentServiceId) || !_isPresent(command.sourceRevisionId) || !_isPresent(command.authoredBy) || !_isPresent(command.changeMessage) || !Number.isFinite(Date.parse(createdAt)))
 	{
 		return { outcome: "denied", reason: "invalid_command" };
 	}
@@ -98,7 +111,7 @@ export async function __RestoreAgentRevision(repository: AgentRevisionLifecycleR
  */
 export async function __ChangeAgentServiceState(repository: AgentRevisionLifecycleRepository, command: ChangeAgentServiceStateCommand, changedAt: string): Promise<ChangeAgentServiceStateResult>
 {
-	if (!_isPresent(command.agentServiceId) || !Number.isFinite(Date.parse(changedAt)) || !__IsAgentServiceTransitionAllowed(command.expectedState, _actionState(command.action)))
+	if (!_isPresent(command.siloId) || !_isPresent(command.agentServiceId) || !Number.isFinite(Date.parse(changedAt)) || !__IsAgentServiceTransitionAllowed(command.expectedState, _actionState(command.action)))
 	{
 		return { outcome: "denied", reason: "transition_not_allowed" };
 	}
@@ -108,17 +121,18 @@ export async function __ChangeAgentServiceState(repository: AgentRevisionLifecyc
 /**
  * Compares two immutable revisions of the same service.
  * @param repository - Definition-plane read boundary.
+ * @param siloId - Caller's silo; a revision whose parent service is elsewhere must not resolve.
  * @param baseRevisionId - Earlier revision to compare from.
  * @param targetRevisionId - Later revision to compare to.
  * @returns The line, scalar, set, and widening diff, or a fail-closed reason.
  */
-export async function __CompareAgentRevisions(repository: AgentRevisionLifecycleRepository, baseRevisionId: AgentRevisionId, targetRevisionId: AgentRevisionId): Promise<CompareAgentRevisionsResult>
+export async function __CompareAgentRevisions(repository: AgentRevisionLifecycleRepository, siloId: string, baseRevisionId: AgentRevisionId, targetRevisionId: AgentRevisionId): Promise<CompareAgentRevisionsResult>
 {
-	if (!_isPresent(baseRevisionId) || !_isPresent(targetRevisionId))
+	if (!_isPresent(siloId) || !_isPresent(baseRevisionId) || !_isPresent(targetRevisionId))
 	{
 		return { outcome: "denied", reason: "invalid_command" };
 	}
-	const [base, target] = await Promise.all([repository.getRevision(baseRevisionId), repository.getRevision(targetRevisionId)]);
+	const [base, target] = await Promise.all([repository.getRevision(baseRevisionId, siloId), repository.getRevision(targetRevisionId, siloId)]);
 	if (base === null || target === null)
 	{
 		return { outcome: "denied", reason: "revision_not_found" };
@@ -134,12 +148,13 @@ export async function __CompareAgentRevisions(repository: AgentRevisionLifecycle
  * Reads the immutable revision lineage and durable run history for one service.
  * @param repository - Definition-plane read boundary.
  * @param agentServiceId - Service whose history is requested.
+ * @param siloId - Caller's silo; history of a service in another silo must not resolve.
  * @param runLimit - Maximum run-history records to return.
  * @returns The revision lineage and run history, newest first.
  */
-export async function __ReadAgentServiceHistory(repository: AgentRevisionLifecycleRepository, agentServiceId: AgentServiceId, runLimit: number): Promise<AgentServiceHistory>
+export async function __ReadAgentServiceHistory(repository: AgentRevisionLifecycleRepository, agentServiceId: AgentServiceId, siloId: string, runLimit: number): Promise<AgentServiceHistory>
 {
-	return repository.readHistory(agentServiceId, runLimit);
+	return repository.readHistory(agentServiceId, siloId, runLimit);
 }
 
 /**
@@ -160,8 +175,8 @@ export async function __AdmitManagedRunNow(repository: AgentRevisionLifecycleRep
 	{
 		return { outcome: "denied", reason: "invalid_command" };
 	}
-	const service = await repository.getService(command.agentServiceId);
-	if (service === null || service.siloId !== command.siloId)
+	const service = await repository.getService(command.agentServiceId, command.siloId);
+	if (service === null)
 	{
 		return { outcome: "denied", reason: "service_not_found" };
 	}

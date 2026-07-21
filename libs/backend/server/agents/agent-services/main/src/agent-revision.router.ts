@@ -55,7 +55,15 @@ function _parseIntegrations(raw: unknown): AgentRevisionContent["integrationAssi
 	return assignments.some(assignment => assignment === null) ? null : (assignments as AgentRevisionContent["integrationAssignments"]);
 }
 
-/** Parses the optional revision-scoped scope-attachment array against the canonical vocabulary. */
+/**
+ * Parses the optional revision-scoped scope-attachment array against the canonical vocabulary.
+ *
+ * Slice 5 only shape-validates the `{ scope, subjectType, subjectId }` triple; attachments are
+ * silo-bounded (every read/write is scoped to the caller's silo) and org-admin-gated. Validating
+ * the caller's authority over each attached scope — and the runtime intersection so a stored
+ * attachment grants nothing beyond the agent's actual effective grants — lands in slice 6 (#332),
+ * which introduces the per-scope attach-authority and effective-access enforcement paths.
+ */
 function _parseScopeAttachments(raw: unknown): AgentRevisionContent["scopeAttachments"] | null
 {
 	if (raw === undefined) return [];
@@ -166,7 +174,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const content = _parseContent(body.content);
 			const expectedParentRevisionId = body.expectedParentRevisionId === undefined || body.expectedParentRevisionId === null ? null : body.expectedParentRevisionId;
 			if (!_isNonEmptyString(body.changeMessage) || content === null || (expectedParentRevisionId !== null && !_isNonEmptyString(expectedParentRevisionId))) { res.status(400).json({ error: "changeMessage, valid content, and an expectedParentRevisionId are required.", code: "VALIDATION_ERROR" }); return; }
-			const result = await __ReviseAgentRevision(lifecycle, { agentServiceId: String(req.params.serviceId), expectedParentRevisionId: expectedParentRevisionId as string | null, authoredBy: caller.subjectId, changeMessage: body.changeMessage, content }, clock.now().toISOString());
+			const result = await __ReviseAgentRevision(lifecycle, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), expectedParentRevisionId: expectedParentRevisionId as string | null, authoredBy: caller.subjectId, changeMessage: body.changeMessage, content }, clock.now().toISOString());
 			_sendAppend(res, result);
 		}
 		catch (error) { _fail(res, error, "revise"); }
@@ -181,7 +189,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const body = (req.body ?? {}) as Record<string, unknown>;
 			const expectedParentRevisionId = body.expectedParentRevisionId === undefined || body.expectedParentRevisionId === null ? null : body.expectedParentRevisionId;
 			if (!_isNonEmptyString(body.sourceRevisionId) || !_isNonEmptyString(body.changeMessage) || (expectedParentRevisionId !== null && !_isNonEmptyString(expectedParentRevisionId))) { res.status(400).json({ error: "sourceRevisionId, changeMessage, and an expectedParentRevisionId are required.", code: "VALIDATION_ERROR" }); return; }
-			const result = await __RestoreAgentRevision(lifecycle, { agentServiceId: String(req.params.serviceId), sourceRevisionId: body.sourceRevisionId, expectedParentRevisionId: expectedParentRevisionId as string | null, authoredBy: caller.subjectId, changeMessage: body.changeMessage }, clock.now().toISOString());
+			const result = await __RestoreAgentRevision(lifecycle, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), sourceRevisionId: body.sourceRevisionId, expectedParentRevisionId: expectedParentRevisionId as string | null, authoredBy: caller.subjectId, changeMessage: body.changeMessage }, clock.now().toISOString());
 			_sendAppend(res, result);
 		}
 		catch (error) { _fail(res, error, "restore"); }
@@ -191,10 +199,11 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 	{
 		try
 		{
-			if (_requireCaller(req, res) === null) return;
+			const caller = _requireCaller(req, res);
+			if (caller === null) return;
 			const base = typeof req.query.base === "string" ? req.query.base : "";
 			const target = typeof req.query.target === "string" ? req.query.target : "";
-			const result = await __CompareAgentRevisions(lifecycle, base, target);
+			const result = await __CompareAgentRevisions(lifecycle, caller.siloId, base, target);
 			if (result.outcome === "denied") { res.status(_denialStatus(result.reason)).json({ error: "Compare denied.", code: result.reason.toUpperCase() }); return; }
 			if (result.base.agentServiceId !== String(req.params.serviceId)) { res.status(404).json({ error: "Revisions do not belong to this service.", code: "REVISION_SERVICE_MISMATCH" }); return; }
 			res.status(200).json({ base: result.base, target: result.target, diff: result.diff });
@@ -211,7 +220,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const body = (req.body ?? {}) as Record<string, unknown>;
 			const expectedActiveRevisionId = body.expectedActiveRevisionId === undefined || body.expectedActiveRevisionId === null ? null : body.expectedActiveRevisionId;
 			if (!_isNonEmptyString(body.agentRevisionId) || (expectedActiveRevisionId !== null && !_isNonEmptyString(expectedActiveRevisionId))) { res.status(400).json({ error: "agentRevisionId and an expectedActiveRevisionId are required.", code: "VALIDATION_ERROR" }); return; }
-			const result = await __PublishAgentRevision(publicationFor(caller), { agentServiceId: String(req.params.serviceId), agentRevisionId: body.agentRevisionId, expectedActiveRevisionId: expectedActiveRevisionId as string | null, publishedAt: clock.now().toISOString() });
+			const result = await __PublishAgentRevision(publicationFor(caller), { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), agentRevisionId: body.agentRevisionId, expectedActiveRevisionId: expectedActiveRevisionId as string | null, publishedAt: clock.now().toISOString() });
 			if (result.outcome === "denied") { res.status(_publishDenialStatus(result.reason)).json({ error: "Publish denied.", code: result.reason.toUpperCase(), currentActiveRevisionId: result.currentActiveRevisionId ?? null }); return; }
 			res.status(200).json({ service: result.service, revision: result.revision });
 		}
@@ -241,9 +250,13 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 	{
 		try
 		{
-			if (_requireCaller(req, res) === null) return;
+			const caller = _requireCaller(req, res);
+			if (caller === null) return;
+			const serviceId = String(req.params.serviceId);
+			// Silo-scoped existence guard: a service in another silo is a 404, not an empty history.
+			if (await lifecycle.getService(serviceId, caller.siloId) === null) { res.status(404).json({ error: "Service not found.", code: "SERVICE_NOT_FOUND" }); return; }
 			const runLimit = typeof req.query.runLimit === "string" && Number.isSafeInteger(Number(req.query.runLimit)) ? Number(req.query.runLimit) : 50;
-			const history = await __ReadAgentServiceHistory(lifecycle, String(req.params.serviceId), runLimit);
+			const history = await __ReadAgentServiceHistory(lifecycle, serviceId, caller.siloId, runLimit);
 			res.status(200).json(history);
 		}
 		catch (error) { _fail(res, error, "history"); }
@@ -261,7 +274,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 				const body = (req.body ?? {}) as Record<string, unknown>;
 				const expectedState = typeof body.expectedState === "string" ? body.expectedState : "";
 				if (!(_SERVICE_STATES as readonly string[]).includes(expectedState)) { res.status(400).json({ error: "expectedState must be one of draft|active|paused|retired.", code: "VALIDATION_ERROR" }); return; }
-				const result = await __ChangeAgentServiceState(lifecycle, { agentServiceId: String(req.params.serviceId), expectedState: expectedState as typeof _SERVICE_STATES[number], action }, clock.now().toISOString());
+				const result = await __ChangeAgentServiceState(lifecycle, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), expectedState: expectedState as typeof _SERVICE_STATES[number], action }, clock.now().toISOString());
 				if (result.outcome === "conflict") { res.status(409).json({ error: "Service state changed concurrently.", code: "STATE_CONFLICT", currentState: result.currentState }); return; }
 				if (result.outcome === "denied") { res.status(_denialStatus(result.reason)).json({ error: "State change denied.", code: result.reason.toUpperCase() }); return; }
 				res.status(200).json({ service: result.service });

@@ -108,7 +108,7 @@ describe("agent revision publication", function _suite()
 	it("allows exactly one concurrent publisher to change the active immutable revision", async function _concurrentPublication()
 	{
 		const repository = new _PublicationRepository();
-		const command = { agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" } as const;
+		const command = { siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" } as const;
 
 		const results = await Promise.all([
 			__PublishAgentRevision(repository, command),
@@ -126,7 +126,7 @@ describe("agent revision publication", function _suite()
 		const getRevision = repository.getRevision.bind(repository);
 		repository.getRevision = async function _getForeign(): Promise<AgentRevision> { return foreign; };
 
-		const result = await __PublishAgentRevision(repository, { agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
+		const result = await __PublishAgentRevision(repository, { siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
 
 		expect(result).toEqual({ outcome: "denied", reason: "revision_service_mismatch" });
 		repository.getRevision = getRevision;
@@ -137,7 +137,7 @@ describe("agent revision publication", function _suite()
 		const repository = new _PublicationRepository();
 		repository.setService({ ..._service(), state: "retired" });
 
-		const result = await __PublishAgentRevision(repository, { agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
+		const result = await __PublishAgentRevision(repository, { siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
 
 		expect(result).toEqual({ outcome: "denied", reason: "service_retired" });
 		expect(repository.revisionReadCount).toBe(0);
@@ -149,7 +149,7 @@ describe("agent revision publication", function _suite()
 		const repository = new _PublicationRepository();
 		repository.retireBeforeNextPublication = true;
 
-		const result = await __PublishAgentRevision(repository, { agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
+		const result = await __PublishAgentRevision(repository, { siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
 
 		expect(result).toEqual({ outcome: "denied", reason: "publication_conflict", currentActiveRevisionId: null });
 		expect(repository.publicationCallCount).toBe(1);

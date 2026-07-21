@@ -22,8 +22,10 @@ DROP INDEX "agent_services_silo_id_owner_scope_owner_subject_id_idx";
 ALTER TABLE "agent_services" DROP COLUMN "owner_scope",
 DROP COLUMN "owner_subject_id";
 
--- AlterTable
-ALTER TABLE "agent_revisions" ADD COLUMN     "change_message" TEXT NOT NULL,
+-- AlterTable: change_message carries DEFAULT '' so the NOT NULL add is safe whether or not
+-- agent_revisions already has rows. The datamodel mirrors this `@default("")`, so there is zero
+-- schema drift; the management API still requires a non-empty change message at the domain boundary.
+ALTER TABLE "agent_revisions" ADD COLUMN     "change_message" TEXT NOT NULL DEFAULT '',
 ADD COLUMN     "parent_revision_id" TEXT,
 ADD COLUMN     "source_revision_id" TEXT;
 

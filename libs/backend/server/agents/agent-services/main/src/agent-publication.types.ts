@@ -1,8 +1,10 @@
-import type { AgentRevision, AgentRevisionId, AgentService, AgentServiceId, AgentServiceState } from "@opencrane/models/agents";
+import type { AgentRevision, AgentRevisionId, AgentService, AgentServiceId, AgentServiceState, SiloId } from "@opencrane/models/agents";
 
 /** Command that publishes one immutable agent revision as the service's active revision. */
 export interface PublishAgentRevisionCommand
 {
+	/** Silo the caller is operating within; a service in another silo must not resolve. */
+	readonly siloId: SiloId;
 	/** Stable service whose active revision will change. */
 	readonly agentServiceId: AgentServiceId;
 	/** Draft immutable revision to publish. */

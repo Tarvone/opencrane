@@ -12,8 +12,6 @@ function _serviceRow()
 		siloId: "silo-1",
 		kind: "Personal",
 		name: "Personal agent",
-		ownerScope: "User",
-		ownerSubjectId: "user-1",
 		state: "Draft",
 		activeRevisionId: null,
 		workloadProfile: "personal-default",
@@ -29,6 +27,9 @@ function _revisionRow()
 		id: "revision-1",
 		agentServiceId: "service-1",
 		revision: 1,
+		parentRevisionId: null,
+		sourceRevisionId: null,
+		changeMessage: "initial",
 		state: "Draft",
 		digest: `sha256:${"1".repeat(64)}`,
 		promptPolicyVersion: "prompt-v1",
@@ -40,6 +41,7 @@ function _revisionRow()
 		publishedAt: null,
 		skillAssignments: [],
 		integrationAssignments: [],
+		scopeAttachments: [],
 	};
 }
 

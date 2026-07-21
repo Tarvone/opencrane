@@ -1,4 +1,5 @@
 import type { AgentRevisionId, AgentServiceId, PersonaRevisionId, UserId } from "./identifiers.types.js";
+import type { RevisionScopeAttachment } from "./scope-attachment.types.js";
 
 /** Publication state of an immutable agent revision. */
 export type AgentRevisionState = "draft" | "published" | "rejected" | "retired";
@@ -43,6 +44,12 @@ export interface AgentRevision
 	readonly agentServiceId: AgentServiceId;
 	/** Monotonically increasing revision number within the service. */
 	readonly revision: number;
+	/** Previous revision in the edit lineage, or null for the first revision. */
+	readonly parentRevisionId: AgentRevisionId | null;
+	/** Older revision this one was cloned from during a restore, or null otherwise. */
+	readonly sourceRevisionId: AgentRevisionId | null;
+	/** Human-authored explanation of what changed in this revision. */
+	readonly changeMessage: string;
 	/** Current publication state. */
 	readonly state: AgentRevisionState;
 	/** Content digest covering every executable field. */
@@ -57,6 +64,8 @@ export interface AgentRevision
 	readonly skills: readonly SkillRevisionReference[];
 	/** Immutable integration and tool assignments available to the runtime. */
 	readonly integrationAssignments: readonly IntegrationAssignmentReference[];
+	/** Immutable revision-scoped knowledge scope attachments authorised for the runtime. */
+	readonly scopeAttachments: readonly RevisionScopeAttachment[];
 	/** Resource ceilings applied to each run. */
 	readonly budget: AgentBudget;
 	/** Identifier of the user who authored the revision. */

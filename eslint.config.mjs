@@ -87,7 +87,7 @@ export default [
             },
             {
               sourceTag: "scope:agent-services",
-              onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:audit", "scope:authorization", "scope:shared"],
+              onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:audit", "scope:authorization", "scope:grants", "scope:shared"],
             },
             {
               sourceTag: "scope:api-spec",

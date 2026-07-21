@@ -169,6 +169,12 @@
       "@opencrane/server/_infra/obot-custody": [
         "./libs/server/_infra/obot-custody/src/index.ts"
       ],
+      "@opencrane/server/_infra/sandbox-execution": [
+        "./libs/server/_infra/sandbox-execution/src/index.ts"
+      ],
+      "@opencrane/server/_infra/memory-gateway-client": [
+        "./libs/server/_infra/memory-gateway-client/src/index.ts"
+      ],
       "@opencrane/server/_infra/tenant-hosting": [
         "./libs/server/_infra/tenant-hosting/src/index.ts"
       ],

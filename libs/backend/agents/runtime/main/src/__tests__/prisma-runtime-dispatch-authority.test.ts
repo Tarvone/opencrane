@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { AGENT_RUNTIME_PROTOCOL_V1, type CompiledRunInput, type RuntimeCandidate, type RuntimeCommandEnvelope } from "@opencrane/contracts";
 
 import { PrismaRuntimeDispatchAuthority } from "../prisma-runtime-dispatch-authority.js";
-import type { RunInputCompiler, RuntimeStreamWorkloadIdentity } from "../prisma-runtime-dispatch-authority.types.js";
+import type { RunInputCompiler, RuntimeExternalActionRunner, RuntimeStreamWorkloadIdentity } from "../prisma-runtime-dispatch-authority.types.js";
 
 /** Fixed reviewed identity for the registered runtime Pod under test. */
 const _identity: RuntimeStreamWorkloadIdentity = { subject: "system:serviceaccount:runtime-ns:agent-runtime-personal", namespace: "runtime-ns", serviceAccountName: "agent-runtime-personal", podUid: "pod-1" };
@@ -24,6 +24,8 @@ interface FakeStreamRow
 	attempt: number;
 	/** Server-owned lease fence. */
 	fence: number;
+	/** Per-attempt input generation. */
+	inputGeneration: number;
 	/** Bound runtime instance, or null when released. */
 	runtimeInstanceId: string | null;
 	/** Next required command sequence. */
@@ -62,6 +64,10 @@ interface FakeOptions
 	readonly podUid?: string | null;
 	/** Assignment state, defaulting to the registered state. */
 	readonly assignmentState?: string;
+	/** Optional composition-root runner invoked for an admitted external-action candidate. */
+	readonly externalActionRunner?: RuntimeExternalActionRunner;
+	/** Approved deferred-tool results available for a resume frame. */
+	readonly approvedDeferredResults?: readonly unknown[];
 }
 
 /** Minimal in-memory Prisma double covering only the reads and writes the adapter performs. */
@@ -96,7 +102,7 @@ function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: Fak
 		runInputSnapshot: { async findUnique(args: { where: { runId_digest?: { runId: string; digest: string } } }) { return args.where.runId_digest && args.where.runId_digest.digest === snapshot.digest ? snapshot : null; } },
 		runtimeCommandStream: {
 			async findUnique(args: { where: { runId_attempt: { runId: string; attempt: number } } }) { return streams.find(row => row.runId === args.where.runId_attempt.runId && row.attempt === args.where.runId_attempt.attempt) ?? null; },
-			async create(args: { data: { runId: string; attempt: number; runtimeInstanceId: string } }) { const row = { runId: args.data.runId, attempt: args.data.attempt, fence: 1, runtimeInstanceId: args.data.runtimeInstanceId, nextCommandSequence: 1, acceptedCandidateIds: [] }; streams.push(row); return row; },
+			async create(args: { data: { runId: string; attempt: number; runtimeInstanceId: string } }) { const row = { runId: args.data.runId, attempt: args.data.attempt, fence: 1, inputGeneration: 0, runtimeInstanceId: args.data.runtimeInstanceId, nextCommandSequence: 1, acceptedCandidateIds: [] }; streams.push(row); return row; },
 			async updateMany(args: { where: Record<string, unknown>; data: Record<string, unknown> })
 			{
 				let count = 0;
@@ -115,6 +121,9 @@ function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: Fak
 			async findMany(args: { where: { runId: string; attempt: number } }) { return commands.filter(row => row.runId === args.where.runId && row.attempt === args.where.attempt).sort((left, right) => left.sequence - right.sequence); },
 			async create(args: { data: FakeCommandRow }) { commands.push({ ...args.data }); return args.data; },
 		},
+		approvalRequest: {
+			async findMany() { return [...(options.approvedDeferredResults ?? [])].map(function _row(result, index) { return { id: `approval-${index}`, deferredToolResult: result }; }); },
+		},
 	};
 	return { prisma: client as unknown as PrismaClient, streams, commands };
 }
@@ -129,7 +138,7 @@ const _compileRunInput: RunInputCompiler = async function _compile(snapshot): Pr
 function _authority(options: FakeOptions)
 {
 	const fake = _fakePrisma(options);
-	return { authority: new PrismaRuntimeDispatchAuthority(fake.prisma, { namespace: "runtime-ns", commandTtlMilliseconds: 60_000 }, _compileRunInput, _clock), ...fake };
+	return { authority: new PrismaRuntimeDispatchAuthority(fake.prisma, { namespace: "runtime-ns", commandTtlMilliseconds: 60_000 }, _compileRunInput, options.externalActionRunner, _clock), ...fake };
 }
 
 /** Build a runtime event candidate bound to a dispatched command. */
@@ -181,6 +190,45 @@ describe("PrismaRuntimeDispatchAuthority", function _describeDispatchAuthority()
 
 		expect(await context.authority.__NextCommand(_identity, _open, 0)).toBeNull();
 		expect(context.commands).toHaveLength(0);
+	});
+
+	it("mints one cancel_attempt as a positive stop signal while cancelling", async function _mintsCancel()
+	{
+		const context = _authority({ runState: "Cancelling" });
+
+		const command = await context.authority.__NextCommand(_identity, _open, 0);
+
+		expect(command?.kind).toBe("cancel_attempt");
+		expect(command?.kind === "cancel_attempt" ? command.payload.reason : null).toBe("cancelled");
+		expect(context.commands).toHaveLength(1);
+		// A late candidate is refused while cancelling, so cancelled output cannot reopen the run.
+		const late = await context.authority.__AdmitCandidate(_identity, _candidate(command?.commandId ?? "command-1"));
+		expect(late.accepted).toBe(false);
+	});
+
+	it("mints a resume_attempt carrying the approved deferred results after start", async function _mintsResume()
+	{
+		const context = _authority({ runState: "Running", approvedDeferredResults: [{ ok: true }] });
+
+		const start = await context.authority.__NextCommand(_identity, _open, 0);
+		const resume = await context.authority.__NextCommand(_identity, _open, 1);
+
+		expect(start?.kind).toBe("start_attempt");
+		expect(resume?.kind).toBe("resume_attempt");
+		expect(resume?.kind === "resume_attempt" ? resume.payload.deferredToolResults : null).toEqual([{ ok: true }]);
+	});
+
+	it("dispatches an admitted external-action candidate through the injected runner", async function _runsExternalAction()
+	{
+		let ran = 0;
+		const context = _authority({ runState: "Running", externalActionRunner: { async run(): Promise<void> { ran += 1; } } });
+		const start = await context.authority.__NextCommand(_identity, _open, 0);
+		const candidate: RuntimeCandidate = { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId: "instance-1", commandId: start?.commandId ?? "command-1", candidateId: "candidate-ext", runId: "run-1", attempt: 1, fence: 1, kind: "external_action", toolRevisionId: "mcp-server:server-1", toolInvocationId: "invocation-1", argumentsDigest: "sha256:d", arguments: { q: "a" } };
+
+		const result = await context.authority.__AdmitCandidate(_identity, candidate);
+
+		expect(result.accepted).toBe(true);
+		expect(ran).toBe(1);
 	});
 
 	it("returns null when no live assignment exists for the reviewed Pod", async function _unknownWorkload()

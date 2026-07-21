@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import type { CompiledRunInput, RunInputSnapshot } from "@opencrane/contracts";
+import type { CompiledRunInput, CompiledToolDefinition, RunInputSnapshot, RuntimeExternalActionCandidate } from "@opencrane/contracts";
 
 /**
  * Injected control-plane compiler that hydrates an immutable snapshot into the literal compiled
@@ -32,6 +32,21 @@ export interface RuntimeStreamWorkloadIdentity
 	readonly serviceAccountName: string;
 	/** Kubernetes Pod UID asserted by TokenReview for this projected token. */
 	readonly podUid: string;
+}
+
+/**
+ * Composition-root port that reserves and dispatches an admitted external-action candidate.
+ *
+ * The dispatch authority admits the candidate against the live fence, then hands it to this injected
+ * runner so the concrete MCP/artifact/memory/sandbox transports stay in the app root and never leak
+ * into `scope:agent-runtime`. The runner performs reserve-before-dispatch via
+ * `__ExecuteExternalAction`; its failure never rewrites the durable admission, since the reserved
+ * ToolInvocation is the authoritative evidence.
+ */
+export interface RuntimeExternalActionRunner
+{
+	/** Reserve and dispatch one admitted external-action candidate against its validated tools. */
+	run(candidate: RuntimeExternalActionCandidate, snapshot: RunInputSnapshot, compiledTools: readonly CompiledToolDefinition[]): Promise<void>;
 }
 
 /** Stable result returned after a candidate reaches the authoritative run boundary. */

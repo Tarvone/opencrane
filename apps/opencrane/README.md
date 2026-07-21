@@ -72,8 +72,10 @@ register its exact first Pod UID. The runtime stream separately accepts the
 explicit, separate runtime namespace. Durable assignment remains the authority for the exact
 ServiceAccount, Job, Pod, run, and revision; the projected bootstrap reference and a ServiceAccount
 name alone are never sufficient.
-The runtime stream still injects an empty command authority, so a verified Pod may maintain a
-heartbeat connection but cannot receive commands or persist candidate output yet.
+The runtime stream mints the full `start_attempt`, `resume_attempt`, and `cancel_attempt` command
+lifecycle and admits candidates, so a verified Pod runs its bounded model/tool loop, proposes
+external actions through the reserve-before-dispatch tool-invocation authority, pauses for deferred
+approval, and stops on a positive cancel signal.
 
 ## Boundary
 

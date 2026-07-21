@@ -1,9 +1,18 @@
-/// Command kind durably minted onto one runtime command stream. Slice 1 issues only the
-/// lifecycle commands the runtime can act on without a model or tool executor.
+/// Command kind durably minted onto one runtime command stream. The dispatch authority mints
+/// `start_attempt` to begin an attempt, `resume_attempt` to feed control-plane-authorized deferred
+/// tool results back into a paused attempt (carrying the current input generation), and
+/// `cancel_attempt` as a positive stop signal the runtime acts on immediately.
 enum RuntimeCommandKind {
   StartAttempt  @map("start_attempt")
   ResumeAttempt @map("resume_attempt")
   CancelAttempt @map("cancel_attempt")
+}
+
+/// Disposition of one ordered steering boundary claim. Exactly one disposition is recorded per
+/// boundary and survives process death, so a reconnecting runtime never double-absorbs steering.
+enum RuntimeSteeringDisposition {
+  Absorbed @map("absorbed")
+  Deferred @map("deferred")
 }
 
 /// Per-attempt durable authority for the runtime command stream. It owns the monotonic command
@@ -15,6 +24,7 @@ model RuntimeCommandStream {
   runId                String                     @map("run_id")
   attempt              Int
   fence                Int                        @default(1)
+  inputGeneration      Int                        @default(0) @map("input_generation")
   runtimeInstanceId    String?                    @map("runtime_instance_id")
   nextCommandSequence  Int                        @default(1) @map("next_command_sequence")
   acceptedCandidateIds String[]                   @default([]) @map("accepted_candidate_ids")
@@ -24,6 +34,49 @@ model RuntimeCommandStream {
 
   @@id([runId, attempt])
   @@map("runtime_command_streams")
+}
+
+/// Ordered steering-boundary ledger for one attempt. The runtime claims a boundary only at a safe
+/// pre-model position, identified by a deterministic `boundaryId` derived from the run, attempt, and
+/// the input generation it is advancing from. Recording is exactly-once: the primary key blocks a
+/// second claim for the same boundary across process death, so on reconnect the prior disposition
+/// (Absorbed or Deferred) is replayed rather than recomputed. Absorbing steering advances the input
+/// generation; a model terminal tagged with a superseded generation is rejected as stale.
+model RuntimeSteeringBoundary {
+  runId               String                     @map("run_id")
+  attempt             Int
+  boundaryId          String                     @map("boundary_id")
+  fromInputGeneration Int                        @map("from_input_generation")
+  toInputGeneration   Int                        @map("to_input_generation")
+  disposition         RuntimeSteeringDisposition
+  steeringDigest      String?                    @map("steering_digest")
+  claimedAt           DateTime                   @default(now()) @map("claimed_at")
+  ackedAt             DateTime?                  @map("acked_at")
+
+  @@id([runId, attempt, boundaryId])
+  @@unique([runId, attempt, toInputGeneration])
+  @@index([runId, attempt])
+  @@map("runtime_steering_boundaries")
+}
+
+/// Latest subordinate runtime checkpoint for one attempt. The runtime writes an encrypted, version-
+/// tagged snapshot of its in-memory loop state; the control plane stores only the ciphertext and its
+/// version, never plaintext. Exactly one row exists per attempt (replaced in place on every write),
+/// because a checkpoint is a resume optimisation that is always subordinate to canonical run
+/// authority — it is discarded whenever its `inputGeneration` disagrees with the live attempt.
+model RuntimeAttemptCheckpoint {
+  runId             String   @map("run_id")
+  attempt           Int
+  checkpointVersion Int      @map("checkpoint_version")
+  inputGeneration   Int      @map("input_generation")
+  cipherVersion     String   @map("cipher_version")
+  encryptedState    Bytes    @map("encrypted_state")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@id([runId, attempt])
+  @@index([runId, attempt])
+  @@map("runtime_attempt_checkpoints")
 }
 
 /// One durably minted command dispatched to the runtime. The rows for an attempt are exactly the

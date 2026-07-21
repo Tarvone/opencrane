@@ -110,9 +110,17 @@ suspended Jobs: a nonterminal `Cancelling` run state fences the current assignme
 pending approvals before any Job is touched; `PrismaRunCancellationRepository` then issues an
 assigned or delayed-orphan cleanup claim, and only its confirmed deletion or authoritative absence
 moves the run to `Cancelled`. The runtime protocol and channel-target admission fences close on
-`cancelling` the same way they close on a terminal state. Bootstrap exchange, runtime command
-dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product capabilities below
-are not complete yet.
+`cancelling` the same way they close on a terminal state. Bootstrap exchange and the full runtime
+command lifecycle now land: the dispatch authority mints `start_attempt`, `resume_attempt`, and a
+positive `cancel_attempt` stop signal; the runtime surfaces model tool calls as external-action
+candidates validated against the immutable snapshot and reserved before dispatch through an injected
+tool-invocation authority; the deferred-tool approval pause/decide/resume lifecycle extends
+`ApprovalRequest`; steering is absorbed only at safe pre-model boundaries with an exactly-once
+ordered claim; and the runtime writes encrypted, version-tagged, replaceable checkpoints subordinate
+to canonical state. The MCP, memory, and sandbox execution transports are ports with fail-closed
+stubs wired only in the composition root. Toolkit selection, the conformance suite, live-LiteLLM
+adoption evidence, OpenClaw deletion, and the remaining E1/E2 product capabilities below are not
+complete yet.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
 `RunInputSnapshot`, the TypeScript-owned prompt compiler, the language-neutral `AgentRuntimeProtocol v1`

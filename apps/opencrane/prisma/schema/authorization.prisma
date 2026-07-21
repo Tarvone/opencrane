@@ -110,8 +110,11 @@ model ApprovalRequest {
   decidedAt              DateTime?                 @map("decided_at")
   decidedBy              String?                   @map("decided_by")
   resumeTokenHash        String?                   @unique @map("resume_token_hash")
+  toolInvocationRowId    String?                   @map("tool_invocation_row_id")
+  deferredToolResult     Json?                     @map("deferred_tool_result")
   createdAt              DateTime                  @default(now()) @map("created_at")
   run                    AgentRun                  @relation(fields: [runId, agentServiceId, agentRevisionId], references: [id, agentServiceId, agentRevisionId], onDelete: Restrict)
+  toolInvocation         ToolInvocation?           @relation(fields: [toolInvocationRowId], references: [id], onDelete: Restrict)
   proofKey               RunProofKey               @relation(fields: [proofKeyId, runId, attempt, workloadKind, workloadUid, proofKeyThumbprint, podUid], references: [id, runId, attempt, workloadKind, workloadUid, keyThumbprint, podUid], onDelete: Restrict)
   assignment             WorkloadAssignment        @relation(fields: [runId, attempt, agentServiceId, agentRevisionId, siloId, subjectId, workloadAudience, serviceAccountName, namespace, workloadKind, workloadUid], references: [runId, attempt, agentServiceId, agentRevisionId, siloId, subjectId, audience, serviceAccountName, namespace, workloadKind, workloadUid], onDelete: Restrict)
   catalog                CapabilityCatalogRevision @relation(fields: [catalogId, catalogRevision, catalogDigest], references: [catalogId, revision, digest], onDelete: Restrict)
@@ -120,6 +123,40 @@ model ApprovalRequest {
   @@index([state, expiresAt])
   @@index([subjectId])
   @@map("approval_requests")
+}
+
+/// One external tool invocation reserved by the runtime external-action authority before dispatch.
+/// It mirrors ActionExecutionReceipt's reserve/execute/complete lifecycle: the row is created
+/// (Reserved) BEFORE any external tool I/O so a crash leaves durable evidence that blocks a retry,
+/// then compare-and-set to Succeeded (with the canonical result) or Failed (with a stable code). The
+/// runtime-supplied `toolInvocationId` is the caller idempotency key; `requestFingerprint` binds the
+/// exact validated tool revision and canonical argument digest so a mutated replay can never reuse a
+/// receipt. Unlike a capability-proof action, authority comes from the immutable RunInputSnapshot's
+/// tool grants (revalidated by the external-action authority), not a signed capability catalog entry.
+model ToolInvocation {
+  id                 String               @id @default(cuid())
+  siloId             String               @map("silo_id")
+  runId              String               @map("run_id")
+  attempt            Int
+  agentServiceId     String               @map("agent_service_id")
+  agentRevisionId    String               @map("agent_revision_id")
+  subjectId          String               @map("subject_id")
+  toolRevisionId     String               @map("tool_revision_id")
+  toolInvocationId   String               @map("tool_invocation_id")
+  argumentsDigest    String               @map("arguments_digest")
+  requestFingerprint String               @unique @map("request_fingerprint")
+  approvalRequired   Boolean              @default(false) @map("approval_required")
+  state              ActionExecutionState @default(Reserved)
+  result             Json?
+  failureCode        String?              @map("failure_code")
+  reservedAt         DateTime             @default(now()) @map("reserved_at")
+  completedAt        DateTime?            @map("completed_at")
+  run                AgentRun             @relation(fields: [runId, agentServiceId, agentRevisionId], references: [id, agentServiceId, agentRevisionId], onDelete: Restrict)
+  approvalRequests   ApprovalRequest[]
+
+  @@unique([runId, attempt, toolInvocationId])
+  @@index([runId, attempt, state])
+  @@map("tool_invocations")
 }
 
 model ActionExecutionReceipt {

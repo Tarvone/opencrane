@@ -17,16 +17,39 @@ import unittest
 from src import runtime
 from src.runtime import (
     BootstrapDeniedError,
+    _absorb_steering,
+    _arguments_digest,
     _candidate,
     _command_coordinates,
+    _execute_cancel_attempt,
+    _execute_resume_attempt,
     _execute_start_attempt,
     _iter_commands,
     _normalize_event,
+    _read_checkpoint,
     _retry_delay,
     _rfc7638_thumbprint,
+    _tool_call_candidate,
+    _write_checkpoint,
     _zero_retry_openai_settings,
     run_forever,
 )
+
+
+def _compiled_input() -> dict:
+    """Build a compiled input whose grant set fixes the ``alpha`` and ``zulu`` tool revisions."""
+    return {
+        "promptCompilerVersion": "v1",
+        "instructions": "be careful",
+        "messages": [{"role": "user", "content": "hi"}],
+        "tools": [
+            {"name": "alpha", "toolRevisionId": "rev-alpha", "description": "", "parametersSchema": {}},
+            {"name": "zulu", "toolRevisionId": "rev-zulu", "description": "", "parametersSchema": {}},
+        ],
+        "model": {"modelAlias": "silo-default", "maxOutputTokens": None},
+        "budget": {},
+        "digest": "sha256:x",
+    }
 
 
 def _start_command() -> dict:
@@ -36,8 +59,42 @@ def _start_command() -> dict:
         "commandId": "c1",
         "fence": 2,
         "assignment": {"runId": "r1", "attempt": 1},
-        "payload": {"compiledInput": {"promptCompilerVersion": "v1", "instructions": "be careful", "messages": [{"role": "user", "content": "hi"}], "tools": [], "model": {"modelAlias": "silo-default", "maxOutputTokens": None}, "budget": {}, "digest": "sha256:x"}},
+        "payload": {"snapshot": {"inputGeneration": 4}, "compiledInput": _compiled_input()},
     }
+
+
+def _resume_command() -> dict:
+    """Build one structurally valid ``resume_attempt`` command carrying authorized deferred results."""
+    return {
+        "kind": "resume_attempt",
+        "commandId": "c2",
+        "fence": 2,
+        "assignment": {"runId": "r1", "attempt": 1},
+        "payload": {"inputGeneration": 7, "deferredToolResults": {"t1": {"ok": True}}},
+    }
+
+
+def _cancel_command() -> dict:
+    """Build one structurally valid ``cancel_attempt`` command carrying a server-chosen reason."""
+    return {
+        "kind": "cancel_attempt",
+        "commandId": "c3",
+        "fence": 2,
+        "assignment": {"runId": "r1", "attempt": 1},
+        "payload": {"reason": "budget_exhausted"},
+    }
+
+
+class _ReversingCipher:
+    """A reversible in-test cipher seam so checkpoints round-trip without the ``cryptography`` package."""
+
+    def encrypt(self, data: bytes) -> bytes:
+        return b"v:" + data[::-1]
+
+    def decrypt(self, token: bytes) -> bytes:
+        if not token.startswith(b"v:"):
+            raise ValueError("bad token")
+        return token[len(b"v:"):][::-1]
 
 
 class RuntimeRetryDelayTests(unittest.TestCase):
@@ -95,20 +152,6 @@ class RuntimeNormalizerTests(unittest.TestCase):
         """Usage counters normalize to non-negative integers, defaulting unknown values to zero."""
         self.assertEqual(_normalize_event({"type": "usage", "inputTokens": 12, "outputTokens": None}), ("run.usage", {"inputTokens": 12, "outputTokens": 0}))
 
-    def test_tool_call_proposal_parses_assembled_arguments(self) -> None:
-        """A tool call with fully assembled JSON arguments surfaces as a bounded proposal."""
-        event = {"type": "tool_call", "toolName": "search", "toolCallId": "tc1", "arguments": '{"q":"a"}'}
-        self.assertEqual(_normalize_event(event), ("run.tool_call_proposed", {"toolName": "search", "toolCallId": "tc1", "arguments": {"q": "a"}}))
-
-    def test_malformed_tool_call_arguments_become_error(self) -> None:
-        """Unparseable tool arguments become a ``run.error`` rather than a proposal."""
-        event = {"type": "tool_call", "toolName": "search", "toolCallId": "tc1", "arguments": '{"q":'}
-        self.assertEqual(_normalize_event(event), ("run.error", {"reason": "malformed_tool_call", "toolCallId": "tc1"}))
-
-    def test_missing_tool_fields_become_error(self) -> None:
-        """A tool call missing its name or id is malformed and never a proposal."""
-        self.assertEqual(_normalize_event({"type": "tool_call", "toolName": "search"}), ("run.error", {"reason": "malformed_tool_call"}))
-
     def test_unknown_event_is_dropped(self) -> None:
         """An unrecognized event yields no candidate but is logged for observability."""
         buffer = io.StringIO()
@@ -117,6 +160,112 @@ class RuntimeNormalizerTests(unittest.TestCase):
         logged = buffer.getvalue()
         self.assertIn("framework_event_dropped", logged)
         self.assertIn("mystery", logged)
+
+
+class RuntimeToolCallCandidateTests(unittest.TestCase):
+    """Validate that a model tool call becomes an external-action candidate or a hard error."""
+
+    def _coordinates(self) -> dict:
+        coordinates = _command_coordinates(_start_command(), "instance-1")
+        assert coordinates is not None
+        return coordinates
+
+    def test_granted_tool_call_becomes_external_action(self) -> None:
+        """A granted tool resolves its revision from the compiled tools and yields an external action."""
+        event = {"type": "tool_call", "toolName": "alpha", "toolCallId": "t1", "arguments": '{"q":"a"}'}
+        candidate = _tool_call_candidate(self._coordinates(), _compiled_input(), event)
+        self.assertEqual(candidate["kind"], "external_action")
+        self.assertEqual(candidate["toolRevisionId"], "rev-alpha")
+        self.assertEqual(candidate["toolInvocationId"], "t1")
+        self.assertEqual(candidate["arguments"], {"q": "a"})
+        self.assertEqual(candidate["argumentsDigest"], _arguments_digest({"q": "a"}))
+        self.assertTrue(candidate["argumentsDigest"].startswith("sha256:"))
+        self.assertNotIn("eventType", candidate)
+
+    def test_arguments_digest_is_deterministic_and_key_order_independent(self) -> None:
+        """The digest is a stable ``sha256:<hex>`` independent of argument key order."""
+        self.assertEqual(_arguments_digest({"a": 1, "b": 2}), _arguments_digest({"b": 2, "a": 1}))
+        self.assertNotEqual(_arguments_digest({"a": 1}), _arguments_digest({"a": 2}))
+
+    def test_ungranted_tool_call_is_unknown_tool_error(self) -> None:
+        """A tool outside the compiled grant set is a hard ``unknown_tool`` error, never an action."""
+        event = {"type": "tool_call", "toolName": "ghost", "toolCallId": "t9", "arguments": "{}"}
+        candidate = _tool_call_candidate(self._coordinates(), _compiled_input(), event)
+        self.assertEqual(candidate["kind"], "event")
+        self.assertEqual(candidate["eventType"], "run.error")
+        self.assertEqual(candidate["payload"], {"reason": "unknown_tool", "toolCallId": "t9"})
+
+    def test_malformed_arguments_become_error(self) -> None:
+        """Unparseable tool arguments become a ``run.error`` rather than an external action."""
+        event = {"type": "tool_call", "toolName": "alpha", "toolCallId": "t1", "arguments": '{"q":'}
+        candidate = _tool_call_candidate(self._coordinates(), _compiled_input(), event)
+        self.assertEqual(candidate["eventType"], "run.error")
+        self.assertEqual(candidate["payload"], {"reason": "malformed_tool_call", "toolCallId": "t1"})
+
+    def test_missing_tool_fields_become_error(self) -> None:
+        """A tool call missing its name or id is malformed and never an external action."""
+        candidate = _tool_call_candidate(self._coordinates(), _compiled_input(), {"type": "tool_call", "toolName": "alpha"})
+        self.assertEqual(candidate["payload"], {"reason": "malformed_tool_call"})
+
+
+class RuntimeSteeringTests(unittest.TestCase):
+    """Validate steering is absorbed only at the pre-model-request boundary."""
+
+    def test_steering_absorbed_only_at_the_next_boundary(self) -> None:
+        """Buffered steering drains at the boundary; steering arriving after waits for the next one."""
+        buffer: list[str] = ["do X"]
+        self.assertEqual(_absorb_steering(buffer), ["do X"])
+        self.assertEqual(buffer, [])
+        # Steering that arrives after the boundary is buffered and absorbed only at the NEXT boundary.
+        buffer.append("do Y")
+        self.assertEqual(_absorb_steering(buffer), ["do Y"])
+        self.assertEqual(_absorb_steering(buffer), [])
+
+
+class RuntimeCheckpointTests(unittest.TestCase):
+    """Validate the encrypted, version-tagged, replaceable, subordinate local checkpoint."""
+
+    def test_checkpoint_round_trips_encrypted_and_version_tagged(self) -> None:
+        """A written checkpoint is stored encrypted and reads back its state when coordinates agree."""
+        with tempfile.TemporaryDirectory() as directory:
+            cipher = _ReversingCipher()
+            path = _write_checkpoint("r1", 1, 3, {"compiledInput": {"tools": []}}, cipher=cipher, checkpoint_dir=directory)
+            with open(path, "rb") as handle:
+                raw = handle.read()
+            # The payload is ciphered on disk, not stored as readable plaintext JSON.
+            self.assertNotIn(b"compiledInput", raw)
+            self.assertNotIn(b"checkpointVersion", raw)
+            state = _read_checkpoint("r1", 1, 3, cipher=cipher, checkpoint_dir=directory)
+            self.assertEqual(state, {"compiledInput": {"tools": []}})
+
+    def test_checkpoint_is_discarded_when_coordinates_disagree(self) -> None:
+        """A checkpoint that disagrees with the server run/attempt/inputGeneration is discarded."""
+        with tempfile.TemporaryDirectory() as directory:
+            cipher = _ReversingCipher()
+            _write_checkpoint("r1", 1, 3, {"compiledInput": {}}, cipher=cipher, checkpoint_dir=directory)
+            self.assertIsNone(_read_checkpoint("r1", 1, 4, cipher=cipher, checkpoint_dir=directory))
+            self.assertIsNone(_read_checkpoint("other", 1, 3, cipher=cipher, checkpoint_dir=directory))
+            self.assertIsNone(_read_checkpoint("r1", 2, 3, cipher=cipher, checkpoint_dir=directory))
+
+    def test_a_wrong_version_checkpoint_is_discarded(self) -> None:
+        """A checkpoint tagged with an unknown version is discarded rather than trusted."""
+        with tempfile.TemporaryDirectory() as directory:
+            cipher = _ReversingCipher()
+            path = runtime._checkpoint_path(directory)
+            forged = cipher.encrypt(runtime.json.dumps({"checkpointVersion": 999, "runId": "r1", "attempt": 1, "inputGeneration": 3, "state": {}}, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+            with open(path, "wb") as handle:
+                handle.write(forged)
+            self.assertIsNone(_read_checkpoint("r1", 1, 3, cipher=cipher, checkpoint_dir=directory))
+
+    def test_second_write_atomically_replaces_the_first(self) -> None:
+        """Writing a new checkpoint replaces the prior one at the same fixed path."""
+        with tempfile.TemporaryDirectory() as directory:
+            cipher = _ReversingCipher()
+            _write_checkpoint("r1", 1, 3, {"compiledInput": {"tag": "first"}}, cipher=cipher, checkpoint_dir=directory)
+            _write_checkpoint("r1", 1, 3, {"compiledInput": {"tag": "second"}}, cipher=cipher, checkpoint_dir=directory)
+            # Only the single fixed checkpoint file survives, holding the latest state.
+            self.assertEqual(os.listdir(directory), [runtime._CHECKPOINT_FILENAME])
+            self.assertEqual(_read_checkpoint("r1", 1, 3, cipher=cipher, checkpoint_dir=directory), {"compiledInput": {"tag": "second"}})
 
 
 class RuntimeZeroRetryTests(unittest.TestCase):
@@ -182,22 +331,53 @@ class RuntimeExecutorTests(unittest.TestCase):
         emitted: list[dict] = []
         fixture = [
             {"type": "output_text", "text": "part-1"},
-            {"type": "tool_call", "toolName": "alpha", "toolCallId": "t1", "arguments": "{}"},
-            {"type": "tool_call", "toolName": "zulu", "toolCallId": "t2", "arguments": "{}"},
+            {"type": "tool_call", "toolName": "alpha", "toolCallId": "t1", "arguments": '{"q":"a"}'},
             {"type": "usage", "inputTokens": 5, "outputTokens": 7},
         ]
-        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=lambda _compiled: iter(fixture))
-        event_types = [candidate["eventType"] for candidate in emitted]
-        self.assertEqual(event_types, ["run.started", "run.output_text", "run.tool_call_proposed", "run.tool_call_proposed", "run.usage", "run.completed"])
-        self.assertEqual([emitted[2]["payload"]["toolName"], emitted[3]["payload"]["toolName"]], ["alpha", "zulu"])
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter(fixture))
+        kinds = [candidate["kind"] for candidate in emitted]
+        self.assertEqual(kinds, ["event", "event", "external_action", "event", "event"])
+        self.assertEqual([emitted[0]["eventType"], emitted[1]["eventType"], emitted[3]["eventType"], emitted[4]["eventType"]], ["run.started", "run.output_text", "run.usage", "run.completed"])
         self.assertTrue(all(candidate["runId"] == "r1" and candidate["fence"] == 2 for candidate in emitted))
+
+    def test_tool_call_surfaces_external_action_with_resolved_revision(self) -> None:
+        """A granted tool call surfaces an external-action candidate with the compiled revision + digest."""
+        emitted: list[dict] = []
+        fixture = [{"type": "tool_call", "toolName": "zulu", "toolCallId": "t2", "arguments": '{"n":1}'}]
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter(fixture))
+        action = emitted[1]
+        self.assertEqual(action["kind"], "external_action")
+        self.assertEqual(action["toolRevisionId"], "rev-zulu")
+        self.assertEqual(action["toolInvocationId"], "t2")
+        self.assertEqual(action["argumentsDigest"], _arguments_digest({"n": 1}))
+
+    def test_unknown_tool_call_is_a_hard_error(self) -> None:
+        """A tool call outside the compiled grant set surfaces a hard ``unknown_tool`` error."""
+        emitted: list[dict] = []
+        fixture = [{"type": "tool_call", "toolName": "ghost", "toolCallId": "t9", "arguments": "{}"}]
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter(fixture))
+        self.assertEqual([candidate.get("eventType") for candidate in emitted], ["run.started", "run.error", "run.completed"])
+        self.assertEqual(emitted[1]["payload"], {"reason": "unknown_tool", "toolCallId": "t9"})
+
+    def test_cancel_suppresses_late_output_and_completion(self) -> None:
+        """Once cancellation fires mid-stream, no later candidate (or completion) is emitted."""
+        emitted: list[dict] = []
+
+        def _source(_compiled: dict, cancel: threading.Event, _steer: list):
+            yield {"type": "output_text", "text": "before"}
+            cancel.set()  # a cancel frame arrives while the loop is running
+            yield {"type": "output_text", "text": "after"}
+
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=_source, cancel_event=threading.Event())
+        self.assertEqual([candidate["eventType"] for candidate in emitted], ["run.started", "run.output_text"])
+        self.assertEqual(emitted[1]["payload"]["text"], "before")
 
     def test_missing_compiled_input_is_a_real_error(self) -> None:
         """A start command without compiled input surfaces a ``run.error``, never a silent ack."""
         emitted: list[dict] = []
         command = _start_command()
         command["payload"] = {}
-        _execute_start_attempt(command, "instance-1", emitted.append, event_source=lambda _compiled: iter([]))
+        _execute_start_attempt(command, "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter([]))
         self.assertEqual([candidate["eventType"] for candidate in emitted], ["run.error"])
         self.assertEqual(emitted[0]["payload"]["reason"], "missing_compiled_input")
 
@@ -205,7 +385,7 @@ class RuntimeExecutorTests(unittest.TestCase):
         """An executor failure with zero retries produces started then a single ``run.error``."""
         emitted: list[dict] = []
 
-        def _boom(_compiled: dict):
+        def _boom(_compiled: dict, _cancel: threading.Event, _steer: list):
             raise RuntimeError("proxy unreachable")
             yield  # pragma: no cover - generator marker
 
@@ -216,7 +396,7 @@ class RuntimeExecutorTests(unittest.TestCase):
     def test_malformed_command_emits_no_candidate(self) -> None:
         """A command missing its assignment yields no coordinates and therefore no candidate."""
         emitted: list[dict] = []
-        _execute_start_attempt({"kind": "start_attempt", "commandId": "c1", "fence": 1}, "instance-1", emitted.append, event_source=lambda _compiled: iter([]))
+        _execute_start_attempt({"kind": "start_attempt", "commandId": "c1", "fence": 1}, "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter([]))
         self.assertEqual(emitted, [])
 
     def test_command_coordinates_bind_candidate_to_command(self) -> None:
@@ -227,6 +407,55 @@ class RuntimeExecutorTests(unittest.TestCase):
         self.assertEqual(candidate["commandId"], "c1")
         self.assertEqual(candidate["attempt"], 1)
         self.assertEqual(candidate["kind"], "event")
+
+
+class RuntimeResumeCancelTests(unittest.TestCase):
+    """Validate resume feeds authorized deferred results and cancel is a positive-signal kill."""
+
+    def test_resume_feeds_deferred_results_into_the_loop(self) -> None:
+        """Resume carries the input generation and injects the payload's deferred results into the loop."""
+        emitted: list[dict] = []
+        captured: dict = {}
+
+        def _resume_source(run_id, attempt, input_generation, deferred_tool_results, _cancel, _steer):
+            captured["runId"] = run_id
+            captured["attempt"] = attempt
+            captured["inputGeneration"] = input_generation
+            captured["deferred"] = deferred_tool_results
+            return iter([{"type": "output_text", "text": "resumed"}, {"type": "usage", "inputTokens": 1, "outputTokens": 2}])
+
+        _execute_resume_attempt(_resume_command(), "instance-1", emitted.append, resume_event_source=_resume_source)
+        self.assertEqual(captured["deferred"], {"t1": {"ok": True}})
+        self.assertEqual(captured["inputGeneration"], 7)
+        self.assertEqual((captured["runId"], captured["attempt"]), ("r1", 1))
+        event_types = [candidate["eventType"] for candidate in emitted]
+        self.assertEqual(event_types, ["run.resumed", "run.output_text", "run.usage", "run.completed"])
+        self.assertEqual(emitted[0]["payload"], {"inputGeneration": 7})
+
+    def test_missing_resume_payload_is_a_real_error(self) -> None:
+        """A resume command without a payload surfaces a ``run.error``, never a silent ack."""
+        emitted: list[dict] = []
+        command = _resume_command()
+        command["payload"] = None
+        _execute_resume_attempt(command, "instance-1", emitted.append, resume_event_source=lambda *args: iter([]))
+        self.assertEqual([candidate["eventType"] for candidate in emitted], ["run.error"])
+        self.assertEqual(emitted[0]["payload"]["reason"], "missing_resume_payload")
+
+    def test_cancel_signals_the_active_task_and_acknowledges_the_server_reason(self) -> None:
+        """Cancel sets the shared cancel event and emits a ``run.cancelled`` echoing the server reason."""
+        emitted: list[dict] = []
+        cancel_event = threading.Event()
+        _execute_cancel_attempt(_cancel_command(), "instance-1", emitted.append, cancel_event=cancel_event)
+        self.assertTrue(cancel_event.is_set())
+        self.assertEqual([candidate["eventType"] for candidate in emitted], ["run.cancelled"])
+        self.assertEqual(emitted[0]["kind"], "event")
+        self.assertEqual(emitted[0]["payload"], {"reason": "budget_exhausted"})
+
+    def test_cancel_before_the_active_task_emits_no_candidate_without_coordinates(self) -> None:
+        """A cancel frame lacking coordinates yields no candidate and no crash when no task is active."""
+        emitted: list[dict] = []
+        _execute_cancel_attempt({"kind": "cancel_attempt", "commandId": "c3", "fence": 1}, "instance-1", emitted.append, cancel_event=None)
+        self.assertEqual(emitted, [])
 
 
 class RuntimePydanticAiDriverTests(unittest.TestCase):

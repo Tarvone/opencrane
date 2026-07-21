@@ -58,7 +58,11 @@ export function __AdmitRuntimeCommand(input: RuntimeCommandAdmissionInput): Runt
 	if (nowEpochMs < issuedAtEpochMs) return { outcome: "denied", reason: "not_yet_valid" };
 	if (nowEpochMs >= expiresAtEpochMs || nowEpochMs >= assignmentExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
 	if (!Number.isSafeInteger(authority.leaseExpiresAtEpochMs) || nowEpochMs >= authority.leaseExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
-	if (_isTerminalForAdmission(authority.runState)) return { outcome: "denied", reason: "terminal_run" };
+	// A `cancel_attempt` is a positive stop signal, so it is admitted while the run is `cancelling`
+	// even though that state is otherwise closed to admission; every other kind stays denied there,
+	// and once the run is fully terminal even a cancel is refused. Late candidates are never admitted
+	// during `cancelling`, so cancelled work can neither continue nor reopen a terminal run.
+	if (_isTerminalForAdmission(authority.runState) && !(authority.runState === "cancelling" && command.kind === "cancel_attempt")) return { outcome: "denied", reason: "terminal_run" };
 
 	// 2. Bind the stream frame to the dispatch-time assignment and current attempt lease.
 	if (command.assignment.runId !== authority.runId || command.assignment.attempt !== authority.attempt || command.assignment.assignmentDigest !== authority.assignmentDigest)

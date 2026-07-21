@@ -279,6 +279,10 @@ def _absorb_steering(steering_buffer: list[str]) -> list[str]:
     so a concurrent enqueue between the copy and the delete is never lost. The runtime only injects
     steering text into the next model request context; it neither persists steering nor authors
     steering authority.
+
+    Scope: this absorption boundary is built and unit-covered. The steering-INGEST HTTP surface that
+    lets a user enqueue steering into an in-flight attempt is an operator/product surface delivered in
+    Phase F (#224); until then the buffer has no external producer.
     """
     drained = steering_buffer[:]
     del steering_buffer[: len(drained)]
@@ -635,7 +639,42 @@ def _recover_compiled_input(coordinates: dict[str, object], input_generation: ob
     return {}
 
 
-def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_event_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None) -> None:
+class _TerminalGate:
+    """Guards the exactly-once terminal candidate for one attempt across the reader and worker threads.
+
+    A run posts exactly one of ``run.completed`` / ``run.error`` / ``run.cancelled``. The completion
+    path runs on the attempt worker thread while the positive-cancel path runs on the stream-reader
+    thread, so the decision to post and the post itself are made atomically under one lock: a
+    completion is skipped if cancellation has been signalled or a terminal already posted, and a
+    cancellation is skipped if a terminal already posted. Late output can never reopen a terminal run.
+    """
+
+    def __init__(self, cancel_event: threading.Event) -> None:
+        """Bind the gate to the attempt's shared cancel event."""
+        self._cancel_event = cancel_event
+        self._lock = threading.Lock()
+        self._posted = False
+
+    def post_completion(self, post_candidate: Callable[[dict[str, object]], None], candidate: dict[str, object]) -> bool:
+        """Post a completion or error terminal only if no terminal posted and no cancel is signalled."""
+        with self._lock:
+            if self._posted or self._cancel_event.is_set():
+                return False
+            self._posted = True
+        post_candidate(candidate)
+        return True
+
+    def post_cancellation(self, post_candidate: Callable[[dict[str, object]], None], candidate: dict[str, object]) -> bool:
+        """Post the cancellation terminal only if no terminal has already been posted."""
+        with self._lock:
+            if self._posted:
+                return False
+            self._posted = True
+        post_candidate(candidate)
+        return True
+
+
+def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_event_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
     """Execute one ``start_attempt`` command as a bounded model loop, reporting candidates.
 
     It emits a ``run.started`` candidate, writes a subordinate local resume checkpoint, then surfaces
@@ -651,6 +690,8 @@ def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str,
         return
     if cancel_event is None:
         cancel_event = threading.Event()
+    if terminal_gate is None:
+        terminal_gate = _TerminalGate(cancel_event)
     payload = command.get("payload")
     compiled_input = payload.get("compiledInput") if isinstance(payload, dict) else None
     if not isinstance(compiled_input, dict):
@@ -664,14 +705,12 @@ def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str,
             if cancel_event.is_set():
                 break
             _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
-        if not cancel_event.is_set():
-            post_candidate(_candidate(coordinates, "run.completed", {}))
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
     except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
-        if not cancel_event.is_set():
-            post_candidate(_candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
 
 
-def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], resume_event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_resume_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None) -> None:
+def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], resume_event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_resume_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
     """Resume one paused attempt by feeding control-plane-authorized deferred tool results into the loop.
 
     It carries the command's ``inputGeneration``, emits a ``run.resumed`` candidate, then injects the
@@ -685,6 +724,8 @@ def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str
         return
     if cancel_event is None:
         cancel_event = threading.Event()
+    if terminal_gate is None:
+        terminal_gate = _TerminalGate(cancel_event)
     payload = command.get("payload")
     if not isinstance(payload, dict):
         post_candidate(_candidate(coordinates, "run.error", {"reason": "missing_resume_payload"}))
@@ -699,29 +740,33 @@ def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str
             if cancel_event.is_set():
                 break
             _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
-        if not cancel_event.is_set():
-            post_candidate(_candidate(coordinates, "run.completed", {}))
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
     except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
-        if not cancel_event.is_set():
-            post_candidate(_candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
 
 
-def _execute_cancel_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], cancel_event: threading.Event | None = None) -> None:
+def _execute_cancel_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], cancel_event: threading.Event | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
     """Handle a positive-signal cancel: kill the active attempt and acknowledge the server's reason.
 
     Cancellation is a POSITIVE signal: on receipt the runtime sets the shared ``cancel_event`` so the
     running model/tool task stops promptly and emits no further candidate. The runtime never chooses a
     terminal state — it echoes the server-chosen reason from the ``CancelAttemptCommand`` payload as a
-    bounded ``run.cancelled`` event candidate.
+    bounded ``run.cancelled`` event candidate, posted through the shared terminal gate so it and the
+    worker thread's completion can never both reach a terminal (exactly one terminal candidate posts).
     """
     coordinates = _command_coordinates(command, runtime_instance_id)
     if coordinates is None:
         return
+    # Set the cancel event BEFORE posting so a racing completion re-checks it under the gate lock.
     if cancel_event is not None:
         cancel_event.set()
     payload = command.get("payload")
     reason = payload.get("reason") if isinstance(payload, dict) else None
-    post_candidate(_candidate(coordinates, "run.cancelled", {"reason": reason}))
+    candidate = _candidate(coordinates, "run.cancelled", {"reason": reason})
+    if terminal_gate is not None:
+        terminal_gate.post_cancellation(post_candidate, candidate)
+    else:
+        post_candidate(candidate)
 
 
 def _iter_commands(response: object, cancelled: threading.Event) -> object:
@@ -767,6 +812,7 @@ def _open_stream(
     request = Request(f"{control_plane_url.rstrip('/')}/stream", data=body, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "text/event-stream"}, method="POST")
     stream_lost = threading.Event()
     active_cancel: threading.Event | None = None
+    active_gate: _TerminalGate | None = None
 
     def _post_candidate(candidate: dict[str, object]) -> None:
         _post_json(f"{control_plane_url.rstrip('/')}/candidates", token, candidate, timeout=30)
@@ -782,12 +828,14 @@ def _open_stream(
                 kind = command.get("kind")
                 if kind == "start_attempt":
                     active_cancel = threading.Event()
-                    threading.Thread(target=handle_start, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel}, daemon=True).start()
+                    active_gate = _TerminalGate(active_cancel)
+                    threading.Thread(target=handle_start, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
                 elif kind == "resume_attempt":
                     active_cancel = threading.Event()
-                    threading.Thread(target=handle_resume, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel}, daemon=True).start()
+                    active_gate = _TerminalGate(active_cancel)
+                    threading.Thread(target=handle_resume, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
                 elif kind == "cancel_attempt":
-                    handle_cancel(command, runtime_instance_id, _post_candidate, cancel_event=active_cancel)
+                    handle_cancel(command, runtime_instance_id, _post_candidate, cancel_event=active_cancel, terminal_gate=active_gate)
                 else:
                     continue
                 _log("command_dispatched", runtime_instance_id=runtime_instance_id, command_kind=kind)

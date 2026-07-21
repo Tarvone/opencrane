@@ -64,6 +64,8 @@ interface DispatchedCommandRow
 	readonly kind: RuntimeCommandKind;
 	/** Server-owned lease fence carried by the frame. */
 	readonly fence: number;
+	/** Persisted resume payload for a resume frame, so redelivery survives resume-token consumption. */
+	readonly payload: Prisma.JsonValue | null;
 	/** Canonical issuance instant of the minted frame. */
 	readonly issuedAt: Date;
 	/** Canonical hard expiry of the minted frame. */
@@ -186,8 +188,9 @@ async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthori
 		const stored = commands.find(function _atTarget(row) { return row.sequence === targetSequence; });
 		if (stored)
 		{
-			// Recompute the kind-specific body from immutable state so a redelivered frame is byte-identical.
-			const extras = await _loadCommandExtras(transaction, context, stored.kind, stream.inputGeneration, compileRunInput);
+			// Rebuild the exact body from immutable state (or the stored resume payload) so a redelivered
+			// frame is byte-identical even after the single-use resume token has been consumed.
+			const extras = await _storedCommandExtras(transaction, context, stored, compileRunInput);
 			if (extras === null) return null;
 			const envelope = _rebuildEnvelope(context, runtimeInstanceId, stored, extras);
 			const admission = __AdmitRuntimeCommand({ authority, command: envelope, clock });
@@ -199,17 +202,19 @@ async function _nextCommand(prisma: PrismaClient, config: RuntimeDispatchAuthori
 		const kind = await _decideKind(transaction, context, commands);
 		if (kind === null) return null;
 		const nowEpochMs = clock.nowEpochMs();
-		const extras = await _loadCommandExtras(transaction, context, kind, stream.inputGeneration, compileRunInput);
+		const extras = await _mintCommandExtras(transaction, context, kind, stream.inputGeneration, compileRunInput);
 		if (extras === null) return null;
 		const envelope = _mintEnvelope(context, runtimeInstanceId, stream.fence, stream.nextCommandSequence, kind, nowEpochMs, config.commandTtlMilliseconds, extras);
 		if (envelope === null) return null;
 		const admission = __AdmitRuntimeCommand({ authority, command: envelope, clock });
 		if (admission.outcome !== "accepted") return null;
 
-		// 5. Persist the accepted command and advance the monotonic sequence under the held lock.
-		await transaction.runtimeDispatchedCommand.create({ data: { runId: context.runId, attempt: context.attempt, sequence: envelope.sequence, commandId: envelope.commandId, kind, fence: envelope.fence, issuedAt: new Date(envelope.issuedAt), expiresAt: new Date(envelope.expiresAt) } });
+		// 5. Persist the accepted command (with any resume payload) and advance the sequence under lock.
+		await transaction.runtimeDispatchedCommand.create({ data: { runId: context.runId, attempt: context.attempt, sequence: envelope.sequence, commandId: envelope.commandId, kind, fence: envelope.fence, payload: extras.resume === null ? Prisma.DbNull : extras.resume as unknown as Prisma.InputJsonValue, issuedAt: new Date(envelope.issuedAt), expiresAt: new Date(envelope.expiresAt) } });
 		const advanced = await transaction.runtimeCommandStream.updateMany({ where: { runId: context.runId, attempt: context.attempt, nextCommandSequence: stream.nextCommandSequence }, data: { nextCommandSequence: admission.nextCommandSequence } });
 		if (advanced.count !== 1) throw new Error("runtime dispatch lost its command sequence fence");
+		// Consume the single-use resume tokens so a duplicate resume can never re-dispatch the results.
+		if (kind === RuntimeCommandKind.ResumeAttempt && extras.resumeApprovalIds.length > 0) await transaction.approvalRequest.updateMany({ where: { id: { in: [...extras.resumeApprovalIds] } }, data: { resumeTokenHash: null } });
 		return envelope;
 	});
 }
@@ -374,6 +379,8 @@ interface CommandExtras
 	readonly compiledInput: CompiledRunInput | null;
 	/** Authorized deferred-result payload required by a `resume_attempt` frame. */
 	readonly resume: ResumeAttemptCommand | null;
+	/** Approval rows whose single-use resume tokens this resume frame consumes when minted. */
+	readonly resumeApprovalIds: readonly string[];
 	/** Server-defined stop reason carried by a `cancel_attempt` frame. */
 	readonly cancelReason: CancelAttemptCommand["reason"];
 }
@@ -418,18 +425,41 @@ function _commandBody(context: RuntimeDispatchContext, kind: RuntimeCommandKind,
 	return { kind: "start_attempt", payload: { snapshot: context.snapshot, compiledInput: extras.compiledInput } };
 }
 
-/** Assemble the deterministic body data for one command kind from the immutable durable state. */
-async function _loadCommandExtras(transaction: Prisma.TransactionClient, context: RuntimeDispatchContext, kind: RuntimeCommandKind, inputGeneration: number, compileRunInput: RunInputCompiler): Promise<CommandExtras | null>
+/** Assemble the body data for a freshly minted command from the immutable durable state. */
+async function _mintCommandExtras(transaction: Prisma.TransactionClient, context: RuntimeDispatchContext, kind: RuntimeCommandKind, inputGeneration: number, compileRunInput: RunInputCompiler): Promise<CommandExtras | null>
 {
 	if (kind === RuntimeCommandKind.StartAttempt)
 	{
 		const compiledInput = await compileRunInput(context.snapshot, transaction);
-		return { compiledInput, resume: null, cancelReason: "cancelled" };
+		return { compiledInput, resume: null, resumeApprovalIds: [], cancelReason: "cancelled" };
 	}
-	if (kind === RuntimeCommandKind.CancelAttempt) return { compiledInput: null, resume: null, cancelReason: _cancelReason(context.terminalReason) };
-	const resume = await _loadResume(transaction, context, inputGeneration);
+	if (kind === RuntimeCommandKind.CancelAttempt) return { compiledInput: null, resume: null, resumeApprovalIds: [], cancelReason: _cancelReason(context.terminalReason) };
+	const loaded = await _loadResume(transaction, context, inputGeneration);
+	if (loaded === null) return null;
+	return { compiledInput: null, resume: loaded.resume, resumeApprovalIds: loaded.approvalIds, cancelReason: "cancelled" };
+}
+
+/** Rebuild the body data for a stored command on redelivery, reading a resume payload from its row. */
+async function _storedCommandExtras(transaction: Prisma.TransactionClient, context: RuntimeDispatchContext, row: DispatchedCommandRow, compileRunInput: RunInputCompiler): Promise<CommandExtras | null>
+{
+	if (row.kind === RuntimeCommandKind.StartAttempt)
+	{
+		const compiledInput = await compileRunInput(context.snapshot, transaction);
+		return { compiledInput, resume: null, resumeApprovalIds: [], cancelReason: "cancelled" };
+	}
+	if (row.kind === RuntimeCommandKind.CancelAttempt) return { compiledInput: null, resume: null, resumeApprovalIds: [], cancelReason: _cancelReason(context.terminalReason) };
+	const resume = _resumeFromPayload(row.payload);
 	if (resume === null) return null;
-	return { compiledInput: null, resume, cancelReason: "cancelled" };
+	return { compiledInput: null, resume, resumeApprovalIds: [], cancelReason: "cancelled" };
+}
+
+/** Parse a persisted resume payload back into the exact frame it was minted from. */
+function _resumeFromPayload(payload: Prisma.JsonValue | null): ResumeAttemptCommand | null
+{
+	if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
+	const record = payload as { readonly [key: string]: JsonValue };
+	if (typeof record["inputGeneration"] !== "number" || !("deferredToolResults" in record)) return null;
+	return { inputGeneration: record["inputGeneration"], deferredToolResults: record["deferredToolResults"] };
 }
 
 /** Map a durable run terminal reason to the server-defined cancellation reason the runtime receives. */
@@ -443,17 +473,18 @@ function _cancelReason(terminalReason: AgentRunTerminalReason | null): CancelAtt
 /**
  * Assemble the authorized deferred-result payload for a resume frame from approved approvals.
  *
- * It gathers every Approved deferred-tool approval for the attempt, ordered by id so the payload is
- * deterministic across restarts, and returns the current input generation with the ordered results.
- * A slice that later supports multiple approval rounds per attempt will key this to the generation;
- * for now a single resume batch covers the approved requests. Returns null when nothing is approved.
+ * It gathers every Approved deferred-tool approval for the attempt whose single-use resume token has
+ * not been consumed (`resumeTokenHash` still set), ordered by id so the payload is deterministic, and
+ * returns the current input generation with the ordered results plus the approval ids to consume on
+ * mint. Once consumed, a duplicate resume finds nothing and is a no-op rather than a re-execution.
+ * Returns null when no unconsumed approved result exists.
  */
-async function _loadResume(transaction: Prisma.TransactionClient, context: RuntimeDispatchContext, inputGeneration: number): Promise<ResumeAttemptCommand | null>
+async function _loadResume(transaction: Prisma.TransactionClient, context: RuntimeDispatchContext, inputGeneration: number): Promise<{ resume: ResumeAttemptCommand; approvalIds: string[] } | null>
 {
-	const approvals = await transaction.approvalRequest.findMany({ where: { runId: context.runId, attempt: context.attempt, state: ApprovalRequestState.Approved, toolInvocationRowId: { not: null } }, orderBy: { id: "asc" } });
+	const approvals = await transaction.approvalRequest.findMany({ where: { runId: context.runId, attempt: context.attempt, state: ApprovalRequestState.Approved, toolInvocationRowId: { not: null }, resumeTokenHash: { not: null } }, orderBy: { id: "asc" } });
 	if (approvals.length === 0) return null;
 	const deferredToolResults = approvals.map(function _result(row): JsonValue { return row.deferredToolResult as JsonValue; });
-	return { inputGeneration, deferredToolResults };
+	return { resume: { inputGeneration, deferredToolResults }, approvalIds: approvals.map(function _id(row) { return row.id; }) };
 }
 
 /** Map the durable snapshot row into the immutable wire snapshot the runtime receives. */
@@ -510,8 +541,8 @@ async function _decideKind(transaction: Prisma.TransactionClient, context: Runti
 	if ((runState === "assigned" || runState === "running") && !hasStart) return RuntimeCommandKind.StartAttempt;
 	if (runState === "running" && hasStart && !commands.some(function _isResume(row) { return row.kind === RuntimeCommandKind.ResumeAttempt; }))
 	{
-		const resume = await _loadResume(transaction, context, 0);
-		if (resume !== null) return RuntimeCommandKind.ResumeAttempt;
+		const loaded = await _loadResume(transaction, context, 0);
+		if (loaded !== null) return RuntimeCommandKind.ResumeAttempt;
 	}
 	return null;
 }

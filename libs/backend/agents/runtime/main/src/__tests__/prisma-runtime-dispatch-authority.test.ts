@@ -49,6 +49,8 @@ interface FakeCommandRow
 	kind: string;
 	/** Server-owned fence. */
 	fence: number;
+	/** Persisted resume payload, if any. */
+	payload?: unknown;
 	/** Issuance instant. */
 	issuedAt: Date;
 	/** Hard expiry. */
@@ -71,10 +73,11 @@ interface FakeOptions
 }
 
 /** Minimal in-memory Prisma double covering only the reads and writes the adapter performs. */
-function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: FakeStreamRow[]; commands: FakeCommandRow[] }
+function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: FakeStreamRow[]; commands: FakeCommandRow[]; approvals: { id: string; deferredToolResult: unknown; resumeTokenHash: string | null }[] }
 {
 	const streams: FakeStreamRow[] = [];
 	const commands: FakeCommandRow[] = [];
+	const approvals: { id: string; deferredToolResult: unknown; resumeTokenHash: string | null }[] = [...(options.approvedDeferredResults ?? [])].map(function _row(result, index) { return { id: `approval-${index}`, deferredToolResult: result, resumeTokenHash: `hash-${index}` }; });
 	const assignment = { runId: "run-1", attempt: 1, agentServiceId: "svc-1", agentRevisionId: "rev-1", siloId: "silo-1", subjectId: "user-1", audience: "opencrane-agent-runtime", serviceAccountName: _identity.serviceAccountName, namespace: _identity.namespace, workloadKind: "Job", workloadUid: "wl-1", workloadProfile: "profile", podUid: options.podUid === undefined ? "pod-1" : options.podUid, state: options.assignmentState ?? "Registered", expiresAt: new Date("2026-07-20T00:05:00.000Z"), createdAt: new Date("2026-07-20T00:00:00.000Z") };
 	const run = { id: "run-1", attempt: 1, agentServiceId: "svc-1", agentRevisionId: "rev-1", siloId: "silo-1", state: options.runState, inputSnapshotDigest: "sha256:snap" };
 	const snapshot = { runId: "run-1", siloId: "silo-1", agentServiceId: "svc-1", agentRevisionId: "rev-1", snapshotVersion: 1, threadId: null, messageIds: [], personaRevisionId: null, preferenceFactIds: [], artifactRevisionIds: [], skillRevisionIds: [], memoryFacts: [], memoryQueryPolicy: {}, toolGrantIds: [], modelRoute: {}, budgetPolicy: {}, identitySnapshot: { executionSubjectId: "user-1", fleetMembershipRevision: 3 }, capabilitySetDigest: "sha256:cap", effectiveContractDigest: "sha256:contract", promptCompilerVersion: "v1", digest: "sha256:snap", compiledAt: new Date("2026-07-20T00:00:00.000Z") };
@@ -122,10 +125,16 @@ function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: Fak
 			async create(args: { data: FakeCommandRow }) { commands.push({ ...args.data }); return args.data; },
 		},
 		approvalRequest: {
-			async findMany() { return [...(options.approvedDeferredResults ?? [])].map(function _row(result, index) { return { id: `approval-${index}`, deferredToolResult: result }; }); },
+			async findMany() { return approvals.filter(row => row.resumeTokenHash !== null); },
+			async updateMany(args: { where: { id: { in: string[] } }; data: { resumeTokenHash: null } })
+			{
+				let count = 0;
+				for (const row of approvals.filter(candidate => args.where.id.in.includes(candidate.id))) { row.resumeTokenHash = args.data.resumeTokenHash; count += 1; }
+				return { count };
+			},
 		},
 	};
-	return { prisma: client as unknown as PrismaClient, streams, commands };
+	return { prisma: client as unknown as PrismaClient, streams, commands, approvals };
 }
 
 /** Deterministic fake compiler: same snapshot digest always yields byte-identical compiled input. */
@@ -216,6 +225,31 @@ describe("PrismaRuntimeDispatchAuthority", function _describeDispatchAuthority()
 		expect(start?.kind).toBe("start_attempt");
 		expect(resume?.kind).toBe("resume_attempt");
 		expect(resume?.kind === "resume_attempt" ? resume.payload.deferredToolResults : null).toEqual([{ ok: true }]);
+	});
+
+	it("consumes the single-use resume token so no duplicate resume is minted", async function _singleUseResume()
+	{
+		const context = _authority({ runState: "Running", approvedDeferredResults: [{ ok: true }] });
+
+		await context.authority.__NextCommand(_identity, _open, 0);
+		await context.authority.__NextCommand(_identity, _open, 1);
+		// The resume token is now consumed; a further poll past the resume frame mints nothing.
+		const afterResume = await context.authority.__NextCommand(_identity, _open, 2);
+
+		expect(afterResume).toBeNull();
+		expect(context.approvals.every(row => row.resumeTokenHash === null)).toBe(true);
+		expect(context.commands.filter(row => row.kind === "ResumeAttempt")).toHaveLength(1);
+	});
+
+	it("redelivers a resume frame byte-identically after its token was consumed", async function _resumeRedeliver()
+	{
+		const context = _authority({ runState: "Running", approvedDeferredResults: [{ ok: true }] });
+
+		await context.authority.__NextCommand(_identity, _open, 0);
+		const resume = await context.authority.__NextCommand(_identity, _open, 1);
+		const redelivered = await context.authority.__NextCommand(_identity, _open, 1);
+
+		expect(redelivered).toEqual(resume);
 	});
 
 	it("dispatches an admitted external-action candidate through the injected runner", async function _runsExternalAction()

@@ -94,10 +94,10 @@ model ApprovalRequest {
   workloadKind           WorkloadKind              @map("workload_kind")
   workloadUid            String                    @map("workload_uid")
   podUid                 String                    @map("pod_uid")
-  catalogId              String                    @map("catalog_id")
-  catalogRevision        Int                       @map("catalog_revision")
-  catalogDigest          String                    @map("catalog_digest")
-  capabilityId           String                    @map("capability_id")
+  catalogId              String?                   @map("catalog_id")
+  catalogRevision        Int?                      @map("catalog_revision")
+  catalogDigest          String?                   @map("catalog_digest")
+  capabilityId           String?                   @map("capability_id")
   resourceKind           String                    @map("resource_kind")
   resourceId             String                    @map("resource_id")
   action                 String
@@ -117,7 +117,7 @@ model ApprovalRequest {
   toolInvocation         ToolInvocation?           @relation(fields: [toolInvocationRowId], references: [id], onDelete: Restrict)
   proofKey               RunProofKey               @relation(fields: [proofKeyId, runId, attempt, workloadKind, workloadUid, proofKeyThumbprint, podUid], references: [id, runId, attempt, workloadKind, workloadUid, keyThumbprint, podUid], onDelete: Restrict)
   assignment             WorkloadAssignment        @relation(fields: [runId, attempt, agentServiceId, agentRevisionId, siloId, subjectId, workloadAudience, serviceAccountName, namespace, workloadKind, workloadUid], references: [runId, attempt, agentServiceId, agentRevisionId, siloId, subjectId, audience, serviceAccountName, namespace, workloadKind, workloadUid], onDelete: Restrict)
-  catalog                CapabilityCatalogRevision @relation(fields: [catalogId, catalogRevision, catalogDigest], references: [catalogId, revision, digest], onDelete: Restrict)
+  catalog                CapabilityCatalogRevision? @relation(fields: [catalogId, catalogRevision, catalogDigest], references: [catalogId, revision, digest], onDelete: Restrict)
 
   @@unique([runId, attempt, actionDigest])
   @@index([state, expiresAt])

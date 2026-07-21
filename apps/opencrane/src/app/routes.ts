@@ -22,7 +22,7 @@ import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACC
 import { spec } from "@opencrane/backend/server/api-spec";
 import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
 import { PrismaRuntimeDispatchAuthority, __ExecuteExternalAction, type RuntimeExternalActionRunner } from "@opencrane/backend/agents/runtime";
-import { PrismaRuntimeBootstrapExchange, PrismaToolInvocationRepository, __CreateRuntimeBootstrapRouter } from "@opencrane/backend/server/iam/authorization";
+import { PrismaRuntimeBootstrapExchange, PrismaToolInvocationRepository, __CreateRuntimeBootstrapRouter, __DeferToolRequest } from "@opencrane/backend/server/iam/authorization";
 import { __UnavailableObotCustodyAdapter } from "@opencrane/server/_infra/obot-custody";
 import { __UnavailableSandboxJobExecutor } from "@opencrane/server/_infra/sandbox-execution";
 import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memory-gateway-client";
@@ -209,11 +209,23 @@ function _CreateExternalActionRunner(prisma: PrismaClient): RuntimeExternalActio
 	return {
 		async run(candidate, snapshot, compiledTools): Promise<void>
 		{
+			// The approval requirement is per-tool, derived from the resolved compiled tool grant.
+			const tool = compiledTools.find(function _match(definition) { return definition.toolRevisionId === candidate.toolRevisionId; });
+			const approvalRequired = tool?.requiresApproval ?? false;
 			const executor = _CreateExternalActionExecutor(candidate, { siloId: snapshot.siloId, subjectId: snapshot.identitySnapshot.executionSubjectId, obotCustody, sandboxExecutor, memoryGateway });
-			await __ExecuteExternalAction(repository, { candidate, snapshot, compiledTools, approvalRequired: false }, executor);
+			const result = await __ExecuteExternalAction(repository, { candidate, snapshot, compiledTools, approvalRequired }, executor);
+			// A deferred invocation opens the pending approval that gates the eventual resume.
+			if (result.outcome === "deferred")
+			{
+				const expiresAt = new Date(Date.now() + _DEFERRED_APPROVAL_TTL_MILLISECONDS);
+				await prisma.$transaction(function _defer(transaction) { return __DeferToolRequest(transaction, { runId: candidate.runId, attempt: candidate.attempt, toolInvocationRowId: result.reservationId, toolRevisionId: candidate.toolRevisionId, argumentsDigest: candidate.argumentsDigest, actionDigest: candidate.toolInvocationId, effectivePolicyDigest: snapshot.capabilitySetDigest, approverPolicyRevision: "mcp-server-requires-approval", now: new Date(), expiresAt }); });
+			}
 		},
 	};
 }
+
+/** Bounded lifetime of a pending deferred-tool approval before it is no longer actionable. */
+const _DEFERRED_APPROVAL_TTL_MILLISECONDS = 24 * 60 * 60 * 1000;
 
 /**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the

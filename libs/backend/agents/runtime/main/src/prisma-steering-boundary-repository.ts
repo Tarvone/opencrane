@@ -48,9 +48,12 @@ export class PrismaSteeringBoundaryRepository implements SteeringBoundaryReposit
 					},
 				});
 				// Advance the per-attempt input generation only when this boundary absorbed steering.
+				// The compare-and-set on the source generation must move exactly one row, or the
+				// recorded boundary and the stream generation would silently disagree.
 				if (claim.disposition === "absorbed")
 				{
-					await transaction.runtimeCommandStream.updateMany({ where: { runId: claim.runId, attempt: claim.attempt, inputGeneration: claim.fromInputGeneration }, data: { inputGeneration: claim.toInputGeneration } });
+					const advanced = await transaction.runtimeCommandStream.updateMany({ where: { runId: claim.runId, attempt: claim.attempt, inputGeneration: claim.fromInputGeneration }, data: { inputGeneration: claim.toInputGeneration } });
+					if (advanced.count !== 1) throw new Error("runtime steering boundary lost its input-generation fence");
 				}
 				return { status: "claimed" };
 			});

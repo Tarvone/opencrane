@@ -40,8 +40,8 @@ function _snapshot(overrides: Partial<RunInputSnapshot> = {}): RunInputSnapshot
 function _tools(): readonly CompiledToolDefinition[]
 {
 	return [
-		{ name: "zulu", toolRevisionId: "tr-z", description: "last by name", parametersSchema: { type: "object" } },
-		{ name: "alpha", toolRevisionId: "tr-a", description: "first by name", parametersSchema: { type: "object" } },
+		{ name: "zulu", toolRevisionId: "tr-z", description: "last by name", requiresApproval: false, parametersSchema: { type: "object" } },
+		{ name: "alpha", toolRevisionId: "tr-a", description: "first by name", requiresApproval: true, parametersSchema: { type: "object" } },
 	];
 }
 

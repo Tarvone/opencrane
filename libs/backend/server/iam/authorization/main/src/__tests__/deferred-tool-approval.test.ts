@@ -1,7 +1,7 @@
-import { ApprovalRequestState, type Prisma } from "@prisma/client";
+import { ApprovalRequestState, Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { __DecideDeferredToolRequest } from "../deferred-tool-approval.js";
+import { __DecideDeferredToolRequest, __DeferToolRequest } from "../deferred-tool-approval.js";
 
 /** Build a transaction whose approvalRequest reads return the supplied row and writes report a count. */
 function _transaction(row: unknown, updatedCount: number): { transaction: Prisma.TransactionClient; updateMany: ReturnType<typeof vi.fn> }
@@ -56,5 +56,56 @@ describe("deferred tool approval authority", function _suite()
 		const { transaction } = _transaction({ ..._pending() as object, toolInvocationRowId: null }, 0);
 		const result = await __DecideDeferredToolRequest(transaction, { approvalRequestId: "approval-1", runId: "run-1", attempt: 2, decision: "approved", decidedBy: "reviewer-1", now: NOW });
 		expect(result).toEqual({ outcome: "conflict" });
+	});
+});
+
+/** Live assignment + proof key the defer authority binds the approval to. */
+const ASSIGNMENT = { agentServiceId: "svc-1", agentRevisionId: "rev-1", siloId: "silo-1", subjectId: "user-1", audience: "opencrane-agent-runtime", serviceAccountName: "agent-runtime-1", namespace: "silo-1-runtime", workloadKind: "Job", workloadUid: "wl-1", podUid: "pod-1" };
+const PROOF_KEY = { id: "proof-1", keyThumbprint: "thumb-1" };
+
+/** Command opening a pending deferred-tool approval for a reserved invocation. */
+function _deferCommand(): Parameters<typeof __DeferToolRequest>[1]
+{
+	return { runId: "run-1", attempt: 2, toolInvocationRowId: "tool-1", toolRevisionId: "mcp-server:server-1", argumentsDigest: "sha256:d", actionDigest: "invocation-1", effectivePolicyDigest: "sha256:cap", approverPolicyRevision: "mcp-server-requires-approval", now: NOW, expiresAt: new Date("2026-07-22T09:00:00.000Z") };
+}
+
+describe("defer tool request authority", function _deferSuite()
+{
+	it("opens a pending approval bound to the reserved tool invocation and live workload", async function _defers()
+	{
+		const create = vi.fn().mockResolvedValue({ id: "approval-9" });
+		const transaction = {
+			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(ASSIGNMENT) },
+			runProofKey: { findUnique: vi.fn().mockResolvedValue(PROOF_KEY) },
+			approvalRequest: { create },
+		} as unknown as Prisma.TransactionClient;
+
+		const result = await __DeferToolRequest(transaction, _deferCommand());
+
+		expect(result).toEqual({ outcome: "deferred", approvalRequestId: "approval-9" });
+		expect(create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ state: ApprovalRequestState.Pending, toolInvocationRowId: "tool-1", resourceKind: "tool", resourceId: "mcp-server:server-1", proofKeyId: "proof-1" }) }));
+	});
+
+	it("reports unavailable when the live workload or proof key is absent", async function _unavailable()
+	{
+		const transaction = {
+			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(ASSIGNMENT) },
+			runProofKey: { findUnique: vi.fn().mockResolvedValue(null) },
+			approvalRequest: { create: vi.fn() },
+		} as unknown as Prisma.TransactionClient;
+
+		expect(await __DeferToolRequest(transaction, _deferCommand())).toEqual({ outcome: "unavailable" });
+	});
+
+	it("replays the existing approval idempotently on a duplicate defer", async function _idempotentDefer()
+	{
+		const create = vi.fn().mockRejectedValue(new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "6" }));
+		const transaction = {
+			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(ASSIGNMENT) },
+			runProofKey: { findUnique: vi.fn().mockResolvedValue(PROOF_KEY) },
+			approvalRequest: { create, findFirst: vi.fn().mockResolvedValue({ id: "approval-existing" }) },
+		} as unknown as Prisma.TransactionClient;
+
+		expect(await __DeferToolRequest(transaction, _deferCommand())).toEqual({ outcome: "already_deferred", approvalRequestId: "approval-existing" });
 	});
 });

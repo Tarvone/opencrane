@@ -10,7 +10,7 @@ import { __ExecuteExternalAction } from "../external-action-authority.js";
 import type { ExternalActionExecutor } from "../external-action-authority.types.js";
 
 /** One granted tool revision the compiled input offers to the run. */
-const TOOL: CompiledToolDefinition = { name: "search", toolRevisionId: "mcp-server:server-1", description: "search", parametersSchema: { type: "object" } };
+const TOOL: CompiledToolDefinition = { name: "search", toolRevisionId: "mcp-server:server-1", description: "search", requiresApproval: false, parametersSchema: { type: "object" } };
 
 /** Immutable snapshot facts the authority binds a candidate to. */
 function _snapshot(): RunInputSnapshot

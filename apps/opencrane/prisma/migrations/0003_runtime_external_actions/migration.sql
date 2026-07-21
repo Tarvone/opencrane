@@ -2,8 +2,8 @@
 -- Cross-domain: also touches the authorization domain (libs/backend/server/iam/authorization/main)
 -- because the runtime external-action authority reserves a ToolInvocation before dispatch and the
 -- deferred-tool approval lifecycle extends the existing ApprovalRequest. Adds: the durable
--- ToolInvocation reserve/execute/complete receipt, the ordered steering-boundary ledger, the
--- subordinate encrypted attempt checkpoint, and the per-attempt input generation.
+-- ToolInvocation reserve/execute/complete receipt, the ordered steering-boundary ledger, and the
+-- per-attempt input generation. (The runtime checkpoint is a local encrypted file, not a DB model.)
 
 -- CreateEnum
 CREATE TYPE "RuntimeSteeringDisposition" AS ENUM ('absorbed', 'deferred');
@@ -11,10 +11,24 @@ CREATE TYPE "RuntimeSteeringDisposition" AS ENUM ('absorbed', 'deferred');
 -- AlterTable (runtime domain): per-attempt input generation advanced when steering is absorbed.
 ALTER TABLE "runtime_command_streams" ADD COLUMN "input_generation" INTEGER NOT NULL DEFAULT 0;
 
+-- AlterTable (runtime domain): persist a resume frame's authorized deferred-result payload so an
+-- idempotent redelivery is byte-identical even after the single-use resume token is consumed.
+ALTER TABLE "runtime_dispatched_commands" ADD COLUMN "payload" JSONB;
+
 -- AlterTable (authorization domain): link a pending approval to its deferred tool invocation and
 -- carry the authorized deferred result that a resume feeds back into the loop.
 ALTER TABLE "approval_requests" ADD COLUMN "tool_invocation_row_id" TEXT;
 ALTER TABLE "approval_requests" ADD COLUMN "deferred_tool_result" JSONB;
+
+-- AlterTable (authorization domain): a deferred-tool approval has no capability-catalog entry, so the
+-- catalog binding becomes optional; the capability-proof approval path fills it when it lands.
+ALTER TABLE "approval_requests" ALTER COLUMN "catalog_id" DROP NOT NULL;
+ALTER TABLE "approval_requests" ALTER COLUMN "catalog_revision" DROP NOT NULL;
+ALTER TABLE "approval_requests" ALTER COLUMN "catalog_digest" DROP NOT NULL;
+ALTER TABLE "approval_requests" ALTER COLUMN "capability_id" DROP NOT NULL;
+
+-- AlterTable (mcp domain): flag whether invoking a server's tools requires a deferred human approval.
+ALTER TABLE "mcp_servers" ADD COLUMN "requires_approval" BOOLEAN NOT NULL DEFAULT false;
 
 -- CreateTable (authorization domain): external tool invocation receipt.
 CREATE TABLE "tool_invocations" (
@@ -54,20 +68,6 @@ CREATE TABLE "runtime_steering_boundaries" (
     CONSTRAINT "runtime_steering_boundaries_pkey" PRIMARY KEY ("run_id","attempt","boundary_id")
 );
 
--- CreateTable (runtime domain): subordinate encrypted attempt checkpoint, one row per attempt.
-CREATE TABLE "runtime_attempt_checkpoints" (
-    "run_id" TEXT NOT NULL,
-    "attempt" INTEGER NOT NULL,
-    "checkpoint_version" INTEGER NOT NULL,
-    "input_generation" INTEGER NOT NULL,
-    "cipher_version" TEXT NOT NULL,
-    "encrypted_state" BYTEA NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "runtime_attempt_checkpoints_pkey" PRIMARY KEY ("run_id","attempt")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "tool_invocations_request_fingerprint_key" ON "tool_invocations"("request_fingerprint");
 
@@ -82,9 +82,6 @@ CREATE UNIQUE INDEX "runtime_steering_boundaries_run_id_attempt_to_input_generat
 
 -- CreateIndex
 CREATE INDEX "runtime_steering_boundaries_run_id_attempt_idx" ON "runtime_steering_boundaries"("run_id", "attempt");
-
--- CreateIndex
-CREATE INDEX "runtime_attempt_checkpoints_run_id_attempt_idx" ON "runtime_attempt_checkpoints"("run_id", "attempt");
 
 -- AddForeignKey
 ALTER TABLE "tool_invocations" ADD CONSTRAINT "tool_invocations_run_id_agent_service_id_agent_revision_id_fkey" FOREIGN KEY ("run_id", "agent_service_id", "agent_revision_id") REFERENCES "agent_runs"("id", "agent_service_id", "agent_revision_id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -24,6 +24,37 @@ export interface DecideDeferredToolRequestCommand
 	readonly deferredToolResult?: JsonValue;
 }
 
+/** Exact reserved tool invocation to pause behind a new pending deferred-tool approval. */
+export interface DeferToolRequestCommand
+{
+	/** Logical run proposing the external action. */
+	readonly runId: string;
+	/** Current positive run attempt. */
+	readonly attempt: number;
+	/** Reserved ToolInvocation row id the approval gates. */
+	readonly toolInvocationRowId: string;
+	/** Immutable tool revision being invoked, recorded as the approval's resource id. */
+	readonly toolRevisionId: string;
+	/** Digest of the normalised action arguments. */
+	readonly argumentsDigest: string;
+	/** Deterministic per-invocation digest; the unique run/attempt key makes deferral idempotent. */
+	readonly actionDigest: string;
+	/** Digest of the effective policy the approval is evaluated against. */
+	readonly effectivePolicyDigest: string;
+	/** Stable identifier of the approver policy revision that required the pause. */
+	readonly approverPolicyRevision: string;
+	/** Trusted creation instant. */
+	readonly now: Date;
+	/** Hard expiry after which the pending approval is no longer actionable. */
+	readonly expiresAt: Date;
+}
+
+/** Result of creating (or idempotently replaying) one pending deferred-tool approval. */
+export type DeferToolRequestResult =
+	| { readonly outcome: "deferred"; readonly approvalRequestId: string }
+	| { readonly outcome: "already_deferred"; readonly approvalRequestId: string }
+	| { readonly outcome: "unavailable" };
+
 /** Result of atomically deciding one pending deferred tool request. */
 export type DecideDeferredToolRequestResult =
 	| { readonly outcome: "approved"; readonly deferredToolResult: JsonValue }

@@ -97,7 +97,7 @@ async function _loadToolDefinitions(transaction: Prisma.TransactionClient, toolG
 	for (const grant of grants)
 	{
 		const server = grant.mcpServer;
-		if (!byServerId.has(server.id)) byServerId.set(server.id, { name: server.name, toolRevisionId: `mcp-server:${server.id}`, description: server.description, parametersSchema: { type: "object" } });
+		if (!byServerId.has(server.id)) byServerId.set(server.id, { name: server.name, toolRevisionId: `mcp-server:${server.id}`, description: server.description, requiresApproval: server.requiresApproval, parametersSchema: { type: "object" } });
 	}
 	return [...byServerId.values()];
 }

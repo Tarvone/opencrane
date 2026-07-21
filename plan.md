@@ -112,15 +112,20 @@ assigned or delayed-orphan cleanup claim, and only its confirmed deletion or aut
 moves the run to `Cancelled`. The runtime protocol and channel-target admission fences close on
 `cancelling` the same way they close on a terminal state. Bootstrap exchange and the full runtime
 command lifecycle now land: the dispatch authority mints `start_attempt`, `resume_attempt`, and a
-positive `cancel_attempt` stop signal; the runtime surfaces model tool calls as external-action
-candidates validated against the immutable snapshot and reserved before dispatch through an injected
-tool-invocation authority; the deferred-tool approval pause/decide/resume lifecycle extends
-`ApprovalRequest`; steering is absorbed only at safe pre-model boundaries with an exactly-once
-ordered claim; and the runtime writes encrypted, version-tagged, replaceable checkpoints subordinate
-to canonical state. The MCP, memory, and sandbox execution transports are ports with fail-closed
-stubs wired only in the composition root. Toolkit selection, the conformance suite, live-LiteLLM
-adoption evidence, OpenClaw deletion, and the remaining E1/E2 product capabilities below are not
-complete yet.
+positive `cancel_attempt` stop signal (with exactly-once terminal reporting under a race); the runtime
+surfaces model tool calls as external-action candidates validated against the immutable snapshot and
+reserved before dispatch through an injected tool-invocation authority. A tool grant flagged
+`requiresApproval` defers: the reserved invocation opens a pending `ApprovalRequest`, so the
+pause is reachable end to end. The deferred-tool DECIDE authority and single-use resume feed
+(`resumeTokenHash`-consumed) are built and unit-covered, and steering is absorbed only at safe
+pre-model boundaries with an exactly-once ordered claim that advances a fenced input generation. The
+runtime also writes encrypted, version-tagged, replaceable LOCAL checkpoints subordinate to canonical
+state (no server-side checkpoint model). The MCP, memory, and sandbox execution transports are ports
+with fail-closed stubs wired only in the composition root. NOT yet built: the human
+approval-DECISION HTTP endpoint and the steering-INGEST HTTP surface are the operator/product plane in
+Phase F (#224), so approval and steering are not end-to-end live; toolkit selection, the conformance
+suite, live-LiteLLM adoption evidence, OpenClaw deletion, and the remaining E1/E2 product capabilities
+below are also incomplete.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
 `RunInputSnapshot`, the TypeScript-owned prompt compiler, the language-neutral `AgentRuntimeProtocol v1`

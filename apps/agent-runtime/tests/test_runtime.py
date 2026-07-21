@@ -457,6 +457,31 @@ class RuntimeResumeCancelTests(unittest.TestCase):
         _execute_cancel_attempt({"kind": "cancel_attempt", "commandId": "c3", "fence": 1}, "instance-1", emitted.append, cancel_event=None)
         self.assertEqual(emitted, [])
 
+    def test_completion_and_cancel_race_posts_exactly_one_terminal(self) -> None:
+        """A cancel firing between the loop end and the completion post yields exactly one terminal."""
+        emitted: list[dict] = []
+        cancel_event = threading.Event()
+        gate = runtime._TerminalGate(cancel_event)
+
+        def _source(_compiled, _cancel, _steer):
+            yield {"type": "output_text", "text": "partial"}
+            # Reader thread cancels in the check-then-act window, before the worker posts completion.
+            _execute_cancel_attempt(_cancel_command(), "instance-1", emitted.append, cancel_event=cancel_event, terminal_gate=gate)
+
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=_source, cancel_event=cancel_event, terminal_gate=gate)
+        terminals = [candidate["eventType"] for candidate in emitted if candidate["eventType"] in ("run.completed", "run.error", "run.cancelled")]
+        self.assertEqual(terminals, ["run.cancelled"])
+
+    def test_completion_then_late_cancel_keeps_the_single_terminal(self) -> None:
+        """When completion wins the race, a late cancel is a no-op and does not add a second terminal."""
+        emitted: list[dict] = []
+        cancel_event = threading.Event()
+        gate = runtime._TerminalGate(cancel_event)
+        _execute_start_attempt(_start_command(), "instance-1", emitted.append, event_source=lambda _compiled, _cancel, _steer: iter([]), cancel_event=cancel_event, terminal_gate=gate)
+        _execute_cancel_attempt(_cancel_command(), "instance-1", emitted.append, cancel_event=cancel_event, terminal_gate=gate)
+        terminals = [candidate["eventType"] for candidate in emitted if candidate["eventType"] in ("run.completed", "run.error", "run.cancelled")]
+        self.assertEqual(terminals, ["run.completed"])
+
 
 class RuntimePydanticAiDriverTests(unittest.TestCase):
     """Guard the deferred live driver so its conformance gate is explicit, not silently skipped."""

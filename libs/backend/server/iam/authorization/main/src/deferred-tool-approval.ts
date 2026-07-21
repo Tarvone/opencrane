@@ -1,8 +1,73 @@
-import { ApprovalRequestState, type Prisma } from "@prisma/client";
+import { ApprovalRequestState, Prisma } from "@prisma/client";
 
 import type { JsonValue } from "@opencrane/util";
 
-import type { DecideDeferredToolRequestCommand, DecideDeferredToolRequestResult, DeferredToolDecision } from "./deferred-tool-approval.types.js";
+import type { DecideDeferredToolRequestCommand, DecideDeferredToolRequestResult, DeferredToolDecision, DeferToolRequestCommand, DeferToolRequestResult } from "./deferred-tool-approval.types.js";
+
+/**
+ * Pause one reserved tool invocation behind a new pending deferred-tool approval.
+ *
+ * This is the create half of the deferred-tool lifecycle: when the runtime external-action authority
+ * returns `deferred` for an approval-gated tool, the composition root calls this to open the pending
+ * {@link ApprovalRequest} bound to the reserved ToolInvocation (`toolInvocationRowId`). It reuses the
+ * existing approval table (no second approval model) rather than the capability-proof catalog path —
+ * the workload/proof-key binding is copied from the live run so the approval is still bound to the
+ * exact executing Pod, while the catalog columns stay null because a tool is not a signed capability.
+ * Deferral is idempotent through the `(runId, attempt, actionDigest)` key: a repeated defer returns
+ * the existing pending row rather than opening a second approval.
+ *
+ * @param transaction - Prisma transaction already holding the owning run's approval fence.
+ * @param command - Reserved invocation coordinates, tool identity, and expiry.
+ * @returns The opened (or replayed) approval id, or `unavailable` when the live workload is absent.
+ */
+export async function __DeferToolRequest(transaction: Prisma.TransactionClient, command: DeferToolRequestCommand): Promise<DeferToolRequestResult>
+{
+	// 1. Bind the approval to the exact live workload and proof key executing the attempt.
+	const assignment = await transaction.workloadAssignment.findUnique({ where: { runId_attempt: { runId: command.runId, attempt: command.attempt } } });
+	const proofKey = await transaction.runProofKey.findUnique({ where: { runId_attempt: { runId: command.runId, attempt: command.attempt } } });
+	if (assignment === null || proofKey === null || assignment.podUid === null) return { outcome: "unavailable" };
+
+	// 2. Open the pending approval; a duplicate defer for the same action replays the existing row.
+	try
+	{
+		const created = await transaction.approvalRequest.create({
+			data: {
+				runId: command.runId,
+				attempt: command.attempt,
+				agentRevisionId: assignment.agentRevisionId,
+				agentServiceId: assignment.agentServiceId,
+				siloId: assignment.siloId,
+				proofKeyId: proofKey.id,
+				proofKeyThumbprint: proofKey.keyThumbprint,
+				subjectId: assignment.subjectId,
+				workloadAudience: assignment.audience,
+				serviceAccountName: assignment.serviceAccountName,
+				namespace: assignment.namespace,
+				workloadKind: assignment.workloadKind,
+				workloadUid: assignment.workloadUid,
+				podUid: assignment.podUid,
+				resourceKind: "tool",
+				resourceId: command.toolRevisionId,
+				action: "invoke",
+				argumentsDigest: command.argumentsDigest,
+				actionDigest: command.actionDigest,
+				approverPolicyRevision: command.approverPolicyRevision,
+				effectivePolicyDigest: command.effectivePolicyDigest,
+				state: ApprovalRequestState.Pending,
+				expiresAt: command.expiresAt,
+				toolInvocationRowId: command.toolInvocationRowId,
+			},
+		});
+		return { outcome: "deferred", approvalRequestId: created.id };
+	}
+	catch (error)
+	{
+		if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+		const existing = await transaction.approvalRequest.findFirst({ where: { runId: command.runId, attempt: command.attempt, actionDigest: command.actionDigest } });
+		if (existing === null) throw error;
+		return { outcome: "already_deferred", approvalRequestId: existing.id };
+	}
+}
 
 /** Maps a decided approval state back to the stable decision literal, or null while still pending. */
 function _decisionOf(state: ApprovalRequestState): DeferredToolDecision | null
@@ -23,6 +88,11 @@ function _decisionOf(state: ApprovalRequestState): DeferredToolDecision | null
  * way returns `already_decided`, and any conflicting decision (different outcome, or a row that was
  * cancelled/expired out from under the reviewer) returns `conflict` rather than mutating a terminal
  * approval. The caller commits this in the same transaction that transitions the owning run state.
+ *
+ * Scope: this decision authority is built and unit-covered here. The human-facing approval-DECISION
+ * HTTP endpoint that calls it is an operator/product surface delivered in Phase F (#224); until then
+ * the pause is reachable (a sensitive tool defers and opens a pending approval) but the decision is
+ * not yet driven by an external route.
  *
  * @param transaction - Prisma transaction already holding the owning run's approval fence.
  * @param command - Exact pending request, reviewer decision, and trusted instant.

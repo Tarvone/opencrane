@@ -1,4 +1,4 @@
-import { HttpMethod, RequestContext, type ConfigurationOptions, type V1Job, type V1Pod } from "@kubernetes/client-node";
+import { HttpMethod, RequestContext, type ConfigurationOptions, type V1Job, type V1Pod, type V1Secret } from "@kubernetes/client-node";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { __BuildSuspendedAgentRuntimeJob } from "@opencrane/backend/agents/runtime/k8s-launcher";
@@ -46,10 +46,20 @@ function _Job(): V1Job
 	);
 }
 
-/** Return a Core API fake that reports no Pod unless a test overrides it. */
+/** Return a Core API fake that reports no Pod and accepts Secret creation unless overridden. */
 function _CoreApi(overrides: Partial<AgentControllerCoreApi> = {}): AgentControllerCoreApi
 {
-	return { async listNamespacedPod() { return { apiVersion: "v1", kind: "PodList", metadata: {}, items: [] }; }, ...overrides };
+	return {
+		async listNamespacedPod() { return { apiVersion: "v1", kind: "PodList", metadata: {}, items: [] }; },
+		async createNamespacedSecret(request) { return request.body; },
+		...overrides,
+	};
+}
+
+/** Build one immutable, Job-owned attempt-key Secret for adapter tests. */
+function _Secret(): V1Secret
+{
+	return { apiVersion: "v1", kind: "Secret", type: "Opaque", immutable: true, metadata: { name: "litellm-key-store-test", namespace: "silo-a-runtime", ownerReferences: [{ apiVersion: "batch/v1", kind: "Job", name: "agent-runtime-a1-x", uid: "job-uid", controller: true, blockOwnerDeletion: true }] }, stringData: { key: "sk-attempt-transient" } };
 }
 
 /** Return the exact Pod labels authored by the Job controller. */
@@ -95,6 +105,40 @@ describe("least-privilege Kubernetes controller store", function _Suite()
 		const store = __CreateKubernetesAgentControllerStore(_StoreOptions({ batchApi, coreApi: _CoreApi() }));
 
 		expect((await store.__EnsureSuspendedJob(job)).metadata?.uid).toBe("job-uid");
+	});
+
+	it("creates the immutable attempt-key Secret with only the create verb", async function _CreatesSecret()
+	{
+		const secret = _Secret();
+		let created: V1Secret | null = null;
+		let listed = 0;
+		const batchApi: AgentControllerBatchApi = { async createNamespacedJob() { throw new Error("unexpected Job"); }, async readNamespacedJob() { throw new Error("unexpected Job"); }, async patchNamespacedJob() { throw new Error("unexpected Job"); } };
+		const coreApi = _CoreApi({ async createNamespacedSecret(request) { created = request.body; return request.body; }, async listNamespacedPod() { listed += 1; return { apiVersion: "v1", kind: "PodList", metadata: {}, items: [] }; } });
+		const store = __CreateKubernetesAgentControllerStore(_StoreOptions({ batchApi, coreApi }));
+
+		await store.__EnsureAttemptKeySecret(secret);
+
+		expect((created as unknown as V1Secret)?.metadata?.name).toBe("litellm-key-store-test");
+		expect((created as unknown as V1Secret)?.immutable).toBe(true);
+		expect(listed).toBe(0);
+	});
+
+	it("treats an AlreadyExists attempt-key Secret as an idempotent success without any read", async function _AdoptsSecret()
+	{
+		const batchApi: AgentControllerBatchApi = { async createNamespacedJob() { throw new Error("unexpected Job"); }, async readNamespacedJob() { throw new Error("unexpected Job"); }, async patchNamespacedJob() { throw new Error("unexpected Job"); } };
+		const coreApi = _CoreApi({ async createNamespacedSecret() { throw _Conflict(); } });
+		const store = __CreateKubernetesAgentControllerStore(_StoreOptions({ batchApi, coreApi }));
+
+		await expect(store.__EnsureAttemptKeySecret(_Secret())).resolves.toBeUndefined();
+	});
+
+	it("surfaces a non-conflict attempt-key Secret creation failure", async function _SecretFailure()
+	{
+		const batchApi: AgentControllerBatchApi = { async createNamespacedJob() { throw new Error("unexpected Job"); }, async readNamespacedJob() { throw new Error("unexpected Job"); }, async patchNamespacedJob() { throw new Error("unexpected Job"); } };
+		const coreApi = _CoreApi({ async createNamespacedSecret() { throw Object.assign(new Error("forbidden"), { statusCode: 403 }); } });
+		const store = __CreateKubernetesAgentControllerStore(_StoreOptions({ batchApi, coreApi }));
+
+		await expect(store.__EnsureAttemptKeySecret(_Secret())).rejects.toThrow(/forbidden/);
 	});
 
 	it("exact-adopts the deterministic Job after a create conflict", async function _Adopts()

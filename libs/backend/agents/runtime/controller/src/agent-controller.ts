@@ -1,3 +1,5 @@
+import type { V1Job, V1Secret } from "@kubernetes/client-node";
+
 import { __BuildSuspendedAgentRuntimeJob, __DeriveAgentRuntimeReleaseDeadlineSeconds, type AgentRuntimeJobProfile } from "@opencrane/backend/agents/runtime/k8s-launcher";
 import { ___DoWithTrace } from "@opencrane/observability";
 
@@ -65,6 +67,46 @@ function _LitellmKeySecretName(bootstrapReference: string): string
 	const prefix = "bootstrap-v1_";
 	const suffix = bootstrapReference.startsWith(prefix) ? bootstrapReference.slice(prefix.length, prefix.length + 32) : "";
 	return suffix.length === 32 ? `litellm-key-${suffix}` : "litellm-key-profilevalidation";
+}
+
+/**
+ * Build the immutable, Job-owned Secret carrying the attempt-scoped LiteLLM virtual key.
+ *
+ * The key value is the transient one delivered on the claim response; it is written straight into
+ * the Secret and never logged or persisted elsewhere. The ownerReference to the suspended Job makes
+ * Kubernetes garbage-collect the Secret with the Job, so the controller needs no `secrets: delete`.
+ * @param persistedJob - The created or exact-adopted suspended Job, carrying its API-issued UID.
+ * @param workloadUid - Immutable Job UID that binds the Secret's ownerReference.
+ * @param secretName - Deterministic per-attempt Secret name the Job's key volume projects.
+ * @param key - Transient attempt-scoped virtual key value; never the master key.
+ */
+function _BuildAttemptKeySecret(persistedJob: V1Job, workloadUid: string, secretName: string, key: string): V1Secret
+{
+	const namespace = persistedJob.metadata?.namespace;
+	const jobName = persistedJob.metadata?.name;
+	if (!namespace || !jobName)
+	{
+		throw new Error("suspended runtime Job is missing the metadata needed to own its key Secret");
+	}
+	if (typeof key !== "string" || key.length === 0)
+	{
+		throw new Error("claimed runtime attempt is missing its transient attempt-scoped key");
+	}
+	return {
+		apiVersion: "v1",
+		kind: "Secret",
+		type: "Opaque",
+		immutable: true,
+		metadata: {
+			name: secretName,
+			namespace,
+			labels: { "app.kubernetes.io/name": "opencrane-agent-runtime", "app.kubernetes.io/component": "agent-runtime" },
+			ownerReferences: [{ apiVersion: "batch/v1", kind: "Job", name: jobName, uid: workloadUid, controller: true, blockOwnerDeletion: true }],
+		},
+		// The single item key matches the Job's projected volume item; group-readable projection and the
+		// runtime-side 0440 mount are owned by the k8s-launcher, not by this Secret.
+		stringData: { key },
+	};
 }
 
 /** Require an immutable UID returned by the Kubernetes API rather than a locally derived value. */
@@ -137,7 +179,12 @@ export async function __ReconcileNextAgentRuntimeAttempt(options: AgentControlle
 	const persistedJob = await options.kubernetes.__EnsureSuspendedJob(job);
 	const workloadUid = _RequireWorkloadUid(persistedJob.metadata?.uid);
 
-	// 4. Commit the exact UID; the separate durable release reconciliation may now unsuspend it.
+	// 4. Create the Job-owned attempt-key Secret before the separate release reconciliation can
+	//    unsuspend the Job. The key rode the claim response transiently; it is written straight into
+	//    the immutable Secret (GC'd with the Job) and never persisted or logged by the controller.
+	await options.kubernetes.__EnsureAttemptKeySecret(_BuildAttemptKeySecret(persistedJob, workloadUid, assignment.litellmKeySecretName, claim.attempt.litellmKey));
+
+	// 5. Commit the exact UID; the separate durable release reconciliation may now unsuspend it.
 	const committed = await options.authority.__CommitAssignment(claim.lease.eventId, {
 		claimedAt: claim.lease.claimedAt,
 		deliveryCount: claim.lease.deliveryCount,

@@ -38,6 +38,15 @@ export interface AgentControllerRunAttemptProjection
 	readonly workloadProfile: string;
 	/** Stable opaque bootstrap reference projected into the one-attempt Job; it is not a credential. */
 	readonly bootstrapReference: string;
+	/**
+	 * Attempt-scoped LiteLLM virtual key minted by the control plane at claim time.
+	 *
+	 * TRANSIENT ONLY: this value rides the claim HTTP response, is written straight into the
+	 * per-attempt Kubernetes Secret by the controller, and is never persisted to Postgres or logged.
+	 * It is a short-lived, budget- and alias-bound virtual key — never the LiteLLM master key or an
+	 * upstream provider secret, both of which stay in the control plane.
+	 */
+	readonly litellmKey: string;
 }
 
 /** One claimed outbox command and its authorised suspended-Job projection. */

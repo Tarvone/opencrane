@@ -9,7 +9,7 @@ function _ClaimBody()
 {
 	return {
 		lease: { eventId: "event/1", claimedAt: "2026-07-20T00:00:00.000Z", deliveryCount: 1, expiresAt: "2026-07-20T00:01:00.000Z" },
-		attempt: { runId: "run-1", attempt: 1, siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", inputSnapshotDigest: "sha256:snapshot", namespace: "silo-a-runtime", workloadProfile: "personal-default", bootstrapReference: "bootstrap-ref-1" },
+		attempt: { runId: "run-1", attempt: 1, siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", inputSnapshotDigest: "sha256:snapshot", namespace: "silo-a-runtime", workloadProfile: "personal-default", bootstrapReference: "bootstrap-ref-1", litellmKey: "sk-attempt-transient" },
 	};
 }
 

@@ -75,13 +75,15 @@ function _ParseClaim(value: unknown): AgentControllerRunAttemptClaim
 {
 	const root = _AsObject(value);
 	const attempt = _AsObject(root?.attempt);
-	if (!root || !attempt || !_IsIdentifier(attempt.runId) || !_IsPositiveInteger(attempt.attempt) || !_IsIdentifier(attempt.siloId) || !_IsIdentifier(attempt.agentServiceId) || !_IsIdentifier(attempt.agentRevisionId) || !_IsIdentifier(attempt.inputSnapshotDigest) || !_IsIdentifier(attempt.namespace) || !_IsIdentifier(attempt.workloadProfile) || !_IsIdentifier(attempt.bootstrapReference))
+	if (!root || !attempt || !_IsIdentifier(attempt.runId) || !_IsPositiveInteger(attempt.attempt) || !_IsIdentifier(attempt.siloId) || !_IsIdentifier(attempt.agentServiceId) || !_IsIdentifier(attempt.agentRevisionId) || !_IsIdentifier(attempt.inputSnapshotDigest) || !_IsIdentifier(attempt.namespace) || !_IsIdentifier(attempt.workloadProfile) || !_IsIdentifier(attempt.bootstrapReference) || !_IsIdentifier(attempt.litellmKey))
 	{
 		throw new Error("OpenCrane returned a malformed controller claim");
 	}
+	// The minted key is transient: it is bound here only long enough for the reconcile to write it
+	// into the per-attempt Secret. It is never logged, committed to the assignment, or persisted.
 	return {
 		lease: _ParseLease(root.lease),
-		attempt: { runId: attempt.runId, attempt: attempt.attempt, siloId: attempt.siloId, agentServiceId: attempt.agentServiceId, agentRevisionId: attempt.agentRevisionId, inputSnapshotDigest: attempt.inputSnapshotDigest, namespace: attempt.namespace, workloadProfile: attempt.workloadProfile, bootstrapReference: attempt.bootstrapReference },
+		attempt: { runId: attempt.runId, attempt: attempt.attempt, siloId: attempt.siloId, agentServiceId: attempt.agentServiceId, agentRevisionId: attempt.agentRevisionId, inputSnapshotDigest: attempt.inputSnapshotDigest, namespace: attempt.namespace, workloadProfile: attempt.workloadProfile, bootstrapReference: attempt.bootstrapReference, litellmKey: attempt.litellmKey },
 	};
 }
 

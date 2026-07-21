@@ -49,7 +49,11 @@ Job, confirms the workload's full identity (who / where / which attempt) matches
 
 `PrismaRunDispatchRepository` is the database side of the controller handshake. It issues a short,
 server-owned claim lease over `RunAttemptRequested`, exposes only the coordinates needed to create a
-suspended Job, and commits the Job UID as a `PendingPod` assignment. That commit also creates an
+suspended Job, and commits the Job UID as a `PendingPod` assignment. At claim time it also mints the
+attempt-scoped model key through an injected `AttemptModelKeyIssuer` (the app binds this to the
+model-routing gateway, which holds the LiteLLM master key) using the alias and budget frozen on the
+snapshot, and attaches the transient virtual key to the claim response only — it is never written to
+Postgres. Minting happens outside the database transaction so no external call holds a lock. That commit also creates an
 unconsumed bootstrap record and a second durable command asking the controller to release the Job.
 The bootstrap reference is an opaque label, not a password: it grants nothing without the exact
 projected workload identity, assigned Job and registered first Pod. The stored integrity digest binds

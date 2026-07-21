@@ -116,6 +116,12 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["list"]
+  # Attempt-scoped LiteLLM key Secrets are created (never read, updated, or deleted) in this dedicated
+  # runtime namespace. Each Secret is owned by its suspended Job and garbage-collected with it, so no
+  # get/list/update/delete verb is required.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

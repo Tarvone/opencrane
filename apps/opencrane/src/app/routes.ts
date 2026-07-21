@@ -6,7 +6,7 @@ import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backen
 import { auditRouter } from "@opencrane/backend/server/iam/audit";
 import { groupsRouter } from "@opencrane/backend/server/iam/groups";
 import { _RegisterInternalTenantContract } from "@opencrane/backend/server/tenancy/contract";
-import { _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingMetricsRouter } from "@opencrane/backend/server/gateways/model-routing";
+import { _IssueAttemptLiteLlmKey, _RegisterInternalTenantModels, modelRoutingDefaultsRouter, modelRoutingMetricsRouter } from "@opencrane/backend/server/gateways/model-routing";
 import { _RegisterInternalParticipation, awarenessRolloutRouter, awarenessParticipationRouter } from "@opencrane/backend/server/reporting/awareness";
 import { mcpOperatorRouter, mcpServersRouter } from "@opencrane/backend/server/gateways/mcp";
 import { metricsRouter, prometheusMetricsRouter } from "@opencrane/backend/server/reporting/metrics";
@@ -20,7 +20,7 @@ import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { _RegisterInternalAgentRuntimeStream, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
 import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
-import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
+import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
 import { PrismaRuntimeDispatchAuthority } from "@opencrane/backend/agents/runtime";
 import { PrismaRuntimeBootstrapExchange, __CreateRuntimeBootstrapRouter } from "@opencrane/backend/server/iam/authorization";
 import { ___DoWithTrace } from "@opencrane/observability";
@@ -159,6 +159,22 @@ function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api, s
 }
 
 /**
+ * Mint one attempt-scoped LiteLLM virtual key for a claimed run attempt.
+ *
+ * This binds the run-dispatch repository's injected issuer to the model-routing gateway, which holds
+ * the LiteLLM master key. Keeping the call here (not in the `scope:personal-runs` library) is why the
+ * master key never reaches the outbound-only controller: only the minted virtual key rides the claim
+ * response. The per-silo server already targets its own silo LiteLLM, so `siloId` needs no routing.
+ * @param request - Alias, single model alias, silo, budget, and expiry the key is bound to.
+ * @returns The transient minted key value.
+ */
+async function _IssueAttemptModelKey(request: AttemptModelKeyMintRequest): Promise<MintedAttemptModelKey>
+{
+	const minted = await _IssueAttemptLiteLlmKey({ keyAlias: request.keyAlias, modelAlias: request.modelAlias, maxBudgetUsd: request.maxBudgetUsd, expirySeconds: request.expirySeconds });
+	return { key: minted.key };
+}
+
+/**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
  *   - The NetworkPolicy-only `tenant-models` route takes no token; access is
@@ -175,7 +191,7 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
 	const claimLeaseMilliseconds = _ReadBoundedSeconds("AGENT_CONTROLLER_CLAIM_LEASE_SECONDS", 30, 1, 300);
 	const assignmentTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS", 3_600, 60, 86_400);
 	const commandTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_COMMAND_TTL_SECONDS", 60, 1, 300);
-	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace: runtimeNamespace, claimLeaseMilliseconds, assignmentTtlMilliseconds });
+	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace: runtimeNamespace, claimLeaseMilliseconds, assignmentTtlMilliseconds }, _IssueAttemptModelKey);
 	const runtimeTokenReviewer = _CreateRuntimeTokenReviewer(authApi, runtimeNamespace);
 	const runtimeDispatchAuthority = new PrismaRuntimeDispatchAuthority(prisma, { namespace: runtimeNamespace, commandTtlMilliseconds }, _CreatePrismaRunInputCompiler());
 	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi, serverNamespace), namespace: serverNamespace, repository: runDispatchRepository, logger: _log }));

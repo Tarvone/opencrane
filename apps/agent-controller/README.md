@@ -49,8 +49,11 @@ on `SIGTERM`/`SIGINT`.
 
 The process holds no database credentials and exposes no Service, Ingress, public route or health
 listener. Its Kubernetes role exists only in the dedicated runtime namespace and grants
-`get/create/patch` for Jobs plus `list` for Pods. It cannot create policy, read Secrets, mutate Pods,
-or get, replace, delete, or watch any Pod. Its ServiceAccount and Deployment remain in the server
+`get/create/patch` for Jobs, `list` for Pods, and `create` (only) for Secrets — the per-attempt
+LiteLLM key Secret, owned by its Job so it is garbage-collected with it. It cannot create policy,
+read/update/delete Secrets, mutate Pods, or get, replace, delete, or watch any Pod. The minted
+virtual key rides the claim response and is written straight into the Secret; the controller never
+holds the LiteLLM master key. Its ServiceAccount and Deployment remain in the server
 namespace, so compromising a runtime Pod does not place it beside the controller identity. The
 projected bootstrap reference is an opaque lookup key, not a credential, and the controller never
 logs it.

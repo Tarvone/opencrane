@@ -1,4 +1,4 @@
-import type { ConfigurationOptions, V1Job, V1Pod, V1PodList } from "@kubernetes/client-node";
+import type { ConfigurationOptions, V1Job, V1Pod, V1PodList, V1Secret } from "@kubernetes/client-node";
 import type { Logger } from "@opencrane/observability";
 import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim, AgentControllerRunWorkloadRegistrationCommand, AgentControllerRunWorkloadRegistrationResult, AgentControllerRunWorkloadReleaseClaim } from "@opencrane/contracts";
 import type { AgentRuntimeJobProfile } from "@opencrane/backend/agents/runtime/k8s-launcher";
@@ -24,6 +24,13 @@ export interface AgentControllerKubernetesStore
 {
 	/** Create or exact-adopt the suspended attempt Job without changing it. */
 	__EnsureSuspendedJob(expected: V1Job): Promise<V1Job>;
+	/**
+	 * Create the immutable, Job-owned attempt-scoped key Secret, or accept an existing one.
+	 *
+	 * Create-only: the store has no `get`/`list` on Secrets. An AlreadyExists response is treated as
+	 * the idempotent replay of this exact attempt's prior creation, never re-read.
+	 */
+	__EnsureAttemptKeySecret(expected: V1Secret): Promise<void>;
 	/** Exact-adopt or conditionally release the assigned Job within its absolute authority lifetime. */
 	__EnsureRuntimeJobReleased(expected: V1Job, workloadUid: string, assignmentExpiresAt: string, releaseLeaseExpiresAt: string): Promise<V1Job>;
 	/** Return the unique exact first Pod, or null while Kubernetes has not created one. */
@@ -112,11 +119,13 @@ interface AgentControllerJobPatchRequest
 	readonly body: readonly AgentControllerJobPatchOperation[];
 }
 
-/** Narrow Core API surface used only for exact Pod listing. */
+/** Narrow Core API surface used only for exact Pod listing and attempt-key Secret creation. */
 export interface AgentControllerCoreApi
 {
 	/** List Pods using the exact attempt and Kubernetes Job UID selector. */
 	listNamespacedPod(request: { readonly namespace: string; readonly labelSelector: string }, options?: ConfigurationOptions): Promise<V1PodList>;
+	/** Create one immutable, Job-owned attempt-key Secret in the runtime namespace (create-only Role). */
+	createNamespacedSecret(request: { readonly namespace: string; readonly body: V1Secret }, options?: ConfigurationOptions): Promise<V1Secret>;
 }
 
 /** Clients required by the Kubernetes adapter. */

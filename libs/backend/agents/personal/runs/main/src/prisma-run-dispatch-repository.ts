@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 
 import { AgentRunState, AgentRunTerminalReason, AgentServiceKind, AgentServiceState, Prisma, RunOutboxEventKind, WorkloadAssignmentState, WorkloadKind, type AgentRun, type OutboxEvent, type PrismaClient, type WorkloadAssignment, type WorkloadBootstrap } from "@prisma/client";
 
-import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName, type AgentControllerRunAttemptAssignmentCommand, type AgentControllerRunWorkloadRegistrationCommand, type AgentControllerRunWorkloadReleaseProjection } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName, type AgentControllerRunAttemptAssignmentCommand, type AgentControllerRunAttemptClaimLease, type AgentControllerRunAttemptProjection, type AgentControllerRunWorkloadRegistrationCommand, type AgentControllerRunWorkloadReleaseProjection } from "@opencrane/contracts";
 import { ___DoWithTrace } from "@opencrane/observability";
 
-import type { ClaimNextRunAttemptResult, ClaimNextRunWorkloadReleaseResult, CommitRunAttemptAssignmentResult, RegisterRunWorkloadPodResult, RunDispatchRepository, RunDispatchRepositoryConfig, RunOutboxCandidateRow, RunWorkloadReleaseCandidateRow } from "./run-dispatch.types.js";
+import type { AttemptModelKeyIssuer, ClaimNextRunAttemptResult, ClaimNextRunWorkloadReleaseResult, CommitRunAttemptAssignmentResult, RegisterRunWorkloadPodResult, RunDispatchRepository, RunDispatchRepositoryConfig, RunOutboxCandidateRow, RunWorkloadReleaseCandidateRow } from "./run-dispatch.types.js";
 
 /** Snapshot identity fields required at the dispatch authority boundary. */
 interface SnapshotExecutionIdentity
@@ -15,6 +15,26 @@ interface SnapshotExecutionIdentity
 	/** Last instant at which the signed fleet-membership evidence remains trusted. */
 	readonly fleetMembershipTrustedUntilEpochMilliseconds: number;
 }
+
+/** Claim plus the inputs needed to mint the attempt key after the database transaction commits. */
+interface ClaimedAttemptWithMintInputs
+{
+	/** Database-issued claim generation fencing the delivery. */
+	readonly lease: AgentControllerRunAttemptClaimLease;
+	/** Narrow attempt projection without the transient key, which is attached after minting. */
+	readonly attempt: Omit<AgentControllerRunAttemptProjection, "litellmKey">;
+	/** Attempt- and delivery-unique alias the minted key is bound to. */
+	readonly keyAlias: string;
+	/** Single model alias frozen into the snapshot's server-selected route. */
+	readonly modelAlias: string;
+	/** Positive US-dollar spend ceiling derived from the snapshot's budget policy. */
+	readonly maxBudgetUsd: number;
+	/** Whole-second key lifetime bounded to the assignment lifetime. */
+	readonly expirySeconds: number;
+}
+
+/** Transaction outcome: no eligible work, or a claim whose key must be minted outside the lock. */
+type ClaimTransactionResult = { readonly status: "none" } | ({ readonly status: "claimed" } & ClaimedAttemptWithMintInputs);
 
 /**
  * Prisma-backed authority for handing one accepted personal run to the Kubernetes controller.
@@ -29,20 +49,24 @@ export class PrismaRunDispatchRepository implements RunDispatchRepository
 	private readonly prisma: PrismaClient;
 	/** Fixed namespace and database-owned lifetime policy. */
 	private readonly config: RunDispatchRepositoryConfig;
+	/** App-injected issuer that mints the attempt-scoped model key; the master key stays server-side. */
+	private readonly issueAttemptModelKey: AttemptModelKeyIssuer;
 
-	/** Creates a dispatch adapter over canonical Postgres. */
-	constructor(prisma: PrismaClient, config: RunDispatchRepositoryConfig)
+	/** Creates a dispatch adapter over canonical Postgres with an injected attempt-key issuer. */
+	constructor(prisma: PrismaClient, config: RunDispatchRepositoryConfig, issueAttemptModelKey: AttemptModelKeyIssuer)
 	{
 		if (!_ConfigIsValid(config)) throw new Error("run dispatch repository requires bounded namespace and lifetimes");
 		this.prisma = prisma;
 		this.config = config;
+		this.issueAttemptModelKey = issueAttemptModelKey;
 	}
 
-	/** Claims one eligible event and loads its immutable desired-state projection atomically. */
+	/** Claims one eligible event, loads its narrow projection, and mints its transient attempt key. */
 	async claimNextAttemptAtomically(): Promise<ClaimNextRunAttemptResult>
 	{
 		const config = this.config;
-		return this.prisma.$transaction(async function _claim(transaction: Prisma.TransactionClient): Promise<ClaimNextRunAttemptResult>
+		// 1. Claim and project under the database lock; extract the mint inputs frozen on the snapshot.
+		const claimed = await this.prisma.$transaction(async function _claim(transaction: Prisma.TransactionClient): Promise<ClaimTransactionResult>
 		{
 			// 1. Discover without locking, then establish the global service -> run -> outbox order.
 			const candidates = await transaction.$queryRaw<RunOutboxCandidateRow[]>(Prisma.sql`
@@ -98,25 +122,44 @@ export class PrismaRunDispatchRepository implements RunDispatchRepository
 				return { status: "none" };
 			}
 
-			// 3. Advance both claim coordinates. The exact pair fences stale controller replicas.
+			// 3. Read the frozen model alias and cost ceiling; fail closed when either cannot bound a key.
+			const modelAlias = _SnapshotModelAlias(snapshot.modelRoute);
+			const maxBudgetUsd = _SnapshotMaxBudgetUsd(snapshot.budgetPolicy);
+			if (modelAlias === null || maxBudgetUsd === null)
+			{
+				await _TerminalizeUndispatchableAttempt(transaction, event, run, now, "RUN_DISPATCH_MODEL_ROUTE_INVALID", AgentRunTerminalReason.InvalidInput);
+				return { status: "none" };
+			}
+
+			// 4. Advance both claim coordinates. The exact pair fences stale controller replicas.
 			const claimedAt = new Date(Math.max(now.getTime(), (event.claimedAt?.getTime() ?? -1) + 1));
 			const deliveryCount = event.deliveryCount + 1;
-			const claimed = await transaction.outboxEvent.updateMany({ where: { id: event.id, claimedAt: event.claimedAt, deliveryCount: event.deliveryCount, publishedAt: null, failedAt: null }, data: { claimedAt, deliveryCount } });
-			if (claimed.count !== 1) throw new Error("run dispatch claim lost its event fence");
+			const claimedEvent = await transaction.outboxEvent.updateMany({ where: { id: event.id, claimedAt: event.claimedAt, deliveryCount: event.deliveryCount, publishedAt: null, failedAt: null }, data: { claimedAt, deliveryCount } });
+			if (claimedEvent.count !== 1) throw new Error("run dispatch claim lost its event fence");
 			if (run.state === AgentRunState.Accepted)
 			{
 				const queued = await transaction.agentRun.updateMany({ where: { id: run.id, attempt: run.attempt, state: AgentRunState.Accepted }, data: { state: AgentRunState.Queued } });
 				if (queued.count !== 1) throw new Error("claimed run could not enter queued state");
 			}
 
+			// 5. Return the claim plus the inputs to mint the transient key once the lock is released.
 			return {
 				status: "claimed",
-				claim: {
-					lease: { eventId: event.id, claimedAt: claimedAt.toISOString(), deliveryCount, expiresAt: new Date(claimedAt.getTime() + config.claimLeaseMilliseconds).toISOString() },
-					attempt: { runId: run.id, attempt: run.attempt, siloId: run.siloId, agentServiceId: run.agentServiceId, agentRevisionId: run.agentRevisionId, inputSnapshotDigest: run.inputSnapshotDigest, namespace: config.namespace, workloadProfile: service.workloadProfile, bootstrapReference: _BootstrapReference(event.id, run.attempt, run, config.namespace) },
-				},
+				lease: { eventId: event.id, claimedAt: claimedAt.toISOString(), deliveryCount, expiresAt: new Date(claimedAt.getTime() + config.claimLeaseMilliseconds).toISOString() },
+				attempt: { runId: run.id, attempt: run.attempt, siloId: run.siloId, agentServiceId: run.agentServiceId, agentRevisionId: run.agentRevisionId, inputSnapshotDigest: run.inputSnapshotDigest, namespace: config.namespace, workloadProfile: service.workloadProfile, bootstrapReference: _BootstrapReference(event.id, run.attempt, run, config.namespace) },
+				keyAlias: _AttemptKeyAlias(run.id, run.attempt, run.siloId, deliveryCount),
+				modelAlias,
+				maxBudgetUsd,
+				expirySeconds: _AttemptKeyExpirySeconds(config.assignmentTtlMilliseconds),
 			};
 		});
+		if (claimed.status === "none") return { status: "none" };
+
+		// 2. Mint the attempt-scoped key OUTSIDE the transaction so no external call holds a database
+		//    lock, then attach it transiently to the claim response. It is never written to Postgres.
+		const minted = await this.issueAttemptModelKey({ keyAlias: claimed.keyAlias, modelAlias: claimed.modelAlias, siloId: claimed.attempt.siloId, maxBudgetUsd: claimed.maxBudgetUsd, expirySeconds: claimed.expirySeconds });
+		if (typeof minted.key !== "string" || minted.key.length === 0) throw new Error("attempt model key issuer returned no key");
+		return { status: "claimed", claim: { lease: claimed.lease, attempt: { ...claimed.attempt, litellmKey: minted.key } } };
 	}
 
 	/** Commits an exact live claim, immutable Job UID, assignment, run state, and outbox publication. */
@@ -647,6 +690,37 @@ async function _TerminalizePoisonedRelease(transaction: Prisma.TransactionClient
 		const maximum = await transaction.conversationRunEvent.aggregate({ where: { runId: run.id }, _max: { sequence: true } });
 		await transaction.conversationRunEvent.create({ data: { runId: run.id, sequence: (maximum._max.sequence ?? 0) + 1, type: "run.failed", payload: { terminalReason: "runtime_failure", failureCode }, occurredAt: now } });
 	}
+}
+
+/** Extract the single model alias frozen into the snapshot's server-selected route. */
+function _SnapshotModelAlias(modelRoute: unknown): string | null
+{
+	if (!modelRoute || typeof modelRoute !== "object" || Array.isArray(modelRoute)) return null;
+	const route = modelRoute as Record<string, unknown>;
+	const alias = typeof route["alias"] === "string" ? route["alias"] : typeof route["publicModelName"] === "string" ? route["publicModelName"] : "";
+	return alias.trim().length > 0 && alias.length <= 128 ? alias : null;
+}
+
+/** Derive the positive US-dollar spend ceiling from the snapshot's micro-dollar cost policy. */
+function _SnapshotMaxBudgetUsd(budgetPolicy: unknown): number | null
+{
+	if (!budgetPolicy || typeof budgetPolicy !== "object" || Array.isArray(budgetPolicy)) return null;
+	const micros = (budgetPolicy as Record<string, unknown>)["maxCostUsdMicros"];
+	if (typeof micros !== "number" || !Number.isSafeInteger(micros) || micros <= 0) return null;
+	return micros / 1_000_000;
+}
+
+/** Derive one attempt- and delivery-unique key alias satisfying the issuer's `attempt-<hex>` grammar. */
+function _AttemptKeyAlias(runId: string, attempt: number, siloId: string, deliveryCount: number): string
+{
+	const canonical = JSON.stringify(["opencrane-attempt-litellm-key-alias-v1", runId, attempt, siloId, deliveryCount]);
+	return `attempt-${createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 32)}`;
+}
+
+/** Bound the minted key lifetime to whole seconds within the issuer's 24-hour ceiling. */
+function _AttemptKeyExpirySeconds(assignmentTtlMilliseconds: number): number
+{
+	return Math.min(Math.floor(assignmentTtlMilliseconds / 1_000), 86_400);
 }
 
 /** Validate untrusted first-Pod evidence before it reaches Prisma or SQL. */

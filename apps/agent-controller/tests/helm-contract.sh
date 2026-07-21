@@ -61,8 +61,19 @@ grep -Fq 'resources: ["jobs"]' "$ROLE"
 grep -Fq 'verbs: ["get", "create", "patch"]' "$ROLE"
 grep -Fq 'resources: ["pods"]' "$ROLE"
 grep -Fq 'verbs: ["list"]' "$ROLE"
-if grep -Eq 'networkpolicies|secrets|serviceaccounts|deployments|"(delete|update|watch)"' "$ROLE"; then
-  echo "agent-controller Role exceeds the accepted Job/Pod boundary" >&2
+# Attempt-key Secrets are create-only in the runtime namespace: the exact resource+verb must appear,
+# and the secrets rule must grant nothing beyond create.
+grep -Fq 'resources: ["secrets"]' "$ROLE"
+if ! grep -A1 'resources: \["secrets"\]' "$ROLE" | grep -Fq 'verbs: ["create"]'; then
+  echo "agent-controller secrets rule must be create-only" >&2
+  exit 1
+fi
+if grep -A1 'resources: \["secrets"\]' "$ROLE" | grep -Eq '"(get|list|patch|delete|update|watch)"'; then
+  echo "agent-controller secrets rule exceeds create-only" >&2
+  exit 1
+fi
+if grep -Eq 'networkpolicies|serviceaccounts|deployments|configmaps|"(delete|update|watch)"' "$ROLE"; then
+  echo "agent-controller Role exceeds the accepted Job/Pod/Secret boundary" >&2
   exit 1
 fi
 test -s "$BINDING"

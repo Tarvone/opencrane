@@ -6,8 +6,11 @@
 
 This package is the narrow reconciliation step between OpenCrane's durable run authority and
 Kubernetes execution state. It first claims an authorised attempt, resolves its named runtime
-profile, and creates the still-suspended Job in a dedicated runtime namespace. A second durable reconciliation releases
-only the exact assigned Job and registers its unique first Pod.
+profile, and creates the still-suspended Job in a dedicated runtime namespace. It then creates the
+attempt's immutable, Job-owned LiteLLM key Secret from the transient virtual key delivered on the
+claim response — before the Job can be released — so the released Pod is admitted and the Secret is
+garbage-collected with the Job. A second durable reconciliation releases only the exact assigned Job
+and registers its unique first Pod.
 
 The split exists because a database transaction and a Kubernetes create cannot commit together. The
 controller therefore orders the two authorities so every recoverable partial state is harmless: a
@@ -56,14 +59,18 @@ ends by the durable expiry; zero Pods means retry while multiple or foreign Pods
   canonical Job builder before polling starts.
 - `__CreateHttpAgentControllerAuthority` — claims and commits over the projected-token-authenticated
   internal OpenCrane API.
-- `__CreateKubernetesAgentControllerStore` — exposes exact Job adoption, expiry-bounded fenced Job release,
-  and selector-bounded first-Pod listing.
+- `__CreateKubernetesAgentControllerStore` — exposes exact Job adoption, create-only attempt-key
+  Secret creation, expiry-bounded fenced Job release, and selector-bounded first-Pod listing.
 
 ## Boundary
 
-The package does not read Postgres directly, create ServiceAccounts, Pods, Secrets, volumes or
-Deployments, watch Kubernetes, replace an object, mutate a Pod, or issue runtime commands. It can
-only lower `spec.activeDeadlineSeconds` and patch `spec.suspend` from true to false together after all identity tests pass. OpenCrane remains business
+The package does not read Postgres directly, create ServiceAccounts, Pods, volumes or Deployments,
+read/update/delete Secrets, watch Kubernetes, replace an object, mutate a Pod, or issue runtime
+commands. Its only Secret power is creating the immutable, Job-owned attempt-key Secret (an
+AlreadyExists response is an idempotent success, never re-read); it can lower
+`spec.activeDeadlineSeconds` and patch `spec.suspend` from true to false together only after all
+identity tests pass. The minted key is transient — written straight into the Secret, never persisted
+or logged — and the LiteLLM master key stays in the control plane. OpenCrane remains business
 authority; Kubernetes remains an execution projection.
 
 ## Dependency direction
@@ -78,7 +85,7 @@ The app supplies one runtime namespace, a bounded poll interval, and an immutabl
 server namespace must be valid and different. The HTTP
 adapter rereads its projected token for every request so kubelet rotation needs no process restart.
 The Kubernetes adapter relies on a Role in the runtime namespace granting `get/create/patch` for
-Jobs and `list` for Pods. It has no Kubernetes Networking client. It lists Pods with both the Job-controller UID
+Jobs, `list` for Pods, and `create` (only) for Secrets. It has no Kubernetes Networking client. It lists Pods with both the Job-controller UID
 and deterministic attempt label; it has no Pod `get`, mutation, delete, or watch privilege. Every
 release reconciliation opens one parent trace around its claim, Kubernetes changes, Pod discovery,
 registration and outcome log; the opaque bootstrap reference is never a trace attribute. Every

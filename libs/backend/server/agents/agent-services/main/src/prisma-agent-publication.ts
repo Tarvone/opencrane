@@ -26,17 +26,17 @@ export class PrismaAgentServicePublicationRepository implements AgentServicePubl
 		this.auditEvidence = auditEvidence;
 	}
 
-	/** Loads one stable service identity without mutating it. */
-	async getService(agentServiceId: string): Promise<AgentService | null>
+	/** Loads one stable service identity scoped to the caller's silo. */
+	async getService(agentServiceId: string, siloId: string): Promise<AgentService | null>
 	{
-		const row = await this.prisma.agentService.findUnique({ where: { id: agentServiceId } });
+		const row = await this.prisma.agentService.findFirst({ where: { id: agentServiceId, siloId } });
 		return row === null ? null : _mapService(row);
 	}
 
-	/** Loads one immutable revision and all executable assignments. */
-	async getRevision(agentRevisionId: string): Promise<AgentRevision | null>
+	/** Loads one immutable revision whose parent service is in the caller's silo. */
+	async getRevision(agentRevisionId: string, siloId: string): Promise<AgentRevision | null>
 	{
-		const row = await this.prisma.agentRevision.findUnique({ where: { id: agentRevisionId }, include: { skillAssignments: true, integrationAssignments: true, scopeAttachments: true } });
+		const row = await this.prisma.agentRevision.findFirst({ where: { id: agentRevisionId, agentService: { is: { siloId } } }, include: { skillAssignments: true, integrationAssignments: true, scopeAttachments: true } });
 		return row === null ? null : _mapRevision(row);
 	}
 

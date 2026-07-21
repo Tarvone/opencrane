@@ -171,7 +171,9 @@ export class PrismaAgentRevisionLifecycleRepository implements AgentRevisionLife
 		{
 			const guard = await _lockAndReadHead(transaction, command.agentServiceId, command.siloId, command.expectedParentRevisionId);
 			if (guard.outcome !== "ok") return guard.result;
-			const source = await transaction.agentRevision.findUnique({ where: { id: command.sourceRevisionId }, include: _REVISION_INCLUDE });
+			// Silo-scope the source lookup: a foreign-silo revision must be a 404, never a distinct 409
+			// existence oracle. The same-silo different-service mismatch is still a 409 within the silo.
+			const source = await transaction.agentRevision.findFirst({ where: { id: command.sourceRevisionId, agentService: { is: { siloId: command.siloId } } }, include: _REVISION_INCLUDE });
 			if (source === null) return { outcome: "denied", reason: "revision_not_found" };
 			if (source.agentServiceId !== command.agentServiceId) return { outcome: "denied", reason: "revision_service_mismatch" };
 			const content = _contentFromRevision(source);

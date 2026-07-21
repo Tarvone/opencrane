@@ -53,7 +53,8 @@ class _Repository implements AgentRevisionLifecycleRepository
 		if (this._siloService(command.agentServiceId, command.siloId) === null) return { outcome: "denied", reason: "service_not_found" };
 		const head = this._head(command.agentServiceId);
 		if (head === null || head.id !== command.expectedParentRevisionId) return { outcome: "conflict", currentHeadRevisionId: head?.id ?? null };
-		const source = this.revisions.find(revision => revision.id === command.sourceRevisionId);
+		// Silo-scope the source lookup exactly like the Prisma adapter: a foreign-silo source is a 404.
+		const source = this.revisions.find(revision => revision.id === command.sourceRevisionId && this._siloService(revision.agentServiceId, command.siloId) !== null);
 		if (source === undefined) return { outcome: "denied", reason: "revision_not_found" };
 		const content: AgentRevisionContent = { promptPolicyVersion: source.promptPolicyVersion, personaRevisionId: source.personaRevisionId, modelPolicyId: source.modelPolicyId, budget: source.budget, skills: source.skills.map(skill => ({ skillId: skill.skillId, revisionId: skill.revisionId })), integrationAssignments: source.integrationAssignments.map(assignment => ({ integrationId: assignment.integrationId, custodyReferenceId: assignment.custodyReferenceId, allowedTools: [...assignment.allowedTools] })), scopeAttachments: source.scopeAttachments.map(attachment => ({ ...attachment })) };
 		return { outcome: "revised", revision: this._append(command.agentServiceId, head.revision + 1, head.id, source.id, content, command.authoredBy, command.changeMessage, createdAt) };
@@ -214,12 +215,19 @@ describe("managed agent revision lifecycle", function _suite()
 		expect(await repository.getService(seed.serviceId, foreign)).toBeNull();
 		expect((await __ReadAgentServiceHistory(repository, seed.serviceId, foreign, 50)).revisions).toHaveLength(0);
 
-		// Writes: revise, restore, state changes, and run-now all fail closed as not-found.
+		// Writes: revise, restore, enable/pause/retire, and run-now all fail closed as not-found.
 		expect(await __ReviseAgentRevision(repository, { siloId: foreign, agentServiceId: seed.serviceId, expectedParentRevisionId: seed.revisionId, authoredBy: "attacker", changeMessage: "x", content: _content() }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(await __RestoreAgentRevision(repository, { siloId: foreign, agentServiceId: seed.serviceId, sourceRevisionId: seed.revisionId, expectedParentRevisionId: seed.revisionId, authoredBy: "attacker", changeMessage: "x" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(await __ChangeAgentServiceState(repository, { siloId: foreign, agentServiceId: seed.serviceId, expectedState: "active", action: "pause" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
+		expect(await __ChangeAgentServiceState(repository, { siloId: foreign, agentServiceId: seed.serviceId, expectedState: "active", action: "retire" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: foreign, requestedBy: "attacker", requestIdempotencyKey: "req-x" })).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(port.lastCommand).toBeNull();
+
+		// Indirect path: a silo-B service restoring a silo-A source revision resolves as revision_not_found,
+		// never revision_service_mismatch — no cross-silo existence oracle on the source lookup.
+		const foreignSeed = await _seedService(repository, foreign);
+		const restoreForeignSource = await __RestoreAgentRevision(repository, { siloId: foreign, agentServiceId: foreignSeed.serviceId, sourceRevisionId: seed.revisionId, expectedParentRevisionId: foreignSeed.revisionId, authoredBy: "attacker", changeMessage: "x" }, _NOW);
+		expect(restoreForeignSource).toEqual({ outcome: "denied", reason: "revision_not_found" });
 
 		// Same-silo access still works.
 		expect((await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: "silo-a", requestedBy: "admin-1", requestIdempotencyKey: "req-ok" })).outcome).toBe("accepted");

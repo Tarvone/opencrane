@@ -1,4 +1,4 @@
-import type { AgentRevision, AgentRevisionId, AgentService } from "@opencrane/models/agents";
+import type { AgentRevision, AgentRevisionId, AgentService, AgentServiceId } from "@opencrane/models/agents";
 import { describe, expect, it } from "vitest";
 
 import { __PublishAgentRevision } from "../agent-publication.js";
@@ -52,6 +52,8 @@ class _PublicationRepository implements AgentServicePublicationRepository
 	private service: AgentService = _service();
 	/** Immutable revision records keyed by identifier. */
 	private readonly revisions = new Map<AgentRevisionId, AgentRevision>([["revision-1", _revision()]]);
+	/** Revision ids whose parent service lives in another silo (never resolve for this caller). */
+	private readonly foreignRevisionIds = new Set<AgentRevisionId>();
 	/** Number of revision reads performed after loading service authority. */
 	revisionReadCount = 0;
 	/** Number of atomic publication calls received. */
@@ -65,17 +67,26 @@ class _PublicationRepository implements AgentServicePublicationRepository
 		this.service = service;
 	}
 
-	/** Loads the one service fixture. */
-	async getService(): Promise<AgentService | null>
+	/** Registers a revision whose parent service is in another silo, so it never resolves here. */
+	addForeignSiloRevision(revision: AgentRevision): void
 	{
-		return this.service;
+		this.revisions.set(revision.id, revision);
+		this.foreignRevisionIds.add(revision.id);
 	}
 
-	/** Loads an immutable revision fixture. */
-	async getRevision(agentRevisionId: AgentRevisionId): Promise<AgentRevision | null>
+	/** Loads the one service fixture when it is in the caller's silo. */
+	async getService(_agentServiceId: AgentServiceId, siloId: string): Promise<AgentService | null>
+	{
+		return this.service.siloId === siloId ? this.service : null;
+	}
+
+	/** Loads an immutable revision fixture when its parent service is in the caller's silo. */
+	async getRevision(agentRevisionId: AgentRevisionId, siloId: string): Promise<AgentRevision | null>
 	{
 		this.revisionReadCount += 1;
-		return this.revisions.get(agentRevisionId) ?? null;
+		if (this.foreignRevisionIds.has(agentRevisionId)) return null;
+		const revision = this.revisions.get(agentRevisionId) ?? null;
+		return revision !== null && this.service.siloId === siloId ? revision : null;
 	}
 
 	/** Atomically publishes only the first command observing the current active pointer. */
@@ -153,5 +164,28 @@ describe("agent revision publication", function _suite()
 
 		expect(result).toEqual({ outcome: "denied", reason: "publication_conflict", currentActiveRevisionId: null });
 		expect(repository.publicationCallCount).toBe(1);
+	});
+
+	it("denies publish for a service in another silo as not-found, never a distinct oracle", async function _crossSiloService()
+	{
+		const repository = new _PublicationRepository();
+
+		const result = await __PublishAgentRevision(repository, { siloId: "silo-other", agentServiceId: "service-1", agentRevisionId: "revision-1", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
+
+		expect(result).toEqual({ outcome: "denied", reason: "service_not_found" });
+		expect(repository.revisionReadCount).toBe(0);
+		expect(repository.publicationCallCount).toBe(0);
+	});
+
+	it("denies publishing a foreign-silo revision as revision_not_found, never revision_service_mismatch", async function _crossSiloRevision()
+	{
+		const repository = new _PublicationRepository();
+		// The caller's own service is in silo-1; the target revision belongs to another silo's service.
+		repository.addForeignSiloRevision({ ..._revision(), id: "revision-foreign", agentServiceId: "service-foreign" });
+
+		const result = await __PublishAgentRevision(repository, { siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-foreign", expectedActiveRevisionId: null, publishedAt: "2026-07-18T01:00:00.000Z" });
+
+		expect(result).toEqual({ outcome: "denied", reason: "revision_not_found" });
+		expect(repository.publicationCallCount).toBe(0);
 	});
 });

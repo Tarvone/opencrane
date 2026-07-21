@@ -18,13 +18,17 @@ checkpoint is written to the per-attempt scratch as a resume optimisation subord
 server state. Because the loop is configured with zero implicit retries, any executor failure
 surfaces as a real ``run.error`` candidate rather than a silent acknowledgement.
 
-Deferred to Phase E slice 4: the live-LiteLLM conformance suite and adoption gate for the pinned
-Pydantic AI package (ADR 0010) and the corresponding OpenClaw loop deletion; those are not exercised
-by this offline slice.
+Phase E slice 4 lands the offline conformance harness and fault-injection matrix that exercise this
+shell against independently authored neutral-event fixtures and a LiteLLM-compatible test double; both
+run in CI with no network (``tests/test_conformance.py`` and ``tests/test_fault_matrix.py``). The
+live-LiteLLM conformance leg, the adoption evidence for the pinned Pydantic AI package (ADR 0010), and
+the corresponding OpenClaw loop deletion remain gated on #337 and are not exercised by this offline
+slice.
 """
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -69,6 +73,38 @@ def _environment(name: str, default: str | None = None) -> str:
 def _log(event: str, **fields: object) -> None:
     """Emit one safe structured log line; callers must never pass credentials."""
     print(json.dumps({"component": "agent-runtime", "event": event, **fields}, sort_keys=True), flush=True)
+
+
+@contextlib.contextmanager
+def _trace(operation: str, **attributes: object):
+    """Wrap one runtime operation in an OpenTelemetry span when the SDK is present, else a no-op.
+
+    ``opentelemetry`` is imported lazily so the outbound shell and its offline tests never require the
+    package; when it is absent (this offline slice) the block is a transparent no-op while the
+    structured wide-event logs still carry the run/attempt evidence. Attributes carry only non-secret
+    run coordinates — never a token, key, or model content. Real OTLP export to the in-cluster
+    collector is part of the #337 live/adoption wiring, mirroring ``@opencrane/observability`` on the
+    TypeScript control plane.
+    """
+    try:
+        from opentelemetry import trace
+    except ImportError:
+        yield None
+        return
+    tracer = trace.get_tracer("agent-runtime")
+    with tracer.start_as_current_span(operation) as span:
+        for key, value in attributes.items():
+            span.set_attribute(key, value)
+        yield span
+
+
+def _run_evidence(coordinates: dict[str, object], outcome: str, **fields: object) -> None:
+    """Emit one durable wide run-evidence event bound to the run and attempt for observability.
+
+    It carries only the run/attempt/command correlation and the terminal outcome; credentials, tokens,
+    keys, and model content are never included, so the event is safe to route to durable log storage.
+    """
+    _log("run_evidence", runId=coordinates.get("runId"), attempt=coordinates.get("attempt"), commandId=coordinates.get("commandId"), runtimeInstanceId=coordinates.get("runtimeInstanceId"), outcome=outcome, **fields)
 
 
 def _read_projected_token(token_path: str) -> str:
@@ -498,8 +534,10 @@ def _pydantic_ai_event_source(compiled_input: dict[str, object], cancel_event: t
     from ``steering_buffer`` ONLY immediately before issuing a model request node (the sole safe
     pre-model boundary), never mid-request or mid-tool.
 
-    Live-LiteLLM conformance is the deferred Phase E slice-4 adoption gate recorded in ADR 0010; it is
-    NOT run here. Offline tests inject a fake event source instead of importing Pydantic AI.
+    The offline conformance harness drives this executor through an injected neutral-event source; the
+    live-LiteLLM leg that drives real Pydantic AI over the proxy is env-guarded and gated on #337
+    (ADR 0010 adoption), not run here. Offline tests inject a fake event source instead of importing
+    Pydantic AI.
     """
     from pydantic_ai import Agent
 
@@ -548,8 +586,8 @@ def _pydantic_ai_resume_source(run_id: str, attempt: int, input_generation: obje
     results so the loop continues from the approval boundary; the runtime authors no approval and
     chooses no terminal state. Steering and cancellation are observed exactly as in the start driver.
 
-    Live-LiteLLM resume conformance is the deferred Phase E slice-4 adoption gate (ADR 0010) and is
-    not run here; offline tests inject a fake resume source.
+    The offline conformance harness drives resume through an injected fake resume source; the
+    live-LiteLLM resume leg is env-guarded and gated on #337 (ADR 0010 adoption), not run here.
     """
     from pydantic_ai import Agent
 
@@ -745,16 +783,20 @@ def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str,
         post_candidate(_candidate(coordinates, "run.error", {"reason": "missing_compiled_input"}))
         return
     post_candidate(_candidate(coordinates, "run.started", {"promptCompilerVersion": compiled_input.get("promptCompilerVersion")}))
+    _run_evidence(coordinates, "started")
     _try_write_checkpoint(coordinates, payload if isinstance(payload, dict) else {}, compiled_input, checkpoint_cipher)
     steering_buffer: list[str] = []
-    try:
-        for neutral_event in event_source(compiled_input, cancel_event, steering_buffer):
-            if cancel_event.is_set():
-                break
-            _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
-        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
-    except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
-        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+    with _trace("agent_runtime.start_attempt", runId=coordinates["runId"], attempt=coordinates["attempt"]):
+        try:
+            for neutral_event in event_source(compiled_input, cancel_event, steering_buffer):
+                if cancel_event.is_set():
+                    break
+                _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
+            if terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {})):
+                _run_evidence(coordinates, "completed")
+        except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
+            if terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__})):
+                _run_evidence(coordinates, "error", reason="executor_failed", errorType=type(error).__name__)
 
 
 def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], resume_event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_resume_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
@@ -781,15 +823,19 @@ def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str
     deferred_tool_results = payload.get("deferredToolResults")
     compiled_input = _recover_compiled_input(coordinates, input_generation, checkpoint_cipher)
     post_candidate(_candidate(coordinates, "run.resumed", {"inputGeneration": input_generation}))
+    _run_evidence(coordinates, "resumed", inputGeneration=input_generation)
     steering_buffer: list[str] = []
-    try:
-        for neutral_event in resume_event_source(coordinates["runId"], coordinates["attempt"], input_generation, deferred_tool_results, cancel_event, steering_buffer):
-            if cancel_event.is_set():
-                break
-            _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
-        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
-    except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
-        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+    with _trace("agent_runtime.resume_attempt", runId=coordinates["runId"], attempt=coordinates["attempt"]):
+        try:
+            for neutral_event in resume_event_source(coordinates["runId"], coordinates["attempt"], input_generation, deferred_tool_results, cancel_event, steering_buffer):
+                if cancel_event.is_set():
+                    break
+                _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
+            if terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {})):
+                _run_evidence(coordinates, "completed")
+        except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
+            if terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__})):
+                _run_evidence(coordinates, "error", reason="executor_failed", errorType=type(error).__name__)
 
 
 def _execute_cancel_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], cancel_event: threading.Event | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
@@ -811,9 +857,11 @@ def _execute_cancel_attempt(command: dict[str, object], runtime_instance_id: str
     reason = payload.get("reason") if isinstance(payload, dict) else None
     candidate = _candidate(coordinates, "run.cancelled", {"reason": reason})
     if terminal_gate is not None:
-        terminal_gate.post_cancellation(post_candidate, candidate)
+        if terminal_gate.post_cancellation(post_candidate, candidate):
+            _run_evidence(coordinates, "cancelled", reason=reason)
     else:
         post_candidate(candidate)
+        _run_evidence(coordinates, "cancelled", reason=reason)
 
 
 def _iter_commands(response: object, cancelled: threading.Event) -> object:

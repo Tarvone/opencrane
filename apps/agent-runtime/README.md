@@ -122,9 +122,11 @@ completes a real agent run over LiteLLM through an attempt-scoped key. It surfac
 resume, kills the active task on a positive cancel signal, absorbs steering at pre-model-request
 boundaries, and writes an encrypted, version-tagged, replaceable local checkpoint subordinate to
 canonical server state. The controller creates or exact-adopts the suspended Job, releases the durable
-assignment, and registers the unique first Pod. The live-LiteLLM conformance run over the pinned
-`pydantic-ai` package (and the corresponding OpenClaw loop deletion) is the deferred Phase E slice-4
-adoption gate recorded in ADR 0010 and is not exercised offline.
+assignment, and registers the unique first Pod. The offline conformance harness and fault-injection
+matrix (`tests/test_conformance.py`, `tests/test_fault_matrix.py`) are built and CI-runnable; the
+live-LiteLLM conformance run over the pinned `pydantic-ai` package, the driver adoption evidence, and
+the corresponding OpenClaw loop deletion remain gated on
+[#337](https://github.com/italanta/opencrane/issues/337) (ADR 0010) and are not exercised offline.
 
 ## See also
 

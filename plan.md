@@ -35,8 +35,10 @@ the target, refined by the
    isolated; controller and channel-proxy trust boundaries are separate apps; legacy CRDs and
    OpenClaw authorities disappear.
 
-Toolkit selection remains evidence-driven: the Phase E conformance run chooses one exact-pinned
-driver (→ [#246](https://github.com/italanta/opencrane/issues/246)).
+Toolkit selection remains evidence-driven: the offline Phase E conformance harness and fault-injection
+matrix are built and CI-runnable, but choosing and adopting the exact-pinned driver waits on the
+live-LiteLLM conformance leg, gated on [#337](https://github.com/italanta/opencrane/issues/337)
+(→ [#246](https://github.com/italanta/opencrane/issues/246)).
 
 ## Current state
 
@@ -123,9 +125,12 @@ runtime also writes encrypted, version-tagged, replaceable LOCAL checkpoints sub
 state (no server-side checkpoint model). The MCP, memory, and sandbox execution transports are ports
 with fail-closed stubs wired only in the composition root. NOT yet built: the human
 approval-DECISION HTTP endpoint and the steering-INGEST HTTP surface are the operator/product plane in
-Phase F (#224), so approval and steering are not end-to-end live; toolkit selection, the conformance
-suite, live-LiteLLM adoption evidence, OpenClaw deletion, and the remaining E1/E2 product capabilities
-below are also incomplete.
+Phase F (#224), so approval and steering are not end-to-end live. The offline conformance harness and
+fault-injection matrix ARE built and CI-runnable (runtime protocol/reliability, attempt-scoped
+credential rejection, observability evidence); still gated on
+[#337](https://github.com/italanta/opencrane/issues/337) are the live-LiteLLM conformance leg,
+driver adoption evidence, and OpenClaw loop deletion — none of which has happened. The remaining
+E1/E2 product capabilities below are also incomplete.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
 `RunInputSnapshot`, the TypeScript-owned prompt compiler, the language-neutral `AgentRuntimeProtocol v1`

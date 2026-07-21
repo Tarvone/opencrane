@@ -6,7 +6,9 @@ fake OpenAI-compatible endpoint is the deferred adoption gate recorded in ADR 00
 here; these tests import no framework package and reach no network.
 """
 
+import contextlib
 import importlib.util
+import io
 import os
 import tempfile
 import threading
@@ -108,8 +110,13 @@ class RuntimeNormalizerTests(unittest.TestCase):
         self.assertEqual(_normalize_event({"type": "tool_call", "toolName": "search"}), ("run.error", {"reason": "malformed_tool_call"}))
 
     def test_unknown_event_is_dropped(self) -> None:
-        """An unrecognized event yields no candidate."""
-        self.assertIsNone(_normalize_event({"type": "mystery"}))
+        """An unrecognized event yields no candidate but is logged for observability."""
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertIsNone(_normalize_event({"type": "mystery"}))
+        logged = buffer.getvalue()
+        self.assertIn("framework_event_dropped", logged)
+        self.assertIn("mystery", logged)
 
 
 class RuntimeZeroRetryTests(unittest.TestCase):
@@ -123,6 +130,48 @@ class RuntimeZeroRetryTests(unittest.TestCase):
         self.assertEqual(settings["provider_http_retries"], 0)
         self.assertEqual(settings["tool_validation_retries"], 0)
         self.assertEqual(settings["output_validation_retries"], 0)
+
+    def test_zero_retry_settings_reach_provider_and_agent(self) -> None:
+        """The zero-retry values are actually passed to the OpenAI client and Agent, not merely returned."""
+        recorded: dict = {}
+
+        class _Client:
+            def __init__(self, **kwargs: object) -> None:
+                recorded["client"] = kwargs
+
+        class _Provider:
+            def __init__(self, **kwargs: object) -> None:
+                recorded["provider"] = kwargs
+
+        class _Model:
+            def __init__(self, name: str, **kwargs: object) -> None:
+                recorded["model"] = {"name": name, **kwargs}
+
+        class _Agent:
+            def __init__(self, model: object, **kwargs: object) -> None:
+                recorded["agent"] = kwargs
+                self.model = model
+
+        runtime._build_zero_retry_agent(
+            "silo-default",
+            "http://litellm.svc.cluster.local",
+            "sk-attempt",
+            "be careful",
+            agent_cls=_Agent,
+            model_cls=_Model,
+            provider_cls=_Provider,
+            async_openai=_Client,
+        )
+        # Provider HTTP / model-request retries land on the OpenAI client transport as max_retries=0.
+        self.assertEqual(recorded["client"]["max_retries"], 0)
+        self.assertEqual(recorded["client"]["base_url"], "http://litellm.svc.cluster.local")
+        self.assertEqual(recorded["client"]["api_key"], "sk-attempt")
+        # The model is bound to that zero-retry client through the provider.
+        self.assertIsInstance(recorded["provider"]["openai_client"], _Client)
+        self.assertEqual(recorded["model"]["name"], "silo-default")
+        # Tool-argument and output validation retries land on the Agent.
+        self.assertEqual(recorded["agent"]["retries"], 0)
+        self.assertEqual(recorded["agent"]["output_retries"], 0)
 
 
 class RuntimeExecutorTests(unittest.TestCase):

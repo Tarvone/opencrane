@@ -15,7 +15,13 @@ export interface PromptCompilerRepositories
 	loadPersonaInstructions(personaRevisionId: string | null): Promise<string>;
 	/** Resolve ordered conversation turns for the exact message references, preserving snapshot order. */
 	loadMessages(messageIds: readonly string[]): Promise<readonly CompiledMessage[]>;
-	/** Resolve the tool schemas exposed by the immutable tool grants for the executed revision. */
+	/**
+	 * Resolve the tool schemas exposed by the immutable tool grants for the executed revision.
+	 *
+	 * The returned order is not significant: the compiler re-sorts tool definitions by name before
+	 * sealing the compiled output, so grant/repository iteration order can never change the compiled
+	 * payload or its digest.
+	 */
 	loadToolDefinitions(toolGrantIds: readonly string[]): Promise<readonly CompiledToolDefinition[]>;
 	/** Resolve durable memory-fact statements included in the prompt for the given references. */
 	loadMemoryFactStatements(memoryFactIds: readonly string[]): Promise<readonly string[]>;

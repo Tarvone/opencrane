@@ -195,6 +195,10 @@ def _normalize_event(neutral_event: dict[str, object]) -> tuple[str, dict[str, o
     if kind == "error":
         message = neutral_event.get("message")
         return ("run.error", {"reason": "model_loop_error", "detail": message if isinstance(message, str) else ""})
+    # An unrecognized framework event is dropped rather than surfaced as a candidate. Log the event
+    # type only (never the payload, which may carry model content) so a silent adapter/seam drift is
+    # observable without leaking anything sensitive.
+    _log("framework_event_dropped", event_type=kind if isinstance(kind, str) else "")
     return None
 
 
@@ -203,13 +207,23 @@ def _non_negative_int(value: object) -> int:
     return value if isinstance(value, int) and value >= 0 else 0
 
 
-def _zero_retry_openai_settings() -> dict[str, object]:
+def _zero_retry_openai_settings() -> dict[str, int]:
     """Return the exact zero-retry model configuration proving no implicit loop retries.
 
-    Every implicit retry path Pydantic AI and its OpenAI provider expose is pinned to zero here:
-    model-request retries, provider HTTP retries, tool-argument-validation retries, and
-    output-validation retries. OpenCrane owns retry, fallback, and terminal authority, so the bounded
-    loop must never silently re-issue a request, re-validate a tool call, or re-coerce output.
+    Every implicit retry path pydantic-ai 2.13.0 and its OpenAI provider expose is pinned to zero,
+    and each value below is applied at a specific construction site by ``_build_zero_retry_agent``:
+
+    - ``model_request_retries`` and ``provider_http_retries`` → the OpenAI SDK client's ``max_retries``
+      (which defaults to 2). The model request is issued through the provider's ``AsyncOpenAI``
+      transport, so a single ``max_retries=0`` disables both the transport-level HTTP retry and any
+      model-request re-issue; both keys therefore map to that one client argument and must agree.
+    - ``tool_validation_retries`` → ``Agent(retries=0)`` — pydantic-ai's default tool-argument
+      validation retry count.
+    - ``output_validation_retries`` → ``Agent(output_retries=0)`` — the output-validation retry count,
+      set explicitly rather than inherited from ``retries`` so the proof never rests on a default.
+
+    OpenCrane owns retry, fallback, and terminal authority, so the bounded loop must never silently
+    re-issue a request, re-validate a tool call, or re-coerce output.
     """
     return {
         "model_request_retries": 0,
@@ -217,6 +231,51 @@ def _zero_retry_openai_settings() -> dict[str, object]:
         "tool_validation_retries": 0,
         "output_validation_retries": 0,
     }
+
+
+def _build_zero_retry_agent(
+    model_alias: str,
+    base_url: str,
+    attempt_key: str,
+    instructions: str,
+    *,
+    agent_cls: Callable[..., object] | None = None,
+    model_cls: Callable[..., object] | None = None,
+    provider_cls: Callable[..., object] | None = None,
+    async_openai: Callable[..., object] | None = None,
+) -> object:
+    """Construct the bounded Pydantic AI agent with every implicit retry path pinned to zero.
+
+    The pydantic-ai and openai symbols are imported lazily so the outbound shell and its offline tests
+    never require either package. The four constructors are injectable seams: offline tests pass
+    recording fakes and assert that the ``_zero_retry_openai_settings`` values actually reach the
+    OpenAI client and the Agent, since pydantic-ai is not installed here to exercise a live call.
+    """
+    # 1. Resolve the real pydantic-ai constructors lazily, honouring any injected test seam.
+    if agent_cls is None or model_cls is None or provider_cls is None:
+        from pydantic_ai import Agent
+        from pydantic_ai.models.openai import OpenAIModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        agent_cls = agent_cls or Agent
+        model_cls = model_cls or OpenAIModel
+        provider_cls = provider_cls or OpenAIProvider
+    if async_openai is None:
+        from openai import AsyncOpenAI
+
+        async_openai = AsyncOpenAI
+
+    settings = _zero_retry_openai_settings()
+    if settings["provider_http_retries"] != settings["model_request_retries"]:
+        raise RuntimeError("provider HTTP and model-request retries must agree on the transport")
+
+    # 2. Disable OpenAI transport retries so neither the HTTP client nor the model request re-issues.
+    openai_client = async_openai(base_url=base_url, api_key=attempt_key, max_retries=settings["provider_http_retries"])
+    # 3. Bind the model to that zero-retry client through the provider.
+    provider = provider_cls(openai_client=openai_client)
+    model = model_cls(model_alias, provider=provider)
+    # 4. Pin the agent's tool-argument and output validation retries to zero as well.
+    return agent_cls(model, system_prompt=instructions, retries=settings["tool_validation_retries"], output_retries=settings["output_validation_retries"])
 
 
 def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dict[str, object]]:
@@ -234,8 +293,6 @@ def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dic
     Offline tests inject a fake event source instead of importing Pydantic AI.
     """
     from pydantic_ai import Agent
-    from pydantic_ai.models.openai import OpenAIModel
-    from pydantic_ai.providers.openai import OpenAIProvider
 
     base_url = _environment("OPENCRANE_RUNTIME_LITELLM_BASE_URL")
     key_path = os.environ.get("OPENCRANE_RUNTIME_LITELLM_KEY_PATH", _DEFAULT_LITELLM_KEY_PATH)
@@ -245,10 +302,8 @@ def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dic
     if not isinstance(model_alias, str) or not model_alias:
         raise RuntimeError("compiled input is missing a model alias")
 
-    provider = OpenAIProvider(base_url=base_url, api_key=attempt_key)
-    model = OpenAIModel(model_alias, provider=provider)
     instructions = compiled_input.get("instructions")
-    agent = Agent(model, system_prompt=instructions if isinstance(instructions, str) else "", retries=0)
+    agent = _build_zero_retry_agent(model_alias, base_url, attempt_key, instructions if isinstance(instructions, str) else "")
 
     async def _collect() -> list[dict[str, object]]:
         events: list[dict[str, object]] = []

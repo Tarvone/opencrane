@@ -14,13 +14,12 @@ This app is not a harvester — harvesting is one job it happens to do first. Th
 and that each do one bounded task. Central agents run on the **same runtime substrate as personal
 agents** (the suspended one-attempt Job, controller, and outbound-only shell) but under a **narrower,
 connector-scoped workload identity** independent of any human user, and they reach external systems
-**only through MCP connectors**. Slack becomes one such connector — instantiable per connected
-workspace — rather than a bespoke SDK loop, and each central agent reads/writes only the canonical
-scopes it is explicitly attached to.
+**only through Obot-custodied MCP servers**, instantiable per connected source rather than a bespoke
+SDK loop, and each central agent reads/writes only the canonical scopes it is explicitly attached to.
 
-The current Slack interval worker described below is the migration starting point, not the product
+The current interval worker described below is the migration starting point, not the product
 boundary: its useful behaviour (normalisation, checkpointing, scoped Cognee writes) is re-expressed as
-a packaged central-agent definition over an approved Slack MCP server, after which the bespoke
+a packaged central-agent definition over an approved Obot MCP server, after which the bespoke
 connector and its direct credential handling are removed. See the direct-refactor plan's Phase E2 and
 issue [#129](https://github.com/italanta/opencrane/issues/129) for the full model.
 

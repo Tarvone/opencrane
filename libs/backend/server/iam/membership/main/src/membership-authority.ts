@@ -1,6 +1,6 @@
 import { __EvaluateFleetMembershipRevision } from "@opencrane/models/authorization";
 
-import type { FleetMembershipAuthorityRepository, FleetMembershipSignatureVerifier, VerifyFleetMembershipCommand, VerifyFleetMembershipResult } from "./membership-authority.types.js";
+import type { FleetMembershipAuthorityRepository, FleetMembershipSignatureVerifier, VerifyFleetMembershipCommand, VerifyFleetMembershipEvidenceResult, VerifyFleetMembershipResult } from "./membership-authority.types.js";
 
 /**
  * Verifies and monotonically accepts the latest signed fleet-membership revision.
@@ -11,6 +11,14 @@ import type { FleetMembershipAuthorityRepository, FleetMembershipSignatureVerifi
  * @returns Trusted membership window or a fail-closed denial.
  */
 export async function __VerifyCurrentFleetMembership(repository: FleetMembershipAuthorityRepository, verifier: FleetMembershipSignatureVerifier, command: VerifyFleetMembershipCommand): Promise<VerifyFleetMembershipResult>
+{
+	const result = await __VerifyCurrentFleetMembershipEvidence(repository, verifier, command);
+	if (result.outcome === "denied") return result;
+	return { outcome: "trusted", revision: result.evidence.revision, trustedUntilEpochMs: result.evidence.trustedUntilEpochMs };
+}
+
+/** Verifies current membership and returns only the signed evidence that may be frozen into a run input. */
+export async function __VerifyCurrentFleetMembershipEvidence(repository: FleetMembershipAuthorityRepository, verifier: FleetMembershipSignatureVerifier, command: VerifyFleetMembershipCommand): Promise<VerifyFleetMembershipEvidenceResult>
 {
 	// 1. Resolve only the freshest locally available signed revision; absence cannot imply membership.
 	const revision = await repository.getLatestSignedRevision(command.trustedIssuerId, command.siloId);
@@ -54,5 +62,5 @@ export async function __VerifyCurrentFleetMembership(repository: FleetMembership
 		return { outcome: "denied", reason: "acceptance_conflict", revision: revision.revision };
 	}
 
-	return { outcome: "trusted", revision: revision.revision, trustedUntilEpochMs: decision.trustedUntilEpochMs };
+	return { outcome: "trusted", evidence: { issuerId: revision.issuerId, issuerKeyId: revision.issuerKeyId, revision: revision.revision, assertionId: command.assertionId, subjectId: command.subjectId, payloadDigest: revision.payloadDigest, trustedUntilEpochMs: decision.trustedUntilEpochMs } };
 }

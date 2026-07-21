@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { GrantAccess, GrantScope, GrantSubjectType, type GrantPayloadType, type PrismaClient } from "@prisma/client";
+import type { GrantAccess, GrantScope, GrantSubjectType, GrantPayloadType, PrismaClient } from "@prisma/client";
 
 import { compile } from "../core/grant-compiler.js";
 import { GrantCompilerAccess, GrantCompilerPayloadType } from "../core/grant-compiler.types.js";
@@ -27,11 +27,18 @@ const _PRISMA_PAYLOAD_BY_API: Record<SharePayloadType, GrantPayloadType> = {
 
 /** Map the API scope string to the Prisma GrantScope enum. */
 const _PRISMA_SCOPE_BY_API: Record<ShareScope, GrantScope> = {
-  org: GrantScope.Org,
-  department: GrantScope.Department,
-  project: GrantScope.Project,
-  personal: GrantScope.Personal,
+  org: "Org" as GrantScope,
+  department: "Department" as GrantScope,
+  project: "Project" as GrantScope,
+  personal: "Personal" as GrantScope,
 };
+
+/** Prisma enum literals used as data, not runtime values from a generated client. */
+const _GRANT_ACCESS_ALLOW = "Allow" as GrantAccess;
+/** Prisma enum literal for a reusable-group recipient. */
+const _GRANT_SUBJECT_GROUP = "Group" as GrantSubjectType;
+/** Prisma enum literal for an opaque OIDC user recipient. */
+const _GRANT_SUBJECT_USER = "User" as GrantSubjectType;
 
 /** The caller's IdP subject (OIDC sub, else verified email), or null when unauthenticated. */
 function _CallerSubject(req: Request): string | null
@@ -137,9 +144,9 @@ export function sharesRouter(prisma: PrismaClient): Router
       // 6. Idempotent on (sharedBy, payloadType, payloadId, subjectType, subjectId, scope):
       //    re-sharing the same payload to the same recipient at the same scope returns the
       //    existing grant. A different scope is a distinct share and creates a new row.
-      const subjectType = recipientType === "group" ? GrantSubjectType.Group : GrantSubjectType.User;
+      const subjectType = recipientType === "group" ? _GRANT_SUBJECT_GROUP : _GRANT_SUBJECT_USER;
       const existing = await prisma.grant.findFirst({
-        where: { sharedBy: caller, payloadType: _PRISMA_PAYLOAD_BY_API[payloadType], payloadId, subjectType, subjectId: recipientId, scope: _PRISMA_SCOPE_BY_API[scope], access: GrantAccess.Allow },
+        where: { sharedBy: caller, payloadType: _PRISMA_PAYLOAD_BY_API[payloadType], payloadId, subjectType, subjectId: recipientId, scope: _PRISMA_SCOPE_BY_API[scope], access: _GRANT_ACCESS_ALLOW },
       });
       if (existing)
       {
@@ -156,7 +163,7 @@ export function sharesRouter(prisma: PrismaClient): Router
           scope: _PRISMA_SCOPE_BY_API[scope],
           subjectType,
           subjectId: recipientId,
-          access: GrantAccess.Allow,
+          access: _GRANT_ACCESS_ALLOW,
           note: body.note,
           sharedBy: caller,
           ...(recipientType === "group" ? { groupId: recipientId } : {}),

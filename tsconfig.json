@@ -106,6 +106,9 @@
       "@opencrane/backend/server/agents/skills": [
         "./libs/backend/server/agents/skills/main/src/index.ts"
       ],
+      "@opencrane/backend/agents/personal/session": [
+        "./libs/backend/agents/personal/session/main/src/index.ts"
+      ],
       "@opencrane/backend/server/reporting/spend": [
         "./libs/backend/server/reporting/spend/main/src/index.ts"
       ],

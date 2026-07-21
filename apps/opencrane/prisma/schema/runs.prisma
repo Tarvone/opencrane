@@ -107,12 +107,12 @@ model RunInputSnapshot {
   budgetPolicy            Json     @map("budget_policy")
   capabilitySetDigest     String   @map("capability_set_digest")
   promptCompilerVersion   String   @map("prompt_compiler_version")
-  inputDigest             String   @unique @map("input_digest")
-  createdAt               DateTime @default(now()) @map("created_at")
-  run                     AgentRun? @relation(fields: [runId, inputDigest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], references: [id, inputSnapshotDigest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], onDelete: Restrict)
+  digest                  String   @unique @map("input_digest")
+  compiledAt              DateTime @default(now()) @map("created_at")
+  run                     AgentRun? @relation(fields: [runId, digest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], references: [id, inputSnapshotDigest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], onDelete: Restrict)
 
-  @@unique([runId, inputDigest])
-  @@unique([runId, inputDigest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], map: "run_input_snapshot_run_identity_key")
+  @@unique([runId, digest])
+  @@unique([runId, digest, threadId, siloId, agentServiceId, agentRevisionId, effectiveContractDigest], map: "run_input_snapshot_run_identity_key")
   @@index([agentServiceId, agentRevisionId])
   @@map("run_input_snapshots")
 }

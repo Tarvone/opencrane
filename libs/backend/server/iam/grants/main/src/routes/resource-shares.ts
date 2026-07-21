@@ -1,9 +1,12 @@
 import { Router, type Request } from "express";
-import { GrantScope, type PrismaClient } from "@prisma/client";
+import type { GrantScope, PrismaClient } from "@prisma/client";
 
 import { _log } from "../log.js";
 // Side-effect import: loads the express-session `SessionData.authUser` augmentation.
 import "@opencrane/server/_infra/auth";
+
+/** Prisma enum literal used as data, not a runtime value from a generated client. */
+const _PRISMA_PERSONAL_SCOPE = "Personal" as GrantScope;
 
 /** Resource kinds a user can directly share (a file or a chat/conversation). */
 const _RESOURCE_TYPES = ["file", "chat", "dataset"] as const;
@@ -90,7 +93,7 @@ export function resourceSharesRouter(prisma: PrismaClient): Router
       const created = await prisma.group.create({
         data: {
           name: groupName,
-          scope: GrantScope.Personal,
+          scope: _PRISMA_PERSONAL_SCOPE,
           description: `Direct share of ${resourceType} ${resourceId}`,
           members: Array.from(new Set([caller, recipient])),
         },
@@ -134,7 +137,7 @@ export function resourceSharesRouter(prisma: PrismaClient): Router
       return;
     }
     // Resource groups are the Personal-scoped groups named `resource:*`; filter to the caller's.
-    const groups = await prisma.group.findMany({ where: { scope: GrantScope.Personal, name: { startsWith: "resource:" } }, select: { id: true, name: true, members: true } });
+    const groups = await prisma.group.findMany({ where: { scope: _PRISMA_PERSONAL_SCOPE, name: { startsWith: "resource:" } }, select: { id: true, name: true, members: true } });
     res.json(groups.filter(function _mine(g) { return _MemberList(g.members).includes(caller); }).map(_ToResourceShare));
   });
 

@@ -52,7 +52,7 @@ export {
   type ProviderKeyStatus,
 } from "./model-routing.types.js";
 export { type DurableStatePolicy, type PlatformPolicy, type RuntimeFilesystemPolicy, type SiloUpdatePolicy } from "@opencrane/models/platform-policy";
-export { type RunInputSnapshot } from "./run-input-snapshot.types.js";
+export { type RunInputSnapshot, type RunInputSnapshotIdentity } from "./run-input-snapshot.types.js";
 export { type RuntimeAssignment } from "./runtime-assignment.types.js";
 export { type TenantModelSet } from "./tenant-models.types.js";
 export {

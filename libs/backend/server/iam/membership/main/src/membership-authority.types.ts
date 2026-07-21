@@ -19,6 +19,19 @@ export interface VerifyFleetMembershipCommand
 	readonly maximumStalenessMs: number;
 }
 
+/** Fixed fleet and scope policy configured before an execution subject is admitted. */
+export interface FleetMembershipAdmissionExpectation
+{
+	/** Fleet issuer trusted to sign the current membership revision. */
+	readonly trustedIssuerId: string;
+	/** Signed assertion that must authorize the execution subject. */
+	readonly assertionId: string;
+	/** Independent scope required for the admitted run. */
+	readonly scope: AuthorizationScope;
+	/** Maximum allowed age of the signed revision at the server-owned admission instant. */
+	readonly maximumStalenessMs: number;
+}
+
 /** Atomic high-watermark acceptance request after membership verification. */
 export interface FleetMembershipAcceptance
 {
@@ -55,7 +68,31 @@ export interface FleetMembershipSignatureVerifier
 	verify(revision: SignedFleetMembershipRevision): Promise<FleetSignatureVerificationEvidence>;
 }
 
+/** Complete signed membership evidence pinned by one transaction-fenced run admission. */
+export interface TrustedFleetMembershipEvidence
+{
+	/** Fleet issuer that signed and owns the accepted revision. */
+	readonly issuerId: string;
+	/** Fleet signing key that cryptographically verified the accepted revision. */
+	readonly issuerKeyId: string;
+	/** Accepted monotonic signed revision. */
+	readonly revision: number;
+	/** Exact assertion authorizing the execution subject and requested scope. */
+	readonly assertionId: string;
+	/** Subject whose membership was verified. */
+	readonly subjectId: string;
+	/** Digest of the exact signed membership payload. */
+	readonly payloadDigest: string;
+	/** UTC epoch-millisecond limit on trust for this verified evidence. */
+	readonly trustedUntilEpochMs: number;
+}
+
 /** Stable domain result for current fleet-membership trust. */
 export type VerifyFleetMembershipResult =
 	| { readonly outcome: "trusted"; readonly revision: number; readonly trustedUntilEpochMs: number }
+	| { readonly outcome: "denied"; readonly reason: FleetMembershipTrustReason | "missing_revision" | "signature_verifier_failed" | "acceptance_conflict"; readonly revision: number };
+
+/** Stable result that exposes only signed evidence produced by current membership verification. */
+export type VerifyFleetMembershipEvidenceResult =
+	| { readonly outcome: "trusted"; readonly evidence: TrustedFleetMembershipEvidence }
 	| { readonly outcome: "denied"; readonly reason: FleetMembershipTrustReason | "missing_revision" | "signature_verifier_failed" | "acceptance_conflict"; readonly revision: number };

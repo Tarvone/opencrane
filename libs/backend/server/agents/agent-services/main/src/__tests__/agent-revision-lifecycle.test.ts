@@ -193,7 +193,7 @@ describe("managed agent revision lifecycle", function _suite()
 		const repository = new _Repository();
 		const port = new _AdmissionPort();
 		const seed = await _seedService(repository);
-		const command: ManagedRunNowCommand = { agentServiceId: seed.serviceId, siloId: _SILO, requestedBy: "admin-1", requestIdempotencyKey: "req-1" };
+		const command: ManagedRunNowCommand = { agentServiceId: seed.serviceId, siloId: _SILO, requestedBy: "admin-1", requestIdempotencyKey: "req-1", trigger: "managed_invocation", scheduledSlot: null };
 		const draftDenied = await __AdmitManagedRunNow(repository, port, command);
 		expect(draftDenied).toEqual({ outcome: "denied", reason: "service_not_runnable" });
 		repository.services.set(seed.serviceId, { ...repository.services.get(seed.serviceId)!, state: "active", activeRevisionId: seed.revisionId });
@@ -220,7 +220,7 @@ describe("managed agent revision lifecycle", function _suite()
 		expect(await __RestoreAgentRevision(repository, { siloId: foreign, agentServiceId: seed.serviceId, sourceRevisionId: seed.revisionId, expectedParentRevisionId: seed.revisionId, authoredBy: "attacker", changeMessage: "x" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(await __ChangeAgentServiceState(repository, { siloId: foreign, agentServiceId: seed.serviceId, expectedState: "active", action: "pause" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(await __ChangeAgentServiceState(repository, { siloId: foreign, agentServiceId: seed.serviceId, expectedState: "active", action: "retire" }, _NOW)).toEqual({ outcome: "denied", reason: "service_not_found" });
-		expect(await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: foreign, requestedBy: "attacker", requestIdempotencyKey: "req-x" })).toEqual({ outcome: "denied", reason: "service_not_found" });
+		expect(await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: foreign, requestedBy: "attacker", requestIdempotencyKey: "req-x", trigger: "managed_invocation", scheduledSlot: null })).toEqual({ outcome: "denied", reason: "service_not_found" });
 		expect(port.lastCommand).toBeNull();
 
 		// Indirect path: a silo-B service restoring a silo-A source revision resolves as revision_not_found,
@@ -230,6 +230,6 @@ describe("managed agent revision lifecycle", function _suite()
 		expect(restoreForeignSource).toEqual({ outcome: "denied", reason: "revision_not_found" });
 
 		// Same-silo access still works.
-		expect((await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: "silo-a", requestedBy: "admin-1", requestIdempotencyKey: "req-ok" })).outcome).toBe("accepted");
+		expect((await __AdmitManagedRunNow(repository, port, { agentServiceId: seed.serviceId, siloId: "silo-a", requestedBy: "admin-1", requestIdempotencyKey: "req-ok", trigger: "managed_invocation", scheduledSlot: null })).outcome).toBe("accepted");
 	});
 });

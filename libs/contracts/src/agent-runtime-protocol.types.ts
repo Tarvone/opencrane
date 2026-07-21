@@ -12,13 +12,36 @@ export const AGENT_RUNTIME_PROTOCOL_V1 = "opencrane.agent-runtime/v1";
 export const AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE = "opencrane-agent-runtime";
 
 /**
- * Return whether a ServiceAccount belongs to the bounded first-party runtime identity class.
+ * Sole projected-token audience accepted from first-party managed (central) agent runtimes.
+ *
+ * Deliberately DISTINCT from {@link AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE}: a personal runtime's
+ * token must never satisfy the managed connector boundary, and vice versa, so the two workload
+ * classes cannot borrow each other's network reach or downstream credentials.
+ */
+export const MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE = "opencrane-managed-agent-runtime";
+
+/**
+ * Return whether a ServiceAccount belongs to the bounded first-party personal-runtime identity class.
  * @param value - Kubernetes ServiceAccount name to validate.
- * @returns True only for a valid runtime-prefixed DNS label.
+ * @returns True only for a valid personal-runtime-prefixed DNS label.
  */
 export function ___IsAgentRuntimeServiceAccountName(value: string): boolean
 {
 	return value.length <= 63 && /^agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value);
+}
+
+/**
+ * Return whether a ServiceAccount belongs to the bounded managed (central) agent runtime identity
+ * class. This is a NARROWER class than {@link ___IsAgentRuntimeServiceAccountName}: the
+ * `managed-agent-runtime-` prefix never overlaps the personal `agent-runtime-` prefix, so a name
+ * that satisfies one validator is rejected by the other and the connector-scoped identity of a
+ * central agent can never be confused with a personal runtime's.
+ * @param value - Kubernetes ServiceAccount name to validate.
+ * @returns True only for a valid managed-runtime-prefixed DNS label.
+ */
+export function ___IsManagedAgentRuntimeServiceAccountName(value: string): boolean
+{
+	return value.length <= 63 && /^managed-agent-runtime-[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value);
 }
 
 /** Exact protocol version literal carried by every runtime frame. */
@@ -26,6 +49,9 @@ export type AgentRuntimeProtocolVersion = typeof AGENT_RUNTIME_PROTOCOL_V1;
 
 /** Exact audience literal for a personal-agent runtime's projected ServiceAccount token. */
 export type AgentRuntimeProjectedTokenAudience = typeof AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE;
+
+/** Exact audience literal for a managed (central) agent runtime's projected ServiceAccount token. */
+export type ManagedAgentRuntimeProjectedTokenAudience = typeof MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE;
 
 /** Initial message sent by a runtime after it opens its control-plane stream. */
 export interface RuntimeStreamOpen

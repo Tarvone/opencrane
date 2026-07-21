@@ -5,6 +5,9 @@ import type { AgentRevisionContent, AgentRevisionLifecycleDenial, AgentServiceLi
 import type { AgentServicesRouterDependencies, ManagementCaller } from "./agent-revision.router.types.js";
 import { __PublishAgentRevision } from "./agent-publication.js";
 import type { PublishAgentRevisionFailureReason } from "./agent-publication.types.js";
+import { __CreateAgentSchedule, __UpdateAgentSchedule } from "./agent-schedule.js";
+import type { AgentScheduleDenial, AgentScheduleOverlapPolicy } from "./agent-schedule.types.js";
+import { __ValidateAttachAuthority } from "./scope-attachment-authority.js";
 
 /** Legal observed states a caller may claim on a lifecycle transition. */
 const _SERVICE_STATES = ["draft", "active", "paused", "retired"] as const;
@@ -58,11 +61,13 @@ function _parseIntegrations(raw: unknown): AgentRevisionContent["integrationAssi
 /**
  * Parses the optional revision-scoped scope-attachment array against the canonical vocabulary.
  *
- * Slice 5 only shape-validates the `{ scope, subjectType, subjectId }` triple; attachments are
- * silo-bounded (every read/write is scoped to the caller's silo) and org-admin-gated. Validating
- * the caller's authority over each attached scope — and the runtime intersection so a stored
- * attachment grants nothing beyond the agent's actual effective grants — lands in slice 6 (#332),
- * which introduces the per-scope attach-authority and effective-access enforcement paths.
+ * Shape-validation only: it confirms each `{ scope, subjectType, subjectId }` triple is well formed.
+ * Per-scope ATTACH-AUTHORITY (the caller must administer every scope they attach) is enforced
+ * separately by `__ValidateAttachAuthority` in the create/revise handlers before the revision is
+ * persisted, and the RUNTIME effective-access intersection (`__ResolveEffectiveScopeAttachments`)
+ * ensures a stored attachment grants nothing beyond the agent's actual compiled grants — both landed
+ * in slice 6 (#332) and both ride the IAM grant compiler. Attachments remain silo-bounded and
+ * org-admin-gated.
  */
 function _parseScopeAttachments(raw: unknown): AgentRevisionContent["scopeAttachments"] | null
 {
@@ -129,7 +134,18 @@ function _publishDenialStatus(reason: PublishAgentRevisionFailureReason): number
 export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDependencies): Router
 {
 	const router = Router();
-	const { lifecycle, publicationFor, runAdmission, resolveCaller, clock, logger } = dependencies;
+	const { lifecycle, publicationFor, runAdmission, schedules, scopeGrantResolver, resolveCaller, clock, logger } = dependencies;
+
+	/**
+	 * Enforce that the caller administers every scope they attach, before the revision is persisted.
+	 * Returns true when the request may proceed; otherwise it has already sent a fail-closed response.
+	 */
+	async function _authoriseAttachments(caller: ManagementCaller, content: AgentRevisionContent, res: Response): Promise<boolean>
+	{
+		const authority = await __ValidateAttachAuthority(scopeGrantResolver, [caller.subjectId], content.scopeAttachments);
+		if (authority.outcome === "unauthorized") { res.status(403).json({ error: "Caller does not administer every attached scope.", code: "FORBIDDEN_SCOPE_ATTACHMENT", unauthorized: authority.unauthorized }); return false; }
+		return true;
+	}
 
 	/** Resolves an org-admin caller, or sends the fail-closed 401/403 envelope. */
 	function _requireAdmin(req: Request, res: Response): ManagementCaller | null
@@ -157,6 +173,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const body = (req.body ?? {}) as Record<string, unknown>;
 			const content = _parseContent(body.content);
 			if (!_isNonEmptyString(body.name) || !_isNonEmptyString(body.workloadProfile) || !_isNonEmptyString(body.changeMessage) || content === null) { res.status(400).json({ error: "name, workloadProfile, changeMessage, and valid content are required.", code: "VALIDATION_ERROR" }); return; }
+			if (!await _authoriseAttachments(caller, content, res)) return;
 			const result = await __CreateManagedAgentService(lifecycle, { siloId: caller.siloId, name: body.name, workloadProfile: body.workloadProfile, authoredBy: caller.subjectId, changeMessage: body.changeMessage, content }, clock.now().toISOString());
 			if (result.outcome === "denied") { res.status(_denialStatus(result.reason)).json({ error: "Create denied.", code: result.reason.toUpperCase() }); return; }
 			res.status(201).json({ service: result.service, revision: result.revision });
@@ -174,6 +191,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const content = _parseContent(body.content);
 			const expectedParentRevisionId = body.expectedParentRevisionId === undefined || body.expectedParentRevisionId === null ? null : body.expectedParentRevisionId;
 			if (!_isNonEmptyString(body.changeMessage) || content === null || (expectedParentRevisionId !== null && !_isNonEmptyString(expectedParentRevisionId))) { res.status(400).json({ error: "changeMessage, valid content, and an expectedParentRevisionId are required.", code: "VALIDATION_ERROR" }); return; }
+			if (!await _authoriseAttachments(caller, content, res)) return;
 			const result = await __ReviseAgentRevision(lifecycle, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), expectedParentRevisionId: expectedParentRevisionId as string | null, authoredBy: caller.subjectId, changeMessage: body.changeMessage, content }, clock.now().toISOString());
 			_sendAppend(res, result);
 		}
@@ -239,7 +257,7 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			if (caller === null) return;
 			const body = (req.body ?? {}) as Record<string, unknown>;
 			if (!_isNonEmptyString(body.requestIdempotencyKey)) { res.status(400).json({ error: "requestIdempotencyKey is required.", code: "VALIDATION_ERROR" }); return; }
-			const result = await __AdmitManagedRunNow(lifecycle, runAdmission, { agentServiceId: String(req.params.serviceId), siloId: caller.siloId, requestedBy: caller.subjectId, requestIdempotencyKey: body.requestIdempotencyKey });
+			const result = await __AdmitManagedRunNow(lifecycle, runAdmission, { agentServiceId: String(req.params.serviceId), siloId: caller.siloId, requestedBy: caller.subjectId, requestIdempotencyKey: body.requestIdempotencyKey, trigger: "managed_invocation", scheduledSlot: null });
 			if (result.outcome === "denied") { res.status(_runDenialStatus(result.reason)).json({ error: "Run-now denied.", code: result.reason.toUpperCase() }); return; }
 			res.status(result.outcome === "accepted" ? 202 : 200).json({ outcome: result.outcome, runId: result.runId });
 		}
@@ -262,7 +280,63 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 		catch (error) { _fail(res, error, "history"); }
 	});
 
-	/** Mounts one optimistic-concurrency service state transition endpoint. */
+	router.get("/:serviceId/schedules", async function _listSchedules(req: Request, res: Response)
+		{
+			try
+			{
+				const caller = _requireCaller(req, res);
+				if (caller === null) return;
+				const serviceId = String(req.params.serviceId);
+				if (await lifecycle.getService(serviceId, caller.siloId) === null) { res.status(404).json({ error: "Service not found.", code: "SERVICE_NOT_FOUND" }); return; }
+				res.status(200).json({ schedules: await schedules.listSchedules(serviceId, caller.siloId) });
+			}
+			catch (error) { _fail(res, error, "list-schedules"); }
+		});
+
+		router.post("/:serviceId/schedules", async function _createSchedule(req: Request, res: Response)
+		{
+			try
+			{
+				const caller = _requireAdmin(req, res);
+				if (caller === null) return;
+				const spec = _parseScheduleSpec(req.body);
+				if (spec === null) { res.status(400).json({ error: "cron, timezone, overlapPolicy, enabled, and catchupWindowSeconds are required.", code: "VALIDATION_ERROR" }); return; }
+				const result = await __CreateAgentSchedule(schedules, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), ...spec }, clock.now().toISOString());
+				if (result.outcome === "denied") { res.status(_scheduleDenialStatus(result.reason)).json({ error: "Schedule create denied.", code: result.reason.toUpperCase() }); return; }
+				res.status(201).json({ schedule: result.schedule });
+			}
+			catch (error) { _fail(res, error, "create-schedule"); }
+		});
+
+		router.put("/:serviceId/schedules/:scheduleId", async function _updateSchedule(req: Request, res: Response)
+		{
+			try
+			{
+				const caller = _requireAdmin(req, res);
+				if (caller === null) return;
+				const spec = _parseScheduleSpec(req.body);
+				if (spec === null) { res.status(400).json({ error: "cron, timezone, overlapPolicy, enabled, and catchupWindowSeconds are required.", code: "VALIDATION_ERROR" }); return; }
+				const result = await __UpdateAgentSchedule(schedules, { siloId: caller.siloId, agentServiceId: String(req.params.serviceId), scheduleId: String(req.params.scheduleId), ...spec }, clock.now().toISOString());
+				if (result.outcome === "denied") { res.status(_scheduleDenialStatus(result.reason)).json({ error: "Schedule update denied.", code: result.reason.toUpperCase() }); return; }
+				res.status(200).json({ schedule: result.schedule });
+			}
+			catch (error) { _fail(res, error, "update-schedule"); }
+		});
+
+		router.delete("/:serviceId/schedules/:scheduleId", async function _deleteSchedule(req: Request, res: Response)
+		{
+			try
+			{
+				const caller = _requireAdmin(req, res);
+				if (caller === null) return;
+				const result = await schedules.deleteSchedule(String(req.params.serviceId), String(req.params.scheduleId), caller.siloId);
+				if (result.outcome === "denied") { res.status(_scheduleDenialStatus(result.reason)).json({ error: "Schedule delete denied.", code: result.reason.toUpperCase() }); return; }
+				res.status(204).end();
+			}
+			catch (error) { _fail(res, error, "delete-schedule"); }
+		});
+
+		/** Mounts one optimistic-concurrency service state transition endpoint. */
 	function _mountStateAction(mounted: Router, action: AgentServiceLifecycleAction): void
 	{
 		mounted.post(`/:serviceId/${action}`, async function _changeState(req: Request, res: Response)
@@ -308,4 +382,39 @@ function _runDenialStatus(reason: string): number
 	if (reason === "service_not_runnable") return 409;
 	if (reason === "run_admission_unavailable") return 503;
 	return 400;
+}
+
+/** Mutable schedule fields shared by the create and update surfaces. */
+interface _ScheduleSpec
+{
+	readonly cron: string;
+	readonly timezone: string;
+	readonly overlapPolicy: AgentScheduleOverlapPolicy;
+	readonly enabled: boolean;
+	readonly catchupWindowSeconds: number;
+}
+
+/** Parses and shape-validates a schedule request body; deeper cron/timezone checks are in the use case. */
+function _parseScheduleSpec(raw: unknown): _ScheduleSpec | null
+{
+	if (raw === null || typeof raw !== "object") return null;
+	const body = raw as Record<string, unknown>;
+	const overlapPolicy = body.overlapPolicy;
+	if (!_isNonEmptyString(body.cron) || !_isNonEmptyString(body.timezone) || (overlapPolicy !== "skip" && overlapPolicy !== "allow") || typeof body.enabled !== "boolean" || typeof body.catchupWindowSeconds !== "number" || !Number.isSafeInteger(body.catchupWindowSeconds)) return null;
+	return { cron: body.cron, timezone: body.timezone, overlapPolicy, enabled: body.enabled, catchupWindowSeconds: body.catchupWindowSeconds };
+}
+
+/** Maps a schedule denial reason to a fail-closed HTTP status. */
+function _scheduleDenialStatus(reason: AgentScheduleDenial): number
+{
+	switch (reason)
+	{
+		case "invalid_command": return 400;
+		case "invalid_cron": return 400;
+		case "invalid_timezone": return 400;
+		case "service_not_found": return 404;
+		case "schedule_not_found": return 404;
+		case "service_not_managed": return 409;
+		default: return 400;
+	}
 }

@@ -152,6 +152,23 @@ legacy ingestion interval worker and its direct Cognee writes are deleted.
 Conversation-initiated config changes (always-granted `upgrade_session` tool,
 logged persona refresh, apply-at-next-snapshot) → [#318](https://github.com/italanta/opencrane/issues/318).
 
+**Central-agents sub-lane** (slice 6, [#332](https://github.com/italanta/opencrane/issues/332) — closes
+[#129](https://github.com/italanta/opencrane/issues/129)): BUILT (offline) — the scheduler semantics
+(`backend-server-agent-scheduling`, composed inside `apps/opencrane`: cron+timezone eval, missed-run
+catch-up, overlap/backoff/suspension, idempotent run creation through the existing
+`ManagedRunAdmissionPort` with `trigger: schedule`), the `AgentServiceSchedule` model + management
+API, the connector-scoped managed identity (`managed-agent-runtime-*` SA class + distinct token
+audience, the launcher's selectable identity profile, and the chart-only `apps/managed-agent-runtime`
+plane), execution authority via the Obot MCP-invocation port (allow-list enforced) and
+memory-gateway scoped read/write with mandatory provenance, the attach-authority + runtime
+effective-access intersection over the grant compiler (closes the slice-5 deferral; scope-isolation
+tested), and the first packaged central-agent DEFINITION (the harvester expressed as a managed
+`AgentService` + schedule + Obot MCP assignment, Obot stubbed). NOT done — a NAMED LATER GATE:
+**the harvesting-central-agent live-Obot proof**, which blocks the reaper deletion of
+`apps/feat-central-agents`, its bespoke Slack connector, and the `HarvestingCursor` table; tracked
+under [#337](https://github.com/italanta/opencrane/issues/337). Until that proof lands,
+`apps/feat-central-agents` and `HarvestingCursor` stay in place untouched.
+
 Exit: the canonical runtime and managed-agent lifecycle pass failure, replay, authorization,
 isolation, cancellation, provider, and artifact tests with no OpenClaw compatibility surface.
 

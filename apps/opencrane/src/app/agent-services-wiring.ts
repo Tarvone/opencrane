@@ -3,7 +3,7 @@ import type { Request, Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 
 import type { AgentRevision, AgentService } from "@opencrane/models/agents";
-import { __CreateAgentServicesRouter, PrismaAgentRevisionLifecycleRepository, PrismaAgentServicePublicationRepository } from "@opencrane/backend/server/agents/agent-services";
+import { __CreateAgentServicesRouter, PrismaAgentRevisionLifecycleRepository, PrismaAgentScheduleRepository, PrismaAgentServicePublicationRepository, PrismaScopeGrantResolver } from "@opencrane/backend/server/agents/agent-services";
 import type { AgentPublicationAuditEvidencePort, AgentServicePublicationRepository, AtomicAgentRevisionPublication, ManagedRunAdmissionPort, ManagedRunAdmissionResult, ManagedRunNowCommand, ManagementCaller } from "@opencrane/backend/server/agents/agent-services";
 import type { AuditDecisionRecord } from "@opencrane/backend/server/iam/audit";
 import { __DigestCanonicalJson } from "@opencrane/backend/server/iam/authorization";
@@ -79,7 +79,7 @@ function _publicationFor(prisma: PrismaClient, caller: ManagementCaller): AgentS
  * @param prisma - Canonical product-authority client.
  * @returns A fail-closed managed run admission port bound to the real admission repository.
  */
-function _createManagedRunAdmissionPort(prisma: PrismaClient): ManagedRunAdmissionPort
+export function _createManagedRunAdmissionPort(prisma: PrismaClient): ManagedRunAdmissionPort
 {
 	const admission = new PrismaRunAdmissionRepository(prisma);
 	return {
@@ -108,6 +108,8 @@ export function _CreateAgentServicesRouter(prisma: PrismaClient): Router
 		lifecycle: new PrismaAgentRevisionLifecycleRepository(prisma),
 		publicationFor(caller: ManagementCaller): AgentServicePublicationRepository { return _publicationFor(prisma, caller); },
 		runAdmission: _createManagedRunAdmissionPort(prisma),
+		schedules: new PrismaAgentScheduleRepository(prisma),
+		scopeGrantResolver: new PrismaScopeGrantResolver(prisma),
 		resolveCaller: _resolveCaller,
 		clock: { now(): Date { return new Date(); } },
 		logger: _log,

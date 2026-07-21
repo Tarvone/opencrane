@@ -1,15 +1,15 @@
-# @opencrane/server/_infra/obot-custody — the Obot credential-custody port
+# @opencrane/server/_infra/obot-custody — the Obot credential-custody + MCP-invocation ports
 
 > [server](../../README.md) › [_infra](../README.md) › obot-custody
 
 ## What it owns
 
-This library owns the **boundary for handing an integration's secret to Obot to hold**, instead of
-storing it in OpenCrane. *Obot* is the external tool-connection system OpenCrane runs alongside (see
-`apps/_infra/obot`); "custody" means Obot keeps the credential and gives back only an opaque
-reference, so the raw secret never has to live in an OpenCrane database. This package is a
-**port** — a runtime-neutral contract (a TypeScript interface) that says *what* custody operations
-exist, with the real transport wired in elsewhere.
+This library owns two **boundaries** for working with Obot without ever holding a raw secret in
+OpenCrane: **custody** (handing an integration's credential to Obot to keep, receiving only an opaque
+reference) and **MCP invocation** (calling a tool *through* that opaque reference). *Obot* is the
+external tool-connection system OpenCrane runs alongside (see `apps/_infra/obot`). Both are
+**ports** — runtime-neutral contracts (TypeScript interfaces) that say *what* operations exist, with
+the real transport wired in elsewhere.
 
 It sits between the integrations backend and the remote Obot authority:
 
@@ -37,11 +37,22 @@ management transport is verified, so no code path can mint a fake local custody 
 meantime. Invariant: a custody reference is only ever real if Obot minted it — the platform never
 synthesises one, and absent a working transport the answer is a hard failure, not a placeholder.
 
+The MCP-invocation port lets a managed (central) agent call an allow-listed tool through a custody
+reference. The command names only the **opaque** `obotCustodyReference` — the runtime never receives
+the credential — plus the tool, its validated arguments, and the immutable `allowedTools` allow-list
+copied from the revision's `AgentRevisionIntegrationAssignment`. Every implementation enforces the
+allow-list FIRST (`__AssertToolAllowed`), so a tool outside the assignment is rejected fail-closed
+regardless of transport. The `__UnavailableObotMcpInvocationAdapter` default enforces the allow-list
+and then refuses; `__FakeObotMcpInvocationAdapter` is the test/offline double.
+
 ## Public surface
 
 - `ObotCustodyPort` — the runtime-neutral provision/revoke contract.
 - `ProvisionObotCustodyCommand`, `ProvisionedObotCustody`, `ObotCustodyCredential` — the I/O types.
 - `__UnavailableObotCustodyAdapter`, `ObotCustodyUnavailableError` — the fail-closed default and its error.
+- `ObotMcpInvocationPort`, `ObotMcpToolInvocationCommand`, `ObotMcpToolResult` — the MCP-invocation contract and I/O.
+- `__AssertToolAllowed` — the single allow-list enforcement point every adapter calls.
+- `__UnavailableObotMcpInvocationAdapter`, `__FakeObotMcpInvocationAdapter`, `ObotMcpInvocationUnavailableError`, `ObotMcpToolNotAllowedError`.
 
 ## Boundary
 

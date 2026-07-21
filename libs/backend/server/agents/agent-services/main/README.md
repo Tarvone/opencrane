@@ -55,7 +55,13 @@ leaves a half-published service. Anything missing or stale is refused with a pla
   revisions, lineage, optimistic concurrency).
 - `__PublishAgentRevision` + `PrismaAgentServicePublicationRepository` — the reused compare-and-swap
   publish path and its Postgres adapter.
-- `ManagedRunAdmissionPort` — the app-owned seam through which run-now records an admission.
+- `ManagedRunAdmissionPort` — the app-owned seam through which run-now AND the scheduler record an
+  admission (`trigger: managed_invocation` or `schedule`).
+- Schedule plane: `__CreateAgentSchedule`, `__UpdateAgentSchedule`, `PrismaAgentScheduleRepository`,
+  and the `/:serviceId/schedules` management surface (list/create/update/delete). Evaluation of a
+  schedule into due runs lives in the sibling `scheduling` package.
+- Scope attach-authority + effective access: `__ValidateAttachAuthority`,
+  `__ResolveEffectiveScopeAttachments`, `__IntersectScopeAttachments`, `PrismaScopeGrantResolver`.
 - Types: the lifecycle commands/results (`AgentRevisionContent`, `CreateManagedAgentServiceCommand`,
   `ReviseAgentRevisionCommand`, `RestoreAgentRevisionCommand`, `ChangeAgentServiceStateCommand`,
   `ManagedRunNowCommand`, `AgentRevisionLifecycleRepository`, `AgentServiceHistory`, …), the publish
@@ -72,20 +78,22 @@ a silent partial publish.
 ## Dependency direction
 
 Tagged `scope:agent-services`: it may depend only on `scope:agent-services`, `scope:agents` (shared
-agent models), `scope:audit`, `scope:authorization`, and `scope:shared` — never on apps, gateways,
-or knowledge domains. run-now and session reading are injected by the app so this package never
-imports `scope:auth` or `scope:personal-runs`. Per-scope attach-authority and runtime
-effective-access enforcement over scope attachments land in slice 6 (#332); the `scope:grants`
-dependency will be re-opened then with a real import. Until then, scope attachments are shape-only,
-silo-bounded, and org-admin-gated.
+agent models), `scope:audit`, `scope:authorization`, `scope:grants`, and `scope:shared` — never on
+apps, gateways, or knowledge domains. run-now and session reading are injected by the app so this
+package never imports `scope:auth` or `scope:personal-runs`. The `scope:grants` edge is real and
+load-bearing: `PrismaScopeGrantResolver` calls the IAM grant compiler so `__ValidateAttachAuthority`
+(a caller must administer every scope they attach) and `__ResolveEffectiveScopeAttachments` (the
+runtime intersection, so a stored attachment grants nothing beyond the agent's actual compiled
+grants) both ride the compiler. Scope attachments remain silo-bounded and org-admin-gated.
 
 ## Data & persistence
 
 Owns the `AgentService`, `AgentRevision` (with `parentRevisionId`/`sourceRevisionId`/`changeMessage`
 lineage), `AgentRevisionScopeAttachment` (revision-scoped `{ scope, subjectType, subjectId }` reusing
-the `GrantScope`/`GrantSubjectType` enums), `AgentRevisionSkillAssignment`, and
-`AgentRevisionIntegrationAssignment` models in `apps/opencrane/prisma/schema/agent-services.prisma`.
-The retired single-owner shape (`ownerScope`/`ownerSubjectId`/`AgentServiceOwnerScope`) is dropped.
+the `GrantScope`/`GrantSubjectType` enums), `AgentRevisionSkillAssignment`,
+`AgentRevisionIntegrationAssignment`, and `AgentServiceSchedule` (cron, timezone, overlap policy,
+enabled, catch-up window) models in `apps/opencrane/prisma/schema/agent-services.prisma`. The retired
+single-owner shape (`ownerScope`/`ownerSubjectId`/`AgentServiceOwnerScope`) is dropped.
 
 ## See also
 

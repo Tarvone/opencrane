@@ -1,0 +1,21 @@
+# Managed (central) agent runtime plane — deployment-only values.
+managedAgentRuntime:
+  # Dedicated namespace that holds ONLY managed-agent runtime workloads and their identity.
+  namespace: opencrane-managed-runtime
+  # Server (control-plane) namespace the runtime reaches for its stream + reachable services.
+  serverNamespace: opencrane
+  # Connector-scoped ServiceAccount. MUST match the bounded managed-agent-runtime-* identity class
+  # (___IsManagedAgentRuntimeServiceAccountName) and NEVER the personal agent-runtime-* class.
+  serviceAccountName: managed-agent-runtime-default
+  # In-cluster egress destinations the managed runtime is allowed to reach, by component label in
+  # the server namespace. Everything else is denied by the default-deny policy below.
+  egress:
+    channelProxyComponent: channel-proxy
+    artifactServiceComponent: artifact-service
+    memoryGatewayComponent: opencrane-server
+    litellmComponent: litellm
+    obotComponent: obot
+    # Port the managed runtime uses to reach the control-plane internal stream + in-cluster services.
+    serverInternalPort: 8081
+    litellmPort: 4000
+    obotPort: 8080

@@ -28,20 +28,28 @@ It sits between the personal-agent backend and the remote memory gateway:
 **In this flow:** the personal-agent backend *(consumer)* · the remote memory gateway *(holds the
 facts, mints fact references)*
 
-It owns: the `MemoryGatewayClient` interface (`query` / `correct` / `forget`); the request/result
-types, where recall returns only gateway-originated `MemoryFact` values and a fact reference is only
-ever real if the gateway minted it; and a **fail-closed** default implementation,
+It owns: the `MemoryGatewayClient` interface (`query` / `correct` / `forget` for a subject's personal
+memory, plus `recallScoped` / `injectScoped` for a shared knowledge SCOPE); the request/result
+types, where recall returns only gateway-originated facts and a fact reference is only ever real if
+the gateway minted it; and a **fail-closed** default implementation,
 `__UnavailableMemoryGatewayClient`, which throws `MemoryGatewayUnavailableError` for every call. That
 default ships until an authenticated memory-gateway transport is verified, so no code path can invent
-an empty recall or a fake write in the meantime. Invariant: absent a working transport the answer is
-a hard failure, not a placeholder result. This package **does not call Cognee directly** and adds no
-real transport — port plus fail-closed stub only; the concrete client is wired in the `apps/opencrane`
-root once the gateway contract is confirmed.
+an empty recall or a fake write in the meantime.
+
+A central agent reads and writes shared knowledge scopes ONLY through this port (never Cognee
+directly), and every scoped write carries mandatory `MemoryProvenance` — the central-agent id, the
+revision, the run id, the timestamp, and the source reference. `__AssertMemoryProvenanceComplete`
+enforces this before any transport, so an unattributable record fails closed with
+`MemoryProvenanceIncompleteError` rather than being written. Invariant: absent a working transport
+the answer is a hard failure, not a placeholder result; and no scoped record is ever injected without
+complete provenance.
 
 ## Public surface
 
-- `MemoryGatewayClient` — the runtime-neutral query/correct/forget contract.
-- `MemoryQueryCommand`, `MemoryQueryResult`, `MemoryFact`, `MemoryCorrectionCommand`, `MemoryForgetCommand` — the I/O types.
+- `MemoryGatewayClient` — the runtime-neutral query/correct/forget + recallScoped/injectScoped contract.
+- `MemoryQueryCommand`, `MemoryQueryResult`, `MemoryFact`, `MemoryCorrectionCommand`, `MemoryForgetCommand` — the personal-memory I/O types.
+- `MemoryProvenance`, `ScopedMemoryRecallCommand`, `ScopedMemoryRecallResult`, `ScopedMemoryFact`, `ScopedMemoryInjectionCommand` — the scoped read/write I/O types.
+- `__AssertMemoryProvenanceComplete`, `MemoryProvenanceIncompleteError` — the provenance guard and its error.
 - `__UnavailableMemoryGatewayClient`, `MemoryGatewayUnavailableError` — the fail-closed default and its error.
 
 ## Boundary

@@ -129,7 +129,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/component: postgres-pooler
+              cnpg.io/poolerName: {{ printf "%s-postgres-pooler" .Release.Name | trunc 63 | trimSuffix "-" }}
       ports:
         - protocol: TCP
           port: 5432

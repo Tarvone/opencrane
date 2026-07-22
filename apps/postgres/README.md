@@ -76,7 +76,7 @@ runtime identity it reconciles.
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
-| Pinned PgBouncer image, pool size and client ingress selectors | Reconciling the `Pooler` into its Deployment and Service |
+| Pinned PgBouncer image, pool size, client ingress, and pooler-to-instance egress | Reconciling the `Pooler` into its Deployment and Service |
 | Supplying distinct application/admin Secret names, the app-owned target baseline reference, and database access | Bootstrapping the target SQL and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 
@@ -117,11 +117,31 @@ Install the database **before** the server release; grow the PVC request as dura
 
 ```bash
 kubectl create namespace opencrane --dry-run=client -o yaml | kubectl apply -f -
+kubernetes_api_host_cidr() {
+  case "$1" in
+    *:*) printf '%s/128' "$1" ;;
+    *) printf '%s/32' "$1" ;;
+  esac
+}
 BASELINE_CONFIG_MAP="$(bash apps/postgres/scripts/publish-initdb-baseline-config-map.sh \
   opencrane opencrane apps/opencrane/prisma/bootstrap/target-baseline.sql)"
 BASELINE_SHA256="$(kubectl get configmap "$BASELINE_CONFIG_MAP" \
   --namespace opencrane \
   -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
+KUBERNETES_API_SERVICE_IP="$(kubectl get service kubernetes --namespace default \
+  -o jsonpath='{.spec.clusterIP}')"
+KUBERNETES_API_SERVICE_PORT="$(kubectl get service kubernetes --namespace default \
+  -o jsonpath='{.spec.ports[0].port}')"
+KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes --namespace default \
+  -o jsonpath='{.subsets[0].ports[0].port}')"
+KUBERNETES_API_ENDPOINT_ARGS=()
+KUBERNETES_API_ENDPOINT_INDEX=0
+while IFS= read -r endpoint_ip; do
+  KUBERNETES_API_ENDPOINT_ARGS+=(--set-string \
+    "networkPolicy.kubernetesApiServerEndpointCidrs[$KUBERNETES_API_ENDPOINT_INDEX]=$(kubernetes_api_host_cidr "$endpoint_ip")")
+  KUBERNETES_API_ENDPOINT_INDEX=$((KUBERNETES_API_ENDPOINT_INDEX + 1))
+done < <(kubectl get endpoints kubernetes --namespace default \
+  -o jsonpath='{range .subsets[*].addresses[*]}{.ip}{"\n"}{end}')
 helm upgrade --install opencrane-postgres apps/postgres/helm \
   --namespace opencrane \
   --set databaseAdmin.name=opencrane_database_admin \
@@ -129,6 +149,10 @@ helm upgrade --install opencrane-postgres apps/postgres/helm \
   --set-string bootstrap.targetBaseline.sha256="$BASELINE_SHA256" \
   --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name="$BASELINE_CONFIG_MAP" \
   --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql \
+  --set-string networkPolicy.kubernetesApiServerCidrs[0]="$(kubernetes_api_host_cidr "$KUBERNETES_API_SERVICE_IP")" \
+  --set networkPolicy.kubernetesApiServerPort="$KUBERNETES_API_SERVICE_PORT" \
+  "${KUBERNETES_API_ENDPOINT_ARGS[@]}" \
+  --set networkPolicy.kubernetesApiServerEndpointPort="$KUBERNETES_API_ENDPOINT_PORT" \
   --set databases[0].credentialsSecret=opencrane-postgres-bootstrap \
   --set databases[1].credentialsSecret=opencrane-obot-postgres-bootstrap \
   --set databases[2].credentialsSecret=opencrane-litellm-postgres-bootstrap \
@@ -145,6 +169,11 @@ or restore a compatible physical backup. The k3d acceptance path server-dry-runs
 Barman Cloud plugin and MinIO test target, writes a marker, completes an on-demand physical backup,
 recovers a fresh Cluster, proves a false baseline claim is rejected, and verifies the data marker
 through the recovered application Secret.
+
+NetworkPolicy also requires the exact Kubernetes API Service and backing endpoint addresses. CNPG's
+PgBouncer manager watches its `Pooler` and Secrets through that API; the two CIDR lists keep this
+control path available whether the cluster enforces egress before or after Service translation. Use
+`/128` rather than `/32` for IPv6, and list every API endpoint on a highly available control plane.
 
 ## See also
 

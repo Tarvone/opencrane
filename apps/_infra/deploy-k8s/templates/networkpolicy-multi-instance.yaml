@@ -38,14 +38,17 @@ metadata:
     {{- include "opencrane.labels" $ | nindent 4 }}
     app.kubernetes.io/component: cross-instance-isolation
 spec:
-  # ArtifactStore and agent-controller have stricter app policies; each agent-runtime Job has a
-  # controller-built policy. Exclude them because this additive same-instance allowance would
-  # widen their deliberately tiny ingress/egress surfaces under the multi-CT profile.
+  # ArtifactStore, agent-controller, and the PostgreSQL pooler have stricter app policies; each
+  # agent-runtime Job has a controller-built policy. Exclude them because this additive
+  # same-instance allowance would widen their deliberately tiny ingress/egress surfaces. CNPG
+  # identifies generated pooler pods with cnpg.io/poolerName.
   podSelector:
     matchExpressions:
       - key: app.kubernetes.io/component
         operator: NotIn
         values: [artifact-service, agent-controller, agent-runtime]
+      - key: cnpg.io/poolerName
+        operator: DoesNotExist
   policyTypes:
     - Ingress
     - Egress

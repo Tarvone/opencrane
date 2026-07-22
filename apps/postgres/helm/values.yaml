@@ -87,6 +87,13 @@ networkPolicy:
   operatorNamespace: cnpg-system
   operatorPodLabels:
     app.kubernetes.io/name: cloudnative-pg
+  # The CNPG-managed PgBouncer pod runs a manager that reads and watches Pooler and
+  # Secret objects. Admit only the exact Kubernetes API Service and backing endpoint
+  # addresses so the rule works with CNIs enforcing before or after Service translation.
+  kubernetesApiServerCidrs: []
+  kubernetesApiServerPort: 443
+  kubernetesApiServerEndpointCidrs: []
+  kubernetesApiServerEndpointPort: 443
   # Direct instance clients required for database reconciliation. Applications use
   # pooler.clientPodSelectors and cannot bypass the PgBouncer connection budget.
   clientPodSelectors:

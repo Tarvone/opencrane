@@ -33,7 +33,7 @@ server_policy="$(printf '%s\n' "$rendered" | awk '
 ')"
 
 [[ -n "$server_policy" ]]
-grep -Fq '              app.kubernetes.io/component: postgres-pooler' <<<"$server_policy"
+grep -Fq '              cnpg.io/poolerName: opencrane-silo-postgres-pooler' <<<"$server_policy"
 grep -Fq '          port: 5432' <<<"$server_policy"
 grep -Fq '          port: 443' <<<"$server_policy"
 grep -Fq '              kubernetes.io/metadata.name: kube-system' <<<"$server_policy"

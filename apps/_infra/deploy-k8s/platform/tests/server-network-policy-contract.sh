@@ -33,8 +33,6 @@ server_policy="$(printf '%s\n' "$rendered" | awk '
 ')"
 
 [[ -n "$server_policy" ]]
-grep -Fq '              - key: cnpg.io/cluster' <<<"$server_policy"
-grep -Fq '                operator: Exists' <<<"$server_policy"
 grep -Fq '              app.kubernetes.io/component: postgres-pooler' <<<"$server_policy"
 grep -Fq '          port: 5432' <<<"$server_policy"
 grep -Fq '          port: 443' <<<"$server_policy"
@@ -50,6 +48,11 @@ grep -Fq '          port: 18789' <<<"$server_policy"
 
 if grep -Fq '              app.kubernetes.io/component: mcp-gateway' <<<"$server_policy"; then
   echo "opencrane-server policy grants unused MCP gateway egress" >&2
+  exit 1
+fi
+
+if grep -Fq 'cnpg.io/cluster' <<<"$server_policy"; then
+  echo "opencrane-server policy bypasses the PostgreSQL pooler" >&2
   exit 1
 fi
 

@@ -123,14 +123,10 @@ spec:
         - protocol: TCP
           port: {{ .Values.agentController.kubernetesApiServerEndpointPort }}
     {{- end }}
-    # PostgreSQL and its PgBouncer pooler are CNPG-owned pods in this silo namespace.
-    # The database Secret binds the exact authority; the app and database releases
-    # intentionally have independent names, including after cluster recovery.
+    # Every application connection goes through the CNPG-owned PgBouncer pooler.
+    # The database Secret binds the exact authority while the pooler owns the
+    # connection budget; direct CNPG-instance egress would bypass that boundary.
     - to:
-        - podSelector:
-            matchExpressions:
-              - key: cnpg.io/cluster
-                operator: Exists
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: postgres-pooler

@@ -142,6 +142,11 @@
   ],
   "nonProducingRuntimeMatches": [
     {
+      "path": "libs/backend/agents/runtime/controller/src/agent-controller.ts",
+      "anchor": "kind: \"Job\"",
+      "reason": "Owner reference only; it binds the immutable key Secret to an already-created Job and cannot create a pod."
+    },
+    {
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/destroy/tenant-cleanup.ts",
       "anchor": "kind: \"Deployment\"",
       "reason": "Deletion selector only; it cannot create a pod."

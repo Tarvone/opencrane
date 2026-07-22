@@ -1,6 +1,12 @@
 instances: 1
 image: ghcr.io/cloudnative-pg/postgresql:17.5
 
+# This is the physical-server budget, not an application default. The pooler below
+# reserves only 50 server connections across the logical databases, leaving 30
+# for CNPG's management/replication work and controlled operator access.
+postgresql:
+  maxConnections: 80
+
 # One physical CNPG Cluster hosts these isolated logical databases. The first item is
 # bootstrapped by CNPG initdb; each later item becomes a CNPG Database CR and a managed
 # PostgreSQL role. Every item must use its own basic-auth Secret (username/password).
@@ -25,6 +31,15 @@ databaseAdmin:
   name: opencrane_database_admin
   credentialsSecret: ""
 
+# A fresh Cluster receives exactly one app-owned target baseline during CNPG initdb.
+# The referenced ConfigMap is created before Helm installation and is content-addressed
+# and immutable. Recovery never attaches this input because the physical backup already
+# contains the authoritative schema.
+bootstrap:
+  initdb:
+    postInitApplicationSQLRefs:
+      configMapRefs: []
+
 storage:
   size: 20Gi
   storageClass: ""
@@ -37,6 +52,33 @@ resources:
   limits:
     memory: 2Gi
 
+# Every application connection goes through this CNPG-managed PgBouncer Pooler.
+# `maxDbConnections` is per logical database; with the five deployed databases
+# (including the optional fleet database), 5 × 10 = 50 server connections stay
+# below `postgresql.maxConnections` (80). `maxClientConnections` bounds queued
+# client connections at the pooler instead of consuming PostgreSQL connections.
+pooler:
+  enabled: true
+  instances: 1
+  poolMode: session
+  maxClientConnections: 50
+  maxDbConnections: 10
+  defaultPoolSize: 10
+  reservePoolSize: 0
+  clientPodSelectors:
+    - matchLabels:
+        app.kubernetes.io/component: opencrane-server
+    - matchLabels:
+        app.kubernetes.io/component: mcp-gateway
+    - matchLabels:
+        app.kubernetes.io/component: litellm
+    - matchLabels:
+        app.kubernetes.io/name: langfuse
+    - matchLabels:
+        app.kubernetes.io/component: fleet-manager
+    - matchLabels:
+        app.kubernetes.io/component: postgres-database-privileges
+
 networkPolicy:
   enabled: true
   # CloudNativePG's operator must reach the instance-manager status endpoint on port 8000.
@@ -48,8 +90,6 @@ networkPolicy:
   clientPodSelectors:
     - matchLabels:
         app.kubernetes.io/component: opencrane-server
-    - matchLabels:
-        app.kubernetes.io/component: opencrane-server-migrate
     - matchLabels:
         app.kubernetes.io/component: postgres-database-privileges
 
@@ -69,6 +109,9 @@ backup:
 restore:
   enabled: false
   sourceName: source
+  # Content-addressed baseline identity recorded on the source Cluster. Recovery
+  # never executes this ConfigMap; it carries provenance for later deploy checks.
+  sourceBaselineConfigMap: ""
   targetTime: ""
   plugin:
     name: ""

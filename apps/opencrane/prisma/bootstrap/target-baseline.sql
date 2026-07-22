@@ -1,3 +1,6 @@
+-- OpenCrane target database baseline.
+-- Applied once by CloudNativePG while creating an empty application database.
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
@@ -2352,7 +2355,7 @@ ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_persona_revision_i
 CREATE UNIQUE INDEX "memory_datasets_exact_scope_key"
     ON "memory_datasets"("silo_id", "scope_kind", "organization_id", COALESCE("scope_resource_id", ''));
 
--- Current legacy-owned projection models retain their target cardinality and scope guards.
+-- Projection read models retain their required cardinality and scope guards.
 ALTER TABLE "tenant_dataset_memberships" ADD CONSTRAINT "tenant_dataset_memberships_scope_subject_check" CHECK (
     ("scope" IN ('team', 'department', 'project', 'personal') AND LENGTH(BTRIM("subject")) > 0)
     OR ("scope" = 'org' AND "subject" = 'default')
@@ -2363,7 +2366,6 @@ CREATE UNIQUE INDEX "org_memberships_one_owner_per_org"
     ON "org_memberships"("cluster_tenant") WHERE "role" = 'owner';
 
 -- Database-native authority guards omitted by Prisma schema diff.
--- Source migrations are intentionally retired by this greenfield baseline.
 
 -- Functions
 CREATE FUNCTION "enforce_agent_revision_immutability"() RETURNS trigger

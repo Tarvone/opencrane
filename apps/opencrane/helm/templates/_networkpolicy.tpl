@@ -1,6 +1,6 @@
 {{- define "opencrane.server.networkPolicy" -}}
 {{- if .Values.networkPolicy.enabled }}
-# Ingress policy for the opencrane-ui service.
+# Network policy for the OpenCrane server.
 #
 # Two listeners, two ports:
 #   - PUBLIC port (service.port): /api/v1/* + /auth, session-authed. Reachable from the
@@ -22,7 +22,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "opencrane.fullname" . }}-opencrane-server-ingress
+  name: {{ include "opencrane.fullname" . }}-opencrane-server
   labels:
     {{- include "opencrane.labels" . | nindent 4 }}
     app.kubernetes.io/component: opencrane-server
@@ -110,6 +110,103 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.agentController.kubernetesApiServerPort }}
+    {{- end }}
+    # PostgreSQL and its PgBouncer pooler are CNPG-owned pods in this silo namespace.
+    # The database Secret binds the exact authority; the app and database releases
+    # intentionally have independent names, including after cluster recovery.
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: postgres-pooler
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Kubernetes API calls and external OIDC/provider APIs use HTTPS. Standard
+    # NetworkPolicy cannot select the API Service or constrain external FQDNs, so
+    # this is intentionally port-scoped; use Cilium to narrow external hostnames.
+    - ports:
+        - protocol: TCP
+          port: 443
+    {{- if .Values.networkPolicy.allowDNS }}
+    # Cluster DNS lives outside the release namespace.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    {{- if and .Values.litellm.enabled (ne (include "opencrane.litellmShared" .) "true") }}
+    # Release-local model routing. Shared LiteLLM endpoints are expected to use HTTPS.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: litellm
+      ports:
+        - protocol: TCP
+          port: {{ .Values.litellm.service.port }}
+    {{- end }}
+    {{- if .Values.clustertenantManager.cognee.install }}
+    # Release-local durable memory and permission synchronization. BYO Cognee is
+    # expected to use HTTPS and is therefore covered by the port-443 rule above.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: cognee
+      ports:
+        - protocol: TCP
+          port: {{ .Values.clustertenantManager.cognee.service.port }}
+    {{- end }}
+    # The in-process gateway proxy connects directly to tenant Services.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: tenant
+      ports:
+        - protocol: TCP
+          port: {{ .Values.tenant.gatewayPort }}
+    {{- if .Values.langfuse.inCluster.enabled }}
+    # Release-local Langfuse metrics and trace API.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: langfuse
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app: web
+      ports:
+        - protocol: TCP
+          port: 3000
+    {{- end }}
+    {{- if .Values.observability.otel.enabled }}
+    # Release-local OTEL collector for trace export.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: otel-collector
+      ports:
+        - protocol: TCP
+          port: {{ .Values.observability.otel.collector.otlpPort }}
+    {{- end }}
+    {{- if eq .Values.hosting.provider "gcp" }}
+    # GKE Workload Identity token exchange before GCS HTTPS calls.
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 80
     {{- end }}
     # The only cross-namespace server call: the app-owned artifact byte plane.
     - to:

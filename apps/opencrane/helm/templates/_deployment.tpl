@@ -198,7 +198,7 @@ spec:
                    Secret created by k8s-deploy.sh (never appear in rendered manifests). */ -}}
             {{- if .Values.langfuse.inCluster.enabled }}
             - name: LANGFUSE_HOST
-              value: "http://{{ .Release.Name }}-langfuse.{{ .Release.Namespace }}.svc.cluster.local:3000"
+              value: "http://{{ .Release.Name }}-langfuse-web.{{ .Release.Namespace }}.svc.cluster.local:3000"
             - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:

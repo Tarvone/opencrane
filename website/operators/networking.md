@@ -194,6 +194,8 @@ See [Identity & network isolation (Cilium + SPIFFE)](/operators/cilium-spiffe-id
 
 Egress is bounded the same way: `CiliumNetworkPolicy` `toFQDN` rules give each silo a per-hostname allow-list (e.g. only `api.openai.com`), so a silo reaches DNS and its approved provider/tool endpoints and nothing else. An `AccessPolicy` with `egressRules` narrows this further per tenant.
 
+The OpenCrane server also owns a portable egress policy. It admits CNPG PostgreSQL, Kubernetes and external HTTPS, DNS, release-local LiteLLM/Cognee/Langfuse/OTEL services, tenant gateways, the GKE metadata endpoint when selected, and the cross-namespace ArtifactStore byte plane. Shared LiteLLM and bring-your-own Cognee endpoints must use HTTPS. Standard `NetworkPolicy` can restrict that external traffic only by port; use the Cilium FQDN layer when it must be narrowed to named hosts.
+
 ---
 
 ## Current enforcement status and known gaps

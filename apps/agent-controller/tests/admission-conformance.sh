@@ -104,6 +104,10 @@ spec:
               value: http://${RELEASE_FULLNAME}-opencrane-server.${SERVER_NAMESPACE}.svc.cluster.local:3001/api/internal/agent-runtime
             - name: OPENCRANE_RUNTIME_TOKEN_PATH
               value: /var/run/opencrane/tokens/runtime.token
+            - name: OPENCRANE_RUNTIME_LITELLM_BASE_URL
+              value: http://${RELEASE_FULLNAME}-litellm.${SERVER_NAMESPACE}.svc.cluster.local:4000
+            - name: OPENCRANE_RUNTIME_LITELLM_KEY_PATH
+              value: /var/run/opencrane/litellm/key
             - name: POD_UID
               valueFrom:
                 fieldRef:
@@ -114,6 +118,9 @@ spec:
               readOnly: true
             - name: runtime-bootstrap
               mountPath: /var/run/opencrane/bootstrap
+              readOnly: true
+            - name: litellm-key
+              mountPath: /var/run/opencrane/litellm
               readOnly: true
             - name: scratch
               mountPath: /tmp
@@ -140,6 +147,15 @@ spec:
               - path: reference
                 fieldRef:
                   fieldPath: metadata.annotations['opencrane.ai/bootstrap-reference']
+        - name: litellm-key
+          projected:
+            defaultMode: 288
+            sources:
+              - secret:
+                  name: litellm-key-00000000000000000000000000000000
+                  items:
+                    - key: key
+                      path: key
         - name: scratch
           emptyDir:
             sizeLimit: 1Gi
@@ -157,8 +173,11 @@ _expect_create_denied "controller ServiceAccount" "$CONTROLLER_USER"
 _variant '[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"ghcr.io/italanta/opencrane-agent-runtime:latest"}]'
 _expect_create_denied "mutable image" "$CONTROLLER_USER"
 
-_variant '[{"op":"replace","path":"/spec/template/spec/volumes/2","value":{"name":"scratch","configMap":{"name":"foreign"}}}]'
-_expect_create_denied "non-scratch volume" "$CONTROLLER_USER"
+_variant '[{"op":"replace","path":"/spec/template/spec/volumes/2","value":{"name":"litellm-key","configMap":{"name":"foreign"}}}]'
+_expect_create_denied "non-attempt-key volume" "$CONTROLLER_USER"
+
+_variant '[{"op":"replace","path":"/spec/template/spec/volumes/2/projected/sources/0/secret/name","value":"foreign-key"}]'
+_expect_create_denied "foreign attempt-key Secret" "$CONTROLLER_USER"
 
 _variant '[{"op":"add","path":"/spec/template/spec/nodeName","value":"foreign-node"}]'
 _expect_create_denied "direct node placement" "$CONTROLLER_USER"

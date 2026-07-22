@@ -52,6 +52,13 @@ projected Kubernetes identity through TokenReview; explicitly network-only route
 NetworkPolicy. If either layer were collapsed, platform-only or runtime authority could become
 internet-facing.
 
+The server also composes one bounded managed-run admission port for both an administrator's
+**run-now** request and the scheduler. It limits work per silo and AgentService before immutable
+snapshot assembly can consume a PostgreSQL connection; overload is rejected rather than allowed to
+form a database-lock convoy. Helm exposes the conservative `runAdmission.maxConcurrent` and
+`runAdmission.maxQueued` settings: one silo is limited to that policy and the whole process to
+twice that policy, which remains below the server's five-connection database pool budget.
+
 ## Public surface
 
 `Entrypoint: src/index.ts` — boots the process: creates the Prisma and Kubernetes clients, starts the

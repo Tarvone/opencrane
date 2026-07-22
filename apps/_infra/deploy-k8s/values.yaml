@@ -429,6 +429,12 @@ clustertenantManager:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
+  # -- Bound run admission before snapshot assembly can take a pooled PostgreSQL connection.
+  # These apply per silo and AgentService; keep the active limit below the server's five-connection
+  # Prisma budget so a hot service cannot starve unrelated control-plane work.
+  runAdmission:
+    maxConcurrent: 2
+    maxQueued: 10
   service:
     # -- Public API port (ingress-facing): /api/v1/*, /auth. Session-authed.
     port: 8080

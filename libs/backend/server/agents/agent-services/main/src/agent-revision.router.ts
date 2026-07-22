@@ -258,7 +258,12 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 			const body = (req.body ?? {}) as Record<string, unknown>;
 			if (!_isNonEmptyString(body.requestIdempotencyKey)) { res.status(400).json({ error: "requestIdempotencyKey is required.", code: "VALIDATION_ERROR" }); return; }
 			const result = await __AdmitManagedRunNow(lifecycle, runAdmission, { agentServiceId: String(req.params.serviceId), siloId: caller.siloId, requestedBy: caller.subjectId, requestIdempotencyKey: body.requestIdempotencyKey, trigger: "managed_invocation", scheduledSlot: null });
-			if (result.outcome === "denied") { res.status(_runDenialStatus(result.reason)).json({ error: "Run-now denied.", code: result.reason.toUpperCase() }); return; }
+			if (result.outcome === "denied")
+			{
+				if (result.reason === "admission_concurrency_limited") res.set("Retry-After", "1");
+				res.status(_runDenialStatus(result.reason)).json({ error: "Run-now denied.", code: result.reason.toUpperCase() });
+				return;
+			}
 			res.status(result.outcome === "accepted" ? 202 : 200).json({ outcome: result.outcome, runId: result.runId });
 		}
 		catch (error) { _fail(res, error, "run-now"); }
@@ -376,11 +381,12 @@ export function __CreateAgentServicesRouter(dependencies: AgentServicesRouterDep
 }
 
 /** Maps a run-now denial reason to a fail-closed HTTP status. */
-function _runDenialStatus(reason: string): number
+function _runDenialStatus(reason: AgentRevisionLifecycleDenial): number
 {
 	if (reason === "service_not_found") return 404;
 	if (reason === "service_not_runnable") return 409;
 	if (reason === "run_admission_unavailable") return 503;
+	if (reason === "admission_concurrency_limited") return 503;
 	return 400;
 }
 

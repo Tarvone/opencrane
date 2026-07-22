@@ -2825,7 +2825,11 @@ $$;
 CREATE FUNCTION "enforce_run_outbox_event_update"() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
-        RAISE EXCEPTION 'OutboxEvent rows cannot be deleted';
+        IF current_setting('opencrane.run_outbox_prune', true) IS DISTINCT FROM 'true'
+            OR OLD."published_at" IS NULL OR OLD."failed_at" IS NOT NULL THEN
+            RAISE EXCEPTION 'OutboxEvent rows cannot be deleted outside successful-delivery retention';
+        END IF;
+        RETURN OLD;
     END IF;
     IF NEW."id" IS DISTINCT FROM OLD."id" OR NEW."run_id" IS DISTINCT FROM OLD."run_id"
         OR NEW."attempt" IS DISTINCT FROM OLD."attempt" OR NEW."sequence" IS DISTINCT FROM OLD."sequence"

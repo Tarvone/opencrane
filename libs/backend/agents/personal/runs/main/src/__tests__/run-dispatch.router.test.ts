@@ -13,7 +13,7 @@ function _App(overrides: Partial<AgentControllerRunDispatchRouterDependencies> =
 	const dependencies: AgentControllerRunDispatchRouterDependencies = {
 		namespace: "silo-a",
 		tokenReviewer: { __Review: vi.fn().mockResolvedValue({ username: "system:serviceaccount:silo-a:agent-controller", namespace: "silo-a", serviceAccountName: "agent-controller", audiences: [AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE] }) },
-		repository: { claimNextAttemptAtomically: vi.fn().mockResolvedValue({ status: "none" }), commitSuspendedJobAssignmentAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "none" }), registerFirstPodAndPublishReleaseAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }) },
+		repository: { claimNextAttemptAtomically: vi.fn().mockResolvedValue({ status: "none" }), commitSuspendedJobAssignmentAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "none" }), registerFirstPodAndPublishReleaseAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), prunePublishedOutboxEventsAtomically: vi.fn().mockResolvedValue({ deletedCount: 0 }) },
 		logger: { error: vi.fn(), warn: vi.fn() },
 		...overrides,
 	};
@@ -45,6 +45,17 @@ describe("agent-controller run-dispatch router", function _DescribeRouter()
 		expect(response.status).toBe(204);
 		expect(dependencies.tokenReviewer.__Review).toHaveBeenCalledWith("projected-token");
 		expect(dependencies.repository.claimNextAttemptAtomically).toHaveBeenCalledOnce();
+	});
+
+	it("permits bounded delivered-outbox retention only for the reviewed controller", async function _PruneOutbox()
+	{
+		const { app, dependencies } = _App({ repository: { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn(), registerFirstPodAndPublishReleaseAtomically: vi.fn(), prunePublishedOutboxEventsAtomically: vi.fn().mockResolvedValue({ deletedCount: 3 }) } });
+
+		const response = await request(app).post("/run-outbox:prune").set("authorization", "Bearer projected-token").send({});
+
+		expect(response.status).toBe(200);
+		expect(response.body).toEqual({ deletedCount: 3 });
+		expect(dependencies.repository.prunePublishedOutboxEventsAtomically).toHaveBeenCalledOnce();
 	});
 
 	it("forwards exact assignment evidence and maps a stale claim to conflict", async function _CommitConflict()

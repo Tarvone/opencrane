@@ -1534,6 +1534,23 @@ SELECT pg_temp.expect_failure(
     'delivered OutboxEvent status is terminal'
 );
 
+SELECT pg_temp.expect_failure(
+    'delivered outbox cannot be deleted without the retention transaction guard',
+    $statement$
+        DELETE FROM "run_outbox_events" WHERE "id" = 'outbox-1'
+    $statement$,
+    'outside successful-delivery retention'
+);
+
+BEGIN;
+SELECT set_config('opencrane.run_outbox_prune', 'true', true);
+DELETE FROM "run_outbox_events" WHERE "id" = 'outbox-1';
+COMMIT;
+SELECT pg_temp.assert_true(
+    'guarded retention transaction can remove a successful delivered outbox record',
+    NOT EXISTS (SELECT 1 FROM "run_outbox_events" WHERE "id" = 'outbox-1')
+);
+
 INSERT INTO "audit_decisions" (
     "id", "decision_digest", "silo_id", "actor_kind", "actor_id", "audience", "namespace",
     "service_account_name", "workload_kind", "workload_uid", "pod_uid", "run_id", "attempt",

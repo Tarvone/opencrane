@@ -36,6 +36,7 @@ describe("agent-controller process config", function _Suite()
 		expect(config.profiles["personal-default"]?.serverNamespace).toBe("silo-a");
 		expect(config.controllerTokenPath).toBe("/var/run/opencrane/tokens/opencrane.token");
 		expect(config.requestTimeoutMilliseconds).toBe(10_000);
+		expect(config.outboxPruneIntervalMilliseconds).toBe(3_600_000);
 		expect(config.profiles["personal-default"]?.serviceAccountName).toBe("agent-runtime-default");
 	});
 
@@ -43,5 +44,11 @@ describe("agent-controller process config", function _Suite()
 	{
 		expect(function _SameNamespace() { _ReadConfig({ ..._Environment(), AGENT_RUNTIME_NAMESPACE: "silo-a" }); }).toThrow(/namespaces separate/);
 		expect(function _MovingImage() { _ReadConfig({ ..._Environment(), AGENT_CONTROLLER_PROFILES_JSON: _ProfilesJson().replace(/@sha256:[a-f0-9]{64}/, ":latest") }); }).toThrow(/immutable image/);
+	});
+
+	it("rejects an outbox-retention cadence outside the safe maintenance range", function _RejectsUnsafeRetentionInterval()
+	{
+		expect(function _TooFrequent() { _ReadConfig({ ..._Environment(), AGENT_CONTROLLER_OUTBOX_PRUNE_INTERVAL_MS: "59999" }); }).toThrow(/OUTBOX_PRUNE_INTERVAL/);
+		expect(function _TooSlow() { _ReadConfig({ ..._Environment(), AGENT_CONTROLLER_OUTBOX_PRUNE_INTERVAL_MS: "86400001" }); }).toThrow(/OUTBOX_PRUNE_INTERVAL/);
 	});
 });

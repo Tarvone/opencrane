@@ -1,5 +1,5 @@
 import type { MemoryFactReference, RunInputSnapshot } from "@opencrane/contracts";
-import type { InitialRunAuthority, RunAdmissionCommand, RunAdmissionRepository, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
+import type { InitialRunAuthority, RunAdmissionCommand, RunAdmissionRepository, RunAdmissionTransaction } from "@opencrane/backend/agents/execution/runs";
 import type { MessageId, PersonaRevisionId } from "@opencrane/models/agents";
 import type { ArtifactRevisionId, SkillRevisionId } from "@opencrane/models/artifacts";
 import type { JsonValue } from "@opencrane/util";

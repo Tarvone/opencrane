@@ -1,13 +1,13 @@
-# @opencrane/backend/agents/runtime — runtime protocol authority
+# @opencrane/backend/agents/execution/protocol — runtime protocol authority
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › [runtime](../README.md) › main
+> [backend](../../../../README.md) › [agents](../../../README.md) › [execution](../../README.md) › protocol
 
 ## What it owns
 
-This package is the checkpoint between OpenCrane and the process that executes a personal agent. The
-executor may be implemented in any language; it receives commands and proposes results, but it does
-not get to decide what is current or authoritative. This package owns that decision through the
-language-neutral `AgentRuntimeProtocol v1`.
+This package is the checkpoint between OpenCrane and the process that executes a personal or managed
+agent. The executor may be implemented in any language; it receives commands and proposes results,
+but it does not get to decide what is current or authoritative. This package owns that decision
+through the language-neutral `AgentRuntimeProtocol v1`.
 
 Before a command reaches an executor, it checks that the command belongs to the currently assigned
 run attempt, carries the exact frozen input snapshot, arrives in order, and is still inside its lease.
@@ -32,7 +32,7 @@ hydrates the immutable snapshot through the same locked Prisma transaction befor
  run / conversation / action authorities decide and persist the proposal
 ```
 
-**In this flow:** [personal/runs](../../personal/runs/main/README.md) · [personal/conversations](../../personal/conversations/main/README.md)
+**In this flow:** [execution/runs](../runs/main/README.md) · [personal/conversations](../../personal/conversations/main/README.md)
 
 Invariant: an executor can only propose a result for a command OpenCrane already accepted for the
 exact current attempt and lease. The `cancelling` run state closes command, event-candidate, and
@@ -88,17 +88,17 @@ records needed to compile a dispatch. The dispatch adapter owns two Postgres mod
 attempt — the lease fence, the bound runtime instance, the next command sequence, and accepted
 candidate ids) and `RuntimeDispatchedCommand` (one row per minted command, whose ids are exactly the
 attempt's accepted command set). Their clean-database schema lives in the OpenCrane-owned target
-baseline. It reads the assignment, run, and immutable snapshot rows owned by the personal-run and
+baseline. It reads the assignment, run, and immutable snapshot rows owned by the execution-run and
 conversation domains but never writes those authorities.
 
 ## Dependency direction
 
-Tagged `scope:agent-runtime` (`layer:backend`): it may depend on runtime, agent, personal-run,
-personal-conversation, authorization, the three injected transport-port scopes, and shared
+Tagged `scope:execution-protocol` (`layer:backend`): it may depend on runtime-controller ports,
+agent, execution-run, personal-conversation, authorization, the three injected transport-port scopes, and shared
 contracts. It never imports an app, concrete transport adapter, model driver, or legacy runtime package.
 
 ## See also
 
-- Parent group: [runtime](../README.md)
+- Parent group: [execution](../README.md)
 - Wire contract: [`@opencrane/contracts`](../../../../../contracts/README.md)
-- Run authority: [personal/runs](../../personal/runs/main/README.md)
+- Run authority: [execution/runs](../runs/main/README.md)

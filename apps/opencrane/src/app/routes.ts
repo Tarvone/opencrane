@@ -20,8 +20,8 @@ import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { _RegisterInternalAgentRuntimeStream, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
 import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
-import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
-import { __CreateExternalActionExecutor, __CreatePrismaRunInputCompiler, PrismaRuntimeDispatchAuthority, __ExecuteExternalAction, type RuntimeExternalActionRunner } from "@opencrane/backend/agents/runtime";
+import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/execution/runs";
+import { __CreateExternalActionExecutor, __CreatePrismaRunInputCompiler, PrismaRuntimeDispatchAuthority, __ExecuteExternalAction, type RuntimeExternalActionRunner } from "@opencrane/backend/agents/execution/protocol";
 import { PrismaRuntimeBootstrapExchange, PrismaToolInvocationRepository, __CreateRuntimeBootstrapRouter, __DeferToolRequest } from "@opencrane/backend/server/iam/authorization";
 import { __UnavailableObotCustodyAdapter } from "@opencrane/server/_infra/obot-custody";
 import { __UnavailableSandboxJobExecutor } from "@opencrane/server/_infra/sandbox-execution";
@@ -176,7 +176,7 @@ function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api, s
  * Mint one attempt-scoped LiteLLM virtual key for a claimed run attempt.
  *
  * This binds the run-dispatch repository's injected issuer to the model-routing gateway, which holds
- * the LiteLLM master key. Keeping the call here (not in the `scope:personal-runs` library) is why the
+ * the LiteLLM master key. Keeping the call here (not in the `scope:execution-runs` library) is why the
  * master key never reaches the outbound-only controller: only the minted virtual key rides the claim
  * response. The per-silo server already targets its own silo LiteLLM, so `siloId` needs no routing.
  * @param request - Alias, single model alias, silo, budget, and expiry the key is bound to.

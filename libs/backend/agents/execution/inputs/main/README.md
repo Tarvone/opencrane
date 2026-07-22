@@ -1,11 +1,12 @@
-# @opencrane/backend/agents/personal/session — run input snapshot assembly
+# @opencrane/backend/agents/execution/inputs — run input snapshot assembly
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › personal › session
+> [backend](../../../../README.md) › [agents](../../../README.md) › [execution](../../README.md) › inputs
 
 ## What it owns
 
-This package is part of the **personal-agent product**. Before an agent runtime executes a run, the
-platform freezes *everything* that run is allowed to see and use into one immutable record — the
+This package is part of the **shared execution flow** used by both personal and managed agents.
+Before an agent runtime executes a run, the platform freezes *everything* that run is allowed to see
+and use into one immutable record — the
 **`RunInputSnapshot`**: which messages, which persona, which memory facts, which tools and budgets,
 and which verified identity. This package owns the **assembly** of that snapshot: it gathers each
 input from an injected authority, validates the combination, and hands the finished snapshot to the
@@ -18,7 +19,7 @@ change — a retry, an audit, or a replay all see the exact same record, identif
           │  __AssembleRunInputSnapshot
           ▼
  ┌─────────────────────────────────────────┐
- │   session  ◄── HERE                       │  load run/persona/thread/preferences/
+ │   execution/inputs  ◄── HERE              │  load run/persona/thread/preferences/
  │   · orchestrates 8 authority loads        │  memory/tools/budget/identity, all inside
  │   · compiles + digests the one snapshot   │  the runs package's admission transaction
  └─────────────────────────────────────────┘
@@ -27,7 +28,7 @@ change — a retry, an audit, or a replay all see the exact same record, identif
  runs · RunAdmissionRepository  ── persists run + snapshot + outbox events in one commit
 ```
 
-**In this flow:** [runs](../../runs/main/README.md) *(owns the admission transaction, the digest
+**In this flow:** [execution/runs](../../runs/main/README.md) *(owns the admission transaction, the digest
 function, and the durable rows)* · [membership](../../../../server/iam/membership/main/README.md)
 *(supplies the signed fleet-membership evidence behind the identity envelope)*
 
@@ -67,12 +68,12 @@ non-canonical digest, or any single source refusal denies the run.
 
 ## Dependency direction
 
-Tagged `scope:personal-session`: it may depend only on `scope:agents`, `scope:artifacts`,
-`scope:membership`, `scope:personal-runs`, `scope:personal-session`, and `scope:shared` — never on
+Tagged `scope:execution-inputs`: it may depend only on `scope:agents`, `scope:artifacts`,
+`scope:membership`, `scope:execution-runs`, `scope:execution-inputs`, and `scope:shared` — never on
 apps or unrelated domains.
 
 ## See also
 
 - Parent index: [agents](../../../README.md)
-- Siblings: [runs](../../runs/main/README.md) · [conversations](../../conversations/main/README.md) ·
-  [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)
+- Siblings: [runs](../../runs/main/README.md) · [conversations](../../../personal/conversations/main/README.md) ·
+  [memory](../../../personal/memory/main/README.md) · [personas](../../../personal/personas/main/README.md)

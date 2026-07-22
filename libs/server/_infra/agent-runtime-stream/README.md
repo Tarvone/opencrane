@@ -26,7 +26,7 @@ Heartbeats keep an idle connection alive without inventing work.
 ```
 
 **In this flow:** [agent-runtime](../../../../apps/agent-runtime/README.md) ·
-[runtime authority](../../../backend/agents/runtime/main/README.md) ·
+[runtime authority](../../../backend/agents/execution/protocol/README.md) ·
 [wire contracts](../../../contracts/README.md)
 
 Invariant: transport syntax never becomes business authority. A token/Pod mismatch, malformed input,
@@ -75,5 +75,5 @@ and opens no listener by itself.
 
 - Parent index: [_infra](../README.md)
 - Runtime process: [agent-runtime](../../../../apps/agent-runtime/README.md)
-- Runtime authority: [backend/agents/runtime](../../../backend/agents/runtime/main/README.md)
+- Runtime authority: [backend/agents/runtime](../../../backend/agents/execution/protocol/README.md)
 - Shared protocol: [contracts](../../../contracts/README.md)

@@ -25,7 +25,7 @@ function _requestFingerprint(command: ExecuteExternalActionCommand): string
  *
  * This is the pure decision/persistence boundary for side-effecting tool calls, modelled exactly on
  * `__ExecuteCapabilityAction`: it takes an INJECTED {@link ToolInvocationRepository} and an INJECTED
- * {@link ExternalActionExecutor} so `scope:agent-runtime` never imports the concrete MCP, artifact,
+ * {@link ExternalActionExecutor} so `scope:execution-protocol` never imports the concrete MCP, artifact,
  * memory, or sandbox transports — those are wired only in the `apps/opencrane` composition root.
  *
  * It (1) rejects any candidate whose `toolRevisionId` is not one of the compiled tool revisions the

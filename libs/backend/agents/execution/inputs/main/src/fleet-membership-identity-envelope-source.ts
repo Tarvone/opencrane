@@ -1,4 +1,4 @@
-import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
+import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/execution/runs";
 import { __VerifyCurrentFleetMembershipEvidence, PrismaFleetMembershipAuthorityRepository } from "@opencrane/backend/server/iam/membership";
 import type { FleetMembershipAdmissionExpectation, FleetMembershipSignatureVerifier } from "@opencrane/backend/server/iam/membership";
 import { ___IsSha256Digest } from "@opencrane/util";

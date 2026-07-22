@@ -103,17 +103,17 @@
       "@opencrane/backend/server/knowledge/retrieval": [
         "./libs/backend/server/knowledge/retrieval/main/src/index.ts"
       ],
-      "@opencrane/backend/agents/personal/runs": [
-        "./libs/backend/agents/personal/runs/main/src/index.ts"
+      "@opencrane/backend/agents/execution/runs": [
+        "./libs/backend/agents/execution/runs/main/src/index.ts"
       ],
-      "@opencrane/backend/agents/runtime": [
-        "./libs/backend/agents/runtime/main/src/index.ts"
+      "@opencrane/backend/agents/execution/protocol": [
+        "./libs/backend/agents/execution/protocol/src/index.ts"
       ],
       "@opencrane/backend/server/agents/skills": [
         "./libs/backend/server/agents/skills/main/src/index.ts"
       ],
-      "@opencrane/backend/agents/personal/session": [
-        "./libs/backend/agents/personal/session/main/src/index.ts"
+      "@opencrane/backend/agents/execution/inputs": [
+        "./libs/backend/agents/execution/inputs/main/src/index.ts"
       ],
       "@opencrane/backend/server/reporting/spend": [
         "./libs/backend/server/reporting/spend/main/src/index.ts"

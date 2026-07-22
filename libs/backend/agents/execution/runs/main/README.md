@@ -1,17 +1,18 @@
-# @opencrane/backend/agents/personal/runs — agent-run attempt authority
+# @opencrane/backend/agents/execution/runs — agent-run attempt authority
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › personal › runs
+> [backend](../../../../README.md) › [agents](../../../README.md) › [execution](../../README.md) › runs
 
 ## What it owns
 
-This package is part of the **personal-agent product**. A **run** is one logical execution of a
-user's agent, while an **attempt** is one try at completing that run. This package owns both ends of
-that lifecycle: it admits the first run together with the immutable input snapshot it will always
-use, then governs later attempts without changing the logical run or its frozen inputs.
+This package is part of the **shared execution flow** used by both personal and managed agents. A
+**run** is one logical execution of an agent, while an **attempt** is one try at completing that run.
+This package owns both ends of that lifecycle: it admits the first run together with the immutable
+input snapshot it will always use, then governs later attempts without changing the logical run or
+its frozen inputs.
 
 ```
  run request + idempotency key
-          │  session assembles inputs inside this package's transaction
+          │  execution/inputs assembles inputs inside this package's transaction
           ▼
  ┌──────────────────────────────────────────┐
  │   runs  ◄── HERE                          │  run + one snapshot + ordered outbox
@@ -26,8 +27,8 @@ use, then governs later attempts without changing the logical run or its frozen 
  run-owned outbox  ── controller claims it ── suspended Job ── release ── first Pod registered
 ```
 
-**In this flow:** [session](../../session/main/README.md) *(assembles the snapshot through this
-package's admission boundary)* · [conversations](../../conversations/main/README.md) *(stores the
+**In this flow:** [execution/inputs](../../inputs/main/README.md) *(assembles the snapshot through this
+package's admission boundary)* · [conversations](../../../personal/conversations/main/README.md) *(stores the
 run's ordered user-visible events)* · dispatcher *(polls the outbox and launches the workload)*
 
 Initial admission serialises the silo and request idempotency key before compiling any mutable
@@ -142,9 +143,9 @@ uncertainty fails closed.
 
 ## Boundary
 
-Consumed by the [session assembler](../../session/main/README.md), run-dispatch and workload-
+Consumed by the [execution input assembler](../../inputs/main/README.md), run-dispatch and workload-
 admission, cancellation, and cleanup-authority paths. It does not choose persona, memory, tools,
-budgets or membership evidence; session supplies those through the transaction callback. It does
+budgets or membership evidence; the input assembler supplies those through the transaction callback. It does
 not run the agent, create/unsuspend the Job, or expose the private input snapshot to the
 controller. It does not treat the bootstrap reference as a credential and does not inspect
 Kubernetes itself. It owns only durable admission, attempts, dispatch leases, assignment
@@ -154,8 +155,8 @@ package only says which exact work may be removed.
 
 ## Dependency direction
 
-Tagged `scope:personal-runs`: it may depend only on `scope:agents` (shared run models),
-`scope:authorization`, `scope:personal-runs`, and `scope:shared` — never on apps or sibling domains.
+Tagged `scope:execution-runs`: it may depend only on `scope:agents` (shared run models),
+`scope:authorization`, `scope:execution-runs`, and `scope:shared` — never on apps or sibling domains.
 
 ## Data & persistence
 
@@ -173,4 +174,4 @@ Cancellation reuses the same outbox with `RunCancellationRequested` and
 ## See also
 
 - Parent index: [agents](../../../README.md)
-- Siblings: [session](../../session/main/README.md) · [conversations](../../conversations/main/README.md) · [memory](../../memory/main/README.md) · [personas](../../personas/main/README.md)
+- Siblings: [inputs](../../inputs/main/README.md) · [conversations](../../../personal/conversations/main/README.md) · [memory](../../../personal/memory/main/README.md) · [personas](../../../personal/personas/main/README.md)

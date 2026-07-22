@@ -13,9 +13,10 @@ retired personal-agent runtime and must not receive new functionality.
 
 ```text
 libs/backend/
-  agents/                     personal-agent product and runtime authority
-    personal/<domain>/main    persona, memory, conversation, run, and session domains
-    runtime/main              language-neutral command/candidate authority
+  agents/                     personal-agent product and shared execution authority
+    personal/<domain>/main    persona, memory, and conversation domains
+    execution/<domain>/main   input assembly and run-attempt domains
+    execution/protocol        language-neutral command/candidate authority
     runtime/k8s-launcher      agent-controller Job projection
   server/<group>/<domain>/main OpenCrane server capability
     project.json              Nx project metadata and targets
@@ -47,7 +48,7 @@ OpenClaw, rollout, or projection behavior survives the direct target refactor.
 - Cross-capability imports use a public barrel such as
   `@opencrane/backend/server/<group>/<domain>`, never an internal source path.
 - Server-runtime imports use `@opencrane/server/_infra/<runtime>`.
-- Agent runtime imports use `@opencrane/backend/agents/runtime` for authority and
+- Agent runtime imports use `@opencrane/backend/agents/execution/protocol` for authority and
   `@opencrane/backend/agents/runtime/k8s-launcher` for the controller projection.
 - No compatibility aliases exist for the previous flat paths.
 - Database models remain in the OpenCrane app's per-domain Prisma schema files; see

@@ -31,7 +31,7 @@ export interface MintedAttemptModelKey
 /**
  * Injected minting port bound by the app to the model-routing gateway.
  *
- * Keeping this a port means `scope:personal-runs` never depends on `scope:model-routing`: the master
+ * Keeping this a port means `scope:execution-runs` never depends on `scope:model-routing`: the master
  * key stays in the server process that already holds it, and the minted virtual key only rides the
  * claim response.
  */

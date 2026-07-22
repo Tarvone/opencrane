@@ -27,7 +27,7 @@ function _stringArgument(candidate: RuntimeExternalActionCandidate, key: string)
  * Build the concrete external-action executor for one admitted candidate, in the composition root.
  *
  * This is the ONLY place the MCP, sandbox, and memory transports are wired together, keeping
- * `scope:agent-runtime` and `scope:authorization` free of any transport import. The returned executor
+ * `scope:execution-protocol` and `scope:authorization` free of any transport import. The returned executor
  * routes by the tool-revision prefix minted by the run-input compiler: `mcp-server:` goes through the
  * Obot custody port, `sandbox:` through the sandbox Job executor, and `memory:` through the memory
  * gateway. Each transport currently defaults to its fail-closed stub, so an action against an

@@ -1,5 +1,5 @@
 import type { FleetMembershipSignatureVerifier } from "@opencrane/backend/server/iam/membership";
-import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/personal/runs";
+import type { InitialRunAuthority, RunAdmissionTransaction } from "@opencrane/backend/agents/execution/runs";
 import type { CapabilitySetDigestSource, SessionAssemblyCommand } from "../session-assembly.types.js";
 import { describe, expect, it, vi } from "vitest";
 

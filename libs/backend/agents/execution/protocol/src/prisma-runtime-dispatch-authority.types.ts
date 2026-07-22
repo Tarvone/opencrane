@@ -43,7 +43,7 @@ export interface RuntimeStreamWorkloadIdentity
  *
  * The dispatch authority admits the candidate against the live fence, then hands it to this injected
  * runner so the concrete MCP/artifact/memory/sandbox transports stay in the app root and never leak
- * into `scope:agent-runtime`. The runner performs reserve-before-dispatch via
+ * into `scope:execution-protocol`. The runner performs reserve-before-dispatch via
  * `__ExecuteExternalAction`. It returns `"completed"` only after a durable invocation result exists,
  * returns `"denied"` for a durable fail-closed refusal, and throws only before reservation when the
  * runtime may safely replay the exact admitted candidate.

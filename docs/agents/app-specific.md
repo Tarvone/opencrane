@@ -53,24 +53,26 @@ Each owns its routes, core services, API types, tests, and (where applicable) a
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);
 schema/baseline ownership in [`prisma.md`](./prisma.md).
 
-## Personal-agent domains (`libs/backend/agents/personal/*/main`)
+## Personal-agent and execution domains (`libs/backend/agents/{personal,execution}/*`)
 
 Personal-agent product capabilities use the `backend-agents-personal-<d>` NX namespace under
-`libs/backend/agents/personal/<d>/main`: personas, conversations, runs, and memory. They own a
-person's approved persona, conversation events, run lifecycle, and memory catalogue respectively.
-The sibling `session/main` package owns the single assembler that turns those authorities into an
-immutable `RunInputSnapshot`; it is session orchestration, not a second source of persona or run
-truth.
+`libs/backend/agents/personal/<d>/main`: personas, conversations, and memory. They own a person's
+approved persona, conversation events, and memory catalogue. Shared execution capabilities use
+`backend-agents-execution-<d>` under `libs/backend/agents/execution/`: `inputs/main` assembles one
+immutable `RunInputSnapshot`, `runs/main` owns the run lifecycle, and `protocol` admits runtime
+commands and candidate output. This grouping keeps the product state separate from the reusable
+execution flow without creating a second source of persona or run truth.
 Fleet membership, proof-bound authorization, and agent-service publication remain in
 `libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
 A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.
 
 ## Agent-runtime domains (`libs/backend/agents/runtime/*`)
 
-Runtime packages sit beside `personal/` because they govern the language-neutral execution boundary
-for personal and managed agents. `runtime/main` admits commands and candidate output only when the
-current run, attempt, workload assignment, sequence, expiry, and lease fence still match. It owns no
-transport, Kubernetes workload, model loop, tool implementation, or second durable event store.
+Runtime packages contain the Kubernetes-specific execution support. The shared language-neutral
+protocol is now `libs/backend/agents/execution/protocol`; it admits commands and candidate output
+only when the current run, attempt, workload assignment, sequence, expiry, and lease fence still
+match. The runtime group owns the Job launcher and controller, but no transport, model loop, tool
+implementation, or second durable event store.
 
 ## Frontend libs (`libs/frontend/*`)
 

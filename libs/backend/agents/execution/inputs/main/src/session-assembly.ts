@@ -1,5 +1,5 @@
-import { __DigestRunInputSnapshot } from "@opencrane/backend/agents/personal/runs";
-import type { InitialRunAuthority } from "@opencrane/backend/agents/personal/runs";
+import { __DigestRunInputSnapshot } from "@opencrane/backend/agents/execution/runs";
+import type { InitialRunAuthority } from "@opencrane/backend/agents/execution/runs";
 import type { RunInputSnapshot } from "@opencrane/contracts";
 import { ___CloneCanonicalJson, ___SortBy } from "@opencrane/util";
 import type { JsonValue } from "@opencrane/util";

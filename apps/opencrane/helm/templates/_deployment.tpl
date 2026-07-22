@@ -64,6 +64,10 @@ spec:
               value: {{ .Values.agentController.claimLeaseSeconds | quote }}
             - name: AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS
               value: {{ .Values.agentController.assignmentTtlSeconds | quote }}
+            - name: AGENT_RUNTIME_OUTBOX_RETENTION_SECONDS
+              value: {{ .Values.agentController.outboxRetentionSeconds | quote }}
+            - name: AGENT_RUNTIME_OUTBOX_PRUNE_BATCH_SIZE
+              value: {{ .Values.agentController.outboxPruneBatchSize | quote }}
             # The server accepts runtime assignments only for this Helm-owned restricted namespace.
             - name: AGENT_RUNTIME_NAMESPACE
               value: {{ include "opencrane.agentController.runtimeNamespace" . | quote }}

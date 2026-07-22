@@ -15,6 +15,9 @@ const _CLAIM_PATH = "/api/internal/agent-controller/run-attempts:claim";
 /** Stable internal release route appended to the configured OpenCrane base URL. */
 const _RELEASE_CLAIM_PATH = "/api/internal/agent-controller/workload-releases:claim";
 
+/** Stable internal route for bounded retention of successfully published runtime commands. */
+const _OUTBOX_PRUNE_PATH = "/api/internal/agent-controller/run-outbox:prune";
+
 /** Return whether an untrusted JSON value is a non-empty bounded identifier. */
 function _IsIdentifier(value: unknown): value is string
 {
@@ -136,6 +139,17 @@ function _ParseRegistrationResult(value: unknown, command: AgentControllerRunWor
 	return { outcome: root.outcome, runId: command.runId, attempt: command.attempt, workloadUid: command.workloadUid, podUid: command.podUid };
 }
 
+/** Parse the narrow count returned by the controller-only maintenance endpoint. */
+function _ParsePrunedCount(value: unknown): number
+{
+	const root = _AsObject(value);
+	if (!root || typeof root.deletedCount !== "number" || !Number.isSafeInteger(root.deletedCount) || root.deletedCount < 0 || root.deletedCount > 1_000)
+	{
+		throw new Error("OpenCrane returned a malformed outbox-prune result");
+	}
+	return root.deletedCount;
+}
+
 /** Read the latest rotated projected token from its mounted file. */
 function _CreateTokenReader(path: string): AgentControllerTokenReader
 {
@@ -240,6 +254,16 @@ export function __CreateHttpAgentControllerAuthority(options: AgentControllerHtt
 				const response = await fetchRequest(new URL(path, baseUrl), { method: "PUT", headers: _Headers(token), body: JSON.stringify(command), signal: _RequestSignal(signal, options.requestTimeoutMilliseconds) });
 				if (response.status !== 200) throw new Error(`OpenCrane first-Pod registration failed with HTTP ${response.status}`);
 				return _ParseRegistrationResult(await _ReadJson(response), command);
+			});
+		},
+		async __PrunePublishedOutbox(signal: AbortSignal): Promise<number>
+		{
+			return ___DoWithTrace("agent_controller.outbox.prune", {}, async function _prunePublishedOutbox()
+			{
+				const token = await readToken();
+				const response = await fetchRequest(new URL(_OUTBOX_PRUNE_PATH, baseUrl), { method: "POST", headers: _Headers(token), body: "{}", signal: _RequestSignal(signal, options.requestTimeoutMilliseconds) });
+				if (response.status !== 200) throw new Error(`OpenCrane outbox prune failed with HTTP ${response.status}`);
+				return _ParsePrunedCount(await _ReadJson(response));
 			});
 		},
 	};

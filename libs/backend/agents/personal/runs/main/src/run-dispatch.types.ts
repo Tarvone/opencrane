@@ -46,6 +46,10 @@ export interface RunDispatchRepositoryConfig
 	readonly claimLeaseMilliseconds: number;
 	/** Hard lifetime persisted on a newly assigned runtime workload. */
 	readonly assignmentTtlMilliseconds: number;
+	/** Age after which a successfully delivered outbox command is no longer operational state. */
+	readonly publishedOutboxRetentionMilliseconds?: number;
+	/** Maximum delivered records deleted by one controller maintenance transaction. */
+	readonly outboxPruneBatchSize?: number;
 }
 
 /** Outcome of claiming the next eligible runtime attempt. */
@@ -69,6 +73,13 @@ export type RegisterRunWorkloadPodResult =
 	| { readonly status: "registered"; readonly result: AgentControllerRunWorkloadRegistrationResult }
 	| { readonly status: "conflict"; readonly reason: "claim_not_found" | "stale_claim" | "claim_terminal" | "attempt_conflict" | "authority_conflict" | "assignment_conflict" | "pod_conflict" | "invalid_registration" };
 
+/** Bounded result of removing delivered, non-failed operational outbox records. */
+export interface PrunePublishedRunOutboxResult
+{
+	/** Number of records removed in this maintenance transaction. */
+	readonly deletedCount: number;
+}
+
 /** Run-owned persistence port used by the controller-only internal API. */
 export interface RunDispatchRepository
 {
@@ -80,6 +91,8 @@ export interface RunDispatchRepository
 	claimNextWorkloadReleaseAtomically(): Promise<ClaimNextRunWorkloadReleaseResult>;
 	/** Registers only the first Pod for the exact current release claim and publishes that command. */
 	registerFirstPodAndPublishReleaseAtomically(eventId: string, command: AgentControllerRunWorkloadRegistrationCommand): Promise<RegisterRunWorkloadPodResult>;
+	/** Removes a bounded batch of retention-expired successfully delivered operational records. */
+	prunePublishedOutboxEventsAtomically(): Promise<PrunePublishedRunOutboxResult>;
 }
 
 /** TokenReview-confirmed identity of an in-cluster workload. */

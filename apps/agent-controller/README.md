@@ -71,6 +71,8 @@ outside the app root.
 - `AGENT_RUNTIME_NAMESPACE` — literal dedicated runtime namespace the Role and controller may
   mutate; it is never inferred from the controller Pod's own namespace.
 - `AGENT_CONTROLLER_POLL_INTERVAL_MS` — 100–60,000 ms delay after idle or failure; default 1,000 ms.
+- `AGENT_CONTROLLER_OUTBOX_PRUNE_INTERVAL_MS` — 60 seconds–24 hours between bounded removal of
+  successfully delivered runtime handshakes; default one hour. Failed commands remain durable evidence.
 - `AGENT_CONTROLLER_REQUEST_TIMEOUT_MS` — 1–60 second hard cap independently applied to every
   OpenCrane and Kubernetes request; default 10 seconds. Process shutdown cancels either request type
   immediately, and each retry receives a fresh deadline.

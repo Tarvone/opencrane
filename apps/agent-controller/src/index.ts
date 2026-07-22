@@ -34,7 +34,7 @@ async function _Main(): Promise<void>
 		process.once("SIGTERM", function _sigterm() { _Shutdown("SIGTERM"); });
 		process.once("SIGINT", function _sigint() { _Shutdown("SIGINT"); });
 		log.info({ runtimeNamespace: config.runtimeNamespace, profiles: Object.keys(config.profiles) }, "agent controller started");
-		await __RunAgentController({ authority, kubernetes, profiles: config.profiles, runtimeNamespace: config.runtimeNamespace, pollIntervalMilliseconds: config.pollIntervalMilliseconds, log }, shutdown.signal);
+		await __RunAgentController({ authority, kubernetes, profiles: config.profiles, runtimeNamespace: config.runtimeNamespace, pollIntervalMilliseconds: config.pollIntervalMilliseconds, outboxPruneIntervalMilliseconds: config.outboxPruneIntervalMilliseconds, log }, shutdown.signal);
 	}
 	finally
 	{

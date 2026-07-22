@@ -295,10 +295,12 @@ export async function __ReconcileNextRuntimeRelease(options: AgentControllerOpti
  */
 export async function __RunAgentController(options: AgentControllerOptions, signal: AbortSignal): Promise<void>
 {
-	if (!_IsNamespace(options.runtimeNamespace) || !Number.isSafeInteger(options.pollIntervalMilliseconds) || options.pollIntervalMilliseconds < 100 || options.pollIntervalMilliseconds > 60_000)
+	const outboxPruneIntervalMilliseconds = options.outboxPruneIntervalMilliseconds ?? 3_600_000;
+	if (!_IsNamespace(options.runtimeNamespace) || !Number.isSafeInteger(options.pollIntervalMilliseconds) || options.pollIntervalMilliseconds < 100 || options.pollIntervalMilliseconds > 60_000 || !Number.isSafeInteger(outboxPruneIntervalMilliseconds) || outboxPruneIntervalMilliseconds < 60_000 || outboxPruneIntervalMilliseconds > 86_400_000)
 	{
-		throw new Error("agent controller requires one valid namespace and a 100-60000ms poll interval");
+		throw new Error("agent controller requires a valid namespace, 100-60000ms poll interval, and 60s-24h outbox prune interval");
 	}
+	let nextOutboxPruneAt = Date.now();
 	while (!signal.aborted)
 	{
 		let didWork = false;
@@ -322,6 +324,22 @@ export async function __RunAgentController(options: AgentControllerOptions, sign
 			if (signal.aborted) break;
 			options.log.error({ err }, "agent controller workload-release reconciliation failed");
 		}
+		if (options.authority.__PrunePublishedOutbox && Date.now() >= nextOutboxPruneAt)
+		{
+			try
+			{
+				const deletedCount = await options.authority.__PrunePublishedOutbox(signal);
+				if (deletedCount > 0) options.log.info({ deletedCount }, "retention-expired runtime outbox records pruned");
+			}
+			catch (err)
+			{
+				if (signal.aborted) break;
+				options.log.error({ err }, "agent controller outbox retention failed");
+			}
+			nextOutboxPruneAt = Date.now() + outboxPruneIntervalMilliseconds;
+		}
+		// 4. Do not arm one more idle-delay listener after shutdown interrupted controller-only maintenance.
+		if (signal.aborted) break;
 		if (didWork) continue;
 		await _Wait(options.pollIntervalMilliseconds, signal);
 	}

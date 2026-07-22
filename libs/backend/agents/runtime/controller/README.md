@@ -62,6 +62,11 @@ ends by the durable expiry; zero Pods means retry while multiple or foreign Pods
 - `__CreateKubernetesAgentControllerStore` — exposes exact Job adoption, create-only attempt-key
   Secret creation, expiry-bounded fenced Job release, and selector-bounded first-Pod listing.
 
+The same controller performs the bounded retention pass for successfully delivered runtime-outbox
+records. It runs once at startup, then at its configured interval. A failed pass is recorded and
+retried at the next interval; it can never prevent workload reconciliation or keep the controller
+alive after shutdown.
+
 ## Boundary
 
 The package does not read Postgres directly, create ServiceAccounts, Pods, volumes or Deployments,

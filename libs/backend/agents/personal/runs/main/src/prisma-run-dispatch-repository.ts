@@ -5,7 +5,7 @@ import { AgentRunState, AgentRunTerminalReason, AgentServiceKind, AgentServiceSt
 import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName, type AgentControllerRunAttemptAssignmentCommand, type AgentControllerRunAttemptClaimLease, type AgentControllerRunAttemptProjection, type AgentControllerRunWorkloadRegistrationCommand, type AgentControllerRunWorkloadReleaseProjection } from "@opencrane/contracts";
 import { ___DoWithTrace } from "@opencrane/observability";
 
-import type { AttemptModelKeyIssuer, ClaimNextRunAttemptResult, ClaimNextRunWorkloadReleaseResult, CommitRunAttemptAssignmentResult, RegisterRunWorkloadPodResult, RunDispatchRepository, RunDispatchRepositoryConfig, RunOutboxCandidateRow, RunWorkloadReleaseCandidateRow } from "./run-dispatch.types.js";
+import type { AttemptModelKeyIssuer, ClaimNextRunAttemptResult, ClaimNextRunWorkloadReleaseResult, CommitRunAttemptAssignmentResult, PrunePublishedRunOutboxResult, RegisterRunWorkloadPodResult, RunDispatchRepository, RunDispatchRepositoryConfig, RunOutboxCandidateRow, RunWorkloadReleaseCandidateRow } from "./run-dispatch.types.js";
 
 /** Snapshot identity fields required at the dispatch authority boundary. */
 interface SnapshotExecutionIdentity
@@ -160,6 +160,39 @@ export class PrismaRunDispatchRepository implements RunDispatchRepository
 		const minted = await this.issueAttemptModelKey({ keyAlias: claimed.keyAlias, modelAlias: claimed.modelAlias, siloId: claimed.attempt.siloId, maxBudgetUsd: claimed.maxBudgetUsd, expirySeconds: claimed.expirySeconds });
 		if (typeof minted.key !== "string" || minted.key.length === 0) throw new Error("attempt model key issuer returned no key");
 		return { status: "claimed", claim: { lease: claimed.lease, attempt: { ...claimed.attempt, litellmKey: minted.key } } };
+	}
+
+	/** Remove one bounded batch of delivered operational records while preserving failed evidence. */
+	async prunePublishedOutboxEventsAtomically(): Promise<PrunePublishedRunOutboxResult>
+	{
+		const config = this.config;
+		const publishedOutboxRetentionMilliseconds = config.publishedOutboxRetentionMilliseconds ?? 604_800_000;
+		const outboxPruneBatchSize = config.outboxPruneBatchSize ?? 100;
+		return this.prisma.$transaction(async function _prune(transaction: Prisma.TransactionClient): Promise<PrunePublishedRunOutboxResult>
+		{
+			// 1. Take database time so the retention boundary is consistent across controller replicas.
+			const databaseTime = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp()::timestamp(3) AS "now"`);
+			const now = databaseTime[0]?.now;
+			if (!now) throw new Error("outbox retention could not read database time");
+			const cutoff = new Date(now.getTime() - publishedOutboxRetentionMilliseconds);
+
+			// 2. Enable the target-schema trigger's narrow maintenance permission for this transaction only.
+			await transaction.$executeRaw(Prisma.sql`SELECT set_config('opencrane.run_outbox_prune', 'true', true)`);
+
+			// 3. Delete only old successful deliveries in deterministic batches; failed records remain evidence.
+			const deleted = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+				DELETE FROM "run_outbox_events"
+				WHERE "id" IN (
+					SELECT "id" FROM "run_outbox_events"
+					WHERE "published_at" IS NOT NULL AND "failed_at" IS NULL AND "published_at" < ${cutoff}
+					ORDER BY "published_at", "id"
+					LIMIT ${outboxPruneBatchSize}
+					FOR UPDATE SKIP LOCKED
+				)
+				RETURNING "id"
+			`);
+			return { deletedCount: deleted.length };
+		});
 	}
 
 	/** Commits an exact live claim, immutable Job UID, assignment, run state, and outbox publication. */
@@ -458,7 +491,9 @@ function _ConfigIsValid(config: RunDispatchRepositoryConfig): boolean
 	return /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(config.namespace)
 		&& config.namespace.length <= 63
 		&& Number.isSafeInteger(config.claimLeaseMilliseconds) && config.claimLeaseMilliseconds >= 1_000 && config.claimLeaseMilliseconds <= 300_000
-		&& Number.isSafeInteger(config.assignmentTtlMilliseconds) && config.assignmentTtlMilliseconds >= 60_000 && config.assignmentTtlMilliseconds <= 86_400_000;
+		&& Number.isSafeInteger(config.assignmentTtlMilliseconds) && config.assignmentTtlMilliseconds >= 60_000 && config.assignmentTtlMilliseconds <= 86_400_000
+		&& (config.publishedOutboxRetentionMilliseconds === undefined || (Number.isSafeInteger(config.publishedOutboxRetentionMilliseconds) && config.publishedOutboxRetentionMilliseconds >= 3_600_000 && config.publishedOutboxRetentionMilliseconds <= 7_776_000_000))
+		&& (config.outboxPruneBatchSize === undefined || (Number.isSafeInteger(config.outboxPruneBatchSize) && config.outboxPruneBatchSize >= 1 && config.outboxPruneBatchSize <= 1_000));
 }
 
 /** Revalidate one discovered claim candidate after all authority locks are held. */

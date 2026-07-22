@@ -13,7 +13,7 @@ function _App(overrides: Partial<AgentControllerRunDispatchRouterDependencies> =
 	const dependencies: AgentControllerRunDispatchRouterDependencies = {
 		namespace: "silo-a",
 		tokenReviewer: { __Review: vi.fn().mockResolvedValue({ username: "system:serviceaccount:silo-a:agent-controller", namespace: "silo-a", serviceAccountName: "agent-controller", audiences: [AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE] }) },
-		repository: { claimNextAttemptAtomically: vi.fn().mockResolvedValue({ status: "none" }), commitSuspendedJobAssignmentAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "none" }), registerFirstPodAndPublishReleaseAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }) },
+		repository: { claimNextAttemptAtomically: vi.fn().mockResolvedValue({ status: "none" }), commitSuspendedJobAssignmentAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "none" }), registerFirstPodAndPublishReleaseAtomically: vi.fn().mockResolvedValue({ status: "conflict", reason: "stale_claim" }), prunePublishedOutboxEventsAtomically: vi.fn().mockResolvedValue({ deletedCount: 0 }) },
 		logger: { error: vi.fn(), warn: vi.fn() },
 		...overrides,
 	};
@@ -47,6 +47,17 @@ describe("agent-controller run-dispatch router", function _DescribeRouter()
 		expect(dependencies.repository.claimNextAttemptAtomically).toHaveBeenCalledOnce();
 	});
 
+	it("permits bounded delivered-outbox retention only for the reviewed controller", async function _PruneOutbox()
+	{
+		const { app, dependencies } = _App({ repository: { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn(), registerFirstPodAndPublishReleaseAtomically: vi.fn(), prunePublishedOutboxEventsAtomically: vi.fn().mockResolvedValue({ deletedCount: 3 }) } });
+
+		const response = await request(app).post("/run-outbox:prune").set("authorization", "Bearer projected-token").send({});
+
+		expect(response.status).toBe(200);
+		expect(response.body).toEqual({ deletedCount: 3 });
+		expect(dependencies.repository.prunePublishedOutboxEventsAtomically).toHaveBeenCalledOnce();
+	});
+
 	it("forwards exact assignment evidence and maps a stale claim to conflict", async function _CommitConflict()
 	{
 		const { app, dependencies } = _App();
@@ -63,7 +74,7 @@ describe("agent-controller run-dispatch router", function _DescribeRouter()
 	{
 		const failure = new Error("database unavailable");
 		const logger = { error: vi.fn(), warn: vi.fn() };
-		const repository = { claimNextAttemptAtomically: vi.fn().mockRejectedValue(failure), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn(), registerFirstPodAndPublishReleaseAtomically: vi.fn() };
+		const repository = { claimNextAttemptAtomically: vi.fn().mockRejectedValue(failure), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn(), registerFirstPodAndPublishReleaseAtomically: vi.fn(), prunePublishedOutboxEventsAtomically: vi.fn() };
 		const { app } = _App({ repository, logger });
 
 		const response = await request(app).post("/run-attempts:claim").set("authorization", "Bearer secret-projected-token").send({});
@@ -76,7 +87,7 @@ describe("agent-controller run-dispatch router", function _DescribeRouter()
 	it("claims release work only for the reviewed controller", async function _ClaimRelease()
 	{
 		const claim = { lease: { eventId: "release-1", claimedAt: "2026-07-20T00:00:00.000Z", deliveryCount: 1, expiresAt: "2026-07-20T00:00:30.000Z" }, workload: { runId: "run-1", attempt: 1, siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", namespace: "silo-a", serviceAccountName: "agent-runtime-small", workloadUid: "job-uid-1", workloadProfile: "personal-small", assignmentExpiresAt: "2026-07-20T01:00:10.000Z", bootstrapReference: `bootstrap-v1_${"a".repeat(64)}` } } as const;
-		const { app, dependencies } = _App({ repository: { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "claimed", claim }), registerFirstPodAndPublishReleaseAtomically: vi.fn() } });
+		const { app, dependencies } = _App({ repository: { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue({ status: "claimed", claim }), registerFirstPodAndPublishReleaseAtomically: vi.fn(), prunePublishedOutboxEventsAtomically: vi.fn() } });
 
 		const response = await request(app).post("/workload-releases:claim").set("authorization", "Bearer projected-token").send({});
 
@@ -89,7 +100,7 @@ describe("agent-controller run-dispatch router", function _DescribeRouter()
 	{
 		const terminalized = { status: "terminalized", eventId: "release-1", runId: "run-1", attempt: 1, failureCode: "RUN_WORKLOAD_RELEASE_INTEGRITY_INVALID" } as const;
 		const logger = { error: vi.fn(), warn: vi.fn() };
-		const repository = { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue(terminalized), registerFirstPodAndPublishReleaseAtomically: vi.fn() };
+		const repository = { claimNextAttemptAtomically: vi.fn(), commitSuspendedJobAssignmentAtomically: vi.fn(), claimNextWorkloadReleaseAtomically: vi.fn().mockResolvedValue(terminalized), registerFirstPodAndPublishReleaseAtomically: vi.fn(), prunePublishedOutboxEventsAtomically: vi.fn() };
 		const { app } = _App({ repository, logger });
 
 		const response = await request(app).post("/workload-releases:claim").set("authorization", "Bearer projected-token").send({});

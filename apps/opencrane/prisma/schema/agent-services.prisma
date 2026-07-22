@@ -3,15 +3,6 @@ enum AgentServiceKind {
   Managed  @map("managed")
 }
 
-enum AgentServiceOwnerScope {
-  Organization @map("organization")
-  Department   @map("department")
-  Team         @map("team")
-  Project      @map("project")
-  Personal     @map("personal")
-  User         @map("user")
-}
-
 enum AgentServiceState {
   Draft   @map("draft")
   Active  @map("active")
@@ -27,24 +18,21 @@ enum AgentRevisionState {
 }
 
 model AgentService {
-  id               String                 @id @default(cuid())
-  siloId           String                 @map("silo_id")
+  id               String            @id @default(cuid())
+  siloId           String            @map("silo_id")
   kind             AgentServiceKind
   name             String
-  ownerScope       AgentServiceOwnerScope @map("owner_scope")
-  ownerSubjectId   String                 @map("owner_subject_id")
-  state            AgentServiceState      @default(Draft)
-  activeRevisionId String?                @map("active_revision_id")
-  workloadProfile  String                 @map("workload_profile")
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
-  revisions        AgentRevision[]        @relation("AgentServiceRevisions")
+  state            AgentServiceState @default(Draft)
+  activeRevisionId String?           @map("active_revision_id")
+  workloadProfile  String            @map("workload_profile")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  revisions        AgentRevision[]   @relation("AgentServiceRevisions")
   runs             AgentRun[]
-  activeRevision   AgentRevision?         @relation("ActiveAgentRevision", fields: [id, activeRevisionId], references: [agentServiceId, id], onDelete: Restrict)
+  activeRevision   AgentRevision?    @relation("ActiveAgentRevision", fields: [id, activeRevisionId], references: [agentServiceId, id], onDelete: Restrict)
 
   @@unique([id, activeRevisionId])
   @@unique([id, siloId])
-  @@index([siloId, ownerScope, ownerSubjectId])
   @@index([siloId, kind, state])
   @@map("agent_services")
 }
@@ -55,6 +43,9 @@ model AgentRevision {
   id                  String                         @id @default(cuid())
   agentServiceId      String                         @map("agent_service_id")
   revision            Int
+  parentRevisionId    String?                        @map("parent_revision_id")
+  sourceRevisionId    String?                        @map("source_revision_id")
+  changeMessage       String                         @default("") @map("change_message")
   state               AgentRevisionState             @default(Draft)
   digest              String
   promptPolicyVersion String                         @map("prompt_policy_version")
@@ -66,15 +57,37 @@ model AgentRevision {
   publishedAt         DateTime?                      @map("published_at")
   agentService        AgentService                   @relation("AgentServiceRevisions", fields: [agentServiceId], references: [id], onDelete: Restrict)
   activeFor           AgentService[]                 @relation("ActiveAgentRevision")
+  parentRevision      AgentRevision?                 @relation("AgentRevisionLineage", fields: [parentRevisionId], references: [id], onDelete: Restrict)
+  childRevisions      AgentRevision[]                @relation("AgentRevisionLineage")
+  sourceRevision      AgentRevision?                 @relation("AgentRevisionRestoreSource", fields: [sourceRevisionId], references: [id], onDelete: Restrict)
+  restoredRevisions   AgentRevision[]                @relation("AgentRevisionRestoreSource")
   skillAssignments    AgentRevisionSkillAssignment[]
   integrationAssignments AgentRevisionIntegrationAssignment[]
+  scopeAttachments    AgentRevisionScopeAttachment[]
   runs                AgentRun[]
 
   @@unique([agentServiceId, revision])
   @@unique([agentServiceId, id])
   @@unique([agentServiceId, digest])
   @@index([digest])
+  @@index([parentRevisionId])
+  @@index([sourceRevisionId])
   @@map("agent_revisions")
+}
+
+/// Revision-scoped knowledge scope attachment. Reuses the canonical GrantScope/GrantSubjectType
+/// vocabulary; each row authorises scoped knowledge read/recall and inject/write for that exact
+/// scope only, never skills, MCP tools, models, credentials, or a neighbouring scope.
+model AgentRevisionScopeAttachment {
+  agentRevisionId String           @map("agent_revision_id")
+  scope           GrantScope
+  subjectType     GrantSubjectType @map("subject_type")
+  subjectId       String           @map("subject_id")
+  agentRevision   AgentRevision    @relation(fields: [agentRevisionId], references: [id], onDelete: Restrict)
+
+  @@id([agentRevisionId, scope, subjectType, subjectId])
+  @@index([scope, subjectType, subjectId])
+  @@map("agent_revision_scope_attachments")
 }
 
 model AgentRevisionSkillAssignment {

@@ -32,10 +32,10 @@ END;
 $$;
 
 INSERT INTO "agent_services" (
-    "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+    "id", "silo_id", "kind", "name",
     "state", "workload_profile", "created_at", "updated_at"
 ) VALUES (
-    'svc-main', 'silo-1', 'managed', 'Main service', 'organization', 'org-1',
+    'svc-main', 'silo-1', 'managed', 'Main service',
     'draft', 'standard', clock_timestamp(), clock_timestamp()
 );
 
@@ -43,10 +43,10 @@ SELECT pg_temp.expect_failure(
     'new AgentService cannot bypass the Draft initial state',
     $statement$
         INSERT INTO "agent_services" (
-            "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+            "id", "silo_id", "kind", "name",
             "state", "workload_profile", "created_at", "updated_at"
         ) VALUES (
-            'svc-invalid-initial', 'silo-1', 'managed', 'Invalid service', 'organization', 'org-1',
+            'svc-invalid-initial', 'silo-1', 'managed', 'Invalid service',
             'paused', 'standard', clock_timestamp(), clock_timestamp()
         )
     $statement$,
@@ -143,10 +143,10 @@ SELECT pg_temp.expect_failure(
 );
 
 INSERT INTO "agent_services" (
-    "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+    "id", "silo_id", "kind", "name",
     "state", "workload_profile", "created_at", "updated_at"
 ) VALUES (
-    'svc-lifecycle', 'silo-1', 'managed', 'Lifecycle service', 'organization', 'org-1',
+    'svc-lifecycle', 'silo-1', 'managed', 'Lifecycle service',
     'draft', 'standard', clock_timestamp(), clock_timestamp()
 );
 
@@ -186,10 +186,10 @@ SELECT pg_temp.expect_failure(
 );
 
 INSERT INTO "agent_services" (
-    "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+    "id", "silo_id", "kind", "name",
     "state", "workload_profile", "created_at", "updated_at"
 ) VALUES (
-    'svc-run-retirement', 'silo-1', 'managed', 'Run retirement service', 'organization', 'org-1',
+    'svc-run-retirement', 'silo-1', 'managed', 'Run retirement service',
     'draft', 'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -249,10 +249,10 @@ SELECT pg_temp.expect_failure(
 );
 
 INSERT INTO "agent_services" (
-    "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+    "id", "silo_id", "kind", "name",
     "state", "workload_profile", "created_at", "updated_at"
 ) VALUES (
-    'svc-run-rollover', 'silo-1', 'managed', 'Run rollover service', 'organization', 'org-1',
+    'svc-run-rollover', 'silo-1', 'managed', 'Run rollover service',
     'draft', 'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -1391,7 +1391,7 @@ INSERT INTO "authorization_grants" (
     "catalog_id", "catalog_revision", "catalog_digest", "capability_id", "resource_kind",
     "resource_id", "effect", "priority", "created_by"
 ) VALUES (
-    'grant-org-1', 'silo-1', 'user-1', 'organization', 'org-1', NULL,
+    'grant-org-1', 'silo-1', 'user-1', NULL,
     'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send', 'message',
     'message-1', 'allow', 100, 'user-1'
 );
@@ -1404,7 +1404,7 @@ SELECT pg_temp.expect_failure(
             "catalog_id", "catalog_revision", "catalog_digest", "capability_id", "resource_kind",
             "resource_id", "effect", "priority", "created_by"
         ) VALUES (
-            'grant-org-2', 'silo-1', 'user-1', 'organization', 'org-1', NULL,
+            'grant-org-2', 'silo-1', 'user-1', NULL,
             'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send', 'message',
             'message-1', 'allow', 100, 'user-1'
         )

@@ -77,11 +77,11 @@ wait_for_holder_sleeping() {
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "updated_at"
 ) VALUES (
   'dispatch-lock-service', 'dispatch-lock-silo', 'personal', 'Dispatch lock service',
-  'user', 'dispatch-lock-user', 'personal-default', clock_timestamp()
+  'personal-default', clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
   "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
@@ -173,10 +173,10 @@ echo 'PASS: dispatch terminalisation serializes behind concurrent conversation e
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-assignment', 'silo-race', 'managed', 'Assignment race', 'organization', 'org-race',
+  'svc-race-assignment', 'silo-race', 'managed', 'Assignment race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -232,10 +232,10 @@ echo 'PASS: concurrent publication serializes and rejects a late revision assign
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-assignment-first', 'silo-race', 'managed', 'Assignment first race', 'organization', 'org-race',
+  'svc-race-assignment-first', 'silo-race', 'managed', 'Assignment first race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -290,10 +290,10 @@ echo 'PASS: pre-publication assignment commits before serialized revision public
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-activation', 'silo-race', 'managed', 'Activation race', 'organization', 'org-race',
+  'svc-race-activation', 'silo-race', 'managed', 'Activation race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -347,10 +347,10 @@ echo 'PASS: concurrent activation serializes and rejects active revision retirem
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-retirement', 'silo-race', 'managed', 'Retirement race', 'organization', 'org-race',
+  'svc-race-retirement', 'silo-race', 'managed', 'Retirement race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -404,10 +404,10 @@ echo 'PASS: concurrent retirement serializes and rejects stale AgentService acti
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-run-rollover', 'silo-race', 'managed', 'Run rollover race', 'organization', 'org-race',
+  'svc-race-run-rollover', 'silo-race', 'managed', 'Run rollover race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -472,10 +472,10 @@ echo 'PASS: concurrent rollover serializes and rejects a run on the superseded r
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-run-first', 'silo-race', 'managed', 'Run first race', 'organization', 'org-race',
+  'svc-race-run-first', 'silo-race', 'managed', 'Run first race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -664,11 +664,11 @@ echo 'PASS: pre-acceptance assertion commits before the serialized membership se
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile",
+  "id", "silo_id", "kind", "name", "workload_profile",
   "created_at", "updated_at"
 ) VALUES (
   'svc-race-action-authority', 'silo-race-action', 'managed', 'Action authority race',
-  'organization', 'org-race', 'standard', clock_timestamp(), clock_timestamp()
+  'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
   "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
@@ -854,11 +854,11 @@ echo 'PASS: receipt reservation waits for assignment authority and rejects after
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "updated_at"
 ) VALUES (
   'svc-race-cancel-proof', 'silo-race-cancel-proof', 'personal', 'Cancellation proof race',
-  'user', 'user-race-cancel-proof', 'personal-default', clock_timestamp()
+  'personal-default', clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
   "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",

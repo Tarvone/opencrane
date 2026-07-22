@@ -80,6 +80,14 @@ grant flagged `requiresApproval` defers and opens a pending `ApprovalRequest`); 
 approval-DECISION endpoint and the steering-INGEST surface are the operator/product plane in Phase F
 (#224), so approval and steering are not yet driven by an external route.
 
+Organisation administrators can also use `/api/v1/agent-services` to create a managed agent, edit
+its next immutable revision, inspect what changed, and publish a reviewed revision. A managed agent
+is a shared, organisation-owned agent rather than one person's personal agent; its allowed knowledge
+scopes are attached to the specific revision, not to the service as a whole. The `run now` request is
+present but deliberately refuses until the later runtime assembler can bind the managed revision to
+verified fleet membership and capability evidence. It never creates a partial run while that evidence
+is unavailable.
+
 ## Boundary
 
 Composition only: it must not contain business logic — that belongs in `libs/backend/*`. Reusable
@@ -106,6 +114,8 @@ Cancellation is a nonterminal cleanup phase: active runs first enter `cancelling
 bootstrap or proof authority there, and become `cancelled` only after exact workload cleanup records
 the matching terminal event. Pending approvals close without resume authority even if their expiry
 sweeper has not yet run.
+Managed-agent definitions are likewise revisioned: a revision records its edit parent or restore
+source and change message, while scoped knowledge attachments remain immutable once published.
 
 ## Runtime & config
 

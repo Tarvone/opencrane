@@ -1,8 +1,10 @@
-import type { AgentRevision, AgentRevisionId, AgentService, AgentServiceId, AgentServiceState } from "@opencrane/models/agents";
+import type { AgentRevision, AgentRevisionId, AgentService, AgentServiceId, AgentServiceState, SiloId } from "@opencrane/models/agents";
 
 /** Command that publishes one immutable agent revision as the service's active revision. */
 export interface PublishAgentRevisionCommand
 {
+	/** Silo the caller is operating within; a service in another silo must not resolve. */
+	readonly siloId: SiloId;
 	/** Stable service whose active revision will change. */
 	readonly agentServiceId: AgentServiceId;
 	/** Draft immutable revision to publish. */
@@ -36,10 +38,10 @@ export type AtomicAgentRevisionPublicationResult =
 /** Concurrency-capable persistence boundary for agent-service publication. */
 export interface AgentServicePublicationRepository
 {
-	/** Loads one stable service identity without mutating it. */
-	getService(agentServiceId: AgentServiceId): Promise<AgentService | null>;
-	/** Loads one immutable service revision without mutating it. */
-	getRevision(agentRevisionId: AgentRevisionId): Promise<AgentRevision | null>;
+	/** Loads one stable service identity scoped to the caller's silo, or null. */
+	getService(agentServiceId: AgentServiceId, siloId: SiloId): Promise<AgentService | null>;
+	/** Loads one immutable revision whose parent service is in the caller's silo, or null. */
+	getRevision(agentRevisionId: AgentRevisionId, siloId: SiloId): Promise<AgentRevision | null>;
 	/** Atomically publishes the draft and activates it only when the expected active revision still matches. */
 	publishRevisionAtomically(publication: AtomicAgentRevisionPublication): Promise<AtomicAgentRevisionPublicationResult>;
 }

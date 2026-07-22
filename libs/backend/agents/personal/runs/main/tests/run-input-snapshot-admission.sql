@@ -1,7 +1,7 @@
 BEGIN;
 
-INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile", "updated_at")
-VALUES ('snapshot-service', 'silo-snapshot', 'managed', 'Snapshot test', 'organization', 'org-snapshot', 'managed-agent', clock_timestamp());
+INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "workload_profile", "updated_at")
+VALUES ('snapshot-service', 'silo-snapshot', 'managed', 'Snapshot test', 'managed-agent', clock_timestamp());
 INSERT INTO "agent_revisions" ("id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version", "model_policy_id", "budget", "authored_by")
 VALUES ('snapshot-revision', 'snapshot-service', 1, 'draft', 'sha256:' || repeat('a', 64), 'prompt-v1', 'model-v1', '{}', 'user-snapshot');
 UPDATE "agent_revisions" SET "state" = 'published', "published_at" = clock_timestamp() WHERE "id" = 'snapshot-revision';

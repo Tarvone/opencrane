@@ -15,6 +15,7 @@
     { "path": "apps/opencrane/src/__tests__/config.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/__tests__/index.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/app/config.ts", "owner": "apps/opencrane", "classification": "app-config" },
+    { "path": "apps/opencrane/src/app/agent-services-wiring.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/__tests__/external-action-executor.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/app/external-action-executor.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/external-action-executor.types.ts", "owner": "apps/opencrane", "classification": "route-composition" },

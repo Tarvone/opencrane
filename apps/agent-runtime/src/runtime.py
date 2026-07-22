@@ -1,17 +1,26 @@
 """Outbound-only OpenCrane personal-agent runtime.
 
 This process performs its one-use bootstrap exchange, then opens a single authenticated command
-stream to OpenCrane and executes the ``start_attempt`` commands it receives. Execution is a bounded
-Pydantic AI model/tool loop over the per-silo LiteLLM proxy, reached only through an attempt-scoped
-virtual key mounted as a group-readable Secret; the runtime holds no master key, no provider secret,
-and no database. Raw framework events are normalized into stable protocol ``event`` candidates while
-the attempt is active; Pydantic AI types, ids, and checkpoints never cross that seam.
+stream to OpenCrane and executes the ``start_attempt``, ``resume_attempt``, and ``cancel_attempt``
+commands it receives. Execution is a bounded Pydantic AI model/tool loop over the per-silo LiteLLM
+proxy, reached only through an attempt-scoped virtual key mounted as a group-readable Secret; the
+runtime holds no master key, no provider secret, and no database. Raw framework events are normalized
+into stable protocol candidates while the attempt is active; Pydantic AI types, ids, and checkpoints
+never cross that seam.
 
-External (side-effecting) TOOL execution, approval, steering, and run recovery (resume/cancel
-dispatch) remain a later Phase E slice (#329): this slice compiles no callable tool and surfaces a
-model-proposed tool call only as a bounded ``event`` candidate, never executing it. Because the loop
-is configured with zero implicit retries, any executor failure surfaces as a real ``run.error``
-candidate rather than a silent acknowledgement.
+Current capability: a model-proposed tool call is surfaced as a bounded ``external_action`` candidate
+(its ``toolRevisionId`` resolved from the compiled grant set, its ``argumentsDigest`` computed
+deterministically) for the control plane to authorize — the runtime never executes the tool itself.
+Resume feeds control-plane-authorized deferred tool results back into the paused loop; cancel is a
+positive signal that kills the active task and acknowledges the server-chosen reason. Steering is
+absorbed only at pre-model-request boundaries, and an encrypted, version-tagged, replaceable local
+checkpoint is written to the per-attempt scratch as a resume optimisation subordinate to canonical
+server state. Because the loop is configured with zero implicit retries, any executor failure
+surfaces as a real ``run.error`` candidate rather than a silent acknowledgement.
+
+Deferred to Phase E slice 4: the live-LiteLLM conformance suite and adoption gate for the pinned
+Pydantic AI package (ADR 0010) and the corresponding OpenClaw loop deletion; those are not exercised
+by this offline slice.
 """
 
 import asyncio
@@ -33,7 +42,16 @@ _PROTOCOL_VERSION = "opencrane.agent-runtime/v1"
 _DEFAULT_TOKEN_PATH = "/var/run/opencrane/tokens/runtime.token"
 _DEFAULT_BOOTSTRAP_PATH = "/var/run/opencrane/bootstrap/reference"
 _DEFAULT_LITELLM_KEY_PATH = "/var/run/opencrane/litellm/key"
+_DEFAULT_CHECKPOINT_DIR = "/tmp/opencrane/checkpoints"
+_CHECKPOINT_VERSION = 1
+_CHECKPOINT_FILENAME = "checkpoint.enc"
 _MAX_FRAME_BYTES = 65_536
+_MAX_CANDIDATE_RETRY_DELAY_SECONDS = 30.0
+
+# Process-lifetime symmetric cipher for local checkpoints. It is generated in memory at first use and
+# never written, logged, or exported; a restarted process cannot read a prior process's checkpoint,
+# which is correct because the checkpoint is a per-attempt scratch optimisation, never durable state.
+_PROCESS_CIPHER: object | None = None
 
 
 class BootstrapDeniedError(RuntimeError):
@@ -104,8 +122,9 @@ def _generate_proof_key() -> dict[str, object]:
     """Generate one per-run ES256 keypair and return its public JWK, thumbprint, and private key.
 
     The private key is retained only in memory for the process lifetime; the public half is bound to
-    the run by the bootstrap exchange so a later slice can sign capability proofs. It is never
-    written to disk, logged, or sent anywhere but as the public JWK in the bootstrap claim.
+    the run by the bootstrap exchange so the bound key can sign capability proofs for external-action
+    authorization. It is never written to disk, logged, or sent anywhere but as the public JWK in the
+    bootstrap claim.
     """
     from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -122,6 +141,52 @@ def _post_json(url: str, token: str, body: dict[str, object], timeout: float) ->
     request = Request(url, data=json.dumps(body).encode("utf-8"), headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}, method="POST")
     with urlopen(request, timeout=timeout) as response:
         return response.status
+
+
+def _retryable_candidate_delay(error: HTTPError) -> float | None:
+    """Read one bounded retry delay from the explicit pre-reservation dispatch response.
+
+    Only the runtime transport's ``503`` result with an exact ``retryable`` JSON body may trigger a
+    same-candidate retry. Other HTTP failures remain ordinary protocol failures; this prevents a
+    rejected or malformed action from being retried as if it had no durable invocation receipt.
+    """
+    if error.code != 503:
+        return None
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    finally:
+        error.close()
+    if not isinstance(payload, dict) or payload.get("accepted") is not False or payload.get("retryable") is not True:
+        return None
+    delay_milliseconds = payload.get("retryAfterMilliseconds")
+    if not isinstance(delay_milliseconds, int) or delay_milliseconds < 1 or delay_milliseconds > int(_MAX_CANDIDATE_RETRY_DELAY_SECONDS * 1_000):
+        return None
+    return delay_milliseconds / 1_000
+
+
+def _post_candidate_with_retry(control_plane_url: str, token: str, candidate: dict[str, object], cancelled: threading.Event, post_json: Callable[[str, str, dict[str, object], float], int] = _post_json) -> None:
+    """Post one candidate until accepted or stream cancellation after bounded retryable responses.
+
+    A retry keeps the exact ``candidateId`` and action payload, so the durable admission fence treats
+    every retry as one candidate rather than authoring a second external action. It only handles the
+    server's explicit pre-reservation ``503`` response; a terminal denial, bad response, or transport
+    failure still follows the existing fail-closed execution path. Each server-selected delay is
+    bounded, and cancellation stops the retry loop without emitting a spurious ``run.error``.
+    """
+    while not cancelled.is_set():
+        try:
+            status = post_json(f"{control_plane_url.rstrip('/')}/candidates", token, candidate, 30)
+            if 200 <= status < 300:
+                return
+            raise RuntimeError(f"candidate admission returned unexpected status {status}")
+        except HTTPError as error:
+            delay_seconds = _retryable_candidate_delay(error)
+            if delay_seconds is None:
+                raise
+            _log("candidate_retry", runId=candidate.get("runId"), attempt=candidate.get("attempt"), candidateId=candidate.get("candidateId"), retry_in_seconds=delay_seconds)
+            cancelled.wait(delay_seconds)
 
 
 def _perform_bootstrap(control_plane_url: str, token: str, bootstrap_reference: str, proof_key: dict[str, object]) -> None:
@@ -167,13 +232,73 @@ def _candidate(coordinates: dict[str, object], event_type: str, payload: dict[st
     return {**coordinates, "candidateId": str(uuid.uuid4()), "kind": "event", "eventType": event_type, "payload": payload}
 
 
+def _arguments_digest(arguments: object) -> str:
+    """Compute the deterministic ``sha256:<hex>`` digest the control-plane authority re-derives.
+
+    The arguments are serialized with sorted keys and no whitespace so the runtime and the TypeScript
+    authority always agree on the digest of the same validated action arguments.
+    """
+    canonical = json.dumps(arguments, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _external_action_candidate(coordinates: dict[str, object], tool_revision_id: str, tool_invocation_id: str, arguments_digest: str, arguments: object) -> dict[str, object]:
+    """Build one bounded ``external_action`` candidate requesting deferred external authorization.
+
+    The runtime never executes the tool: it surfaces the resolved tool revision, the model's
+    invocation id, the deterministic arguments digest, and the arguments for the control plane to
+    authorize and (later) execute. Tool grants come from the accepted snapshot, never from the model.
+    """
+    return {**coordinates, "candidateId": str(uuid.uuid4()), "kind": "external_action", "toolRevisionId": tool_revision_id, "toolInvocationId": tool_invocation_id, "argumentsDigest": arguments_digest, "arguments": arguments}
+
+
+def _resolve_tool_revision(compiled_input: dict[str, object], tool_name: str) -> str | None:
+    """Resolve a model tool name to its immutable revision from the compiled grant set.
+
+    The compiled tools carry the authoritative ``name`` → ``toolRevisionId`` mapping fixed by the
+    snapshot. A name absent from that set returns ``None`` so the caller emits an ``unknown_tool``
+    error rather than an external action for an ungranted tool.
+    """
+    tools = compiled_input.get("tools")
+    if not isinstance(tools, list):
+        return None
+    for tool in tools:
+        if isinstance(tool, dict) and tool.get("name") == tool_name:
+            revision = tool.get("toolRevisionId")
+            return revision if isinstance(revision, str) else None
+    return None
+
+
+def _tool_call_candidate(coordinates: dict[str, object], compiled_input: dict[str, object], neutral_event: dict[str, object]) -> dict[str, object]:
+    """Turn one model tool call into an ``external_action`` candidate or a hard ``run.error``.
+
+    A malformed or unparseable tool call remains a ``run.error`` (``malformed_tool_call``); a tool
+    naming a revision outside the compiled grant set is a hard ``run.error`` (``unknown_tool``) and
+    never an external action. Otherwise the call becomes a bounded ``external_action`` candidate with
+    the revision resolved from the snapshot's grants and a deterministic arguments digest.
+    """
+    tool_name = neutral_event.get("toolName")
+    tool_call_id = neutral_event.get("toolCallId")
+    raw_arguments = neutral_event.get("arguments")
+    if not isinstance(tool_name, str) or not isinstance(tool_call_id, str) or not isinstance(raw_arguments, str):
+        return _candidate(coordinates, "run.error", {"reason": "malformed_tool_call"})
+    try:
+        arguments = json.loads(raw_arguments)
+    except json.JSONDecodeError:
+        return _candidate(coordinates, "run.error", {"reason": "malformed_tool_call", "toolCallId": tool_call_id})
+    tool_revision_id = _resolve_tool_revision(compiled_input, tool_name)
+    if tool_revision_id is None:
+        return _candidate(coordinates, "run.error", {"reason": "unknown_tool", "toolCallId": tool_call_id})
+    return _external_action_candidate(coordinates, tool_revision_id, tool_call_id, _arguments_digest(arguments), arguments)
+
+
 def _normalize_event(neutral_event: dict[str, object]) -> tuple[str, dict[str, object]] | None:
-    """Normalize one neutral framework event into a stable protocol event type and payload.
+    """Normalize one non-tool neutral framework event into a stable protocol event type and payload.
 
     The neutral event is the adapter seam: the model driver translates Pydantic AI's own event
     objects into these plain dicts, so no framework type, id, or checkpoint crosses into a candidate.
-    A model-proposed tool call is surfaced as a bounded proposal and never executed in this slice; a
-    tool call with unparseable arguments becomes a ``run.error`` rather than a proposal.
+    Tool calls are handled separately by ``_tool_call_candidate`` (they become ``external_action``
+    candidates, never ``event`` candidates); this function covers output text, usage, and errors.
     """
     kind = neutral_event.get("type")
     if kind == "output_text":
@@ -181,17 +306,6 @@ def _normalize_event(neutral_event: dict[str, object]) -> tuple[str, dict[str, o
         return ("run.output_text", {"text": text if isinstance(text, str) else ""})
     if kind == "usage":
         return ("run.usage", {"inputTokens": _non_negative_int(neutral_event.get("inputTokens")), "outputTokens": _non_negative_int(neutral_event.get("outputTokens"))})
-    if kind == "tool_call":
-        tool_name = neutral_event.get("toolName")
-        tool_call_id = neutral_event.get("toolCallId")
-        raw_arguments = neutral_event.get("arguments")
-        if not isinstance(tool_name, str) or not isinstance(tool_call_id, str) or not isinstance(raw_arguments, str):
-            return ("run.error", {"reason": "malformed_tool_call"})
-        try:
-            arguments = json.loads(raw_arguments)
-        except json.JSONDecodeError:
-            return ("run.error", {"reason": "malformed_tool_call", "toolCallId": tool_call_id})
-        return ("run.tool_call_proposed", {"toolName": tool_name, "toolCallId": tool_call_id, "arguments": arguments})
     if kind == "error":
         message = neutral_event.get("message")
         return ("run.error", {"reason": "model_loop_error", "detail": message if isinstance(message, str) else ""})
@@ -202,9 +316,99 @@ def _normalize_event(neutral_event: dict[str, object]) -> tuple[str, dict[str, o
     return None
 
 
+def _absorb_steering(steering_buffer: list[str]) -> list[str]:
+    """Drain and return buffered steering, applied ONLY at a pre-model-request boundary.
+
+    Boundary invariant: this is consulted immediately before issuing a model request node and NEVER
+    mid-request or mid-tool. Steering that arrives while a model request is in flight stays in the
+    buffer and is absorbed at the NEXT pre-model boundary, or dropped if the attempt terminates first
+    (the buffer is per-attempt and discarded with it). The drain removes exactly the entries observed
+    so a concurrent enqueue between the copy and the delete is never lost. The runtime only injects
+    steering text into the next model request context; it neither persists steering nor authors
+    steering authority.
+
+    Scope: this absorption boundary is built and unit-covered. The steering-INGEST HTTP surface that
+    lets a user enqueue steering into an in-flight attempt is an operator/product surface delivered in
+    Phase F (#224); until then the buffer has no external producer.
+    """
+    drained = steering_buffer[:]
+    del steering_buffer[: len(drained)]
+    return drained
+
+
 def _non_negative_int(value: object) -> int:
     """Coerce a usage counter to a non-negative integer, defaulting unknown values to zero."""
     return value if isinstance(value, int) and value >= 0 else 0
+
+
+def _process_cipher() -> object:
+    """Return the process-lifetime symmetric cipher, generating its key in memory on first use.
+
+    ``cryptography`` is imported lazily so the outbound shell and its offline tests never require the
+    package; a unit test injects a fake cipher seam instead. The key is generated once per process and
+    held only in memory, matching the checkpoint's per-attempt, non-durable scope.
+    """
+    global _PROCESS_CIPHER
+    if _PROCESS_CIPHER is None:
+        from cryptography.fernet import Fernet
+
+        _PROCESS_CIPHER = Fernet(Fernet.generate_key())
+    return _PROCESS_CIPHER
+
+
+def _checkpoint_path(checkpoint_dir: str | None) -> str:
+    """Resolve the single fixed checkpoint path so a new write atomically replaces the prior one."""
+    directory = checkpoint_dir or os.environ.get("OPENCRANE_RUNTIME_CHECKPOINT_DIR", _DEFAULT_CHECKPOINT_DIR)
+    return os.path.join(directory, _CHECKPOINT_FILENAME)
+
+
+def _write_checkpoint(run_id: str, attempt: int, input_generation: object, state: dict[str, object], *, cipher: object | None = None, checkpoint_dir: str | None = None) -> str:
+    """Atomically write the encrypted, version-tagged local resume checkpoint, replacing any prior one.
+
+    The checkpoint is SUBORDINATE to canonical server state: a local resume optimisation written to
+    the per-attempt scratch ``emptyDir``, never a source of truth. It is encrypted with the
+    process-lifetime cipher (injectable for tests), tagged with ``checkpointVersion``, and bound to
+    the run, attempt, and input generation so a stale or foreign checkpoint is rejected on read. The
+    write is temp-file + ``os.replace`` so a new checkpoint atomically supersedes the previous one at
+    the same fixed path.
+    """
+    cipher = cipher or _process_cipher()
+    path = _checkpoint_path(checkpoint_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    document = {"checkpointVersion": _CHECKPOINT_VERSION, "runId": run_id, "attempt": attempt, "inputGeneration": input_generation, "state": state}
+    plaintext = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    token = cipher.encrypt(plaintext)
+    temporary = f"{path}.{uuid.uuid4().hex}.tmp"
+    with open(temporary, "wb") as handle:
+        handle.write(token)
+    os.replace(temporary, path)
+    return path
+
+
+def _read_checkpoint(run_id: str, attempt: int, input_generation: object, *, cipher: object | None = None, checkpoint_dir: str | None = None) -> object | None:
+    """Read the local checkpoint's state, but ONLY if it agrees with canonical server coordinates.
+
+    Returns ``None`` (discard) when the checkpoint is absent, unreadable, wrong-version, or disagrees
+    with the server-authoritative run, attempt, or input generation. The checkpoint is never a source
+    of truth; disagreement always defers to canonical server state rather than resuming from stale
+    local data.
+    """
+    cipher = cipher or _process_cipher()
+    path = _checkpoint_path(checkpoint_dir)
+    try:
+        with open(path, "rb") as handle:
+            token = handle.read()
+    except OSError:
+        return None
+    try:
+        document = json.loads(cipher.decrypt(token).decode("utf-8"))
+    except Exception:  # noqa: BLE001 - a corrupt or foreign checkpoint is discarded, never fatal
+        return None
+    if not isinstance(document, dict) or document.get("checkpointVersion") != _CHECKPOINT_VERSION:
+        return None
+    if document.get("runId") != run_id or document.get("attempt") != attempt or document.get("inputGeneration") != input_generation:
+        return None
+    return document.get("state")
 
 
 def _zero_retry_openai_settings() -> dict[str, int]:
@@ -278,7 +482,7 @@ def _build_zero_retry_agent(
     return agent_cls(model, system_prompt=instructions, retries=settings["tool_validation_retries"], output_retries=settings["output_validation_retries"])
 
 
-def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dict[str, object]]:
+def _pydantic_ai_event_source(compiled_input: dict[str, object], cancel_event: threading.Event, steering_buffer: list[str]) -> Iterator[dict[str, object]]:
     """Drive the bounded Pydantic AI model/tool loop and yield neutral framework events.
 
     Pydantic AI is imported lazily so the outbound shell and its offline tests never require the
@@ -289,8 +493,13 @@ def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dic
     memory / compaction, filesystem / shell tools, and Logfire export — are disabled by omission and
     configuration, never imported and then switched off.
 
-    Live-LiteLLM conformance is the deferred adoption gate recorded in ADR 0010; it is NOT run here.
-    Offline tests inject a fake event source instead of importing Pydantic AI.
+    ``cancel_event`` is a positive cancellation signal observed at the model-request and stream
+    boundaries so a dispatched cancel kills the in-flight provider task promptly. Steering is absorbed
+    from ``steering_buffer`` ONLY immediately before issuing a model request node (the sole safe
+    pre-model boundary), never mid-request or mid-tool.
+
+    Live-LiteLLM conformance is the deferred Phase E slice-4 adoption gate recorded in ADR 0010; it is
+    NOT run here. Offline tests inject a fake event source instead of importing Pydantic AI.
     """
     from pydantic_ai import Agent
 
@@ -309,15 +518,80 @@ def _pydantic_ai_event_source(compiled_input: dict[str, object]) -> Iterator[dic
         events: list[dict[str, object]] = []
         async with agent.iter(_prompt(compiled_input)) as run:
             async for node in run:
+                if cancel_event.is_set():
+                    break
                 if Agent.is_model_request_node(node):
+                    # Safe pre-model boundary: absorb any buffered steering into the next request
+                    # context. Steering arriving after this point waits for the next boundary.
+                    _apply_steering_to_request(node, _absorb_steering(steering_buffer))
                     async with node.stream(run.ctx) as request_stream:
                         async for event in request_stream:
+                            if cancel_event.is_set():
+                                break
                             events.append(_translate_framework_event(event))
         usage = run.usage()
         events.append({"type": "usage", "inputTokens": getattr(usage, "input_tokens", 0), "outputTokens": getattr(usage, "output_tokens", 0)})
         return events
 
     for event in asyncio.run(_collect()):
+        if cancel_event.is_set():
+            break
+        yield event
+
+
+def _pydantic_ai_resume_source(run_id: str, attempt: int, input_generation: object, deferred_tool_results: object, cancel_event: threading.Event, steering_buffer: list[str], *, checkpoint_cipher: object | None = None) -> Iterator[dict[str, object]]:
+    """Resume the paused bounded loop by injecting control-plane-authorized deferred tool results.
+
+    The paused loop's compiled context is recovered from the SUBORDINATE local checkpoint, which is
+    discarded (raising rather than resuming from stale data) if it disagrees with the server's run,
+    attempt, or input generation. The authorized deferred results are then fed back as prior tool
+    results so the loop continues from the approval boundary; the runtime authors no approval and
+    chooses no terminal state. Steering and cancellation are observed exactly as in the start driver.
+
+    Live-LiteLLM resume conformance is the deferred Phase E slice-4 adoption gate (ADR 0010) and is
+    not run here; offline tests inject a fake resume source.
+    """
+    from pydantic_ai import Agent
+
+    state = _read_checkpoint(run_id, attempt, input_generation, cipher=checkpoint_cipher)
+    compiled_input = state.get("compiledInput") if isinstance(state, dict) else None
+    if not isinstance(compiled_input, dict):
+        raise RuntimeError("no agreeing local checkpoint to resume from")
+
+    base_url = _environment("OPENCRANE_RUNTIME_LITELLM_BASE_URL")
+    key_path = os.environ.get("OPENCRANE_RUNTIME_LITELLM_KEY_PATH", _DEFAULT_LITELLM_KEY_PATH)
+    attempt_key = _read_attempt_litellm_key(key_path)
+    model_route = compiled_input.get("model")
+    model_alias = model_route.get("modelAlias") if isinstance(model_route, dict) else None
+    if not isinstance(model_alias, str) or not model_alias:
+        raise RuntimeError("compiled input is missing a model alias")
+
+    instructions = compiled_input.get("instructions")
+    agent = _build_zero_retry_agent(model_alias, base_url, attempt_key, instructions if isinstance(instructions, str) else "")
+
+    async def _collect() -> list[dict[str, object]]:
+        events: list[dict[str, object]] = []
+        # The control-plane-authorized deferred results are injected as prior tool results so the
+        # bounded loop continues from the approval boundary; the runtime decides no approval.
+        async with agent.iter(_prompt(compiled_input), deferred_tool_results=deferred_tool_results) as run:
+            async for node in run:
+                if cancel_event.is_set():
+                    break
+                if Agent.is_model_request_node(node):
+                    for steer in _absorb_steering(steering_buffer):
+                        run.ctx.deps.steering.append(steer) if hasattr(getattr(run.ctx, "deps", None), "steering") else None
+                    async with node.stream(run.ctx) as request_stream:
+                        async for event in request_stream:
+                            if cancel_event.is_set():
+                                break
+                            events.append(_translate_framework_event(event))
+        usage = run.usage()
+        events.append({"type": "usage", "inputTokens": getattr(usage, "input_tokens", 0), "outputTokens": getattr(usage, "output_tokens", 0)})
+        return events
+
+    for event in asyncio.run(_collect()):
+        if cancel_event.is_set():
+            break
         yield event
 
 
@@ -346,31 +620,200 @@ def _translate_framework_event(event: object) -> dict[str, object]:
     return {"type": "output_text", "text": ""}
 
 
-def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], event_source: Callable[[dict[str, object]], Iterable[dict[str, object]]] = _pydantic_ai_event_source) -> None:
-    """Execute one ``start_attempt`` command as a bounded model loop, reporting event candidates.
+def _apply_steering_to_request(model_request_node: object, steering: list[str]) -> None:
+    """Inject absorbed steering text into the pending model request context at the safe boundary.
 
-    It emits a ``run.started`` candidate, normalizes every model-loop event into a bounded ``event``
-    candidate as the attempt runs, and closes with ``run.completed``. Because the loop performs zero
-    implicit retries, any failure — a missing key, an unreachable proxy, or a framework error —
-    surfaces as a single ``run.error`` candidate, never a silent acknowledgement.
+    Called only from the pre-model-request boundary in the driver, never mid-request or mid-tool. The
+    runtime merely appends steering text to the next request's user-visible context; it authors no
+    steering authority and persists nothing. When no steering is buffered this is a no-op.
+    """
+    if not steering:
+        return
+    parts = getattr(getattr(model_request_node, "request", None), "parts", None)
+    if isinstance(parts, list):
+        parts.extend({"content": text} for text in steering)
+
+
+def _dispatch_neutral_event(coordinates: dict[str, object], compiled_input: dict[str, object], neutral_event: dict[str, object], post_candidate: Callable[[dict[str, object]], None]) -> None:
+    """Post the right candidate for one neutral event: external_action for tool calls, else event.
+
+    Tool calls become bounded ``external_action`` candidates (or a hard ``run.error``) resolved
+    against the compiled grant set; every other event normalizes to an ``event`` candidate. This is
+    shared by the start and resume executors so both surface tool calls identically.
+    """
+    if neutral_event.get("type") == "tool_call":
+        post_candidate(_tool_call_candidate(coordinates, compiled_input, neutral_event))
+        return
+    normalized = _normalize_event(neutral_event)
+    if normalized is not None:
+        post_candidate(_candidate(coordinates, normalized[0], normalized[1]))
+
+
+def _snapshot_input_generation(payload: dict[str, object]) -> object:
+    """Read the input generation carried by the accepted snapshot, defaulting to zero when absent."""
+    snapshot = payload.get("snapshot") if isinstance(payload, dict) else None
+    if isinstance(snapshot, dict) and isinstance(snapshot.get("inputGeneration"), int):
+        return snapshot["inputGeneration"]
+    return 0
+
+
+def _try_write_checkpoint(coordinates: dict[str, object], payload: dict[str, object], compiled_input: dict[str, object], cipher: object | None) -> None:
+    """Best-effort write of the SUBORDINATE local resume checkpoint; never blocks or fails the attempt.
+
+    The checkpoint is a local optimisation only (never a source of truth). Any failure — including the
+    absence of the crypto backend offline — is swallowed and logged so a missing checkpoint never
+    turns a live attempt into an error.
+    """
+    try:
+        _write_checkpoint(coordinates["runId"], coordinates["attempt"], _snapshot_input_generation(payload), {"compiledInput": compiled_input}, cipher=cipher)
+    except Exception:  # noqa: BLE001 - the checkpoint is a subordinate optimisation, never load-bearing
+        _log("checkpoint_skipped", runId=coordinates.get("runId"), attempt=coordinates.get("attempt"))
+
+
+def _recover_compiled_input(coordinates: dict[str, object], input_generation: object, cipher: object | None) -> dict[str, object]:
+    """Best-effort recovery of compiled tools from the subordinate checkpoint for resume tool calls.
+
+    Returns an empty mapping when the checkpoint is absent, disagrees, or the crypto backend is
+    unavailable offline; a resume tool call against an empty grant set then surfaces ``unknown_tool``
+    rather than resuming from stale local state.
+    """
+    try:
+        state = _read_checkpoint(coordinates["runId"], coordinates["attempt"], input_generation, cipher=cipher)
+    except Exception:  # noqa: BLE001 - a subordinate checkpoint never crashes resume
+        return {}
+    if isinstance(state, dict) and isinstance(state.get("compiledInput"), dict):
+        return state["compiledInput"]
+    return {}
+
+
+class _TerminalGate:
+    """Guards the exactly-once terminal candidate for one attempt across the reader and worker threads.
+
+    A run posts exactly one of ``run.completed`` / ``run.error`` / ``run.cancelled``. The completion
+    path runs on the attempt worker thread while the positive-cancel path runs on the stream-reader
+    thread, so the decision to post and the post itself are made atomically under one lock: a
+    completion is skipped if cancellation has been signalled or a terminal already posted, and a
+    cancellation is skipped if a terminal already posted. Late output can never reopen a terminal run.
+    """
+
+    def __init__(self, cancel_event: threading.Event) -> None:
+        """Bind the gate to the attempt's shared cancel event."""
+        self._cancel_event = cancel_event
+        self._lock = threading.Lock()
+        self._posted = False
+
+    def post_completion(self, post_candidate: Callable[[dict[str, object]], None], candidate: dict[str, object]) -> bool:
+        """Post a completion or error terminal only if no terminal posted and no cancel is signalled."""
+        with self._lock:
+            if self._posted or self._cancel_event.is_set():
+                return False
+            self._posted = True
+        post_candidate(candidate)
+        return True
+
+    def post_cancellation(self, post_candidate: Callable[[dict[str, object]], None], candidate: dict[str, object]) -> bool:
+        """Post the cancellation terminal only if no terminal has already been posted."""
+        with self._lock:
+            if self._posted:
+                return False
+            self._posted = True
+        post_candidate(candidate)
+        return True
+
+
+def _execute_start_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_event_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
+    """Execute one ``start_attempt`` command as a bounded model loop, reporting candidates.
+
+    It emits a ``run.started`` candidate, writes a subordinate local resume checkpoint, then surfaces
+    every model-loop event: a tool call becomes a bounded ``external_action`` candidate resolved
+    against the compiled grant set, and other events normalize to ``event`` candidates. It closes with
+    ``run.completed``. Cancellation is a positive signal — once ``cancel_event`` is set no further
+    candidate (not even ``run.completed`` or a late ``run.error``) is emitted, so late runtime output
+    after cancel is suppressed. Because the loop performs zero implicit retries, any failure surfaces
+    as a single ``run.error`` candidate, never a silent acknowledgement.
     """
     coordinates = _command_coordinates(command, runtime_instance_id)
     if coordinates is None:
         return
+    if cancel_event is None:
+        cancel_event = threading.Event()
+    if terminal_gate is None:
+        terminal_gate = _TerminalGate(cancel_event)
     payload = command.get("payload")
     compiled_input = payload.get("compiledInput") if isinstance(payload, dict) else None
     if not isinstance(compiled_input, dict):
         post_candidate(_candidate(coordinates, "run.error", {"reason": "missing_compiled_input"}))
         return
     post_candidate(_candidate(coordinates, "run.started", {"promptCompilerVersion": compiled_input.get("promptCompilerVersion")}))
+    _try_write_checkpoint(coordinates, payload if isinstance(payload, dict) else {}, compiled_input, checkpoint_cipher)
+    steering_buffer: list[str] = []
     try:
-        for neutral_event in event_source(compiled_input):
-            normalized = _normalize_event(neutral_event)
-            if normalized is not None:
-                post_candidate(_candidate(coordinates, normalized[0], normalized[1]))
-        post_candidate(_candidate(coordinates, "run.completed", {}))
+        for neutral_event in event_source(compiled_input, cancel_event, steering_buffer):
+            if cancel_event.is_set():
+                break
+            _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
     except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
-        post_candidate(_candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+
+
+def _execute_resume_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], resume_event_source: Callable[..., Iterable[dict[str, object]]] = _pydantic_ai_resume_source, cancel_event: threading.Event | None = None, checkpoint_cipher: object | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
+    """Resume one paused attempt by feeding control-plane-authorized deferred tool results into the loop.
+
+    It carries the command's ``inputGeneration``, emits a ``run.resumed`` candidate, then injects the
+    payload's ``deferredToolResults`` back into the model loop (via the resume driver) so the loop
+    continues from where it paused for approval. Tool calls, cancellation, and errors are surfaced
+    exactly as in the start executor; the runtime injects the authorized results only and decides no
+    approval or terminal state.
+    """
+    coordinates = _command_coordinates(command, runtime_instance_id)
+    if coordinates is None:
+        return
+    if cancel_event is None:
+        cancel_event = threading.Event()
+    if terminal_gate is None:
+        terminal_gate = _TerminalGate(cancel_event)
+    payload = command.get("payload")
+    if not isinstance(payload, dict):
+        post_candidate(_candidate(coordinates, "run.error", {"reason": "missing_resume_payload"}))
+        return
+    input_generation = payload.get("inputGeneration")
+    deferred_tool_results = payload.get("deferredToolResults")
+    compiled_input = _recover_compiled_input(coordinates, input_generation, checkpoint_cipher)
+    post_candidate(_candidate(coordinates, "run.resumed", {"inputGeneration": input_generation}))
+    steering_buffer: list[str] = []
+    try:
+        for neutral_event in resume_event_source(coordinates["runId"], coordinates["attempt"], input_generation, deferred_tool_results, cancel_event, steering_buffer):
+            if cancel_event.is_set():
+                break
+            _dispatch_neutral_event(coordinates, compiled_input, neutral_event, post_candidate)
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.completed", {}))
+    except (HTTPError, URLError, OSError, RuntimeError, ValueError) as error:
+        terminal_gate.post_completion(post_candidate, _candidate(coordinates, "run.error", {"reason": "executor_failed", "errorType": type(error).__name__}))
+
+
+def _execute_cancel_attempt(command: dict[str, object], runtime_instance_id: str, post_candidate: Callable[[dict[str, object]], None], cancel_event: threading.Event | None = None, terminal_gate: "_TerminalGate | None" = None) -> None:
+    """Handle a positive-signal cancel: kill the active attempt and acknowledge the server's reason.
+
+    Cancellation is a POSITIVE signal: on receipt the runtime sets the shared ``cancel_event`` so the
+    running model/tool task stops promptly and emits no further candidate. The runtime never chooses a
+    terminal state — it echoes the server-chosen reason from the ``CancelAttemptCommand`` payload as a
+    bounded ``run.cancelled`` event candidate, posted through the shared terminal gate so it and the
+    worker thread's completion can never both reach a terminal (exactly one terminal candidate posts).
+    """
+    coordinates = _command_coordinates(command, runtime_instance_id)
+    if coordinates is None:
+        return
+    # Set the cancel event BEFORE posting so a racing completion re-checks it under the gate lock.
+    if cancel_event is not None:
+        cancel_event.set()
+    payload = command.get("payload")
+    reason = payload.get("reason") if isinstance(payload, dict) else None
+    candidate = _candidate(coordinates, "run.cancelled", {"reason": reason})
+    if terminal_gate is not None:
+        terminal_gate.post_cancellation(post_candidate, candidate)
+    else:
+        post_candidate(candidate)
 
 
 def _iter_commands(response: object, cancelled: threading.Event) -> object:
@@ -394,36 +837,65 @@ def _iter_commands(response: object, cancelled: threading.Event) -> object:
             current_event = ""
 
 
-def _open_stream(control_plane_url: str, token: str, runtime_instance_id: str, pod_uid: str) -> int:
-    """Open one authenticated stream and execute each received ``start_attempt`` as a model loop.
+def _open_stream(
+    control_plane_url: str,
+    token: str,
+    runtime_instance_id: str,
+    pod_uid: str,
+    handle_start: Callable[..., None] = _execute_start_attempt,
+    handle_resume: Callable[..., None] = _execute_resume_attempt,
+    handle_cancel: Callable[..., None] = _execute_cancel_attempt,
+) -> int:
+    """Open one authenticated stream and dispatch each received command to its handler.
 
-    Only ``start_attempt`` is dispatched to this runtime; resume and cancel dispatch belong to a later
-    slice, so any other command kind is ignored without a candidate. When the stream drops, a local
-    cancellation flag bounds further candidate emission so a lost connection cannot keep reporting
-    against a dead attempt.
+    ``start_attempt`` and ``resume_attempt`` run the active attempt on a worker thread carrying a
+    fresh ``cancel_event`` so the reader keeps receiving frames; ``cancel_attempt`` is a positive
+    signal that sets that event to kill the active task promptly and acknowledge the server-chosen
+    reason. The three handlers are injectable seams for offline tests. When the stream drops, the
+    ``finally`` block sets both the stream-loss flag and the active attempt's cancel event, so a
+    missed cancel frame still holds cancellation (the fence-bump + stream-loss fallback).
     """
     body = json.dumps({"protocolVersion": _PROTOCOL_VERSION, "runtimeInstanceId": runtime_instance_id, "podUid": pod_uid}).encode("utf-8")
     request = Request(f"{control_plane_url.rstrip('/')}/stream", data=body, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "text/event-stream"}, method="POST")
-    cancelled = threading.Event()
+    stream_lost = threading.Event()
+    active_cancel: threading.Event | None = None
+    active_gate: _TerminalGate | None = None
 
-    def _post_candidate(candidate: dict[str, object]) -> None:
-        _post_json(f"{control_plane_url.rstrip('/')}/candidates", token, candidate, timeout=30)
+    def _post_stream_candidate(candidate: dict[str, object]) -> None:
+        _post_candidate_with_retry(control_plane_url, token, candidate, stream_lost)
 
     try:
         with urlopen(request, timeout=45) as response:
             if response.status != 200:
                 raise RuntimeError(f"runtime stream returned unexpected status {response.status}")
             _log("stream_connected", runtime_instance_id=runtime_instance_id)
-            for command in _iter_commands(response, cancelled):
-                if cancelled.is_set():
+            for command in _iter_commands(response, stream_lost):
+                if stream_lost.is_set():
                     break
-                if command.get("kind") != "start_attempt":
+                kind = command.get("kind")
+                if kind == "start_attempt":
+                    active_cancel = threading.Event()
+                    active_gate = _TerminalGate(active_cancel)
+                    def _post_start_candidate(candidate: dict[str, object], cancelled: threading.Event = active_cancel) -> None:
+                        _post_candidate_with_retry(control_plane_url, token, candidate, cancelled)
+                    threading.Thread(target=handle_start, args=(command, runtime_instance_id, _post_start_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
+                elif kind == "resume_attempt":
+                    active_cancel = threading.Event()
+                    active_gate = _TerminalGate(active_cancel)
+                    def _post_resume_candidate(candidate: dict[str, object], cancelled: threading.Event = active_cancel) -> None:
+                        _post_candidate_with_retry(control_plane_url, token, candidate, cancelled)
+                    threading.Thread(target=handle_resume, args=(command, runtime_instance_id, _post_resume_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
+                elif kind == "cancel_attempt":
+                    handle_cancel(command, runtime_instance_id, _post_stream_candidate, cancel_event=active_cancel, terminal_gate=active_gate)
+                else:
                     continue
-                _execute_start_attempt(command, runtime_instance_id, _post_candidate)
-                _log("attempt_executed", runtime_instance_id=runtime_instance_id, command_kind=command.get("kind"))
+                _log("command_dispatched", runtime_instance_id=runtime_instance_id, command_kind=kind)
     finally:
-        # Bounded local cancellation: once the stream context exits, no further candidate is emitted.
-        cancelled.set()
+        # Bounded local cancellation: once the stream context exits, stop reading and signal the
+        # active attempt so a lost connection cannot keep working against a dead attempt.
+        stream_lost.set()
+        if active_cancel is not None:
+            active_cancel.set()
     return 0
 
 

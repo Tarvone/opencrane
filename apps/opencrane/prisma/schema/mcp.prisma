@@ -46,6 +46,7 @@ model McpServer {
   scope              GrantScope
   transport          McpServerTransport
   status             McpServerStatus        @default(Draft)
+  requiresApproval   Boolean                @default(false) @map("requires_approval")
   capabilities       String[]               @default([])
   publisher          String?
   glyph              String?

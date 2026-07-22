@@ -6,6 +6,10 @@ export { __ConsumeRuntimeBootstrap, __ExecuteCapabilityAction } from "./runtime-
 export type { ActionReplayMode, CapabilityActionExecutor, CapabilityActionFailureResult, CapabilityActionIntent, CapabilityActionReceipt, CapabilityActionReceiptRepository, CapabilityActionReservationResult, CapabilityActionSuccessResult, ConsumeRuntimeBootstrapResult, ExecuteCapabilityActionCommand, ExecuteCapabilityActionResult, RuntimeBootstrapClaim, RuntimeBootstrapConsumptionResult, RuntimeBootstrapExpectation, RuntimeBootstrapFailureReason, RuntimeBootstrapRepository } from "./runtime-proof.types.js";
 export { __CancelPendingRunApprovalAuthority } from "./run-approval-cancellation.js";
 export type { CancelPendingRunApprovalAuthorityCommand, CancelPendingRunApprovalAuthorityResult } from "./run-approval-cancellation.types.js";
+export { __DecideDeferredToolRequest, __DeferToolRequest } from "./deferred-tool-approval.js";
+export type { DecideDeferredToolRequestCommand, DecideDeferredToolRequestResult, DeferredToolDecision, DeferToolRequestCommand, DeferToolRequestResult } from "./deferred-tool-approval.types.js";
+export { PrismaToolInvocationRepository } from "./prisma-tool-invocation-repository.js";
+export type { ToolInvocationFailureResult, ToolInvocationIntent, ToolInvocationReceipt, ToolInvocationRepository, ToolInvocationReservationResult, ToolInvocationSuccessResult } from "./tool-invocation.types.js";
 export { PrismaRuntimeAuthorityRepository } from "./prisma-runtime-authority.js";
 export { PrismaAuthorizationGrantRepository } from "./prisma-authorization-grants.js";
 export { __CreateRuntimeBootstrapRouter } from "./runtime-bootstrap.router.js";

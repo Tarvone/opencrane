@@ -74,6 +74,7 @@ model AgentRun {
   proofKeys               RunProofKey[]
   approvalRequests        ApprovalRequest[]
   executionReceipts       ActionExecutionReceipt[]
+  toolInvocations         ToolInvocation[]
   outboxEvents            OutboxEvent[]
 
   @@unique([siloId, requestIdempotencyKey])

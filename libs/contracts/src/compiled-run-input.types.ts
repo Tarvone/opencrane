@@ -49,6 +49,8 @@ export interface CompiledToolDefinition
 	readonly toolRevisionId: string;
 	/** Human-readable tool description compiled from its revision. */
 	readonly description: string;
+	/** Whether an invocation of this tool must pause for a deferred human approval before dispatch. */
+	readonly requiresApproval: boolean;
 	/** JSON-Schema parameters object validated by the adapter, never by an implicit retry. */
 	readonly parametersSchema: JsonValue;
 }

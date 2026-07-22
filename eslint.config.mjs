@@ -155,6 +155,8 @@ export default [
             { sourceTag: "scope:membership", onlyDependOnLibsWithTags: ["scope:audit", "scope:authorization", "scope:membership", "scope:shared"] },
             { sourceTag: "scope:personal-memory", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:personal-memory", "scope:shared"] },
             { sourceTag: "scope:obot-custody", onlyDependOnLibsWithTags: ["scope:obot-custody", "scope:shared"] },
+            { sourceTag: "scope:sandbox-execution", onlyDependOnLibsWithTags: ["scope:sandbox-execution", "scope:shared"] },
+            { sourceTag: "scope:memory-gateway-client", onlyDependOnLibsWithTags: ["scope:memory-gateway-client", "scope:shared"] },
             { sourceTag: "scope:model-routing", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:shared"] },
             { sourceTag: "scope:policies", onlyDependOnLibsWithTags: ["scope:grants", "scope:k8s-api", "scope:policies", "scope:projection", "scope:shared"] },
             { sourceTag: "scope:personal-personas", onlyDependOnLibsWithTags: ["scope:personal-personas", "scope:shared"] },

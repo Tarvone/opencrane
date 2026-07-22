@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import * as k8s from "@kubernetes/client-node";
-import type { PrismaClient } from "@prisma/client";
+import { ActionExecutionState, type PrismaClient } from "@prisma/client";
 
 import { aiBudgetRouter, tokenUsageRouter, spendRouter } from "@opencrane/backend/server/reporting/spend";
 import { auditRouter } from "@opencrane/backend/server/iam/audit";
@@ -21,11 +21,15 @@ import { _RegisterInternalAgentRuntimeStream, type RuntimeTokenReviewer, type Ru
 import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
 import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
-import { PrismaRuntimeDispatchAuthority } from "@opencrane/backend/agents/runtime";
-import { PrismaRuntimeBootstrapExchange, __CreateRuntimeBootstrapRouter } from "@opencrane/backend/server/iam/authorization";
+import { PrismaRuntimeDispatchAuthority, __ExecuteExternalAction, type RuntimeExternalActionRunner } from "@opencrane/backend/agents/runtime";
+import { PrismaRuntimeBootstrapExchange, PrismaToolInvocationRepository, __CreateRuntimeBootstrapRouter, __DeferToolRequest } from "@opencrane/backend/server/iam/authorization";
+import { __UnavailableObotCustodyAdapter } from "@opencrane/server/_infra/obot-custody";
+import { __UnavailableSandboxJobExecutor } from "@opencrane/server/_infra/sandbox-execution";
+import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memory-gateway-client";
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import { _CreatePrismaRunInputCompiler } from "./prisma-run-input-compiler.js";
+import { _CreateExternalActionExecutor } from "./external-action-executor.js";
 import { _log } from "./log.js";
 
 /** Read a bounded, server-owned seconds setting and return milliseconds. */
@@ -185,6 +189,95 @@ async function _IssueAttemptModelKey(request: AttemptModelKeyMintRequest): Promi
 }
 
 /**
+ * Assemble the composition-root external-action runner from the concrete transports.
+ *
+ * This is where the MCP (Obot custody), sandbox, and memory transports are bound to the pure
+ * `__ExecuteExternalAction` boundary and the durable {@link PrismaToolInvocationRepository}, so no
+ * `scope:agent-runtime` or `scope:authorization` package imports a transport. Every transport is its
+ * fail-closed default until a real one is verified, so an admitted action reserves its invocation and
+ * then fails closed rather than fabricating a tool result.
+ *
+ * @param prisma - Canonical product-authority client backing the tool-invocation receipts.
+ * @returns A runner the dispatch authority invokes for each admitted external-action candidate.
+ */
+function _CreateExternalActionRunner(prisma: PrismaClient): RuntimeExternalActionRunner
+{
+	const repository = new PrismaToolInvocationRepository(prisma);
+	const obotCustody = new __UnavailableObotCustodyAdapter();
+	const sandboxExecutor = new __UnavailableSandboxJobExecutor();
+	const memoryGateway = new __UnavailableMemoryGatewayClient();
+	return {
+		async run(candidate, snapshot, compiledTools)
+		{
+			// The approval requirement is per-tool, derived from the resolved compiled tool grant.
+			const tool = compiledTools.find(function _match(definition) { return definition.toolRevisionId === candidate.toolRevisionId; });
+			const approvalRequired = tool?.requiresApproval ?? false;
+			let executor;
+			try
+			{
+				executor = _CreateExternalActionExecutor(candidate, { siloId: snapshot.siloId, subjectId: snapshot.identitySnapshot.executionSubjectId, obotCustody, sandboxExecutor, memoryGateway });
+			}
+			catch (error)
+			{
+				return { outcome: "retryable" as const, error };
+			}
+			const result = await __ExecuteExternalAction(repository, { candidate, snapshot, compiledTools, approvalRequired }, executor);
+			if (result.outcome === "denied") return { outcome: "denied" as const };
+			// A deferred invocation opens the pending approval that gates the eventual resume.
+			if (result.outcome === "deferred")
+			{
+				const deferred = await _OpenDeferredToolApproval(prisma, repository, candidate, snapshot.capabilitySetDigest, result.reservationId);
+				return { outcome: deferred ? "completed" as const : "denied" as const };
+			}
+			return { outcome: "completed" as const };
+		},
+	};
+}
+
+/** Open an approval or terminally fail its already-reserved invocation without allowing a replay. */
+async function _OpenDeferredToolApproval(prisma: PrismaClient, repository: PrismaToolInvocationRepository, candidate: { readonly runId: string; readonly attempt: number; readonly toolInvocationId: string; readonly toolRevisionId: string; readonly argumentsDigest: string }, capabilitySetDigest: string, reservationId: string): Promise<boolean>
+{
+	const expiresAt = new Date(Date.now() + _DEFERRED_APPROVAL_TTL_MILLISECONDS);
+	try
+	{
+		return await prisma.$transaction(async function _defer(transaction): Promise<boolean>
+		{
+			const result = await __DeferToolRequest(transaction, { runId: candidate.runId, attempt: candidate.attempt, toolInvocationRowId: reservationId, toolRevisionId: candidate.toolRevisionId, argumentsDigest: candidate.argumentsDigest, actionDigest: candidate.toolInvocationId, effectivePolicyDigest: capabilitySetDigest, approverPolicyRevision: "mcp-server-requires-approval", now: new Date(), expiresAt });
+			if (result.outcome !== "unavailable") return true;
+			const failed = await transaction.toolInvocation.updateMany({ where: { id: reservationId, state: ActionExecutionState.Reserved }, data: { state: ActionExecutionState.Failed, failureCode: "approval_unavailable", completedAt: new Date() } });
+			if (failed.count !== 1) throw new Error("deferred approval lost its reserved invocation fence");
+			return false;
+		});
+	}
+	catch
+	{
+		// A commit may have succeeded before its connection failed. A linked approval proves the reserved
+		// invocation is not stranded; otherwise compare-and-set it to the terminal failed state.
+		let approval = null;
+		try
+		{
+			approval = await prisma.approvalRequest.findFirst({ where: { runId: candidate.runId, attempt: candidate.attempt, actionDigest: candidate.toolInvocationId, toolInvocationRowId: reservationId } });
+		}
+		catch
+		{
+			// The compare-and-set below remains the best available terminalisation if a read failed.
+		}
+		if (approval !== null) return true;
+		try
+		{
+			return (await repository.markFailed(reservationId, "approval_defer_failed")).status === "failed";
+		}
+		catch
+		{
+			return false;
+		}
+	}
+}
+
+/** Bounded lifetime of a pending deferred-tool approval before it is no longer actionable. */
+const _DEFERRED_APPROVAL_TTL_MILLISECONDS = 24 * 60 * 60 * 1000;
+
+/**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
  *   - The NetworkPolicy-only `tenant-models` route takes no token; access is
@@ -205,7 +298,7 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
 	const commandTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_COMMAND_TTL_SECONDS", 60, 1, 300);
 	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace: runtimeNamespace, claimLeaseMilliseconds, assignmentTtlMilliseconds, publishedOutboxRetentionMilliseconds, outboxPruneBatchSize }, _IssueAttemptModelKey);
 	const runtimeTokenReviewer = _CreateRuntimeTokenReviewer(authApi, runtimeNamespace);
-	const runtimeDispatchAuthority = new PrismaRuntimeDispatchAuthority(prisma, { namespace: runtimeNamespace, commandTtlMilliseconds }, _CreatePrismaRunInputCompiler());
+	const runtimeDispatchAuthority = new PrismaRuntimeDispatchAuthority(prisma, { namespace: runtimeNamespace, commandTtlMilliseconds, externalActionRetryLimit: 3, externalActionRetryWindowMilliseconds: 30_000 }, _CreatePrismaRunInputCompiler(), _CreateExternalActionRunner(prisma));
 	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi, serverNamespace), namespace: serverNamespace, repository: runDispatchRepository, logger: _log }));
   // NetworkPolicy-only (no auth/TokenReview): the operator fetches a tenant's
   // allowed model set + effective default at reconcile. Best-effort — never 404/500.

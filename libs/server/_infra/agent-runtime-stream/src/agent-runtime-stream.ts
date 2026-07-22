@@ -208,7 +208,7 @@ export function _RegisterInternalAgentRuntimeStream(options: RuntimeStreamTransp
 				response.status(401).json({ code: "UNAUTHORIZED" });
 				return;
 			}
-			response.status(result.accepted ? 202 : 409).json(result);
+			response.status(result.accepted ? 202 : result.retryable ? 503 : 409).json(result);
 		}
 		catch (error)
 		{

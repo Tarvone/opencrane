@@ -16,7 +16,9 @@ never look like a business capability. Each is owned by the server and by nothin
 | [`channel-proxy`](./channel-proxy/README.md) | The blue OpenClaw gateway proxy. *(frozen — see below)* |
 | [`agent-runtime-stream`](./agent-runtime-stream/README.md) | Projected-token runtime-initiated HTTP/SSE framing; never run state. |
 | [`http`](./http/README.md) | Express transport plumbing. |
+| [`memory-gateway-client`](./memory-gateway-client/README.md) | The personal-memory gateway port. |
 | [`obot-custody`](./obot-custody/README.md) | The Obot credential-custody port. |
+| [`sandbox-execution`](./sandbox-execution/README.md) | The sandboxed tool-execution port. |
 | [`tenant-hosting`](./tenant-hosting/README.md) | The hosting-substrate adapter. |
 
 ```

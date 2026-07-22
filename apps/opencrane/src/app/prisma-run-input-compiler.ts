@@ -32,9 +32,7 @@ function _repositories(transaction: Prisma.TransactionClient): PromptCompilerRep
 	return {
 		loadPersonaInstructions(personaRevisionId: string | null): Promise<string> { return _loadPersonaInstructions(transaction, personaRevisionId); },
 		loadMessages(messageIds: readonly string[]): Promise<readonly CompiledMessage[]> { return _loadMessages(transaction, messageIds); },
-		// Tool-schema compilation and external tool execution arrive with slice 3 (#329); this slice
-		// compiles no callable tool, so the bounded loop is proposal-only.
-		loadToolDefinitions(): Promise<readonly CompiledToolDefinition[]> { return Promise.resolve([]); },
+		loadToolDefinitions(toolGrantIds: readonly string[]): Promise<readonly CompiledToolDefinition[]> { return _loadToolDefinitions(transaction, toolGrantIds); },
 		// Durable fact text lives in Cognee behind the memory gateway (a network read); the immutable
 		// fact references stay on the snapshot and are not inlined by this offline compile step.
 		loadMemoryFactStatements(): Promise<readonly string[]> { return Promise.resolve([]); },
@@ -79,6 +77,29 @@ function _messageContent(blocks: Prisma.JsonValue): string
 		else if (block && typeof block === "object" && !Array.isArray(block) && typeof block["text"] === "string") parts.push(block["text"]);
 	}
 	return parts.join("\n");
+}
+
+/**
+ * Resolve the snapshot's tool grants into the compiled tool definitions the bounded loop may propose.
+ *
+ * Each `toolGrantId` is an {@link McpServerGrant}; a grant resolves to its granted MCP server, which
+ * becomes one callable tool the model may select. The revision id is derived from the immutable
+ * server id so an external-action proposal can be fixed to (and later revalidated against) the exact
+ * granted tool. Per-argument JSON schemas are not modelled server-side yet, so the compiled schema is
+ * a permissive object the adapter still validates; tightening it is a later enrichment. Ordering is
+ * left to the prompt compiler, which sorts tools canonically by name.
+ */
+async function _loadToolDefinitions(transaction: Prisma.TransactionClient, toolGrantIds: readonly string[]): Promise<readonly CompiledToolDefinition[]>
+{
+	if (toolGrantIds.length === 0) return [];
+	const grants = await transaction.mcpServerGrant.findMany({ where: { id: { in: [...toolGrantIds] } }, include: { mcpServer: true } });
+	const byServerId = new Map<string, CompiledToolDefinition>();
+	for (const grant of grants)
+	{
+		const server = grant.mcpServer;
+		if (!byServerId.has(server.id)) byServerId.set(server.id, { name: server.name, toolRevisionId: `mcp-server:${server.id}`, description: server.description, requiresApproval: server.requiresApproval, parametersSchema: { type: "object" } });
+	}
+	return [...byServerId.values()];
 }
 
 /** Resolve one-line availability summaries for the immutable artifact revisions offered to the run. */

@@ -14,8 +14,12 @@ The agent controller creates the fresh, initially suspended Job from durable run
 the exact assigned Job, and registers its first Pod. This process then binds its per-run public proof
 key with a one-use bootstrap exchange, opens its command stream, and executes each `start_attempt`
 command as a bounded Pydantic AI model/tool loop over the per-silo LiteLLM proxy, reporting normalized
-`event` candidates as the attempt runs. External (side-effecting) tool execution, approval, steering,
-and run recovery remain a later Phase E slice.
+candidates as the attempt runs. A model tool call is surfaced as a bounded `external_action`
+candidate for the control plane to authorize — the runtime never executes the tool itself. It also
+handles `resume_attempt` (feeding control-plane-authorized deferred tool results back into the paused
+loop) and `cancel_attempt` (a positive signal that kills the active task and acknowledges the
+server-chosen reason), absorbs steering only at pre-model-request boundaries, and writes an encrypted,
+version-tagged, replaceable local checkpoint subordinate to canonical server state.
 
 ```text
  durable run attempt
@@ -24,7 +28,7 @@ and run recovery remain a later Phase E slice.
  ┌──────────────────────────────┐
  │  agent-runtime  ◄── HERE      │  bootstrap exchange + outbound stream + bounded model loop
  └──────────────┬───────────────┘
-                │ normalized event candidates (external tool execution comes later)
+                │ event + external_action candidates (tool execution stays server-side authority)
                 ▼
  OpenCrane server authority
 ```
@@ -48,10 +52,18 @@ rejects any individual response line above 64 KiB, and executes each `start_atte
 bounded Pydantic AI model/tool loop. The loop reaches the LiteLLM proxy only through an
 attempt-scoped virtual key mounted as a group-readable Secret, performs zero implicit retries, and is
 driven with `agent.iter()` / `run_stream_events()` (never the `run_stream()` final-output shortcut).
-Raw framework events are normalized into stable protocol `event` candidates — output text, usage,
-bounded tool-call proposals, and errors — while the attempt is active; Pydantic AI types, ids, and
-checkpoints never cross that seam. Any executor failure surfaces as a real `run.error` candidate
-rather than a silent acknowledgement, and a dropped stream bounds further candidate emission.
+Raw framework events are normalized into stable protocol candidates while the attempt is active:
+output text, usage, and errors become bounded `event` candidates, while a model tool call becomes a
+bounded `external_action` candidate whose `toolRevisionId` is resolved from the compiled grant set
+and whose `argumentsDigest` is a deterministic `sha256:<hex>` the control plane re-derives. Pydantic
+AI types, ids, and checkpoints never cross that seam. Resume injects only control-plane-authorized
+deferred tool results; cancel is a positive signal that suppresses any late candidate; steering is
+absorbed only at the safe pre-model-request boundary. Any executor failure surfaces as a real
+`run.error` candidate rather than a silent acknowledgement, and a dropped stream bounds further
+candidate emission. The one exception is the control plane's explicit bounded retry response before
+an external action has a durable invocation receipt: the runtime resubmits that exact candidate id
+until the server accepts it, exhausts its durable retry budget, or the active attempt/stream is
+cancelled, without misreporting a dispatch outage as a model failure.
 
 ## Boundary
 
@@ -82,6 +94,10 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 - `OPENCRANE_RUNTIME_LITELLM_BASE_URL` — in-cluster LiteLLM proxy base URL the bounded loop calls.
 - `OPENCRANE_RUNTIME_LITELLM_KEY_PATH` — path of the mounted attempt-scoped LiteLLM key (defaults to
   `/var/run/opencrane/litellm/key`).
+- `OPENCRANE_RUNTIME_CHECKPOINT_DIR` — directory in the per-attempt scratch `emptyDir` for the
+  encrypted local resume checkpoint (defaults to `/tmp/opencrane/checkpoints`). The checkpoint is a
+  subordinate local optimisation only, encrypted with a process-lifetime in-memory key, never durable
+  state and never a source of truth.
 - `/var/run/opencrane/bootstrap/reference` — read-only opaque lookup reference projected from the
   Pod annotation. It is not a credential and is never placed in an environment variable or argument.
 - `/var/run/opencrane/litellm/key` — the attempt-scoped LiteLLM virtual key, projected as a
@@ -99,13 +115,16 @@ credential is group-readable (`0440`) only by that runtime group; it is never wo
 ## Status
 
 The current image proves identity, the one-use bootstrap exchange, durable command dispatch, and a
-bounded model/tool loop: it binds its proof key, receives its fenced `start_attempt` command with its
-control-plane-compiled literal input, and completes a real agent run over LiteLLM through an
-attempt-scoped key, reporting normalized `event` candidates. The controller creates or exact-adopts
-the suspended Job, releases the durable assignment, and registers the unique first Pod. External
-(side-effecting) tool execution, approval, steering, and run recovery (resume/cancel dispatch) remain
-a later Phase E slice (#329). The live-LiteLLM conformance run over the pinned `pydantic-ai` package
-is the deferred adoption gate recorded in ADR 0010 and is not exercised offline.
+bounded model/tool loop: it binds its proof key, receives its fenced `start_attempt`,
+`resume_attempt`, and `cancel_attempt` commands with its control-plane-compiled literal input, and
+completes a real agent run over LiteLLM through an attempt-scoped key. It surfaces model tool calls as
+`external_action` candidates for server-side authorization, feeds authorized deferred results on
+resume, kills the active task on a positive cancel signal, absorbs steering at pre-model-request
+boundaries, and writes an encrypted, version-tagged, replaceable local checkpoint subordinate to
+canonical server state. The controller creates or exact-adopts the suspended Job, releases the durable
+assignment, and registers the unique first Pod. The live-LiteLLM conformance run over the pinned
+`pydantic-ai` package (and the corresponding OpenClaw loop deletion) is the deferred Phase E slice-4
+adoption gate recorded in ADR 0010 and is not exercised offline.
 
 ## See also
 

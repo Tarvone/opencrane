@@ -173,6 +173,12 @@ CREATE TYPE "WorkloadKind" AS ENUM ('job', 'deployment');
 CREATE TYPE "RunOutboxEventKind" AS ENUM ('run.accepted', 'run.attempt_requested', 'run.workload_release_requested', 'run.workload_cleanup_requested', 'run.cancellation_requested', 'run.resume_requested');
 
 -- CreateEnum
+CREATE TYPE "RuntimeCommandKind" AS ENUM ('start_attempt', 'resume_attempt', 'cancel_attempt');
+
+-- CreateEnum
+CREATE TYPE "RuntimeSteeringDisposition" AS ENUM ('absorbed', 'deferred');
+
+-- CreateEnum
 CREATE TYPE "SkillState" AS ENUM ('active', 'retired');
 
 -- CreateEnum
@@ -377,10 +383,10 @@ CREATE TABLE "authorization_grants" (
     "scope_kind" "AuthorizationScopeKind" NOT NULL,
     "organization_id" TEXT NOT NULL,
     "scope_resource_id" TEXT,
-    "catalog_id" TEXT NOT NULL,
-    "catalog_revision" INTEGER NOT NULL,
-    "catalog_digest" TEXT NOT NULL,
-    "capability_id" TEXT NOT NULL,
+    "catalog_id" TEXT,
+    "catalog_revision" INTEGER,
+    "catalog_digest" TEXT,
+    "capability_id" TEXT,
     "resource_kind" TEXT NOT NULL,
     "resource_id" TEXT NOT NULL,
     "effect" "AuthorizationEffect" NOT NULL,
@@ -440,9 +446,34 @@ CREATE TABLE "approval_requests" (
     "decided_at" TIMESTAMP(3),
     "decided_by" TEXT,
     "resume_token_hash" TEXT,
+    "tool_invocation_row_id" TEXT,
+    "deferred_tool_result" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "approval_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tool_invocations" (
+    "id" TEXT NOT NULL,
+    "silo_id" TEXT NOT NULL,
+    "run_id" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "agent_service_id" TEXT NOT NULL,
+    "agent_revision_id" TEXT NOT NULL,
+    "subject_id" TEXT NOT NULL,
+    "tool_revision_id" TEXT NOT NULL,
+    "tool_invocation_id" TEXT NOT NULL,
+    "arguments_digest" TEXT NOT NULL,
+    "request_fingerprint" TEXT NOT NULL,
+    "approval_required" BOOLEAN NOT NULL DEFAULT false,
+    "state" "ActionExecutionState" NOT NULL DEFAULT 'reserved',
+    "result" JSONB,
+    "failure_code" TEXT,
+    "reserved_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completed_at" TIMESTAMP(3),
+
+    CONSTRAINT "tool_invocations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -795,6 +826,7 @@ CREATE TABLE "mcp_servers" (
     "scope" "GrantScope" NOT NULL,
     "transport" "McpServerTransport" NOT NULL,
     "status" "McpServerStatus" NOT NULL DEFAULT 'draft',
+    "requires_approval" BOOLEAN NOT NULL DEFAULT false,
     "capabilities" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "publisher" TEXT,
     "glyph" TEXT,
@@ -1354,6 +1386,66 @@ CREATE TABLE "run_outbox_events" (
 );
 
 -- CreateTable
+CREATE TABLE "runtime_command_streams" (
+    "run_id" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "fence" INTEGER NOT NULL DEFAULT 1,
+    "input_generation" INTEGER NOT NULL DEFAULT 0,
+    "runtime_instance_id" TEXT,
+    "next_command_sequence" INTEGER NOT NULL DEFAULT 1,
+    "accepted_candidate_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "runtime_command_streams_pkey" PRIMARY KEY ("run_id", "attempt")
+);
+
+-- CreateTable
+CREATE TABLE "runtime_external_action_retries" (
+    "run_id" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "candidate_id" TEXT NOT NULL,
+    "retry_count" INTEGER NOT NULL DEFAULT 0,
+    "retry_deadline_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "runtime_external_action_retries_pkey" PRIMARY KEY ("run_id", "attempt", "candidate_id")
+);
+
+-- CreateTable
+CREATE TABLE "runtime_steering_boundaries" (
+    "run_id" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "boundary_id" TEXT NOT NULL,
+    "from_input_generation" INTEGER NOT NULL,
+    "to_input_generation" INTEGER NOT NULL,
+    "disposition" "RuntimeSteeringDisposition" NOT NULL,
+    "steering_digest" TEXT,
+    "claimed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "acked_at" TIMESTAMP(3),
+
+    CONSTRAINT "runtime_steering_boundaries_pkey" PRIMARY KEY ("run_id", "attempt", "boundary_id")
+);
+
+-- CreateTable
+CREATE TABLE "runtime_dispatched_commands" (
+    "id" TEXT NOT NULL,
+    "run_id" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "sequence" INTEGER NOT NULL,
+    "command_id" TEXT NOT NULL,
+    "kind" "RuntimeCommandKind" NOT NULL,
+    "fence" INTEGER NOT NULL,
+    "payload" JSONB,
+    "issued_at" TIMESTAMP(3) NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "runtime_dispatched_commands_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "skills" (
     "id" TEXT NOT NULL,
     "silo_id" TEXT NOT NULL,
@@ -1458,6 +1550,33 @@ CREATE TABLE "tenants" (
 
     CONSTRAINT "tenants_pkey" PRIMARY KEY ("name")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tool_invocations_request_fingerprint_key" ON "tool_invocations"("request_fingerprint");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tool_invocations_run_id_attempt_tool_invocation_id_key" ON "tool_invocations"("run_id", "attempt", "tool_invocation_id");
+
+-- CreateIndex
+CREATE INDEX "tool_invocations_run_id_attempt_state_idx" ON "tool_invocations"("run_id", "attempt", "state");
+
+-- CreateIndex
+CREATE INDEX "runtime_external_action_retries_run_id_attempt_retry_deadline_at_idx" ON "runtime_external_action_retries"("run_id", "attempt", "retry_deadline_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "runtime_steering_boundaries_run_id_attempt_to_input_generat_key" ON "runtime_steering_boundaries"("run_id", "attempt", "to_input_generation");
+
+-- CreateIndex
+CREATE INDEX "runtime_steering_boundaries_run_id_attempt_idx" ON "runtime_steering_boundaries"("run_id", "attempt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "runtime_dispatched_commands_command_id_key" ON "runtime_dispatched_commands"("command_id");
+
+-- CreateIndex
+CREATE INDEX "runtime_dispatched_commands_run_id_attempt_idx" ON "runtime_dispatched_commands"("run_id", "attempt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "runtime_dispatched_commands_run_id_attempt_sequence_key" ON "runtime_dispatched_commands"("run_id", "attempt", "sequence");
 
 -- CreateIndex
 CREATE INDEX "agent_services_silo_id_owner_scope_owner_subject_id_idx" ON "agent_services"("silo_id", "owner_scope", "owner_subject_id");
@@ -2128,6 +2247,18 @@ ALTER TABLE "approval_requests" ADD CONSTRAINT "approval_requests_run_id_attempt
 
 -- AddForeignKey
 ALTER TABLE "approval_requests" ADD CONSTRAINT "approval_requests_catalog_id_catalog_revision_catalog_dige_fkey" FOREIGN KEY ("catalog_id", "catalog_revision", "catalog_digest") REFERENCES "capability_catalog_revisions"("catalog_id", "revision", "digest") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "approval_requests" ADD CONSTRAINT "approval_requests_tool_invocation_row_id_fkey" FOREIGN KEY ("tool_invocation_row_id") REFERENCES "tool_invocations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tool_invocations" ADD CONSTRAINT "tool_invocations_run_id_agent_service_id_agent_revision_id_fkey" FOREIGN KEY ("run_id", "agent_service_id", "agent_revision_id") REFERENCES "agent_runs"("id", "agent_service_id", "agent_revision_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "runtime_external_action_retries" ADD CONSTRAINT "runtime_external_action_retries_run_id_attempt_fkey" FOREIGN KEY ("run_id", "attempt") REFERENCES "runtime_command_streams"("run_id", "attempt") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "runtime_dispatched_commands" ADD CONSTRAINT "runtime_dispatched_commands_run_id_attempt_fkey" FOREIGN KEY ("run_id", "attempt") REFERENCES "runtime_command_streams"("run_id", "attempt") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "action_execution_receipts" ADD CONSTRAINT "action_execution_receipts_run_id_agent_service_id_agent_re_fkey" FOREIGN KEY ("run_id", "agent_service_id", "agent_revision_id") REFERENCES "agent_runs"("id", "agent_service_id", "agent_revision_id") ON DELETE RESTRICT ON UPDATE CASCADE;

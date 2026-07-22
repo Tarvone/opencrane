@@ -194,6 +194,9 @@ OPENCRANE_BASELINE_CONFIG_MAP="$(bash "$ROOT_DIR/apps/postgres/scripts/publish-i
   "$NAMESPACE" \
   "$SILO_POSTGRES_OWNER" \
   "$ROOT_DIR/apps/opencrane/prisma/bootstrap/target-baseline.sql")"
+OPENCRANE_BASELINE_SHA256="$(kubectl get configmap "$OPENCRANE_BASELINE_CONFIG_MAP" \
+  -n "$NAMESPACE" \
+  -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
 
 function _install_postgres_server()
 {
@@ -204,6 +207,7 @@ function _install_postgres_server()
     --set-json "databases=$databases_json" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "storage.storageClass=local-path" \

@@ -203,7 +203,7 @@ export function modelRoutingDefaultsRouter(prisma: PrismaClient): Router
     // 3. Upsert on the (scope, clusterTenant) pair so repeated writes update in place. Prisma's
     //    compound-unique selector cannot express a null clusterTenant (Global scope), so resolve the
     //    existing row with findFirst then branch. Uniqueness is DB-enforced (compound index for
-    //    ClusterTenant rows; a partial unique index for the Global row — migration 0018); if a
+    //    ClusterTenant rows; a partial unique index for the Global row in the target baseline); if a
     //    concurrent create loses that race it surfaces as P2002, so fall back to updating the
     //    now-existing row, keeping the upsert idempotent under concurrency.
     const prismaScope = _toPrismaScope(scope);

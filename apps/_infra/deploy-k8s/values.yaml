@@ -376,6 +376,23 @@ agentController:
 
 # -- Control plane settings
 clustertenantManager:
+  # -- The server image runs as the Node.js uid/gid. The fsGroup makes projected
+  #    artifact signing keys readable at 0440 without widening them to every uid.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+
   # -- Whether this control plane owns per-ClusterTenant namespace creation. Default true;
   #    the app-owned OpenCrane Helm unit renders its gated namespace-management ClusterRole
   #    and injects MANAGE_TENANT_NAMESPACES=true. Set false only when a separate namespace

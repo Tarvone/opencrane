@@ -17,7 +17,7 @@ This file is the canonical agent instruction file for the repository.
 | **Angular / Frontend** | [`docs/agents/angular.md`](docs/agents/angular.md) | working in the `apps/opencrane-ui` Angular SPA or `libs/frontend/*` (ported from WeOwnAI, #152) — PrimeNG, layering, signals/resources, standalone components. |
 | **Architecture & Identity** | [`docs/agents/architecture.md`](docs/agents/architecture.md) | making IAM, identity, auth, or token-policy decisions (the IAM-first philosophy). |
 | **Kubernetes** | [`docs/agents/k8s.md`](docs/agents/k8s.md) | touching service accounts, RBAC, NetworkPolicy, or routes excluded from auth middleware. |
-| **Prisma & migrations** | [`docs/agents/prisma.md`](docs/agents/prisma.md) | adding/altering database models or writing a migration — per-domain schema files under `prisma/schema/`, migration naming. |
+| **Prisma & target baseline** | [`docs/agents/prisma.md`](docs/agents/prisma.md) | adding/altering database models or regenerating the clean target baseline — per-domain schema files under `prisma/schema/`, reviewed SQL under `prisma/bootstrap/`. |
 | **Cluster topology** | [`docs/agents/cluster-architecture.md`](docs/agents/cluster-architecture.md) | you need the whole-cluster picture — planes, namespaces, Helm templates, isolation tiers, multi-instance, Workload Identity. |
 | **Monorepo boundaries** | [`docs/agents/monorepo.md`](docs/agents/monorepo.md) | creating/moving an app or library, adding a deployable workload, or changing NX tags/dependency direction. |
 | **Build, Test & Infra** | [`docs/agents/infra.md`](docs/agents/infra.md) | building/testing, or editing Terraform/Helm/deploy under `platform/`. |

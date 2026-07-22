@@ -36,6 +36,10 @@ databaseAdmin:
 # and immutable. Recovery never attaches this input because the physical backup already
 # contains the authoritative schema.
 bootstrap:
+  # Full identity embedded by the superuser-owned baseline envelope. The privileges
+  # hook compares this value with the protected row inside fresh and restored databases.
+  targetBaseline:
+    sha256: ""
   initdb:
     postInitApplicationSQLRefs:
       configMapRefs: []
@@ -109,9 +113,6 @@ backup:
 restore:
   enabled: false
   sourceName: source
-  # Content-addressed baseline identity recorded on the source Cluster. Recovery
-  # never executes this ConfigMap; it carries provenance for later deploy checks.
-  sourceBaselineConfigMap: ""
   targetTime: ""
   plugin:
     name: ""

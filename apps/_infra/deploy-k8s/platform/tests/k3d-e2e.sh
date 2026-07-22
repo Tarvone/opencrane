@@ -418,6 +418,9 @@ OPENCRANE_BASELINE_CONFIG_MAP="$(bash "$ROOT_DIR/apps/postgres/scripts/publish-i
   "$NAMESPACE" \
   "$POSTGRES_OWNER" \
   "$ROOT_DIR/apps/opencrane/prisma/bootstrap/target-baseline.sql")"
+OPENCRANE_BASELINE_SHA256="$(kubectl get configmap "$OPENCRANE_BASELINE_CONFIG_MAP" \
+  -n "$NAMESPACE" \
+  -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
 DATABASES_JSON="[{\"name\":\"opencrane\",\"owner\":\"$POSTGRES_OWNER\",\"credentialsSecret\":\"$POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"obot\",\"owner\":\"$OBOT_POSTGRES_OWNER\",\"credentialsSecret\":\"$OBOT_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"litellm\",\"owner\":\"$LITELLM_POSTGRES_OWNER\",\"credentialsSecret\":\"$LITELLM_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"langfuse\",\"owner\":\"$LANGFUSE_POSTGRES_OWNER\",\"credentialsSecret\":\"$LANGFUSE_POSTGRES_CREDENTIALS_SECRET\"}]"
 
 echo "[e2e] Installing pinned MinIO backup target"
@@ -564,6 +567,7 @@ function _validate_cnpg_backup_recovery_schema()
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
@@ -578,9 +582,9 @@ function _validate_cnpg_backup_recovery_schema()
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set restore.enabled=true \
-    --set-string "restore.sourceBaselineConfigMap=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set restore.plugin.parameters.barmanObjectName=contract-only \
     --set-string restore.targetTime=2026-07-18T00:00:00Z >"$rendered"
@@ -596,6 +600,7 @@ function _install_postgres_server()
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "storage.size=${DB_STORAGE_GB}Gi" \
@@ -635,6 +640,9 @@ function _copy_cnpg_uri_secret()
 
 function _run_backup_restore_smoke()
 {
+  local baseline_mismatch_log
+  baseline_mismatch_log="$(mktemp)"
+
   echo "[e2e] Enabling the pinned Barman plugin on '$OPENCRANE_DB_RELEASE_NAME'"
   helm upgrade "$OPENCRANE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
@@ -769,13 +777,13 @@ EOF
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set storage.storageClass=local-path \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
     --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
     --set restore.enabled=true \
-    --set-string "restore.sourceBaselineConfigMap=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set-string "restore.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME" \
     --set-string "restore.plugin.parameters.serverName=$OPENCRANE_DB_RELEASE_NAME"
@@ -792,6 +800,26 @@ EOF
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${RESTORE_DB_RELEASE_NAME}-${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   done
   kubectl wait --for=condition=complete "job/${RESTORE_DB_RELEASE_NAME}-database-privileges" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+
+  echo "[e2e] Proving recovered baseline verification fails closed on a false claim"
+  if helm upgrade "$RESTORE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --reuse-values \
+    --set-string bootstrap.targetBaseline.sha256=0000000000000000000000000000000000000000000000000000000000000000; then
+    echo "[e2e] Recovered database accepted caller-asserted target-baseline provenance" >&2
+    exit 1
+  fi
+  kubectl logs "job/${RESTORE_DB_RELEASE_NAME}-database-privileges" \
+    -n "$NAMESPACE" \
+    -c opencrane-privileges \
+    >"$baseline_mismatch_log"
+  grep -q "records baseline '$OPENCRANE_BASELINE_SHA256'" "$baseline_mismatch_log"
+  helm upgrade "$RESTORE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
+    --namespace "$NAMESPACE" \
+    --reuse-values \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256"
+  rm -f "$baseline_mismatch_log"
+
   _publish_restored_connection() {
     local credentials_secret="$1"
     local app_secret="$2"

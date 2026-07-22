@@ -273,7 +273,8 @@ Cluster from the physical backup, then deploy the application version that produ
 Do not run `prisma db push`, an incremental SQL script, or a previous application image against the
 current database. If the target baseline changed, recreate from an empty database or restore a
 compatible physical backup. The deploy command fails when an existing Cluster was created from a
-different baseline.
+different baseline by comparing the release digest with a protected marker restored inside the
+database, not with caller-supplied recovery metadata.
 :::
 
 The repository's k3d acceptance path demonstrates the supported sequence end to end: create the

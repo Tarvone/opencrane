@@ -82,6 +82,8 @@ package imports it.
 - `crds.install` — defaults `true` (standalone: this chart installs the ClusterTenant/Tenant/AccessPolicy
   CRDs); set `false` when running under a fleet that installs its own CRDs.
 - Reusable environment/multi-instance profiles live under `values/` and `platform/values/`.
+- `npx nx run deploy-k8s:test` renders the silo chart and verifies that the non-root server can read
+  projected ArtifactStore keys through its declared uid/gid and `fsGroup` contract.
 
 ## Sub-docs (the deep detail)
 

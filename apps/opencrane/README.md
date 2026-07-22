@@ -105,7 +105,8 @@ import back into it.
 Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, and one app-owned
 target database definition at `prisma/bootstrap/target-baseline.sql`. CloudNativePG applies that SQL
 once, during `initdb` for an empty database, as the configured application owner. Physical recovery
-uses the schema already stored in the backup, and server startup never mutates database shape.
+uses the schema and protected baseline marker already stored in the backup; the database hook checks
+that marker before the server release may proceed. Server startup never mutates database shape.
 OpenCrane does not carry an upgrade or data-conversion path from an older product schema. The runs
 slice binds every `AgentRun` to exactly one immutable `RunInputSnapshot` by run, digest, thread,
 silo, service, revision and effective-contract coordinates, and commits its initial acceptance and
@@ -141,6 +142,8 @@ Built into `dist/apps/opencrane` by esbuild and imaged from `deploy/Dockerfile`
 (`ghcr.io/italanta/opencrane-server`), with the repository root as build context. Its Helm chart under
 `helm/` is a named-template library (Deployment, RBAC, Services, ingress, certificate, NetworkPolicy)
 composed by the silo umbrella chart — see [`HELM.md`](./HELM.md).
+The pod runs as uid/gid 1000 with `fsGroup: 1000`; projected ArtifactStore key files use mode `0440`,
+so the non-root server can read its private lease key without making that key world-readable.
 
 ## See also
 

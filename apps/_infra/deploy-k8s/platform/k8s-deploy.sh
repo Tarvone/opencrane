@@ -653,13 +653,13 @@ _require_postgres_bootstrap database-admin "$POSTGRES_ADMIN_CREDENTIALS_SECRET" 
 POSTGRES_RELEASE="${RELEASE}-postgres"
 if kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" >/dev/null 2>&1; then
   POSTGRES_BASELINE_CONFIG_MAP="$(bash "$POSTGRES_BASELINE_PUBLISHER" "$NAMESPACE" "$POSTGRES_OWNER" "$POSTGRES_BASELINE_FILE" --verify-only)"
-  installed_baseline="$(kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.opencrane\.ai/database-baseline-config-map}')"
-  if [[ "$installed_baseline" != "$POSTGRES_BASELINE_CONFIG_MAP" ]]; then
-    err "PostgreSQL '$POSTGRES_RELEASE' was not created from target baseline '$POSTGRES_BASELINE_CONFIG_MAP'. Recreate it from a clean database or restore a compatible physical backup; OpenCrane does not migrate existing schemas."
-    exit 1
-  fi
 else
   POSTGRES_BASELINE_CONFIG_MAP="$(bash "$POSTGRES_BASELINE_PUBLISHER" "$NAMESPACE" "$POSTGRES_OWNER" "$POSTGRES_BASELINE_FILE")"
+fi
+POSTGRES_BASELINE_SHA256="$(kubectl get configmap "$POSTGRES_BASELINE_CONFIG_MAP" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
+if [[ ! "$POSTGRES_BASELINE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  err "PostgreSQL target baseline '$POSTGRES_BASELINE_CONFIG_MAP' has no valid full SHA-256 identity."
+  exit 1
 fi
 _install_postgres_server() {
   local client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
@@ -673,6 +673,7 @@ _install_postgres_server() {
     --set-json "databases=$databases_json"
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME"
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET"
+    --set-string "bootstrap.targetBaseline.sha256=$POSTGRES_BASELINE_SHA256"
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$POSTGRES_BASELINE_CONFIG_MAP"
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql"
     --set-json "networkPolicy.clientPodSelectors=$client_selectors_json")
@@ -685,12 +686,6 @@ _install_postgres_server() {
   log "Reconciling PostgreSQL server against target baseline '$POSTGRES_BASELINE_CONFIG_MAP'…"
   helm "${postgres_args[@]}"
   kubectl wait --for=condition=Ready "cluster/${POSTGRES_RELEASE}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
-  local reconciled_baseline
-  reconciled_baseline="$(kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.opencrane\.ai/database-baseline-config-map}')"
-  if [[ "$reconciled_baseline" != "$POSTGRES_BASELINE_CONFIG_MAP" ]]; then
-    err "PostgreSQL '$POSTGRES_RELEASE' restored baseline '$reconciled_baseline', but this release requires '$POSTGRES_BASELINE_CONFIG_MAP'. Restore a compatible physical backup or recreate the database; OpenCrane does not migrate schemas."
-    exit 1
-  fi
   # CNPG Pooler resources do not publish a Kubernetes Ready condition; the managed Deployment does.
   kubectl wait --for=create "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
   kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"

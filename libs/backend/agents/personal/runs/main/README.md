@@ -31,9 +31,11 @@ package's admission boundary)* · [conversations](../../conversations/main/READM
 run's ordered user-visible events)* · dispatcher *(polls the outbox and launches the workload)*
 
 Initial admission serialises the silo and request idempotency key before compiling any mutable
-input. A duplicate request therefore returns the first durable snapshot instead of recompiling at a
-later time. A new request locks the AgentService, lets the session assembler revalidate every input
-inside that transaction, and commits the `AgentRun`, its only `RunInputSnapshot`, and the ordered
+input. A duplicate returns the first durable snapshot only when the AgentService, conversation
+thread and signed execution subject are the same; an interactive run also proves that its delegated
+user is that exact subject. A same-silo key from any other authority scope fails closed without
+exposing a run. A new request locks the AgentService, lets the session assembler
+revalidate every input inside that transaction, and commits the `AgentRun`, its only `RunInputSnapshot`, and the ordered
 `RunAccepted` and `RunAttemptRequested` outbox events together. The canonical digest covers every
 snapshot field except its own digest.
 

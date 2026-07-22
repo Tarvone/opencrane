@@ -39,7 +39,7 @@ function _dependencies(): ChannelTargetResolutionDependencies
 /** Constructs the common workload-authenticated browser request. */
 function _command(action: "command.forward" | "events.read" = "events.read")
 {
-	return { workloadToken: "projected-token", cookie: "session=opaque", delegatedAuthorization: "Bearer browser-token", trustedHost: "acme.example.com", action, threadId: "thread-1" } as const;
+	return { workloadToken: "projected-token", cookie: "session=opaque", delegatedAuthorization: "Bearer browser-token", trustedHost: "acme.example.com", action, threadId: "thread-1", requestIdempotencyKey: action === "command.forward" ? "delivery-1" : undefined } as const;
 }
 
 describe("channel target resolution", () =>
@@ -104,6 +104,33 @@ describe("channel target resolution", () =>
 		expect(requiredActions).toEqual(["agent.run.start", "thread.message.create"]);
 		expect(result).toEqual({ outcome: "denied", reason: "run_unavailable" });
 		expect(issue).not.toHaveBeenCalled();
+	});
+
+	it("requires a transport idempotency key before a command may create a durable run", async function _RequiresCommandDeliveryKey()
+	{
+		const dependencies = _dependencies();
+		const runStart = vi.spyOn(dependencies.runStart, "prepareInteractiveRun");
+
+		const result = await __ResolveChannelTarget(dependencies, { ..._command("command.forward"), requestIdempotencyKey: undefined });
+
+		expect(result).toEqual({ outcome: "denied", reason: "invalid_request" });
+		expect(runStart).not.toHaveBeenCalled();
+	});
+
+	it("passes the accepted transport delivery key to the durable run-start authority", async function _BindsCommandDeliveryKey()
+	{
+		const dependencies = _dependencies();
+		let prepared: unknown;
+		dependencies.runStart.prepareInteractiveRun = async function _prepare(command)
+		{
+			prepared = command;
+			return { outcome: "ready", runId: "run-1" };
+		};
+
+		const result = await __ResolveChannelTarget(dependencies, _command("command.forward"));
+
+		expect(result.outcome).toBe("authorized");
+		expect(prepared).toMatchObject({ threadId: "thread-1", requestIdempotencyKey: "delivery-1" });
 	});
 
 	it("fails closed when the thread is outside the host silo or subject participation", async () =>

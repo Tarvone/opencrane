@@ -38,6 +38,10 @@ customer's isolated tenancy) and a current signed membership; requires an active
 same silo and participant; and only then authorizes the full action set. A forwarded command also
 requires a real, ready run before a target is issued.
 
+For commands, the proxy also supplies a canonical thread id and an opaque transport idempotency key.
+The run-start authority must bind that key to the durable command before creating or reusing a run; the
+resolver never accepts a command route that lacks either coordinate.
+
 Invariant: it stores only the *digest* of the invocation context, never the token itself, and the
 context expires at the sooner of its configured lifetime or the membership's own expiry. The issued
 endpoint must be a credential-free HTTP(S) address inside a configured internal DNS suffix. Every

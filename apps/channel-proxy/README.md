@@ -54,6 +54,10 @@ bounded `SIGTERM`/`SIGINT` shutdown that drains in-flight requests and flushes t
 HTTP endpoints served: `POST /v1/commands` (bounded command forwarding), `GET /v1/events`
 (server-sent-event relay), and `/livez` · `/readyz` health probes. Any other path is `404`.
 
+Commands are JSON envelopes that include an opaque `threadId` and use the standard `Idempotency-Key`
+request header. The proxy validates those routing coordinates before asking OpenCrane to authorize a
+target; it otherwise leaves the command payload uninterpreted.
+
 ## Boundary
 
 Stateless and product-logic-free: it holds no database and no session, and consumers behind it (the

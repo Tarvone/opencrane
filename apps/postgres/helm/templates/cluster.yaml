@@ -59,6 +59,7 @@
 {{- if or (not $baselineConfigMapRef.name) (not $baselineConfigMapRef.key) -}}
 {{- fail "the initdb target baseline ConfigMap reference requires name and key" -}}
 {{- end -}}
+{{- end -}}
 {{- if and .Values.pooler.enabled (lt (int .Values.postgresql.maxConnections) 1) -}}
 {{- fail "postgresql.maxConnections must be positive when the pooler is enabled" -}}
 {{- end -}}

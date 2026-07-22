@@ -210,7 +210,8 @@ function _install_postgres_server()
     --set "networkPolicy.operatorNamespace=$NAMESPACE" \
     --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
   kubectl wait --for=condition=Ready "cluster/$POSTGRES_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
-  kubectl wait --for=condition=Ready "pooler/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  kubectl wait --for=create "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   for database_resource in fleet obot litellm langfuse; do
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${POSTGRES_RELEASE_NAME}-${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   done

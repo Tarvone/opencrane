@@ -21,12 +21,12 @@ if grep -Fq 'langfuse.postgresql.host=${POSTGRES_RELEASE}-rw.' "$DEPLOY_SCRIPT";
   exit 1
 fi
 
-grep -Fq 'pooler/${OPENCRANE_DB_RELEASE_NAME}-pooler' "$K3D_E2E_SCRIPT"
-grep -Fq 'pooler/${RESTORE_DB_RELEASE_NAME}-pooler' "$K3D_E2E_SCRIPT"
+grep -Fq 'deployment/${OPENCRANE_DB_RELEASE_NAME}-pooler' "$K3D_E2E_SCRIPT"
+grep -Fq 'deployment/${RESTORE_DB_RELEASE_NAME}-pooler' "$K3D_E2E_SCRIPT"
 grep -Fq '"${OPENCRANE_DB_RELEASE_NAME}-pooler" "$database_name"' "$K3D_E2E_SCRIPT"
 grep -Fq '"${RESTORE_DB_RELEASE_NAME}-pooler" "$database_name"' "$K3D_E2E_SCRIPT"
 grep -Fq 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}}' "$K3D_E2E_SCRIPT"
-grep -Fq 'pooler/${POSTGRES_RELEASE_NAME}-pooler' "$K3D_LOCAL_SCRIPT"
+grep -Fq 'deployment/${POSTGRES_RELEASE_NAME}-pooler' "$K3D_LOCAL_SCRIPT"
 grep -Fq '"${POSTGRES_RELEASE_NAME}-pooler" "$database_name"' "$K3D_LOCAL_SCRIPT"
 
 echo "pooler deploy contract: PASS"

@@ -691,7 +691,9 @@ _install_postgres_server() {
     err "PostgreSQL '$POSTGRES_RELEASE' restored baseline '$reconciled_baseline', but this release requires '$POSTGRES_BASELINE_CONFIG_MAP'. Restore a compatible physical backup or recreate the database; OpenCrane does not migrate schemas."
     exit 1
   fi
-  kubectl wait --for=condition=Ready "pooler/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
+  # CNPG Pooler resources do not publish a Kubernetes Ready condition; the managed Deployment does.
+  kubectl wait --for=create "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
+  kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
   for database_resource in "${POSTGRES_RELEASE}-obot" "${POSTGRES_RELEASE}-litellm" "${POSTGRES_RELEASE}-langfuse"; do
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
   done

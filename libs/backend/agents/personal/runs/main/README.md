@@ -16,6 +16,7 @@ use, then governs later attempts without changing the logical run or its frozen 
  ┌──────────────────────────────────────────┐
  │   runs  ◄── HERE                          │  run + one snapshot + ordered outbox
  │   · PrismaRunAdmissionRepository          │  duplicate returns the first snapshot
+ │   · PrismaRunCancellationRepository       │  fence first; clean exact Job; then terminal
  │   · __StartNextRunAttempt                 │  terminal run: attempt N → N+1
  │   · __ValidateRunWorkloadAssignment       │  Job/Pod identity == current attempt?
  └──────────────────────────────────────────┘
@@ -71,6 +72,21 @@ signed fleet-membership evidence they rely on. That absolute expiry is sealed in
 outbox payload and projected back to the controller, so delayed release cannot restart the full
 profile lifetime after some assignment authority has already elapsed.
 
+Cancellation is deliberately two-stage. The request transaction first enters `Cancelling`, revokes
+the current assignment and proof key, closes pending approvals through the authorization domain,
+and fails any unpublished dispatch or release command. It then records both the cancellation intent
+and any physical cleanup still required. A committed assignment yields an `assigned` cleanup claim
+with its immutable Kubernetes UID. If the controller may have created a suspended Job just before
+the database fence won, an `unassigned_orphan` claim becomes available only after the dispatch lease
+and request margin; the cleaner must reconstruct and exactly compare that suspended Job before it
+may adopt the API UID for deletion. If no controller claim ever left Postgres, the locked failed
+attempt event proves no Job can exist and cancellation can finish immediately. Only confirmed
+deletion or authoritative absence moves `Cancelling` to `Cancelled` and emits `run.cancelled`.
+
+Poisoned or expired release authority uses the same generic cleanup event after failing the run, so
+physical residue is not confused with user cancellation and a suspended Job is never left for an
+inapplicable terminal TTL to discover.
+
 Invariant: a logical run either commits with exactly one digest-sealed snapshot and its dispatch
 event, or does not exist. Retries retain that run and snapshot identity, attempts only move forward
 under optimistic concurrency, and any authority, membership, workload, lease, or persistence
@@ -90,6 +106,10 @@ uncertainty fails closed.
 - `PrismaAgentRunAuthorityRepository` — the Prisma-backed adapter implementing the persistence port (atomic retry + outbox append).
 - `PrismaRunDispatchRepository` — claim an attempt, commit its suspended Job and bootstrap, then
   claim release work and register exactly one first Pod.
+- `PrismaRunCancellationRepository` — atomically fence one exact attempt, issue assigned or delayed
+  orphan cleanup authority, lease that cleanup, and finalise cancellation only after confirmation.
+- `RequestRunCancellation*`, `RunWorkloadCleanup*`, and `ConfirmRunWorkloadCleanup*` — the typed
+  lifecycle, lease, server-derived Job projection, and physical-evidence outcomes.
 - `__CreateAgentControllerRunDispatchRouter` — projected-token-authenticated internal assignment and
   release API for the fixed `agent-controller` ServiceAccount.
 - `RunDispatchRepository` / `AgentControllerTokenReviewer` — persistence and TokenReview ports used by that internal API.
@@ -102,11 +122,14 @@ uncertainty fails closed.
 ## Boundary
 
 Consumed by the [session assembler](../../session/main/README.md), run-dispatch and workload-
-admission paths. It does not choose persona, memory, tools, budgets or membership evidence; session
-supplies those through the transaction callback. It does not run the agent, create/unsuspend the Job,
-or expose the private input snapshot to the controller. It does not treat the bootstrap reference as
-a credential and does not inspect Kubernetes itself. It owns only durable admission, attempts,
-dispatch leases, assignment integrity, release delivery and first-Pod registration.
+admission, cancellation, and cleanup-authority paths. It does not choose persona, memory, tools,
+budgets or membership evidence; session supplies those through the transaction callback. It does
+not run the agent, create/unsuspend the Job, or expose the private input snapshot to the
+controller. It does not treat the bootstrap reference as a credential and does not inspect
+Kubernetes itself. It owns only durable admission, attempts, dispatch leases, assignment
+integrity, release delivery, first-Pod registration, cancellation fencing, and cleanup
+confirmation. Kubernetes inspection and mutation remain in dedicated runtime processes; this
+package only says which exact work may be removed.
 
 ## Dependency direction
 
@@ -123,6 +146,8 @@ the immutable `WorkloadAssignment` and `WorkloadBootstrap`, advances the run to 
 one `RunWorkloadReleaseRequested` event for that attempt, and publishes only the attempt event in one
 transaction. First-Pod registration publishes the release event atomically, leaving no gap where a
 Pod is trusted but its release command can be reclaimed.
+Cancellation reuses the same outbox with `RunCancellationRequested` and
+`RunWorkloadCleanupRequested`; no second cleanup queue or revocation authority exists.
 
 ## See also
 

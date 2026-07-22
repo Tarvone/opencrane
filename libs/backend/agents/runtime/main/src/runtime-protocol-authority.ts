@@ -1,6 +1,6 @@
 import { AGENT_RUNTIME_PROTOCOL_V1 } from "@opencrane/contracts";
 
-import type { RuntimeCandidateAdmission, RuntimeCandidateAdmissionInput, RuntimeCommandAdmission, RuntimeCommandAdmissionInput } from "./runtime-protocol-authority.types.js";
+import type { RuntimeAdmissionRunState, RuntimeCandidateAdmission, RuntimeCandidateAdmissionInput, RuntimeCommandAdmission, RuntimeCommandAdmissionInput } from "./runtime-protocol-authority.types.js";
 
 /** Returns whether a runtime identifier is structurally usable at a security boundary. */
 function _hasIdentifier(value: unknown): value is string
@@ -12,6 +12,16 @@ function _hasIdentifier(value: unknown): value is string
 function _hasPositiveCounter(value: unknown): value is number
 {
 	return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+/** Returns whether the durable run lifecycle has closed all new runtime admission. */
+function _isTerminalForAdmission(state: RuntimeAdmissionRunState): boolean
+{
+	return state !== "accepted"
+		&& state !== "queued"
+		&& state !== "assigned"
+		&& state !== "running"
+		&& state !== "waiting_for_approval";
 }
 
 /**
@@ -48,7 +58,7 @@ export function __AdmitRuntimeCommand(input: RuntimeCommandAdmissionInput): Runt
 	if (nowEpochMs < issuedAtEpochMs) return { outcome: "denied", reason: "not_yet_valid" };
 	if (nowEpochMs >= expiresAtEpochMs || nowEpochMs >= assignmentExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
 	if (!Number.isSafeInteger(authority.leaseExpiresAtEpochMs) || nowEpochMs >= authority.leaseExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
-	if (authority.terminal) return { outcome: "denied", reason: "terminal_run" };
+	if (_isTerminalForAdmission(authority.runState)) return { outcome: "denied", reason: "terminal_run" };
 
 	// 2. Bind the stream frame to the dispatch-time assignment and current attempt lease.
 	if (command.assignment.runId !== authority.runId || command.assignment.attempt !== authority.attempt || command.assignment.assignmentDigest !== authority.assignmentDigest)
@@ -84,7 +94,7 @@ export function __AdmitRuntimeCandidate(input: RuntimeCandidateAdmissionInput): 
 		return { outcome: "denied", reason: "invalid_candidate" };
 	}
 	if (candidate.protocolVersion !== AGENT_RUNTIME_PROTOCOL_V1) return { outcome: "denied", reason: "unsupported_protocol" };
-	if (authority.terminal) return { outcome: "denied", reason: "terminal_run" };
+	if (_isTerminalForAdmission(authority.runState)) return { outcome: "denied", reason: "terminal_run" };
 	if (!Number.isSafeInteger(authority.leaseExpiresAtEpochMs) || input.clock.nowEpochMs() >= authority.leaseExpiresAtEpochMs) return { outcome: "denied", reason: "expired" };
 
 	// 2. Require the exact current stream and attempt rather than accepting a stale runtime reconnect.

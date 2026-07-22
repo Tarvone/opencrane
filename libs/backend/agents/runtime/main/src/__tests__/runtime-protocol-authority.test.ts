@@ -18,7 +18,7 @@ function _authority(): RuntimeAttemptAuthority
 		acceptedCommandIds: [],
 		acceptedCandidateIds: [],
 		leaseExpiresAtEpochMs: Date.parse("2026-07-20T00:05:00.000Z"),
-		terminal: false,
+		runState: "running",
 	};
 }
 
@@ -52,6 +52,12 @@ function _command(): RuntimeStartAttemptCommand
 function _candidate(): RuntimeCandidate
 {
 	return { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId: "runtime-1", commandId: "command-1", candidateId: "candidate-1", runId: "run-1", attempt: 2, fence: 7, kind: "event", eventType: "run.started", payload: {} };
+}
+
+/** Returns a valid external-action candidate for the current authority. */
+function _actionCandidate(): RuntimeCandidate
+{
+	return { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId: "runtime-1", commandId: "command-1", candidateId: "action-1", runId: "run-1", attempt: 2, fence: 7, kind: "external_action", toolRevisionId: "tool-1", toolInvocationId: "invocation-1", argumentsDigest: "sha256:arguments", arguments: {} };
 }
 
 describe("runtime protocol authority", function _describeRuntimeProtocolAuthority()
@@ -95,6 +101,16 @@ describe("runtime protocol authority", function _describeRuntimeProtocolAuthorit
 	{
 		const authority = { ..._authority(), leaseExpiresAtEpochMs: Date.parse("2026-07-20T00:01:00.000Z") };
 		expect(__AdmitRuntimeCommand({ authority, command: _command(), clock: { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } } })).toEqual({ outcome: "denied", reason: "expired" });
+	});
+
+	it.each(["cancelling", "completed", "failed", "cancelled"] as const)("uses terminal_run denial for commands and candidates while the run is %s", function _rejectsClosedRunState(runState)
+	{
+		const authority = { ..._authority(), runState, acceptedCommandIds: ["command-1"] };
+		const clock = { nowEpochMs: function _nowEpochMs(): number { return Date.parse("2026-07-20T00:01:00.000Z"); } };
+
+		expect(__AdmitRuntimeCommand({ authority, command: _command(), clock })).toEqual({ outcome: "denied", reason: "terminal_run" });
+		expect(__AdmitRuntimeCandidate({ authority, candidate: _candidate(), clock })).toEqual({ outcome: "denied", reason: "terminal_run" });
+		expect(__AdmitRuntimeCandidate({ authority, candidate: _actionCandidate(), clock })).toEqual({ outcome: "denied", reason: "terminal_run" });
 	});
 
 	it("rejects a command after its assignment expires before the attempt lease", function _rejectsExpiredAssignment()

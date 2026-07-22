@@ -104,9 +104,14 @@ the outbound-only runtime process, the suspended one-Job-per-attempt resource co
 crash-safe controller boundary that exactly creates/adopts suspended Jobs before persisting their
 Kubernetes UID as the pending assignment. This dependent slice adds a durable release claim,
 conditionally unsuspends only that assigned Job, and records its unique first Pod before bootstrap
-exchange can begin. Bootstrap exchange, cancellation-owned cleanup of abandoned suspended Jobs,
-runtime command dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
-capabilities below are not complete yet.
+exchange can begin. A further dependent slice adds cancellation-owned cleanup of abandoned
+suspended Jobs: a nonterminal `Cancelling` run state fences the current assignment, proof key, and
+pending approvals before any Job is touched; `PrismaRunCancellationRepository` then issues an
+assigned or delayed-orphan cleanup claim, and only its confirmed deletion or authoritative absence
+moves the run to `Cancelled`. The runtime protocol and channel-target admission fences close on
+`cancelling` the same way they close on a terminal state. Bootstrap exchange, runtime command
+dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product capabilities below
+are not complete yet.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
 `RunInputSnapshot`, the prompt compiler, independently authored target fixtures, toolkit conformance

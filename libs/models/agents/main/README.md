@@ -17,15 +17,18 @@ It owns two kinds of thing:
 - **Pure decision functions** over those types:
   - `state-transitions` holds the small lookup tables of which state may legally follow which (for
     example a run may go `running → completed` but never `completed → running`), and answers a plain
-    yes/no for a proposed move. It also checks that persisted run events form one gap-free sequence.
+    yes/no for a proposed move. Cancellation is deliberately two-phase: every active state moves to
+    nonterminal `cancelling`, and only completed workload cleanup may move it to `cancelled`. It also
+    checks that persisted run events form one gap-free sequence.
   - `persona-onboarding` turns a draft persona into an approved, runnable one: it validates the
     interview question set, checks every required category is answered, selects a template, and
     builds the runtime input — returning a typed success/failure result, never throwing.
 
 Used by the agent-services backend, the personal-agent backends, and re-exported through
 `@opencrane/contracts`. Invariant: transitions are **fail-closed** — only an explicitly listed next
-state is allowed, and an incompletely evidenced persona can never be approved. Because it is pure,
-the caller owns all persistence; a wrong answer here can only refuse a legal move, never invent one.
+state is allowed, cancellation cannot skip cleanup, and an incompletely evidenced persona can never
+be approved. Because it is pure, the caller owns all persistence; a wrong answer here can only refuse
+a legal move, never invent one.
 
 ## Public surface
 

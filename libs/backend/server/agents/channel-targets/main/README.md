@@ -43,6 +43,8 @@ context expires at the sooner of its configured lifetime or the membership's own
 endpoint must be a credential-free HTTP(S) address inside a configured internal DNS suffix. Every
 check is fail-closed: a missing, altered, or expired fact yields a `denied` outcome with a stable
 reason, and a mistake here can only ever refuse a legitimate request — never over-grant.
+Once a run enters `cancelling`, both new command contexts and previously issued, unconsumed command
+contexts are refused immediately; physical Job cleanup does not keep browser command authority open.
 
 ## Public surface
 

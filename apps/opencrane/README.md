@@ -97,6 +97,10 @@ OpenCrane does not carry an upgrade or data-conversion path from an older produc
 slice binds every `AgentRun` to exactly one immutable `RunInputSnapshot` by run, digest, thread,
 silo, service, revision and effective-contract coordinates, and commits its initial acceptance and
 dispatch events in the same transaction. A partial or mismatched admission cannot commit.
+Cancellation is a nonterminal cleanup phase: active runs first enter `cancelling`, cannot mint
+bootstrap or proof authority there, and become `cancelled` only after exact workload cleanup records
+the matching terminal event. Pending approvals close without resume authority even if their expiry
+sweeper has not yet run.
 
 ## Runtime & config
 

@@ -333,7 +333,7 @@ describe("PrismaRunDispatchRepository", function _DescribeDispatchRepository()
 		const expiredTransaction = {
 			$queryRaw: expiredQueryRaw,
 			agentRun: { findUnique: vi.fn().mockResolvedValue({ ..._Run(), state: AgentRunState.Assigned }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
-			outboxEvent: { findUnique: vi.fn().mockResolvedValue(expiredEvent), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+			outboxEvent: { findUnique: vi.fn().mockResolvedValue(expiredEvent), updateMany: vi.fn().mockResolvedValue({ count: 1 }), aggregate: vi.fn().mockResolvedValue({ _max: { sequence: 3 } }), create: vi.fn().mockResolvedValue({}) },
 			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(expiredAssignment), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
 			workloadBootstrap: { findUnique: vi.fn().mockResolvedValue(expiredBootstrap) },
 			conversationRunEvent: { aggregate: vi.fn().mockResolvedValue({ _max: { sequence: 4 } }), create: vi.fn().mockResolvedValue({}) },
@@ -350,7 +350,7 @@ describe("PrismaRunDispatchRepository", function _DescribeDispatchRepository()
 		const laterTransaction = {
 			$queryRaw: laterQueryRaw,
 			agentRun: { findUnique: vi.fn().mockResolvedValue({ ..._Run(), id: "run-2", state: AgentRunState.Assigned }), updateMany: vi.fn() },
-			outboxEvent: { findUnique: vi.fn().mockResolvedValue(laterEvent), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+			outboxEvent: { findUnique: vi.fn().mockResolvedValue(laterEvent), updateMany: vi.fn().mockResolvedValue({ count: 1 }), aggregate: vi.fn(), create: vi.fn() },
 			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(laterAssignment), updateMany: vi.fn() },
 			workloadBootstrap: { findUnique: vi.fn().mockResolvedValue(laterBootstrap) },
 			conversationRunEvent: { aggregate: vi.fn(), create: vi.fn() },
@@ -363,6 +363,7 @@ describe("PrismaRunDispatchRepository", function _DescribeDispatchRepository()
 		expect(expiredTransaction.workloadAssignment.updateMany).toHaveBeenCalledOnce();
 		expect(expiredTransaction.agentRun.updateMany).toHaveBeenCalledOnce();
 		expect(expiredTransaction.outboxEvent.updateMany).toHaveBeenCalledWith({ where: { id: "release-expired", claimedAt: null, deliveryCount: 0, publishedAt: null, failedAt: null }, data: { claimedAt: now, deliveryCount: 1, failedAt: now, failureCode: "RUN_WORKLOAD_RELEASE_AUTHORITY_EXPIRED" } });
+		expect(expiredTransaction.outboxEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: RunOutboxEventKind.RunWorkloadCleanupRequested, payload: expect.objectContaining({ mode: "assigned", reason: "dispatch_failure", workloadUid: "job-uid-1" }) }) });
 
 		await expect(repository.claimNextWorkloadReleaseAtomically()).resolves.toMatchObject({ status: "claimed", claim: { lease: { eventId: "release-valid" }, workload: { runId: "run-2" } } });
 		expect(laterTransaction.outboxEvent.updateMany).toHaveBeenCalledOnce();
@@ -384,7 +385,7 @@ describe("PrismaRunDispatchRepository", function _DescribeDispatchRepository()
 		const transaction = {
 			$queryRaw: queryRaw,
 			agentRun: { findUnique: vi.fn().mockResolvedValue(run), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
-			outboxEvent: { findUnique: vi.fn().mockResolvedValue(event), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+			outboxEvent: { findUnique: vi.fn().mockResolvedValue(event), updateMany: vi.fn().mockResolvedValue({ count: 1 }), aggregate: vi.fn().mockResolvedValue({ _max: { sequence: 3 } }), create: vi.fn().mockResolvedValue({}) },
 			workloadAssignment: { findUnique: vi.fn().mockResolvedValue(_Assignment()), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
 			workloadBootstrap: { findUnique: vi.fn().mockResolvedValue(_Bootstrap({ claimDigest: `sha256:${"0".repeat(64)}` })) },
 			conversationRunEvent: { aggregate: vi.fn().mockResolvedValue({ _max: { sequence: 4 } }), create: vi.fn().mockResolvedValue({}) },
@@ -404,6 +405,7 @@ describe("PrismaRunDispatchRepository", function _DescribeDispatchRepository()
 		});
 		expect(transaction.workloadAssignment.updateMany).toHaveBeenCalledWith({ where: { runId: "run-1", attempt: 1, state: WorkloadAssignmentState.PendingPod, podUid: null }, data: { state: WorkloadAssignmentState.Revoked, revokedAt: new Date("2026-07-20T00:20:00.000Z") } });
 		expect(transaction.agentRun.updateMany).toHaveBeenCalledWith({ where: { id: "run-1", attempt: 1, state: AgentRunState.Assigned }, data: { state: AgentRunState.Failed, terminalReason: AgentRunTerminalReason.RuntimeFailure, finishedAt: new Date("2026-07-20T00:20:00.000Z") } });
+		expect(transaction.outboxEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: RunOutboxEventKind.RunWorkloadCleanupRequested, payload: expect.objectContaining({ mode: "assigned", reason: "dispatch_failure", workloadUid: "job-uid-1" }) }) });
 		expect(transaction.conversationRunEvent.create).toHaveBeenCalledWith({ data: { runId: "run-1", sequence: 5, type: "run.failed", payload: { terminalReason: "runtime_failure", failureCode: "RUN_WORKLOAD_RELEASE_INTEGRITY_INVALID" }, occurredAt: new Date("2026-07-20T00:20:00.000Z") } });
 	});
 

@@ -158,7 +158,7 @@ CREATE TYPE "ThirdPartySourceItemKind" AS ENUM ('mcp-server');
 CREATE TYPE "AgentRunTrigger" AS ENUM ('interactive', 'schedule', 'managed_invocation');
 
 -- CreateEnum
-CREATE TYPE "AgentRunState" AS ENUM ('accepted', 'queued', 'assigned', 'running', 'waiting_for_approval', 'completed', 'failed', 'cancelled');
+CREATE TYPE "AgentRunState" AS ENUM ('accepted', 'queued', 'assigned', 'running', 'waiting_for_approval', 'cancelling', 'completed', 'failed', 'cancelled');
 
 -- CreateEnum
 CREATE TYPE "AgentRunTerminalReason" AS ENUM ('success', 'user_cancelled', 'policy_denied', 'budget_exhausted', 'runtime_failure', 'invalid_input');
@@ -170,7 +170,7 @@ CREATE TYPE "WorkloadAssignmentState" AS ENUM ('pending_pod', 'registered', 'rev
 CREATE TYPE "WorkloadKind" AS ENUM ('job', 'deployment');
 
 -- CreateEnum
-CREATE TYPE "RunOutboxEventKind" AS ENUM ('run.accepted', 'run.attempt_requested', 'run.workload_release_requested', 'run.cancellation_requested', 'run.resume_requested');
+CREATE TYPE "RunOutboxEventKind" AS ENUM ('run.accepted', 'run.attempt_requested', 'run.workload_release_requested', 'run.workload_cleanup_requested', 'run.cancellation_requested', 'run.resume_requested');
 
 -- CreateEnum
 CREATE TYPE "SkillState" AS ENUM ('active', 'retired');
@@ -2560,6 +2560,9 @@ BEGIN
 END;
 $$;
 CREATE FUNCTION "enforce_agent_run_authority_update"() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    assignment_exists BOOLEAN;
+    attempt_event_claimed_at TIMESTAMP(3);
 BEGIN
     IF NEW."id" IS DISTINCT FROM OLD."id" OR NEW."silo_id" IS DISTINCT FROM OLD."silo_id"
         OR NEW."agent_service_id" IS DISTINCT FROM OLD."agent_service_id"
@@ -2590,13 +2593,56 @@ BEGIN
             RAISE EXCEPTION 'terminal AgentRun attempt coordinates are immutable';
         END IF;
         IF NEW."state" IS DISTINCT FROM OLD."state" AND NOT (
-            (OLD."state" = 'accepted' AND NEW."state" IN ('queued', 'failed', 'cancelled')) OR
-            (OLD."state" = 'queued' AND NEW."state" IN ('assigned', 'failed', 'cancelled')) OR
-            (OLD."state" = 'assigned' AND NEW."state" IN ('running', 'failed', 'cancelled')) OR
-            (OLD."state" = 'running' AND NEW."state" IN ('waiting_for_approval', 'completed', 'failed', 'cancelled')) OR
-            (OLD."state" = 'waiting_for_approval' AND NEW."state" IN ('running', 'completed', 'failed', 'cancelled'))
+            (OLD."state" = 'accepted' AND NEW."state" IN ('queued', 'failed', 'cancelling')) OR
+            (OLD."state" = 'queued' AND NEW."state" IN ('assigned', 'failed', 'cancelling')) OR
+            (OLD."state" = 'assigned' AND NEW."state" IN ('running', 'failed', 'cancelling')) OR
+            (OLD."state" = 'running' AND NEW."state" IN ('waiting_for_approval', 'completed', 'failed', 'cancelling')) OR
+            (OLD."state" = 'waiting_for_approval' AND NEW."state" IN ('running', 'completed', 'failed', 'cancelling')) OR
+            (OLD."state" = 'cancelling' AND NEW."state" = 'cancelled')
         ) THEN
             RAISE EXCEPTION 'invalid AgentRun state transition';
+        END IF;
+        IF OLD."state" = 'cancelling' AND NEW."state" = 'cancelled' THEN
+            PERFORM 1 FROM "workload_assignments" WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" FOR UPDATE;
+            PERFORM 1 FROM "run_proof_keys" WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" FOR UPDATE;
+            PERFORM 1 FROM "run_outbox_events" WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" FOR UPDATE;
+            IF EXISTS (
+                SELECT 1 FROM "workload_assignments"
+                WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt"
+                  AND "state" IN ('pending_pod'::"WorkloadAssignmentState", 'registered'::"WorkloadAssignmentState")
+            ) THEN
+                RAISE EXCEPTION 'a Cancelled AgentRun requires no current PendingPod or Registered WorkloadAssignment';
+            END IF;
+            IF EXISTS (
+                SELECT 1 FROM "run_proof_keys" WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" AND "revoked_at" IS NULL
+            ) THEN
+                RAISE EXCEPTION 'a Cancelled AgentRun requires every RunProofKey revoked';
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM "run_outbox_events"
+                WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" AND "kind" = 'run.cancellation_requested'::"RunOutboxEventKind"
+            ) THEN
+                RAISE EXCEPTION 'a Cancelled AgentRun requires its RunCancellationRequested event';
+            END IF;
+            IF EXISTS (
+                SELECT 1 FROM "run_outbox_events"
+                WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt"
+                  AND "kind" IN ('run.attempt_requested'::"RunOutboxEventKind", 'run.workload_release_requested'::"RunOutboxEventKind")
+                  AND "published_at" IS NULL AND "failed_at" IS NULL
+            ) THEN
+                RAISE EXCEPTION 'a Cancelled AgentRun requires its attempt and release commands resolved';
+            END IF;
+            SELECT EXISTS (SELECT 1 FROM "workload_assignments" WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt") INTO assignment_exists;
+            SELECT "claimed_at" INTO attempt_event_claimed_at
+            FROM "run_outbox_events"
+            WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" AND "kind" = 'run.attempt_requested'::"RunOutboxEventKind";
+            IF (assignment_exists OR attempt_event_claimed_at IS NOT NULL) AND NOT EXISTS (
+                SELECT 1 FROM "run_outbox_events"
+                WHERE "run_id" = NEW."id" AND "attempt" = NEW."attempt" AND "kind" = 'run.workload_cleanup_requested'::"RunOutboxEventKind"
+                  AND "published_at" IS NOT NULL AND "failed_at" IS NULL
+            ) THEN
+                RAISE EXCEPTION 'a Cancelled AgentRun with possible physical work requires a confirmed WorkloadCleanup';
+            END IF;
         END IF;
         IF OLD."started_at" IS NOT NULL AND NEW."started_at" IS DISTINCT FROM OLD."started_at" THEN
             RAISE EXCEPTION 'AgentRun started_at is immutable once recorded';
@@ -2668,6 +2714,13 @@ BEGIN
         OR NEW."consumed_at" >= OLD."expires_at" OR transition_time >= OLD."expires_at" THEN
         RAISE EXCEPTION 'WorkloadBootstrap must be consumed at a current time before expiry';
     END IF;
+    SELECT "state" INTO run_state
+    FROM "agent_runs"
+    WHERE "id" = NEW."run_id" AND "attempt" = NEW."attempt"
+    FOR UPDATE;
+    IF run_state IS DISTINCT FROM 'assigned'::"AgentRunState" THEN
+        RAISE EXCEPTION 'WorkloadBootstrap consumption requires the current Assigned attempt';
+    END IF;
     SELECT "state", "pod_uid" INTO assignment_state, assignment_pod_uid
     FROM "workload_assignments"
     WHERE "run_id" = NEW."run_id" AND "attempt" = NEW."attempt"
@@ -2680,7 +2733,16 @@ BEGIN
 END;
 $$;
 CREATE FUNCTION "enforce_run_proof_key_bootstrap"() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    run_state "AgentRunState";
 BEGIN
+    SELECT "state" INTO run_state
+    FROM "agent_runs"
+    WHERE "id" = NEW."run_id" AND "attempt" = NEW."attempt"
+    FOR UPDATE;
+    IF run_state IS DISTINCT FROM 'assigned'::"AgentRunState" THEN
+        RAISE EXCEPTION 'RunProofKey requires the current Assigned attempt';
+    END IF;
     IF NOT EXISTS (
         SELECT 1 FROM "workload_bootstraps" WHERE "id" = NEW."bootstrap_id"
         AND "run_id" = NEW."run_id" AND "attempt" = NEW."attempt"
@@ -2893,7 +2955,13 @@ BEGIN
     IF OLD."state" <> 'pending' OR NEW."state" = 'pending' THEN
         RAISE EXCEPTION 'ApprovalRequest may be decided exactly once';
     END IF;
-    NEW."decided_at" := decision_time;
+    IF NEW."state" = 'cancelled' THEN
+        IF NEW."decided_at" IS NULL OR NEW."decided_at" > decision_time OR NEW."decided_at" < OLD."created_at" THEN
+            RAISE EXCEPTION 'ApprovalRequest cancellation requires a caller-supplied decision time between creation and now';
+        END IF;
+    ELSE
+        NEW."decided_at" := decision_time;
+    END IF;
     IF NEW."state" IN ('approved', 'denied') THEN
         SELECT "attempt", "state" INTO current_attempt, current_run_state
         FROM "agent_runs" WHERE "id" = OLD."run_id" FOR UPDATE;
@@ -2919,11 +2987,14 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    IF NEW."state" = 'expired' THEN
+    IF NEW."state" = 'cancelled' THEN
+        NEW."decided_by" := NULL;
+        NEW."resume_token_hash" := NULL;
+    ELSIF NEW."state" = 'expired' THEN
         IF decision_time < OLD."expires_at" THEN
             RAISE EXCEPTION 'ApprovalRequest may expire only after its deadline';
         END IF;
-    ELSIF decision_time >= OLD."expires_at" THEN
+    ELSIF NEW."state" IN ('approved', 'denied') AND decision_time >= OLD."expires_at" THEN
         RAISE EXCEPTION 'ApprovalRequest decisions must be recorded before expiry';
     END IF;
     RETURN NEW;

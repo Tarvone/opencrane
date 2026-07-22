@@ -16,7 +16,8 @@ testing on its own, it belongs in a library, not here.
 | [`opencrane-ui`](./opencrane-ui/README.md) | The org-admin single-page app. |
 | [`channel-proxy`](./channel-proxy/README.md) | The inbound-channel edge trust boundary. |
 | [`artifact-service`](./artifact-service/README.md) | The artifact promote-and-receipt service. |
-| [`agent-runtime`](./agent-runtime/README.md) | Outbound-only personal-agent process designed for one suspended Job per attempt; controller follows next. |
+| [`agent-runtime`](./agent-runtime/README.md) | Outbound-only personal-agent process prepared as one suspended Job per run attempt. |
+| [`agent-controller`](./agent-controller/README.md) | Sole Kubernetes mutator for personal-runtime attempt resources. |
 | [`feat-central-agents`](./feat-central-agents/README.md) | The Slack-to-Cognee ingestion worker. |
 | [`feat-openclaw-tenant`](./feat-openclaw-tenant/README.md) | The OpenClaw tenant runtime image. *(blue/frozen — deletion target)* |
 | [`postgres`](./postgres/README.md) | The durable PostgreSQL deployable. |
@@ -28,7 +29,7 @@ service map.
 ```
    opencrane (control plane) ──serves──► opencrane-ui (SPA)
         │                                  channel-proxy (edge)
-        ├── artifact-service · agent-runtime · feat-central-agents (workers)
+        ├── artifact-service · agent-controller · agent-runtime · feat-central-agents (workers)
         ├── postgres (durable DB)
         └── feat-openclaw-tenant (blue, frozen — dies at retirement)
    apps/_infra/ ── vendored infra + release composer

@@ -52,22 +52,25 @@ provider credentials or mutable source objects.
   provenance rather than a mutable revision counter.
 - `AGENT_RUNTIME_PROTOCOL_V1`, `AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE`,
   `___IsAgentRuntimeServiceAccountName`, `RuntimeStreamOpen`, `RuntimeCommandEnvelope`, and
-  `RuntimeCandidate`
-  — the private workload protocol for a personal-agent process that opens its own authenticated
-  stream to the control plane. The opening frame binds the ephemeral runtime instance to the Pod UID
-  independently verified from its Kubernetes credential. The audience constant fixes workload
-  identity to `opencrane-agent-runtime`, and the shared validator keeps Job issuance and TokenReview
-  admission on one bounded ServiceAccount grammar. Later commands and candidate output retain that
-  identity. These frames are not a browser or OpenAPI contract.
+  `RuntimeCandidate` — the private workload protocol for a personal-agent process that opens its own
+  authenticated stream. The opening frame binds the runtime instance to the Pod UID independently
+  verified from its Kubernetes credential. The audience constant and shared validator keep Job
+  issuance and TokenReview admission on one bounded identity grammar.
+- `AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE`, `AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME`, and
+  `AgentControllerRunAttempt*` — the private controller handshake for claiming one authorised run,
+  reporting the Kubernetes-issued Job identity, and committing that identity under the same database
+  lease. These types deliberately expose only the immutable coordinates needed to create a suspended
+  workload; they never expose the run-input body or give the controller authority to choose a user,
+  revision, namespace, or runtime profile.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary
 
 The one contract surface for public control-plane calls and first-party workload protocols; callers
 import it instead of duplicating wire shapes. It defines types and builds a client — it holds no
-business logic, persistence, or server state. Runtime frames remain private internal contracts;
-external proprietary frontends should generate their client from the released spec (see below)
-rather than importing this package, keeping a clean process/network boundary.
+business logic, persistence, or server state. Runtime and controller frames remain private workload
+contracts rather than public browser endpoints. External proprietary frontends should generate their
+client from the released spec (see below), keeping a clean process/network boundary.
 
 ## Licensing
 

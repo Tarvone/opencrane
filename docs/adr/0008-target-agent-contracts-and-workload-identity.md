@@ -83,7 +83,7 @@ omitted from the network column for brevity.
 | `apps/opencrane` | Control API | `opencrane-api` | none | Postgres, artifact-service, memory-gateway, channel-proxy, agent-controller, Obot, LiteLLM |
 | `apps/opencrane-ui` | Browser bundle | none | none | public HTTPS to opencrane only |
 | `apps/channel-proxy` | Channel trust boundary | `channel-proxy` | none | opencrane, agent-runtime, managed-agent-runtime |
-| `apps/agent-controller` | Sole agent-workload mutator | `agent-controller` | bounded create/watch/patch/delete for target runtime Pods and Jobs only | Kubernetes API, opencrane |
+| `apps/agent-controller` | Sole agent-workload mutator | `agent-controller` | current slice: `get/create` on Jobs and NetworkPolicies; later transitions add only the exact verbs their accepted contracts require | Kubernetes API, opencrane |
 | `apps/artifact-service` | ArtifactStore CAS API and maintenance Jobs | `artifact-service` | none | Postgres and its mounted artifact volume |
 | `apps/memory-gateway` | Scoped memory API | `memory-gateway` | none | Cognee, opencrane |
 | `apps/cognee-indexer` | Artifact-to-memory indexing Job | `cognee-indexer` | none | artifact-service, memory-gateway, Cognee |

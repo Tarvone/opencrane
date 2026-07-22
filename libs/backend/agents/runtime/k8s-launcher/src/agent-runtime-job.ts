@@ -57,6 +57,10 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 	{
 		throw new Error("agent runtime profile requires an immutable image and an in-cluster HTTP stream URL");
 	}
+	if (!["Always", "IfNotPresent", "Never"].includes(profile.imagePullPolicy))
+	{
+		throw new Error("agent runtime profile requires a Kubernetes image pull policy");
+	}
 
 	// 2. Bind the profile to one same-namespace runtime identity class, never a per-user KSA.
 	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !___IsAgentRuntimeServiceAccountName(profile.serviceAccountName))

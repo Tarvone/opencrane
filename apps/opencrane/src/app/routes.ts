@@ -18,8 +18,22 @@ import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/ret
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { _RegisterInternalAgentRuntimeStream, type RuntimeCommandStreamAuthority, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
-import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
+import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
+import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/personal/runs";
+import { ___DoWithTrace } from "@opencrane/observability";
+
+import { _log } from "./log.js";
+
+/** Read a bounded, server-owned seconds setting and return milliseconds. */
+function _ReadBoundedSeconds(name: string, fallbackSeconds: number, minimumSeconds: number, maximumSeconds: number): number
+{
+	const raw = process.env[name]?.trim();
+	if (!raw) return fallbackSeconds * 1_000;
+	const seconds = Number(raw);
+	if (!Number.isSafeInteger(seconds) || seconds < minimumSeconds || seconds > maximumSeconds) throw new Error(`${name} must be an integer from ${minimumSeconds} through ${maximumSeconds}`);
+	return seconds * 1_000;
+}
 
 /**
  * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
@@ -53,6 +67,26 @@ function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): strin
 }
 
 /**
+ * Submit one audience-bound projected token and expose only an authenticated accepted review.
+ *
+ * The raw credential remains local to this traced Kubernetes call. A valid signature without the
+ * exact requested audience is collapsed into the same denial as any other failed TokenReview.
+ */
+async function _ReviewProjectedToken(authApi: k8s.AuthenticationV1Api, token: string, audience: string): Promise<k8s.V1TokenReviewStatus | null>
+{
+	return ___DoWithTrace("kubernetes.projected_token.review", { audience }, async function _reviewToken(): Promise<k8s.V1TokenReviewStatus | null>
+	{
+		const body = new k8s.V1TokenReview();
+		body.spec = new k8s.V1TokenReviewSpec();
+		body.spec.token = token;
+		body.spec.audiences = [audience];
+		const review = await authApi.createTokenReview({ body });
+		const status = review.status;
+		return status?.authenticated && status.audiences?.includes(audience) ? status : null;
+	});
+}
+
+/**
  * Build the app-owned Kubernetes TokenReview adapter for runtime projected credentials.
  *
  * Kubernetes remains the issuer and verifier. This adapter fixes the audience and namespace, then
@@ -66,24 +100,45 @@ function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeT
   return {
     async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
     {
-      const body = new k8s.V1TokenReview();
-      body.spec = new k8s.V1TokenReviewSpec();
-      body.spec.token = token;
-		body.spec.audiences = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE];
-      const review = await authApi.createTokenReview({ body });
-      const status = review.status;
-		if (!status?.authenticated || !status.audiences?.includes(AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE))
-      {
-        return null;
-      }
+		const status = await _ReviewProjectedToken(authApi, token, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
+		if (!status) return null;
 		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, _ReadReviewedPodUid(status.user?.extra));
     },
   };
 }
 
 /**
- * Deliberately empty composition until the next controller slice owns durable runtime assignments.
- * It permits an authenticated shell to stay connected but accepts no candidate and issues no command.
+ * Parse only the fixed agent-controller ServiceAccount subject in one silo namespace.
+ * A valid token for any other namespaced identity must never inherit controller dispatch authority.
+ */
+function _ParseAgentControllerSubject(username: string, expectedNamespace: string, audiences: readonly string[]): ReviewedAgentControllerIdentity | null
+{
+	const expectedUsername = `system:serviceaccount:${expectedNamespace}:${AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME}`;
+	if (username !== expectedUsername) return null;
+	return { username, namespace: expectedNamespace, serviceAccountName: AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, audiences };
+}
+
+/**
+ * Build the app-owned TokenReview adapter for the sole agent-controller identity.
+ * The adapter fixes audience, namespace, and ServiceAccount before exposing a reviewed identity to
+ * the run-dispatch router; no caller-provided coordinate can widen those bindings.
+ */
+function _CreateAgentControllerTokenReviewer(authApi: k8s.AuthenticationV1Api): AgentControllerTokenReviewer
+{
+	const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
+	return {
+		async __Review(token: string): Promise<ReviewedAgentControllerIdentity | null>
+		{
+			const status = await _ReviewProjectedToken(authApi, token, AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE);
+			return status ? _ParseAgentControllerSubject(status.user?.username ?? "", expectedNamespace, status.audiences ?? []) : null;
+		},
+	};
+}
+
+/**
+ * Deliberately empty runtime-stream composition until bootstrap and command/candidate authority are
+ * connected. The controller already records the suspended Job assignment; this adapter permits that
+ * authenticated runtime shell to stay connected without inventing executable work or durable output.
  */
 const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
   /** Refuse to invent commands before durable assignment authority is connected. */
@@ -99,18 +154,6 @@ const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
 };
 
 /**
- * Registers all API routes on the given Express application instance.
- * All business routes are namespaced under /api/v1/.
- * Infrastructure routes (/healthz, /prom) remain at the root.
- *
- * @param app       - Express application to register routes on.
- * @param prisma    - Prisma ORM client for database access in route handlers.
- * @param customApi - Kubernetes Custom Objects API client for tenant and policy management.
- * @param coreApi   - Kubernetes Core V1 API client for AI budget management.
- * @param authApi   - Kubernetes Authentication API for tenant contract TokenReview validation.
- * @returns The Express application instance with registered routes.
- */
-/**
  * Mount the internal (`/api/internal/*`) routers. These MUST be registered BEFORE the
  * session `___AuthMiddleware` (see index.ts) — mounting them after it 401s every caller:
  *   - The NetworkPolicy-only `tenant-models` route takes no token; access is
@@ -123,6 +166,11 @@ const _NoRuntimeAssignmentAuthority: RuntimeCommandStreamAuthority = {
  */
 export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, authApi: k8s.AuthenticationV1Api): void
 {
+	const namespace = process.env.POD_NAMESPACE?.trim() || "default";
+	const claimLeaseMilliseconds = _ReadBoundedSeconds("AGENT_CONTROLLER_CLAIM_LEASE_SECONDS", 30, 1, 300);
+	const assignmentTtlMilliseconds = _ReadBoundedSeconds("AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS", 3_600, 60, 86_400);
+	const runDispatchRepository = new PrismaRunDispatchRepository(prisma, { namespace, claimLeaseMilliseconds, assignmentTtlMilliseconds });
+	app.use("/api/internal/agent-controller", __CreateAgentControllerRunDispatchRouter({ tokenReviewer: _CreateAgentControllerTokenReviewer(authApi), namespace, repository: runDispatchRepository, logger: _log }));
   // NetworkPolicy-only (no auth/TokenReview): the operator fetches a tenant's
   // allowed model set + effective default at reconcile. Best-effort — never 404/500.
   app.use("/api/internal/tenant-models", _RegisterInternalTenantModels(prisma));

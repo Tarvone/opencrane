@@ -63,10 +63,13 @@ public and internal listeners, starts the projection and OpenClaw-tenant lifecyc
 - `createInternalApp(prisma, authApi)` — builds the internal-only Express app; each mounted route
   declares projected-workload TokenReview or explicit NetworkPolicy-only trust.
 
-The internal runtime stream TokenReviews only the fixed `opencrane-agent-runtime` audience and a
-bounded runtime-profile ServiceAccount name. Durable assignment remains the authority for the exact
-ServiceAccount, Job, Pod, run, and revision; the ServiceAccount name alone is never sufficient.
-The current composition injects an empty command authority, so a verified Pod may maintain a
+The internal controller routes TokenReview only the fixed `agent-controller` ServiceAccount and
+`opencrane-agent-controller` audience. They let that process claim a database-fenced run attempt and
+commit only the immutable UID of the suspended Job it created. The runtime stream separately accepts
+the `opencrane-agent-runtime` audience and bounded runtime-profile ServiceAccount grammar. Durable
+assignment remains the authority for the exact ServiceAccount, Job, Pod, run, and revision; a
+ServiceAccount name alone is never sufficient.
+The runtime stream still injects an empty command authority, so a verified Pod may maintain a
 heartbeat connection but cannot receive commands or persist candidate output yet.
 
 ## Boundary
@@ -101,6 +104,8 @@ Read from the environment at startup.
 | `INTERNAL_PORT` | Workload-facing internal listener port | `8081` |
 | `DATABASE_URL` | Postgres connection string (Prisma) | *(required)* |
 | `NAMESPACE` | Silo namespace the reconcilers act on | `default` |
+| `AGENT_CONTROLLER_CLAIM_LEASE_SECONDS` | Database-owned lease for one controller delivery attempt | `30` |
+| `AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS` | Hard lifetime of a pending runtime workload assignment | `3600` |
 | `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |
 | `FLEET_INTERNAL_URL` | Fleet membership write-through URL; empty = standalone silo | *(empty)* |
 | `OPENCRANE_API_TOKEN` | Token for fleet-internal calls | *(empty)* |

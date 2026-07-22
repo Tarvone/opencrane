@@ -21,7 +21,7 @@ use, then governs later attempts without changing the logical run or its frozen 
  └──────────────────────────────────────────┘
           │  accepted / retry started / assignment trusted / denied
           ▼
- run-owned outbox  ── dispatcher launches the exact pinned revision and snapshot
+ run-owned outbox  ── controller claims it ── creates suspended Job ── commits Job UID
 ```
 
 **In this flow:** [session](../../session/main/README.md) *(assembles the snapshot through this
@@ -46,9 +46,17 @@ polls) so a started attempt can never be lost between deciding and launching.
 Job, confirms the workload's full identity (who / where / which attempt) matches the expected authority exactly, uses the fixed
 `opencrane-agent-runtime` projected-token audience, and has not expired.
 
+`PrismaRunDispatchRepository` is the database side of the controller handshake. It issues a short,
+server-owned claim lease over `RunAttemptRequested`, exposes only the coordinates needed to create a
+suspended Job, and commits the Job UID as a `PendingPod` assignment together with the run's `Assigned`
+state and outbox publication. The exact `claimedAt` plus `deliveryCount` pair is the compare-and-swap
+fence: an expired claimant cannot overwrite a later reclaim. Both claim and commit also require the
+snapshot's signed fleet-membership trust window to remain in the future according to database time.
+
 Invariant: a logical run either commits with exactly one digest-sealed snapshot and its dispatch
 event, or does not exist. Retries retain that run and snapshot identity, attempts only move forward
-under optimistic concurrency, and any authority, workload or persistence uncertainty fails closed.
+under optimistic concurrency, and any authority, membership, workload, lease, or persistence
+uncertainty fails closed.
 
 ## Public surface
 
@@ -62,6 +70,9 @@ under optimistic concurrency, and any authority, workload or persistence uncerta
   `RunAdmissionBuildResult` and `RunAdmissionResult` — the transaction-fenced initial-admission port
   and its input/output vocabulary.
 - `PrismaAgentRunAuthorityRepository` — the Prisma-backed adapter implementing the persistence port (atomic retry + outbox append).
+- `PrismaRunDispatchRepository` — atomically claim an attempt and commit its suspended Job assignment.
+- `__CreateAgentControllerRunDispatchRouter` — projected-token-authenticated internal claim/commit API for the fixed `agent-controller` ServiceAccount.
+- `RunDispatchRepository` / `AgentControllerTokenReviewer` — persistence and TokenReview ports used by that internal API.
 - `AgentRunAuthorityRepository` / `AgentRunAuthoritySnapshot` — the persistence port and its consistent read shape.
 - `StartNextRunAttemptCommand` / `StartNextRunAttemptResult`, `AtomicStartNextRunAttemptCommand` / `AtomicRunAttemptResult` — retry request/result and their atomic commit forms.
 - `RunWorkloadAssignment` / `RunWorkloadAssignmentExpectation` / `RunWorkloadAssignmentDecision` — the workload-identity check inputs and verdict.
@@ -70,8 +81,9 @@ under optimistic concurrency, and any authority, workload or persistence uncerta
 
 Consumed by the [session assembler](../../session/main/README.md), run-dispatch and workload-
 admission paths. It does not choose persona, memory, tools, budgets or membership evidence; session
-supplies those through the transaction callback. It does not run the agent or schedule a Pod. It
-owns only the durable admission/attempt boundary and the outbox facts downstream execution consumes.
+supplies those through the transaction callback. It does not run the agent, create/unsuspend the Job,
+or expose the private input snapshot to the controller. It owns only the durable admission, attempt,
+dispatch-lease, assignment, and workload-identity boundaries.
 
 ## Dependency direction
 
@@ -83,7 +95,9 @@ Tagged `scope:personal-runs`: it may depend only on `scope:agents` (shared run m
 Owns `AgentRun`, its one `RunInputSnapshot`, and run-domain outbox rows in
 `apps/opencrane/prisma/schema/runs.prisma`. Initial admission commits the run, snapshot,
 `RunAccepted`, and first `RunAttemptRequested` event together; later retries atomically advance the
-attempt counter and append another `RunAttemptRequested` event.
+attempt counter and append another `RunAttemptRequested` event. Dispatch leases that event, persists
+the immutable `WorkloadAssignment`, advances the run to `Assigned`, and publishes the event in one
+transaction.
 
 ## See also
 

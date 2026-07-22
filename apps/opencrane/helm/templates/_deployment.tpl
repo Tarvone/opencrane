@@ -45,6 +45,10 @@ spec:
             # Second (internal-only) listener for /api/internal/*.
             - name: INTERNAL_PORT
               value: {{ .Values.clustertenantManager.service.internalPort | quote }}
+            - name: AGENT_CONTROLLER_CLAIM_LEASE_SECONDS
+              value: {{ .Values.agentController.claimLeaseSeconds | quote }}
+            - name: AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS
+              value: {{ .Values.agentController.assignmentTtlSeconds | quote }}
             {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "opencrane-server") | nindent 12 }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}

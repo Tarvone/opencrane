@@ -100,7 +100,9 @@ tests fail closed; backup/restore reconstructs target-owned stores; no legacy co
 ### Phase E — personal runtime and AgentService plane (parallel work lanes)
 
 **In progress:** the active PR stack now defines immutable run input, the fenced runtime protocol,
-the outbound-only runtime process, and the suspended one-Job-per-attempt resource contract. Durable
+the outbound-only runtime process, the suspended one-Job-per-attempt resource contract, and a
+crash-safe controller boundary that exactly creates/adopts suspended Jobs before persisting their
+Kubernetes UID as the pending assignment. Durable
 assignment/command dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
 capabilities below are not complete yet.
 

@@ -95,6 +95,7 @@ describe("personal-runtime attempt Job resources", function _Suite()
 		expect(function _InternetEndpoint() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), runtimeStreamUrl: "https://example.com/runtime" }); }).toThrow(/in-cluster HTTP stream URL/);
 		expect(function _InvalidAttempt() { __BuildSuspendedAgentRuntimeJobResources({ ..._Assignment(), attempt: 0 }, _Profile()); }).toThrow(/positive safe integer/);
 		expect(function _MutableImageTag() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), image: "ghcr.io/italanta/opencrane-agent-runtime:latest" }); }).toThrow(/immutable image/);
+		expect(function _InvalidPullPolicy() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), imagePullPolicy: "Sometimes" as "Always" }); }).toThrow(/image pull policy/);
 		expect(function _CrossNamespaceServer() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), serverNamespace: "other-silo", runtimeStreamUrl: "http://opencrane-server.other-silo.svc.cluster.local:3001/api/internal/agent-runtime" }); }).toThrow(/share one namespace/);
 		expect(function _MismatchedServerPort() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), serverPort: 3002 }); }).toThrow(/in-cluster HTTP stream URL/);
 		expect(function _UnboundedScratch() { __BuildSuspendedAgentRuntimeJobResources(_Assignment(), { ..._Profile(), scratchSize: "2Gi" }); }).toThrow(/bounded scratch/);

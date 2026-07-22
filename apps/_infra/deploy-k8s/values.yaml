@@ -300,6 +300,54 @@ artifactService:
       cpu: 500m
       memory: 512Mi
 
+# -- Personal-runtime workload controller. Disabled until an immutable runtime image digest and
+# exact Kubernetes API Service CIDR are supplied; enabling it never starts a runtime Job directly.
+agentController:
+  enabled: false
+  image:
+    repository: ghcr.io/italanta/opencrane-agent-controller
+    digest: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  openCraneInternalUrl: ""
+  pollIntervalMs: 1000
+  # -- Database/server-owned fencing windows. The controller receives their resulting expiries but
+  # cannot propose or extend them in its claim/commit requests.
+  claimLeaseSeconds: 30
+  assignmentTtlSeconds: 3600
+  projectedTokenTtlSeconds: 600
+  kubernetesTokenTtlSeconds: 600
+  # -- Exact Kubernetes Service IP CIDRs admitted by the controller's app-owned NetworkPolicy.
+  # For a single API Service use its /32 (IPv4) or /128 (IPv6); never use a whole pod/service range.
+  kubernetesApiServerCidrs: []
+  kubernetesApiServerPort: 443
+  runtimeProfile:
+    name: personal-default
+    image:
+      repository: ghcr.io/italanta/opencrane-agent-runtime
+      digest: ""
+      pullPolicy: IfNotPresent
+    runtimeStreamUrl: ""
+    serviceAccountName: agent-runtime-default
+    projectedTokenTtlSeconds: 600
+    scratchSize: 1Gi
+    activeDeadlineSeconds: 3600
+    ttlSecondsAfterFinished: 3600
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 # -- Control plane settings
 clustertenantManager:
   # -- Whether this control plane owns per-ClusterTenant namespace creation. Default true;

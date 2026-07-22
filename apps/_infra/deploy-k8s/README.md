@@ -25,7 +25,7 @@ wires the pieces and the per-silo networking together.
  │  opencrane-silo umbrella chart  ◄── HERE                     │
  │    composes app-owned template libraries into one release:   │
  │    server · opencrane-ui · channel-proxy · artifact-service  │
- │    · cognee · litellm · obot · langfuse                      │
+  │    · agent-controller · cognee · litellm · obot · langfuse   │
  └────────────────────────────────────────────────────────────┘
         │  requires (external prerequisites, NOT installed here)
         ▼
@@ -34,6 +34,7 @@ wires the pieces and the per-silo networking together.
 
 **In this flow:** [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
 · [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+· [agent-controller](../../agent-controller/README.md)
 · [postgres](../../postgres/README.md) · [cognee](../cognee/README.md) · [litellm](../litellm/README.md)
 · [obot](../obot/README.md) · [langfuse](../langfuse/README.md)
 
@@ -42,9 +43,9 @@ external-dns, CloudNativePG, cert-manager) are external prerequisites a silo nev
 resolve from `Chart.lock` via `helm dep build` (pinned, reproducible) — never from open version ranges.
 
 The personal `agent-runtime` image is deliberately absent from this static rollup. It is not a
-long-lived silo service: this slice defines the bounded Job contract that the next agent-controller
-slice will create for each authorised run attempt. Workload lifetime and Kubernetes identity will
-therefore remain tied to that attempt rather than to a release.
+long-lived silo service: the agent controller creates its bounded, suspended Job for each authorised
+run attempt and commits the Kubernetes-issued Job identity to OpenCrane. Workload lifetime and
+Kubernetes identity therefore remain tied to that attempt rather than to a release.
 
 ## Public surface
 
@@ -83,6 +84,7 @@ package imports it.
 - Parent index: [_infra](../README.md)
 - Composed apps: [opencrane server](../../opencrane/README.md) · [opencrane-ui](../../opencrane-ui/README.md)
 · [channel-proxy](../../channel-proxy/README.md) · [artifact-service](../../artifact-service/README.md)
+  · [agent-controller](../../agent-controller/README.md)
   · [postgres](../../postgres/README.md)
 - Composed infra: [cognee](../cognee/README.md) · [litellm](../litellm/README.md) ·
   [obot](../obot/README.md) · [langfuse](../langfuse/README.md)

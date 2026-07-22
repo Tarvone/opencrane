@@ -52,6 +52,16 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}
+    # The controller authenticates its fixed KSA and projected audience before it may claim or
+    # commit an assignment; this rule exposes only the internal listener at the L3/4 floor.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: agent-controller
+      ports:
+        - protocol: TCP
+          port: {{ .Values.clustertenantManager.service.internalPort }}
     # The personal-agent runtime owns no listener and can only initiate this connection.
     # TokenReview fixes its exact projected-token audience and ServiceAccount subject in-process.
     - from:

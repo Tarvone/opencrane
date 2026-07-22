@@ -72,4 +72,20 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    - to:
+        {{- range .Values.networkPolicy.kubernetesApiServerCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.kubernetesApiServerPort }}
+    - to:
+        {{- range .Values.networkPolicy.kubernetesApiServerEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.kubernetesApiServerEndpointPort }}
 {{- end }}

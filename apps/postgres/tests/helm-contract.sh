@@ -7,7 +7,9 @@ OUTPUT="$(mktemp)"
 trap 'rm -f "$OUTPUT"' EXIT
 
 DATABASES_JSON='[{"name":"opencrane","owner":"opencrane","credentialsSecret":"postgres-opencrane-bootstrap"},{"name":"obot","owner":"obot","credentialsSecret":"postgres-obot-bootstrap"},{"name":"litellm","owner":"litellm","credentialsSecret":"postgres-litellm-bootstrap"},{"name":"langfuse","owner":"langfuse","credentialsSecret":"postgres-langfuse-bootstrap"}]'
-COMMON_VALUES=(--set-json "databases=$DATABASES_JSON" --set-string databaseAdmin.name=opencrane_database_admin --set-string databaseAdmin.credentialsSecret=postgres-admin-bootstrap --set-string bootstrap.targetBaseline.sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=opencrane-database-baseline-deadbeef --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql)
+BASE_VALUES=(--set-json "databases=$DATABASES_JSON" --set-string databaseAdmin.name=opencrane_database_admin --set-string databaseAdmin.credentialsSecret=postgres-admin-bootstrap --set-string bootstrap.targetBaseline.sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=opencrane-database-baseline-deadbeef --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql)
+API_VALUES=(--set-string networkPolicy.kubernetesApiServerCidrs[0]=10.43.0.1/32 --set-string networkPolicy.kubernetesApiServerEndpointCidrs[0]=172.18.0.2/32 --set networkPolicy.kubernetesApiServerEndpointPort=6443)
+COMMON_VALUES=("${BASE_VALUES[@]}" "${API_VALUES[@]}")
 
 helm lint "$CHART" "${COMMON_VALUES[@]}" >/dev/null
 bash "$ROOT_DIR/apps/_infra/deploy-k8s/platform/tests/pooler-deploy-contract.sh"
@@ -35,6 +37,10 @@ grep -q 'cnpg.io/cluster: opencrane-postgres' <<<"$POOLER_POLICY"
 grep -q '    - Egress' <<<"$POOLER_POLICY"
 grep -q '          port: 5432' <<<"$POOLER_POLICY"
 grep -q '          port: 53' <<<"$POOLER_POLICY"
+grep -q '            cidr: "10.43.0.1/32"' <<<"$POOLER_POLICY"
+grep -q '            cidr: "172.18.0.2/32"' <<<"$POOLER_POLICY"
+grep -q '          port: 443' <<<"$POOLER_POLICY"
+grep -q '          port: 6443' <<<"$POOLER_POLICY"
 if grep -q 'namespaceSelector' <<<"$POOLER_POLICY"; then
   echo "postgres pooler boundary must not admit cross-namespace clients or destinations" >&2
   exit 1
@@ -139,13 +145,46 @@ if helm template missing-pooler-image "$CHART" \
   exit 1
 fi
 
+if helm template missing-api-service "$CHART" \
+  "${BASE_VALUES[@]}" \
+  --set-string networkPolicy.kubernetesApiServerEndpointCidrs[0]=172.18.0.2/32 >/dev/null 2>&1; then
+  echo "postgres chart accepted an isolated pooler without Kubernetes API Service egress" >&2
+  exit 1
+fi
+
+if helm template missing-api-endpoint "$CHART" \
+  "${BASE_VALUES[@]}" \
+  --set-string networkPolicy.kubernetesApiServerCidrs[0]=10.43.0.1/32 >/dev/null 2>&1; then
+  echo "postgres chart accepted an isolated pooler without Kubernetes API endpoint egress" >&2
+  exit 1
+fi
+
+for invalid_cidr in 10.43.0.0/24 2001:db8::/64 0.0.0.0/0 ::/0 not-a-cidr 999.43.0.1/32; do
+  if helm template invalid-api-cidr "$CHART" \
+    "${COMMON_VALUES[@]}" \
+    --set-string "networkPolicy.kubernetesApiServerCidrs[0]=$invalid_cidr" >/dev/null 2>&1; then
+    echo "postgres chart accepted non-host Kubernetes API CIDR '$invalid_cidr'" >&2
+    exit 1
+  fi
+done
+
+helm template valid-ipv6-api "$CHART" \
+  "${BASE_VALUES[@]}" \
+  --set-string networkPolicy.kubernetesApiServerCidrs[0]=fd00::1/128 \
+  --set-string networkPolicy.kubernetesApiServerEndpointCidrs[0]=2001:db8::2/128 >/dev/null
+
+for invalid_port in 0 65536; do
+  if helm template invalid-api-port "$CHART" \
+    "${COMMON_VALUES[@]}" \
+    --set "networkPolicy.kubernetesApiServerEndpointPort=$invalid_port" >/dev/null 2>&1; then
+    echo "postgres chart accepted invalid Kubernetes API endpoint port '$invalid_port'" >&2
+    exit 1
+  fi
+done
+
 helm template one-database "$CHART" \
+  "${COMMON_VALUES[@]}" \
   --set-json 'databases=[{"name":"opencrane","owner":"opencrane","credentialsSecret":"postgres-opencrane-bootstrap"}]' \
-  --set-string databaseAdmin.name=opencrane_database_admin \
-  --set-string databaseAdmin.credentialsSecret=postgres-admin-bootstrap \
-  --set-string bootstrap.targetBaseline.sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=opencrane-database-baseline-deadbeef \
-  --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql \
   >"$OUTPUT"
 grep -q 'name: "opencrane_database_admin"' "$OUTPUT"
 grep -q 'pg_read_all_data' "$OUTPUT"

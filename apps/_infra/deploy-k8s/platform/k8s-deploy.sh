@@ -661,6 +661,38 @@ if [[ ! "$POSTGRES_BASELINE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   err "PostgreSQL target baseline '$POSTGRES_BASELINE_CONFIG_MAP' has no valid full SHA-256 identity."
   exit 1
 fi
+
+_postgres_api_host_cidr() {
+  local address="$1"
+  if [[ "$address" == *:* ]]; then
+    printf '%s/128' "$address"
+  else
+    printf '%s/32' "$address"
+  fi
+}
+
+POSTGRES_KUBERNETES_API_SERVICE_IP="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.clusterIP}')"
+POSTGRES_KUBERNETES_API_SERVICE_PORT="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.ports[0].port}')"
+POSTGRES_KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].ports[0].port}')"
+if [[ -z "$POSTGRES_KUBERNETES_API_SERVICE_IP" || -z "$POSTGRES_KUBERNETES_API_SERVICE_PORT" || -z "$POSTGRES_KUBERNETES_API_ENDPOINT_PORT" ]]; then
+  err "Kubernetes API Service and endpoint addresses are required for bounded PostgreSQL pooler egress."
+  exit 1
+fi
+POSTGRES_KUBERNETES_API_ARGS=(
+  --set-string "networkPolicy.kubernetesApiServerCidrs[0]=$(_postgres_api_host_cidr "$POSTGRES_KUBERNETES_API_SERVICE_IP")"
+  --set "networkPolicy.kubernetesApiServerPort=$POSTGRES_KUBERNETES_API_SERVICE_PORT"
+  --set "networkPolicy.kubernetesApiServerEndpointPort=$POSTGRES_KUBERNETES_API_ENDPOINT_PORT")
+POSTGRES_KUBERNETES_API_ENDPOINT_INDEX=0
+while IFS= read -r postgres_api_endpoint_ip; do
+  [[ -z "$postgres_api_endpoint_ip" ]] && continue
+  POSTGRES_KUBERNETES_API_ARGS+=(--set-string "networkPolicy.kubernetesApiServerEndpointCidrs[$POSTGRES_KUBERNETES_API_ENDPOINT_INDEX]=$(_postgres_api_host_cidr "$postgres_api_endpoint_ip")")
+  POSTGRES_KUBERNETES_API_ENDPOINT_INDEX=$((POSTGRES_KUBERNETES_API_ENDPOINT_INDEX + 1))
+done < <(kubectl get endpoints kubernetes -n default -o jsonpath='{range .subsets[*].addresses[*]}{.ip}{"\n"}{end}')
+if [[ "$POSTGRES_KUBERNETES_API_ENDPOINT_INDEX" -eq 0 ]]; then
+  err "Kubernetes API has no backing endpoints for bounded PostgreSQL pooler egress."
+  exit 1
+fi
+
 _install_postgres_server() {
   local pooler_client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
   local databases_json="[{\"name\":\"opencrane\",\"owner\":\"$POSTGRES_OWNER\",\"credentialsSecret\":\"$POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"obot\",\"owner\":\"$OBOT_POSTGRES_OWNER\",\"credentialsSecret\":\"$OBOT_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"litellm\",\"owner\":\"$LITELLM_POSTGRES_OWNER\",\"credentialsSecret\":\"$LITELLM_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"langfuse\",\"owner\":\"$LANGFUSE_POSTGRES_OWNER\",\"credentialsSecret\":\"$LANGFUSE_POSTGRES_CREDENTIALS_SECRET\"}]"
@@ -676,7 +708,8 @@ _install_postgres_server() {
     --set-string "bootstrap.targetBaseline.sha256=$POSTGRES_BASELINE_SHA256"
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$POSTGRES_BASELINE_CONFIG_MAP"
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql"
-    --set-json "pooler.clientPodSelectors=$pooler_client_selectors_json")
+    --set-json "pooler.clientPodSelectors=$pooler_client_selectors_json"
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}")
   [[ -n "$POSTGRES_VALUES_FILE" ]] && postgres_args+=(--values "$POSTGRES_VALUES_FILE")
   [[ -n "$STORAGE_CLASS" ]] && postgres_args+=(--set-string "storage.storageClass=$STORAGE_CLASS")
   if helm status "$POSTGRES_RELEASE" -n "$NAMESPACE" >/dev/null 2>&1; then

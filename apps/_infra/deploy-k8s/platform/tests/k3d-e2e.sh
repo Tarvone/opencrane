@@ -566,6 +566,7 @@ function _validate_cnpg_backup_recovery_schema()
   echo "[e2e] Validating backup contract against the pinned CNPG API server schema"
   helm template postgres-backup-contract "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}" \
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
@@ -581,6 +582,7 @@ function _validate_cnpg_backup_recovery_schema()
   echo "[e2e] Validating recovery contract against the pinned CNPG API server schema"
   helm template postgres-recovery-contract "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}" \
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
@@ -599,6 +601,7 @@ function _install_postgres_server()
   echo "[e2e] Installing one PostgreSQL server with isolated logical databases"
   helm upgrade --install "$OPENCRANE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}" \
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
@@ -776,6 +779,7 @@ EOF
   echo "[e2e] Recovering the backup into fresh Cluster '$RESTORE_DB_RELEASE_NAME'"
   helm upgrade --install "$RESTORE_DB_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}" \
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
@@ -948,6 +952,26 @@ EOF
   _verify_restored_logical_marker langfuse "${RESTORE_DB_RELEASE_NAME}-langfuse-app"
 }
 
+function _kubernetes_api_host_cidr()
+{
+  local address="$1"
+  if [[ "$address" == *:* ]]; then
+    printf '%s/128' "$address"
+  else
+    printf '%s/32' "$address"
+  fi
+}
+
+KUBERNETES_API_SERVICE_IP="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.clusterIP}')"
+KUBERNETES_API_SERVICE_PORT="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.ports[0].port}')"
+KUBERNETES_API_ENDPOINT_IP="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')"
+KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].ports[0].port}')"
+POSTGRES_KUBERNETES_API_ARGS=(
+  --set-string "networkPolicy.kubernetesApiServerCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_SERVICE_IP")"
+  --set "networkPolicy.kubernetesApiServerPort=$KUBERNETES_API_SERVICE_PORT"
+  --set-string "networkPolicy.kubernetesApiServerEndpointCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_ENDPOINT_IP")"
+  --set "networkPolicy.kubernetesApiServerEndpointPort=$KUBERNETES_API_ENDPOINT_PORT")
+
 _validate_cnpg_backup_recovery_schema
 _install_postgres_server
 OPENCRANE_POSTGRES_APP_SECRET="${OPENCRANE_DB_RELEASE_NAME}-opencrane-app"
@@ -1106,8 +1130,6 @@ kubectl create secret generic "$BOOTSTRAP_SECRET_NAME" \
 #    Per-org domain provisioning stays on (manageOwnDomain, from standalone.yaml) and
 #    fail-closes cleanly without external-dns.
 echo "[e2e] Installing standalone silo release '$RELEASE_NAME'"
-KUBERNETES_API_ENDPOINT_IP="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')"
-KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].ports[0].port}')"
 helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --namespace "$NAMESPACE" \
   --create-namespace \
@@ -1126,8 +1148,8 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set agentController.replicas=0 \
   --set-string agentController.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --set-string agentController.runtimeProfile.image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
-  --set-string 'agentController.kubernetesApiServerCidrs[0]=10.43.0.1/32' \
-  --set-string "agentController.kubernetesApiServerEndpointCidrs[0]=${KUBERNETES_API_ENDPOINT_IP}/32" \
+  --set-string "agentController.kubernetesApiServerCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_SERVICE_IP")" \
+  --set-string "agentController.kubernetesApiServerEndpointCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_ENDPOINT_IP")" \
   --set "agentController.kubernetesApiServerEndpointPort=${KUBERNETES_API_ENDPOINT_PORT}" \
   --set-string "artifactService.namespace=$ARTIFACT_NAMESPACE" \
   --set-string "artifactService.keys.catalogExistingSecret=$ARTIFACT_CATALOG_KEY_SECRET" \

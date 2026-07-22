@@ -20,11 +20,31 @@ helm template opencrane-postgres "$CHART" \
   --set backup.plugin.parameters.barmanObjectName=opencrane-postgres \
   >"$OUTPUT"
 
+INSTANCE_POLICY="$(awk 'BEGIN { RS="---" } /kind: NetworkPolicy/ && /name: opencrane-postgres-ingress/ { print }' "$OUTPUT")"
+POOLER_POLICY="$(awk 'BEGIN { RS="---" } /kind: NetworkPolicy/ && /name: opencrane-postgres-pooler-ingress/ { print }' "$OUTPUT")"
+[[ -n "$INSTANCE_POLICY" ]]
+[[ -n "$POOLER_POLICY" ]]
+grep -q 'app.kubernetes.io/component: postgres-database-privileges' <<<"$INSTANCE_POLICY"
+grep -q 'app.kubernetes.io/component: postgres-pooler' <<<"$INSTANCE_POLICY"
+grep -q 'app.kubernetes.io/component: opencrane-server' <<<"$POOLER_POLICY"
+grep -q 'app.kubernetes.io/component: mcp-gateway' <<<"$POOLER_POLICY"
+grep -q 'app.kubernetes.io/component: litellm' <<<"$POOLER_POLICY"
+grep -q 'app.kubernetes.io/name: langfuse' <<<"$POOLER_POLICY"
+if grep -Eq 'app.kubernetes.io/(component: (opencrane-server|mcp-gateway|litellm|fleet-manager)|name: langfuse)' <<<"$INSTANCE_POLICY"; then
+  echo "postgres instance policy allows an application to bypass the pooler" >&2
+  exit 1
+fi
+if grep -q 'app.kubernetes.io/component: postgres-database-privileges' <<<"$POOLER_POLICY"; then
+  echo "postgres privileges hook is unnecessarily admitted through the pooler" >&2
+  exit 1
+fi
+
 grep -q '^kind: Cluster$' "$OUTPUT"
 test "$(grep -c '^kind: Cluster$' "$OUTPUT")" -eq 1
 grep -q '^kind: Pooler$' "$OUTPUT"
 test "$(grep -c '^kind: Pooler$' "$OUTPUT")" -eq 1
 grep -q 'name: opencrane-postgres-pooler' "$OUTPUT"
+grep -q 'image: "ghcr.io/cloudnative-pg/pgbouncer:1.25.1"' "$OUTPUT"
 grep -q 'poolMode: "session"' "$OUTPUT"
 grep -q 'max_client_conn: "50"' "$OUTPUT"
 grep -q 'max_db_connections: "10"' "$OUTPUT"
@@ -100,6 +120,13 @@ if helm template invalid-pool-budget "$CHART" \
   --set postgresql.maxConnections=20 \
   --set pooler.maxDbConnections=10 >/dev/null 2>&1; then
   echo "postgres chart accepted a pooler server-connection budget above PostgreSQL capacity" >&2
+  exit 1
+fi
+
+if helm template missing-pooler-image "$CHART" \
+  "${COMMON_VALUES[@]}" \
+  --set-string pooler.image= >/dev/null 2>&1; then
+  echo "postgres chart accepted an enabled pooler without a pinned image" >&2
   exit 1
 fi
 

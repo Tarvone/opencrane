@@ -1372,7 +1372,7 @@ langfuse:
   #    injected via --set at deploy time.
   postgresql:
     deploy: false
-    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-rw.<namespace>.svc.cluster.local
+    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-pooler.<namespace>.svc.cluster.local
     host: ""
     auth:
       username: "opencrane"

@@ -346,6 +346,7 @@ k3d cluster create "$CLUSTER_NAME" --agents 1
 # 4a. Pre-pulling the official CloudNativePG database image (retried — registry pulls flake).
 echo "[e2e] Pre-pulling official CloudNativePG database image"
 _retry 3 docker pull ghcr.io/cloudnative-pg/postgresql:17.5
+_retry 3 docker pull ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 echo "[e2e] Pre-pulling pinned backup smoke images"
 _retry 3 docker pull "$MINIO_IMAGE"
 _retry 3 docker pull "$MINIO_CLIENT_IMAGE"
@@ -357,6 +358,7 @@ _import_k3d_image opencrane/tenant:e2e
 _import_k3d_image opencrane/channel-proxy:e2e
 _import_k3d_image opencrane/artifact-service:e2e
 _import_k3d_image ghcr.io/cloudnative-pg/postgresql:17.5
+_import_k3d_image ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 _import_k3d_image "$MINIO_IMAGE"
 _import_k3d_image "$MINIO_CLIENT_IMAGE"
 
@@ -606,7 +608,7 @@ function _install_postgres_server()
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
+    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
   kubectl wait --for=condition=Ready "cluster/$OPENCRANE_DB_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=create "deployment/${OPENCRANE_DB_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=condition=available "deployment/${OPENCRANE_DB_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
@@ -781,8 +783,8 @@ EOF
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set storage.storageClass=local-path \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
-    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
+    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
+    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}}]' \
     --set restore.enabled=true \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set-string "restore.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME" \
@@ -1005,7 +1007,7 @@ spec:
               fi
           env:
             - name: PGHOST
-              value: ${OPENCRANE_DB_RELEASE_NAME}-rw
+              value: ${OPENCRANE_DB_RELEASE_NAME}-pooler
             - name: PGUSER
               valueFrom:
                 secretKeyRef:

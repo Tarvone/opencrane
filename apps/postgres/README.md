@@ -76,6 +76,7 @@ runtime identity it reconciles.
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
+| Pinned PgBouncer image, pool size and client ingress selectors | Reconciling the `Pooler` into its Deployment and Service |
 | Supplying distinct application/admin Secret names, the app-owned target baseline reference, and database access | Bootstrapping the target SQL and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 
@@ -87,6 +88,7 @@ repair database credentials.
 `Entrypoint:` the Helm chart under `helm/`. No importable code. Prerequisites the chart expects:
 
 - a compatible CloudNativePG operator and CRDs, installed outside the OpenCrane release;
+- access to the pinned `ghcr.io/cloudnative-pg/pgbouncer:1.25.1` Pooler image;
 - one pre-created `kubernetes.io/basic-auth` Secret per logical database (`username`/`password`, where
   `username` equals that database's owner);
 - one separate basic-auth Secret for the operational database administrator; its `username` must

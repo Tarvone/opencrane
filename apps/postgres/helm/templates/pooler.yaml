@@ -1,4 +1,3 @@
-{{- if .Values.pooler.enabled }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
@@ -23,5 +22,7 @@ spec:
       labels:
         app.kubernetes.io/component: postgres-pooler
     spec:
-      containers: []
-{{- end }}
+      containers:
+        - name: pgbouncer
+          image: {{ .Values.pooler.image | quote }}
+          imagePullPolicy: IfNotPresent

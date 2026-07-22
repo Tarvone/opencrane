@@ -17,11 +17,9 @@ spec:
         - podSelector:
             {{- toYaml . | nindent 12 }}
         {{- end }}
-        {{- if .Values.pooler.enabled }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: postgres-pooler
-        {{- end }}
         - podSelector:
             matchLabels:
               cnpg.io/cluster: {{ include "opencrane.postgres.fullname" . }}
@@ -38,7 +36,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-{{- if .Values.pooler.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -61,5 +58,4 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-{{- end }}
 {{- end }}

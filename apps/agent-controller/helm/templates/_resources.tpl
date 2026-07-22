@@ -44,6 +44,7 @@
 {{- end -}}
 {{- $openCraneInternalUrl := default (printf "http://%s-opencrane-server.%s.svc.cluster.local:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.clustertenantManager.service.internalPort) .Values.agentController.openCraneInternalUrl -}}
 {{- $runtimeStreamUrl := default (printf "%s/api/internal/agent-runtime" $openCraneInternalUrl) .Values.agentController.runtimeProfile.runtimeStreamUrl -}}
+{{- $runtimeLiteLlmUrl := default (printf "http://%s-litellm.%s.svc.cluster.local:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.litellm.service.port) .Values.agentController.runtimeProfile.litellmBaseUrl -}}
 {{- $runtimeImage := printf "%s@%s" .Values.agentController.runtimeProfile.image.repository .Values.agentController.runtimeProfile.image.digest -}}
 {{- $controllerImage := printf "%s@%s" .Values.agentController.image.repository .Values.agentController.image.digest -}}
 {{- $controllerUsername := printf "system:serviceaccount:%s:%s" .Release.Namespace $controllerName -}}
@@ -190,7 +191,7 @@ spec:
             - name: AGENT_CONTROLLER_POLL_INTERVAL_MS
               value: {{ .Values.agentController.pollIntervalMs | quote }}
             - name: AGENT_CONTROLLER_PROFILES_JSON
-              value: {{ dict .Values.agentController.runtimeProfile.name (dict "image" $runtimeImage "imagePullPolicy" .Values.agentController.runtimeProfile.image.pullPolicy "runtimeStreamUrl" $runtimeStreamUrl "serverNamespace" .Release.Namespace "serviceAccountName" $runtimeServiceAccount "projectedTokenTtlSeconds" .Values.agentController.runtimeProfile.projectedTokenTtlSeconds "scratchSize" .Values.agentController.runtimeProfile.scratchSize "activeDeadlineSeconds" .Values.agentController.runtimeProfile.activeDeadlineSeconds "ttlSecondsAfterFinished" .Values.agentController.runtimeProfile.ttlSecondsAfterFinished "resources" .Values.agentController.runtimeProfile.resources) | toJson | quote }}
+              value: {{ dict .Values.agentController.runtimeProfile.name (dict "image" $runtimeImage "imagePullPolicy" .Values.agentController.runtimeProfile.image.pullPolicy "runtimeStreamUrl" $runtimeStreamUrl "litellmBaseUrl" $runtimeLiteLlmUrl "serverNamespace" .Release.Namespace "serviceAccountName" $runtimeServiceAccount "projectedTokenTtlSeconds" .Values.agentController.runtimeProfile.projectedTokenTtlSeconds "scratchSize" .Values.agentController.runtimeProfile.scratchSize "activeDeadlineSeconds" .Values.agentController.runtimeProfile.activeDeadlineSeconds "ttlSecondsAfterFinished" .Values.agentController.runtimeProfile.ttlSecondsAfterFinished "resources" .Values.agentController.runtimeProfile.resources) | toJson | quote }}
             {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "agent-controller") | nindent 12 }}
           volumeMounts:
             - name: opencrane-token
@@ -333,6 +334,17 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: litellm
+      ports:
+        - protocol: TCP
+          port: {{ .Values.litellm.service.port }}
     - to:
         - namespaceSelector:
             matchLabels:
@@ -498,26 +510,33 @@ spec:
         quantity(object.spec.template.spec.containers[0].resources.limits.memory).compareTo(quantity({{ .Values.agentController.runtimeProfile.resources.limits.memory | toJson }})) == 0
       message: runtime image, container shape, security and resources are immutable
     - expression: >-
-        object.spec.template.spec.containers[0].env.size() == 3 &&
+        object.spec.template.spec.containers[0].env.size() == 5 &&
         object.spec.template.spec.containers[0].env[0].name == 'OPENCRANE_RUNTIME_STREAM_URL' &&
         object.spec.template.spec.containers[0].env[0].value == {{ $runtimeStreamUrl | toJson }} &&
         object.spec.template.spec.containers[0].env[1].name == 'OPENCRANE_RUNTIME_TOKEN_PATH' &&
         object.spec.template.spec.containers[0].env[1].value == '/var/run/opencrane/tokens/runtime.token' &&
-        object.spec.template.spec.containers[0].env[2].name == 'POD_UID' &&
-        object.spec.template.spec.containers[0].env[2].valueFrom.fieldRef.fieldPath == 'metadata.uid' &&
-        object.spec.template.spec.containers[0].volumeMounts.size() == 3 &&
+        object.spec.template.spec.containers[0].env[2].name == 'OPENCRANE_RUNTIME_LITELLM_BASE_URL' &&
+        object.spec.template.spec.containers[0].env[2].value == {{ $runtimeLiteLlmUrl | toJson }} &&
+        object.spec.template.spec.containers[0].env[3].name == 'OPENCRANE_RUNTIME_LITELLM_KEY_PATH' &&
+        object.spec.template.spec.containers[0].env[3].value == '/var/run/opencrane/litellm/key' &&
+        object.spec.template.spec.containers[0].env[4].name == 'POD_UID' &&
+        object.spec.template.spec.containers[0].env[4].valueFrom.fieldRef.fieldPath == 'metadata.uid' &&
+        object.spec.template.spec.containers[0].volumeMounts.size() == 4 &&
         object.spec.template.spec.containers[0].volumeMounts[0].name == 'runtime-token' &&
         object.spec.template.spec.containers[0].volumeMounts[0].mountPath == '/var/run/opencrane/tokens' &&
         object.spec.template.spec.containers[0].volumeMounts[0].readOnly == true &&
         object.spec.template.spec.containers[0].volumeMounts[1].name == 'runtime-bootstrap' &&
         object.spec.template.spec.containers[0].volumeMounts[1].mountPath == '/var/run/opencrane/bootstrap' &&
         object.spec.template.spec.containers[0].volumeMounts[1].readOnly == true &&
-        object.spec.template.spec.containers[0].volumeMounts[2].name == 'scratch' &&
-        object.spec.template.spec.containers[0].volumeMounts[2].mountPath == '/tmp' &&
-        (!has(object.spec.template.spec.containers[0].volumeMounts[2].readOnly) || object.spec.template.spec.containers[0].volumeMounts[2].readOnly == false)
-      message: runtime environment and mounts must contain only the fixed non-secret interfaces
+        object.spec.template.spec.containers[0].volumeMounts[2].name == 'litellm-key' &&
+        object.spec.template.spec.containers[0].volumeMounts[2].mountPath == '/var/run/opencrane/litellm' &&
+        object.spec.template.spec.containers[0].volumeMounts[2].readOnly == true &&
+        object.spec.template.spec.containers[0].volumeMounts[3].name == 'scratch' &&
+        object.spec.template.spec.containers[0].volumeMounts[3].mountPath == '/tmp' &&
+        (!has(object.spec.template.spec.containers[0].volumeMounts[3].readOnly) || object.spec.template.spec.containers[0].volumeMounts[3].readOnly == false)
+      message: runtime environment and mounts must contain only the fixed stream, virtual-key, and scratch interfaces
     - expression: >-
-        object.spec.template.spec.volumes.size() == 3 &&
+        object.spec.template.spec.volumes.size() == 4 &&
         object.spec.template.spec.volumes[0].name == 'runtime-token' &&
         object.spec.template.spec.volumes[0].projected.defaultMode == 288 &&
         object.spec.template.spec.volumes[0].projected.sources.size() == 1 &&
@@ -529,10 +548,16 @@ spec:
         object.spec.template.spec.volumes[1].downwardAPI.items.size() == 1 &&
         object.spec.template.spec.volumes[1].downwardAPI.items[0].path == 'reference' &&
         object.spec.template.spec.volumes[1].downwardAPI.items[0].fieldRef.fieldPath == "metadata.annotations['opencrane.ai/bootstrap-reference']" &&
-        object.spec.template.spec.volumes[2].name == 'scratch' &&
-        (!has(object.spec.template.spec.volumes[2].emptyDir.medium) || object.spec.template.spec.volumes[2].emptyDir.medium == '') &&
-        quantity(object.spec.template.spec.volumes[2].emptyDir.sizeLimit).compareTo(quantity({{ .Values.agentController.runtimeProfile.scratchSize | toJson }})) == 0
-      message: runtime volumes must be exactly one audience token, one reference and bounded scratch
+        object.spec.template.spec.volumes[2].name == 'litellm-key' &&
+        object.spec.template.spec.volumes[2].projected.defaultMode == 288 &&
+        object.spec.template.spec.volumes[2].projected.sources.size() == 1 &&
+        object.spec.template.spec.volumes[2].projected.sources[0].secret.items.size() == 1 &&
+        object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].key == 'key' &&
+        object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].path == 'key' &&
+        object.spec.template.spec.volumes[3].name == 'scratch' &&
+        (!has(object.spec.template.spec.volumes[3].emptyDir.medium) || object.spec.template.spec.volumes[3].emptyDir.medium == '') &&
+        quantity(object.spec.template.spec.volumes[3].emptyDir.sizeLimit).compareTo(quantity({{ .Values.agentController.runtimeProfile.scratchSize | toJson }})) == 0
+      message: runtime volumes must be exactly one audience token, one reference, one virtual key, and bounded scratch
     - expression: >-
         (request.operation == 'CREATE' && object.spec.suspend == true) ||
         (request.operation == 'UPDATE' && oldObject.spec.suspend == true && object.spec.suspend == false &&

@@ -81,9 +81,10 @@ separate projected tokens: one for OpenCrane and one for the Kubernetes API. Str
 standard output, and OpenTelemetry spans cover every HTTP and Kubernetes input/output call. Enabling
 the chart requires immutable SHA-256 digests for both the controller and runtime images. Helm derives
 one `<release>-runtime` namespace by default, applies the Pod Security Standards restricted profile,
-an aggregate Job/Pod/CPU/memory quota, default-deny networking, fixed OpenCrane-and-DNS egress, and a
+an aggregate Job/Pod/CPU/memory quota, default-deny networking, fixed OpenCrane, same-silo LiteLLM,
+and DNS egress, and a
 ValidatingAdmissionPolicy that rejects sidecars, probes, unpinned images, privileged or host access,
-durable/secret mounts, and any update other than the exact one-time `suspend: true` to `false`
+durable mounts, arbitrary Secret projections, and any update other than the exact one-time `suspend: true` to `false`
 release. Enabling this controller requires Kubernetes 1.30 or newer, where that admission API is
 stable.
 

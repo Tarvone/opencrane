@@ -103,6 +103,8 @@ grep -A20 -F 'name: oc-opencrane-agent-runtime-egress' "$MANIFEST" | grep -Fq 'n
 grep -Fq 'opencrane.ai/runtime-release:' "$MANIFEST"
 grep -Fq 'kubernetes.io/metadata.name: server-ns' "$MANIFEST"
 grep -Fq 'kubernetes.io/metadata.name: kube-system' "$MANIFEST"
+grep -Fq 'app.kubernetes.io/component: litellm' "$RUNTIME_EGRESS"
+grep -Fq 'port: 4000' "$RUNTIME_EGRESS"
 test -s "$SERVER_POLICY"
 grep -Fq 'cidr: "10.43.0.1/32"' "$SERVER_POLICY"
 grep -A3 -F 'cidr: "10.43.0.1/32"' "$SERVER_POLICY" | grep -Fq 'port: 443'
@@ -130,8 +132,12 @@ grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.requests.cp
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.requests.memory).compareTo(quantity("128Mi")) == 0' "$ADMISSION"
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.limits.cpu).compareTo(quantity("1000m")) == 0' "$ADMISSION"
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.limits.memory).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
-grep -Fq "object.spec.template.spec.volumes.size() == 3" "$ADMISSION"
-grep -Fq 'quantity(object.spec.template.spec.volumes[2].emptyDir.sizeLimit).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].env.size() == 5" "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].env[2].name == 'OPENCRANE_RUNTIME_LITELLM_BASE_URL'" "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].volumeMounts.size() == 4" "$ADMISSION"
+grep -Fq "object.spec.template.spec.volumes.size() == 4" "$ADMISSION"
+grep -Fq "object.spec.template.spec.volumes[2].name == 'litellm-key'" "$ADMISSION"
+grep -Fq 'quantity(object.spec.template.spec.volumes[3].emptyDir.sizeLimit).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
 if grep -Eq 'resources\.(requests|limits)\.[a-z]+ == quantity|emptyDir\.sizeLimit == quantity' "$ADMISSION"; then
   echo "admission compares a serialized resource string directly with a CEL Quantity" >&2
   exit 1

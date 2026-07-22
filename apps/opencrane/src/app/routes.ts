@@ -17,8 +17,8 @@ import { tenantsRouter } from "@opencrane/backend/server/tenancy/tenants";
 import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/retrieval";
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
-import { _RegisterInternalAgentRuntimeStream, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
-import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
+import { _CreateRuntimeTokenReviewer, _RegisterInternalAgentRuntimeStream } from "@opencrane/server/_infra/agent-runtime-stream";
+import { AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE, AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
 import { PrismaRunDispatchRepository, __CreateAgentControllerRunDispatchRouter, type AgentControllerTokenReviewer, type AttemptModelKeyMintRequest, type MintedAttemptModelKey, type ReviewedAgentControllerIdentity } from "@opencrane/backend/agents/execution/runs";
 import { __CreateExternalActionExecutor, __CreatePrismaRunInputCompiler, PrismaRuntimeDispatchAuthority, __ExecuteExternalAction, type RuntimeExternalActionRunner } from "@opencrane/backend/agents/execution/protocol";
@@ -75,37 +75,6 @@ function _ReadRuntimeNamespaceBoundary(): { readonly serverNamespace: string; re
 }
 
 /**
- * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
- *
- * The expected namespace comes from server-owned deployment configuration. The reviewed
- * ServiceAccount must satisfy the same bounded runtime-profile grammar used when building Jobs, and
- * the Pod UID must come from TokenReview. Returning `null` on every mismatch keeps subject parsing
- * from silently broadening which runtime workloads the server trusts.
- */
-function _ParseRuntimeSubject(subject: string, expectedNamespace: string, podUid: string | null): RuntimeWorkloadIdentity | null
-{
-  const parts = subject.split(":");
-	const serviceAccountName = parts[3];
-	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || !serviceAccountName || !___IsAgentRuntimeServiceAccountName(serviceAccountName) || !podUid)
-  {
-    return null;
-  }
-	return { subject, namespace: expectedNamespace, serviceAccountName, podUid };
-}
-
-/**
- * Read the Pod UID claim Kubernetes attaches to a bound projected ServiceAccount token.
- *
- * The UID is required because a ServiceAccount name identifies a workload class, not the exact Pod
- * assigned to one run attempt. Missing or malformed TokenReview extras therefore fail closed.
- */
-function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): string | null
-{
-	const podUid = extra?.["authentication.kubernetes.io/pod-uid"]?.[0];
-	return typeof podUid === "string" && podUid.length > 0 ? podUid : null;
-}
-
-/**
  * Submit one audience-bound projected token and expose only an authenticated accepted review.
  *
  * The raw credential remains local to this traced Kubernetes call. A valid signature without the
@@ -123,26 +92,6 @@ async function _ReviewProjectedToken(authApi: k8s.AuthenticationV1Api, token: st
 		const status = review.status;
 		return status?.authenticated && status.audiences?.includes(audience) ? status : null;
 	});
-}
-
-/**
- * Build the app-owned Kubernetes TokenReview adapter for runtime projected credentials.
- *
- * Kubernetes remains the issuer and verifier. This adapter fixes the audience and namespace, then
- * validates the reviewed ServiceAccount against the shared runtime-profile grammar and exposes only
- * the workload identity needed by the transport. It never forwards the raw token or TokenReview
- * response; a valid signature without all bindings is still unauthorised.
- */
-function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api, runtimeNamespace: string): RuntimeTokenReviewer
-{
-  return {
-    async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
-    {
-		const status = await _ReviewProjectedToken(authApi, token, AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
-		if (!status) return null;
-		return _ParseRuntimeSubject(status.user?.username ?? "", runtimeNamespace, _ReadReviewedPodUid(status.user?.extra));
-    },
-  };
 }
 
 /**

@@ -4,9 +4,11 @@
 
 ## What it owns
 
-This package is the OpenCrane server's narrow transport for personal-agent runtimes. It turns an
-outbound request from a runtime Pod into an authenticated stream with bounded inbound requests,
-without becoming an authority over runs, commands, or agent output.
+This package is the OpenCrane server's narrow transport for agent runtimes. Its current
+`_CreateRuntimeTokenReviewer` factory is deliberately bounded to personal runtime Pods; a managed
+runtime needs its own audience and ServiceAccount-specific reviewer before it can use this transport.
+The transport turns an outbound request from a runtime Pod into an authenticated stream with bounded
+inbound requests, without becoming an authority over runs, commands, or agent output.
 
 The transport first asks an injected TokenReview adapter which Kubernetes Pod presented the
 credential. It then validates the stream opening frame, emits only commands supplied by an injected
@@ -39,8 +41,9 @@ The package does not repair identity, choose a run, mint a command, or persist a
 
 - `_RegisterInternalAgentRuntimeStream(options)` — builds the internal Express router for the
   authenticated stream and candidate endpoints.
-- `RuntimeTokenReviewer` — port through which the OpenCrane app verifies projected Kubernetes
-  credentials.
+- `_CreateRuntimeTokenReviewer` — fail-closed Kubernetes TokenReview adapter for the fixed runtime
+  audience, namespace, ServiceAccount grammar, and bound Pod UID.
+- `RuntimeTokenReviewer` — identity-review port used by the stream transport.
 - `RuntimeCommandStreamAuthority` — port through which the personal-agent domain supplies commands,
   admits candidate output, and (optionally) is told when a stream was lost so it can release its
   runtime-instance binding.
@@ -67,9 +70,9 @@ import apps, Prisma, or backend persistence implementations.
 
 ## Runtime & config
 
-The composing app supplies maximum request bytes, heartbeat interval, command-poll interval, the
-TokenReview port, and the command/candidate authority. This library reads no environment variables
-and opens no listener by itself.
+The composing app supplies maximum request bytes, heartbeat interval, command-poll interval, runtime
+namespace, and command/candidate authority. This library reads no environment variables and opens no
+listener by itself.
 
 ## See also
 

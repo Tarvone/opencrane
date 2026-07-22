@@ -145,6 +145,11 @@
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/destroy/tenant-cleanup.ts",
       "anchor": "kind: \"Deployment\"",
       "reason": "Deletion selector only; it cannot create a pod."
+    },
+    {
+      "path": "libs/backend/agents/runtime/controller/src/agent-controller.ts",
+      "anchor": "kind: \"Job\"",
+      "reason": "This is a Secret owner reference to an already-created attempt Job; it cannot create a pod."
     }
   ],
   "archiveWorkloadInventory": {

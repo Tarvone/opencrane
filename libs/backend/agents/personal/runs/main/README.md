@@ -55,6 +55,11 @@ The bootstrap reference is an opaque label, not a password: it grants nothing wi
 projected workload identity, assigned Job and registered first Pod. The stored integrity digest binds
 the label to every immutable assignment field, including the selected workload profile.
 
+Delivered runtime commands are short-lived operational handshakes, not the permanent run audit. The
+controller periodically asks this repository to delete only old, successfully published records in a
+small database transaction. Failed commands remain intact for diagnosis, and the target-schema trigger
+rejects every direct delete outside that dedicated transaction.
+
 Release uses another recoverable claim lease. The controller unsuspends only the assigned Job, then
 returns the first Pod's immutable Kubernetes identifier. This package changes `PendingPod` to
 `Registered` and marks the release delivered in one transaction. Replaying the same Pod returns the

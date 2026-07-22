@@ -61,8 +61,19 @@ grep -Fq 'resources: ["jobs"]' "$ROLE"
 grep -Fq 'verbs: ["get", "create", "patch"]' "$ROLE"
 grep -Fq 'resources: ["pods"]' "$ROLE"
 grep -Fq 'verbs: ["list"]' "$ROLE"
-if grep -Eq 'networkpolicies|secrets|serviceaccounts|deployments|"(delete|update|watch)"' "$ROLE"; then
-  echo "agent-controller Role exceeds the accepted Job/Pod boundary" >&2
+# Attempt-key Secrets are create-only in the runtime namespace: the exact resource+verb must appear,
+# and the secrets rule must grant nothing beyond create.
+grep -Fq 'resources: ["secrets"]' "$ROLE"
+if ! grep -A1 'resources: \["secrets"\]' "$ROLE" | grep -Fq 'verbs: ["create"]'; then
+  echo "agent-controller secrets rule must be create-only" >&2
+  exit 1
+fi
+if grep -A1 'resources: \["secrets"\]' "$ROLE" | grep -Eq '"(get|list|patch|delete|update|watch)"'; then
+  echo "agent-controller secrets rule exceeds create-only" >&2
+  exit 1
+fi
+if grep -Eq 'networkpolicies|serviceaccounts|deployments|configmaps|"(delete|update|watch)"' "$ROLE"; then
+  echo "agent-controller Role exceeds the accepted Job/Pod/Secret boundary" >&2
   exit 1
 fi
 test -s "$BINDING"
@@ -92,6 +103,8 @@ grep -A20 -F 'name: oc-opencrane-agent-runtime-egress' "$MANIFEST" | grep -Fq 'n
 grep -Fq 'opencrane.ai/runtime-release:' "$MANIFEST"
 grep -Fq 'kubernetes.io/metadata.name: server-ns' "$MANIFEST"
 grep -Fq 'kubernetes.io/metadata.name: kube-system' "$MANIFEST"
+grep -Fq 'app.kubernetes.io/component: litellm' "$RUNTIME_EGRESS"
+grep -Fq 'port: 4000' "$RUNTIME_EGRESS"
 test -s "$SERVER_POLICY"
 grep -Fq 'cidr: "10.43.0.1/32"' "$SERVER_POLICY"
 grep -A3 -F 'cidr: "10.43.0.1/32"' "$SERVER_POLICY" | grep -Fq 'port: 443'
@@ -119,8 +132,13 @@ grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.requests.cp
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.requests.memory).compareTo(quantity("128Mi")) == 0' "$ADMISSION"
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.limits.cpu).compareTo(quantity("1000m")) == 0' "$ADMISSION"
 grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.limits.memory).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
-grep -Fq "object.spec.template.spec.volumes.size() == 3" "$ADMISSION"
-grep -Fq 'quantity(object.spec.template.spec.volumes[2].emptyDir.sizeLimit).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].env.size() == 5" "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].env[2].name == 'OPENCRANE_RUNTIME_LITELLM_BASE_URL'" "$ADMISSION"
+grep -Fq "object.spec.template.spec.containers[0].volumeMounts.size() == 4" "$ADMISSION"
+grep -Fq "object.spec.template.spec.volumes.size() == 4" "$ADMISSION"
+grep -Fq "object.spec.template.spec.volumes[2].name == 'litellm-key'" "$ADMISSION"
+grep -Fq "secret.name.matches('^litellm-key-[a-f0-9]{32}$')" "$ADMISSION"
+grep -Fq 'quantity(object.spec.template.spec.volumes[3].emptyDir.sizeLimit).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
 if grep -Eq 'resources\.(requests|limits)\.[a-z]+ == quantity|emptyDir\.sizeLimit == quantity' "$ADMISSION"; then
   echo "admission compares a serialized resource string directly with a CEL Quantity" >&2
   exit 1
@@ -169,6 +187,10 @@ if render_enabled --set agentController.runtimeProfile.resources.requests.cpu=2 
 fi
 if render_enabled --kube-version 1.29.9 >/dev/null 2>&1; then
   echo "Kubernetes 1.29 was accepted despite the stable admission API requirement" >&2
+  exit 1
+fi
+if render_enabled --set sharedPlatform.litellm.mode=shared >/dev/null 2>&1; then
+  echo "agent controller accepted shared LiteLLM despite requiring its same-silo Service boundary" >&2
   exit 1
 fi
 if helm template oc "$CHART_ROOT" --namespace server-ns \

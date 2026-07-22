@@ -17,6 +17,8 @@ export interface AgentControllerAuthority
 	__ClaimWorkloadRelease(signal: AbortSignal): Promise<AgentControllerRunWorkloadReleaseClaim | null>;
 	/** Atomically register the first exact Pod created by the assigned Job. */
 	__RegisterFirstPod(eventId: string, command: AgentControllerRunWorkloadRegistrationCommand, signal: AbortSignal): Promise<AgentControllerRunWorkloadRegistrationResult>;
+	/** Delete one bounded batch of successful, retention-expired run outbox records. */
+	__PrunePublishedOutbox?(signal: AbortSignal): Promise<number>;
 }
 
 /** Kubernetes operations available to the assignment and release reconciliations. */
@@ -43,6 +45,8 @@ export interface AgentControllerOptions
 	readonly runtimeNamespace: string;
 	/** Delay after an empty poll or a handled reconciliation failure. */
 	readonly pollIntervalMilliseconds: number;
+	/** Delay between durable outbox-retention maintenance attempts. */
+	readonly outboxPruneIntervalMilliseconds?: number;
 	/** Process-wide structured logger. */
 	readonly log: Logger;
 }

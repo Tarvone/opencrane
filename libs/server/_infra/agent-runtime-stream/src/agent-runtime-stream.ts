@@ -136,7 +136,16 @@ export function _RegisterInternalAgentRuntimeStream(options: RuntimeStreamTransp
 				response.flushHeaders();
 				let closed = false;
 				let sequence = 0;
-				const cleanup = function _cleanup() { closed = true; clearInterval(heartbeat); };
+				// Stream loss must bound in-flight command dispatch and let the injected authority release
+				// the runtime-instance binding. The signal is a port call, never an import of the backend
+				// authority package, so a lost connection cannot leave the attempt bound to a dead Pod.
+				const cleanup = function _cleanup()
+				{
+					if (closed) return;
+					closed = true;
+					clearInterval(heartbeat);
+					void options.authority.__ReleaseStream?.(identity, open).catch(function _ignoreReleaseError() {});
+				};
 				const heartbeat = setInterval(function _heartbeat()
 				{
 					if (!closed)

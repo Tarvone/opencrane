@@ -1114,6 +1114,17 @@ kubectl get pvc "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/de
 kubectl get service "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/dev/null
 kubectl get networkpolicy "${RELEASE_NAME}-artifact-service" -n "$ARTIFACT_NAMESPACE" >/dev/null
 
+# Durable command dispatch and the one-use bootstrap exchange are reached over egress only: the
+# runtime plane must still declare NO ingress. Assert the agent-runtime NetworkPolicies carry an
+# empty (or absent) ingress rule after this slice; any ingress rule would break the outbound-only
+# posture the runtime namespace depends on.
+RUNTIME_NP_INGRESS="$(kubectl get networkpolicy -n "$RUNTIME_NAMESPACE" -l app.kubernetes.io/component=agent-runtime -o jsonpath='{range .items[*]}{.spec.ingress}{end}' 2>/dev/null | tr -d '[:space:]')"
+if [[ -n "${RUNTIME_NP_INGRESS//[]/}" ]]; then
+  echo "[e2e] agent-runtime NetworkPolicy unexpectedly declares ingress: $RUNTIME_NP_INGRESS"
+  exit 1
+fi
+echo "[e2e] PASS: agent-runtime network plane stays outbound-only after command dispatch"
+
 # Execute both controller trust boundaries against the live API server. Replicas stay at zero so
 # the probe owns every state transition: admission checks the exact Job shape, while a one-shot Job
 # proves the projected controller token reaches server-side TokenReview through both policies.

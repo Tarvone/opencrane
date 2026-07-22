@@ -49,11 +49,13 @@ on `SIGTERM`/`SIGINT`.
 
 The process holds no database credentials and exposes no Service, Ingress, public route or health
 listener. Its Kubernetes role exists only in the dedicated runtime namespace and grants
-`get/create/patch` for Jobs plus `list` for Pods. It cannot create policy, read Secrets, mutate Pods,
-or get, replace, delete, or watch any Pod. Its ServiceAccount and Deployment remain in the server
-namespace, so compromising a runtime Pod does not place it beside the controller identity. The
-projected bootstrap reference is an opaque lookup key, not a credential, and the controller never
-logs it.
+`get/create/patch` for Jobs, `list` for Pods, and `create` (only) for Secrets — the per-attempt
+LiteLLM key Secret, owned by its Job so it is garbage-collected with it. It cannot create policy,
+read/update/delete Secrets, mutate Pods, or get, replace, delete, or watch any Pod. The minted
+virtual key rides the claim response and is written straight into the Secret; the controller never
+holds the LiteLLM master key. Its ServiceAccount and Deployment remain in the server namespace, so
+compromising a runtime Pod does not place it beside the controller identity. The projected bootstrap
+reference is an opaque lookup key, not a credential, and the controller never logs it.
 
 ## Dependency direction
 
@@ -68,6 +70,8 @@ outside the app root.
 - `AGENT_RUNTIME_NAMESPACE` — literal dedicated runtime namespace the Role and controller may
   mutate; it is never inferred from the controller Pod's own namespace.
 - `AGENT_CONTROLLER_POLL_INTERVAL_MS` — 100–60,000 ms delay after idle or failure; default 1,000 ms.
+- `AGENT_CONTROLLER_OUTBOX_PRUNE_INTERVAL_MS` — 60 seconds–24 hours between bounded removal of
+  successfully delivered runtime handshakes; default one hour. Failed commands remain durable evidence.
 - `AGENT_CONTROLLER_REQUEST_TIMEOUT_MS` — 1–60 second hard cap independently applied to every
   OpenCrane and Kubernetes request; default 10 seconds. Process shutdown cancels either request type
   immediately, and each retry receives a fresh deadline.
@@ -78,11 +82,13 @@ separate projected tokens: one for OpenCrane and one for the Kubernetes API. Str
 standard output, and OpenTelemetry spans cover every HTTP and Kubernetes input/output call. Enabling
 the chart requires immutable SHA-256 digests for both the controller and runtime images. Helm derives
 one `<release>-runtime` namespace by default, applies the Pod Security Standards restricted profile,
-an aggregate Job/Pod/CPU/memory quota, default-deny networking, fixed OpenCrane-and-DNS egress, and a
-ValidatingAdmissionPolicy that rejects sidecars, probes, unpinned images, privileged or host access,
-durable/secret mounts, and any update other than the exact one-time `suspend: true` to `false`
-release. Enabling this controller requires Kubernetes 1.30 or newer, where that admission API is
-stable.
+an aggregate Job/Pod/CPU/memory quota, default-deny networking, fixed OpenCrane, same-silo LiteLLM,
+and DNS egress, and a ValidatingAdmissionPolicy that rejects sidecars, probes, unpinned images,
+privileged or host access, durable mounts, arbitrary Secret projections, and any update other than
+the exact one-time `suspend: true` to `false` release. Enabling this controller requires Kubernetes
+1.30 or newer, where that admission API is stable, and the release-local LiteLLM mode: a shared
+LiteLLM endpoint is rejected because this runtime boundary deliberately permits only the same-silo
+Service and port.
 
 Runtime-profile CPU values use whole cores or millicores such as `1` or `100m`; memory values use
 `Ki`, `Mi`, or `Gi`. Helm rejects malformed or non-string quantities before it can install an

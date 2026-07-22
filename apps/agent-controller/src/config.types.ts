@@ -11,6 +11,8 @@ export interface AgentControllerProcessConfig
 	readonly runtimeNamespace: string;
 	/** Delay after an idle poll or handled error. */
 	readonly pollIntervalMilliseconds: number;
+	/** Delay between controller-only runs of durable outbox retention. */
+	readonly outboxPruneIntervalMilliseconds: number;
 	/** Hard timeout independently applied to each OpenCrane or Kubernetes call. */
 	readonly requestTimeoutMilliseconds: number;
 	/** Immutable runtime profiles keyed by authority-owned profile name. */

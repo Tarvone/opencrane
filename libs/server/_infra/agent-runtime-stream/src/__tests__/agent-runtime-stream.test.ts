@@ -144,4 +144,40 @@ describe("_RegisterInternalAgentRuntimeStream", function _runtimeTransportSuite(
 		expect(nextCommand).toHaveBeenCalledWith(expect.anything(), _streamOpen, 0);
 		expect(nextCommand).toHaveBeenCalledWith(expect.anything(), _streamOpen, 1);
 	});
+
+	it("signals stream loss to the authority when the connection closes", async function _releaseOnClose()
+	{
+		const release = vi.fn<NonNullable<RuntimeCommandStreamAuthority["__ReleaseStream"]>>().mockResolvedValue(undefined);
+		const app = express();
+		app.use(_RegisterInternalAgentRuntimeStream({
+			tokenReviewer: { async __Review() { return { subject: "system:serviceaccount:tenant:agent-runtime", namespace: "tenant", serviceAccountName: "agent-runtime", podUid: _streamOpen.podUid }; } },
+			authority: { async __NextCommand() { return null; }, async __AdmitCandidate() { return { accepted: false }; }, __ReleaseStream: release },
+			maxBodyBytes: 64 * 1024,
+			heartbeatMilliseconds: 5,
+			commandPollMilliseconds: 2,
+		}));
+		const server = createServer(app);
+		await new Promise<void>(function _listen(resolve) { server.listen(0, "127.0.0.1", resolve); });
+		const address = server.address() as AddressInfo;
+		try
+		{
+			await new Promise<void>(function _consume(resolve, reject)
+			{
+				const timer = setTimeout(function _timedOut() { reject(new Error("stream never opened")); }, 1_000);
+				const clientRequest = httpRequest({ hostname: "127.0.0.1", port: address.port, path: "/stream", method: "POST", headers: { Authorization: "Bearer valid-token", "Content-Type": "application/json" } }, function _response(response)
+				{
+					response.setEncoding("utf8");
+					response.on("data", function _data() { clearTimeout(timer); response.destroy(); resolve(); });
+					response.on("error", reject);
+				});
+				clientRequest.on("error", reject);
+				clientRequest.end(JSON.stringify(_streamOpen));
+			});
+			await vi.waitFor(function _released() { expect(release).toHaveBeenCalledWith(expect.objectContaining({ podUid: _streamOpen.podUid }), _streamOpen); });
+		}
+		finally
+		{
+			await _CloseServer(server);
+		}
+	});
 });

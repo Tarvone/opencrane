@@ -27,6 +27,8 @@ export interface RuntimeCommandStreamAuthority
 	__NextCommand(identity: RuntimeWorkloadIdentity, open: RuntimeStreamOpen, afterSequence: number): Promise<RuntimeCommandEnvelope | null>;
 	/** Admit a runtime candidate through the authoritative run boundary. */
 	__AdmitCandidate(identity: RuntimeWorkloadIdentity, candidate: RuntimeCandidate): Promise<RuntimeCandidateAdmission>;
+	/** Signal that an authenticated runtime stream was lost so the authority can release its binding. */
+	__ReleaseStream?(identity: RuntimeWorkloadIdentity, open: RuntimeStreamOpen): Promise<void>;
 }
 
 /** Stable result sent after a candidate reaches the authoritative run boundary. */

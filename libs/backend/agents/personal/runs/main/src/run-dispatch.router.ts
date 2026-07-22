@@ -109,6 +109,27 @@ export function __CreateAgentControllerRunDispatchRouter(dependencies: AgentCont
 		}
 	});
 
+	router.post("/run-outbox:prune", async function _pruneOutbox(request: Request, response: Response)
+	{
+		try
+		{
+			// 1. Restrict operational retention to the same TokenReview-confirmed controller identity.
+			if (!await _IsController(request, dependencies) || !_IsEmptyObject(request.body))
+			{
+				_RespondProblem(response, 401, "controller_identity_denied");
+				return;
+			}
+
+			// 2. Keep selection and deletion in the database-owned transaction, never in HTTP memory.
+			response.status(200).json(await dependencies.repository.prunePublishedOutboxEventsAtomically());
+		}
+		catch (err)
+		{
+			dependencies.logger.error({ err, operation: "agent_controller.outbox_prune" }, "Agent-controller outbox retention failed");
+			_RespondProblem(response, 503, "dispatch_authority_unavailable");
+		}
+	});
+
 	router.put("/workload-releases/:eventId/registration", async function _registerPod(request: Request, response: Response)
 	{
 		try

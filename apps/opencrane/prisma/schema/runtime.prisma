@@ -1,0 +1,48 @@
+/// Command kind durably minted onto one runtime command stream. Slice 1 issues only the
+/// lifecycle commands the runtime can act on without a model or tool executor.
+enum RuntimeCommandKind {
+  StartAttempt  @map("start_attempt")
+  ResumeAttempt @map("resume_attempt")
+  CancelAttempt @map("cancel_attempt")
+}
+
+/// Per-attempt durable authority for the runtime command stream. It owns the monotonic command
+/// sequence, the server-owned lease fence, the runtime instance bound to the current stream, and
+/// the accepted candidate ids. It is created lazily the first time a registered runtime Pod polls
+/// its stream and is never edited from a non-owning domain; the dispatch adapter reloads and locks
+/// the live WorkloadAssignment on every call rather than trusting a foreign-key snapshot.
+model RuntimeCommandStream {
+  runId                String                     @map("run_id")
+  attempt              Int
+  fence                Int                        @default(1)
+  runtimeInstanceId    String?                    @map("runtime_instance_id")
+  nextCommandSequence  Int                        @default(1) @map("next_command_sequence")
+  acceptedCandidateIds String[]                   @default([]) @map("accepted_candidate_ids")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
+  commands             RuntimeDispatchedCommand[]
+
+  @@id([runId, attempt])
+  @@map("runtime_command_streams")
+}
+
+/// One durably minted command dispatched to the runtime. The rows for an attempt are exactly the
+/// authority's accepted command-id set, and `(runId, attempt, sequence)` is strictly monotonic so a
+/// reconnecting runtime can be re-sent an already-accepted command without the sequence advancing.
+model RuntimeDispatchedCommand {
+  id        String               @id @default(cuid())
+  runId     String               @map("run_id")
+  attempt   Int
+  sequence  Int
+  commandId String               @unique @map("command_id")
+  kind      RuntimeCommandKind
+  fence     Int
+  issuedAt  DateTime             @map("issued_at")
+  expiresAt DateTime             @map("expires_at")
+  createdAt DateTime             @default(now()) @map("created_at")
+  stream    RuntimeCommandStream @relation(fields: [runId, attempt], references: [runId, attempt], onDelete: Restrict)
+
+  @@unique([runId, attempt, sequence])
+  @@index([runId, attempt])
+  @@map("runtime_dispatched_commands")
+}

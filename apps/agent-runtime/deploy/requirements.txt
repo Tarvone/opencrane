@@ -1,0 +1,4 @@
+# Sole runtime dependency: a maintained P-256 (ES256) key generator for the one-use bootstrap
+# exchange. The runtime generates a per-run keypair, binds its public half, and later signs
+# capability proofs; the standard library has no elliptic-curve key generation.
+cryptography==44.0.0

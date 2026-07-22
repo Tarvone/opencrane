@@ -214,6 +214,32 @@ describe("agent-controller orchestration", function _Suite()
 		expect(removeListener).toHaveBeenCalledTimes(1);
 	});
 
+	it("prunes at startup, retries after a maintenance failure, and stops without arming another delay", async function _PrunesDeliveredOutboxReliably()
+	{
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-07-22T10:00:00.000Z"));
+		const shutdown = new AbortController();
+		const error = vi.fn();
+		let pruneAttempts = 0;
+		const authority = _Authority({
+			async __PrunePublishedOutbox()
+			{
+				pruneAttempts += 1;
+				if (pruneAttempts === 1) throw new Error("maintenance authority unavailable");
+				shutdown.abort();
+				return 2;
+			},
+		});
+		const options = { ..._Options(authority, _Kubernetes({})), outboxPruneIntervalMilliseconds: 60_000, log: { info: vi.fn(), error } as unknown as Logger };
+
+		const running = __RunAgentController(options, shutdown.signal);
+		await vi.advanceTimersByTimeAsync(60_000);
+		await running;
+
+		expect(pruneAttempts).toBe(2);
+		expect(error).toHaveBeenCalledWith(expect.objectContaining({ err: expect.any(Error) }), "agent controller outbox retention failed");
+	});
+
 	it("rejects a deployment profile with a non-Kubernetes image pull policy", function _RejectsInvalidPullPolicy()
 	{
 		const profile = { ..._Profiles()["personal-default"], imagePullPolicy: "Sometimes" };

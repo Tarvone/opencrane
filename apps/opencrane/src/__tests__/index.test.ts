@@ -56,7 +56,18 @@ function _buildAuthApp(): Express
 async function _BuildRuntimeCandidateApp(username: string, audiences: string[] = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE]): Promise<Express>
 {
   const { _RegisterInternalRoutes } = await import("../app/routes.js");
-  const prisma = {} as PrismaClient;
+  // The real Prisma dispatch authority runs inside a transaction and loads the live assignment for
+  // the reviewed Pod. Returning no assignment lets an authenticated runtime reach the authority and
+  // receive its real fail-closed candidate denial instead of a hardcoded stub reason.
+  const prisma = {
+    $transaction: vi.fn(async function _transaction(run: (tx: unknown) => Promise<unknown>)
+    {
+      return run({
+        $queryRaw: vi.fn().mockResolvedValue([]),
+        workloadAssignment: { findUnique: vi.fn().mockResolvedValue(null) },
+      });
+    }),
+  } as unknown as PrismaClient;
   const authApi = {
     createTokenReview: vi.fn().mockResolvedValue({
       status: {
@@ -179,8 +190,11 @@ describe("Control Plane", () =>
       const accepted = await request(acceptedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
       const rejected = await request(rejectedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
 
+      // A reviewed runtime SA reaches the real dispatch authority, which fails closed with a
+      // contract reason (no live assignment for this Pod) rather than a stubbed placeholder string.
       expect(accepted.status).toBe(409);
-      expect(accepted.body).toEqual({ accepted: false, reason: "RUNTIME_ASSIGNMENT_UNAVAILABLE" });
+      expect(accepted.body).toEqual({ accepted: false, reason: "unknown_workload" });
+      // A subject outside the bounded runtime namespace/SA grammar never reaches the authority.
       expect(rejected.status).toBe(401);
     });
 

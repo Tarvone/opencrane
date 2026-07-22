@@ -276,6 +276,8 @@ export async function __RunAgentController(options: AgentControllerOptions, sign
 			}
 			nextOutboxPruneAt = Date.now() + outboxPruneIntervalMilliseconds;
 		}
+		// 4. Do not arm one more idle-delay listener after shutdown interrupted controller-only maintenance.
+		if (signal.aborted) break;
 		if (didWork) continue;
 		await _Wait(options.pollIntervalMilliseconds, signal);
 	}

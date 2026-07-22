@@ -15,8 +15,12 @@
     { "path": "apps/opencrane/src/__tests__/config.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/__tests__/index.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/app/config.ts", "owner": "apps/opencrane", "classification": "app-config" },
+    { "path": "apps/opencrane/src/app/__tests__/external-action-executor.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
+    { "path": "apps/opencrane/src/app/external-action-executor.ts", "owner": "apps/opencrane", "classification": "route-composition" },
+    { "path": "apps/opencrane/src/app/external-action-executor.types.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/instrument.ts", "owner": "apps/opencrane", "classification": "process-instrumentation" },
     { "path": "apps/opencrane/src/app/log.ts", "owner": "apps/opencrane", "classification": "process-logging" },
+    { "path": "apps/opencrane/src/app/prisma-run-input-compiler.ts", "owner": "apps/opencrane", "classification": "prisma-composition" },
     { "path": "apps/opencrane/src/app/routes.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/hosting/hosting-adapter.factory.ts", "owner": "apps/opencrane", "classification": "hosting-composition" },
     { "path": "apps/opencrane/src/hosting/index.ts", "owner": "apps/opencrane", "classification": "hosting-composition" },
@@ -63,6 +67,8 @@
     { "path": "apps/agent-controller/vitest.config.ts", "owner": "apps/agent-controller", "classification": "test-config" },
 
     { "path": "apps/agent-runtime/src/runtime.py", "owner": "apps/agent-runtime", "classification": "process-entrypoint" },
+    { "path": "apps/agent-runtime/tests/test_conformance.py", "owner": "apps/agent-runtime", "classification": "composition-test" },
+    { "path": "apps/agent-runtime/tests/test_fault_matrix.py", "owner": "apps/agent-runtime", "classification": "composition-test" },
     { "path": "apps/agent-runtime/tests/test_runtime.py", "owner": "apps/agent-runtime", "classification": "composition-test" },
 
     { "path": "apps/feat-central-agents/src/__tests__/connectors/slack.connector.test.ts", "owner": "apps/feat-central-agents", "classification": "delete" },

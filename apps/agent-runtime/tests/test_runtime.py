@@ -1,9 +1,11 @@
 """Focused behavioral tests for the runtime shell, its bootstrap exchange, and the model executor.
 
 The executor is exercised offline against recorded neutral-event fixtures fed through the same
-normalizer the live Pydantic AI driver feeds. Driving the real ``pydantic-ai`` package against a
-fake OpenAI-compatible endpoint is the deferred adoption gate recorded in ADR 0010 and is not run
-here; these tests import no framework package and reach no network.
+normalizer the live Pydantic AI driver feeds. The broader offline conformance harness and
+fault-injection matrix live in ``test_conformance.py`` and ``test_fault_matrix.py``. Driving the real
+``pydantic-ai`` package against a live LiteLLM-compatible endpoint is the adoption gate recorded in
+ADR 0010, gated on #337, and is not run here; these tests import no framework package and reach no
+network.
 """
 
 import contextlib
@@ -569,9 +571,9 @@ class RuntimeResumeCancelTests(unittest.TestCase):
 
 
 class RuntimePydanticAiDriverTests(unittest.TestCase):
-    """Guard the deferred live driver so its conformance gate is explicit, not silently skipped."""
+    """Guard the live driver import so its #337 adoption gate is explicit, not silently skipped."""
 
-    @unittest.skipUnless(importlib.util.find_spec("pydantic_ai") is not None, "pydantic-ai is installed only in the adoption/conformance environment")
+    @unittest.skipUnless(importlib.util.find_spec("pydantic_ai") is not None, "pydantic-ai is installed only in the #337 live-LiteLLM adoption/conformance environment")
     def test_driver_module_is_importable_when_present(self) -> None:  # pragma: no cover - adoption env only
         """When the pinned framework is present, the lazily imported driver symbols resolve."""
         from pydantic_ai import Agent  # noqa: F401

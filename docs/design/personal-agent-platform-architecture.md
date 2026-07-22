@@ -1,30 +1,29 @@
 # Personal-agent platform architecture
 
-Status: **proposed for review — 2026-07-16.** This is a decision document, not an accepted
-ADR. If the runtime and authority decisions below are accepted, record them in new ADRs and use
-either the companion [strangler migration plan](personal-agent-platform-simplification-plan.md) or
-the alternative [rewrite-freeze plan](personal-agent-platform-rewrite-freeze-plan.md) as the
-accepted execution sequence. The
+Status: **adopted — 2026-07-16.** [ADR 0005](../adr/0005-opencrane-owned-agent-runtime.md)
+records the OpenCrane-owned runtime end state. The
+[direct-refactor plan](../../plan.md) is the execution sequence:
+build the target product directly and delete superseded code in the same replacement slices. The
 [OpenClaw loop investigation](openclaw-agent-loop-replacement-plan.md) provides the pinned source
 trace, toolkit decision gate, and conformance plan for the runtime slice.
 
-## Decision requested
+## Decision
 
 Adopt a personal-agent platform in which the user's own assistant is the primary product and the
 same assistant is the front door to company AI assets. Use one per-ClusterTenant OpenCrane API as
-the authority for silo-owned agents, assets, grants, persona, schedules, and runs; keep
-fleet-managed membership/lifecycle as explicit upstream contracts. Use one runtime contract, one
+the authority for agents, assets, grants, persona, schedules, runs, and membership. Use one runtime contract, one
 artifact authority, one scheduler/controller, and one management console.
 
-The recommended end state is an OpenCrane-owned, OpenClaw-free TypeScript runtime with one
+The target is an OpenCrane-owned, OpenClaw-free TypeScript runtime with one
 conformance-selected `AgentLoopDriver`. The
 [OpenAI Agents SDK](https://openai.github.io/openai-agents-js/) is the leading candidate; Vercel AI
 SDK's `ToolLoopAgent` is the control and fallback.
-The delivery strategy is a separate decision. The strangler reaches the target through staged
-replacement behind `ConversationGateway`, with a deliberately reduced, immutable OpenClaw runtime
-as its temporary bridge. The rewrite-freeze route holds the complete blue platform at a supportable
-release while green is built without an OpenClaw bridge, then replaces one whole ClusterTenant silo
-at a time.
+
+Build that target directly. Do not transfer, import, convert, or preserve legacy data, state,
+configuration, credentials, keys, salts, schemas, protocols, IDs, or runtime behavior. Create the
+new stores, credentials, persona, grants, catalog, skills, providers, agents, documents, and
+artifacts from the target contracts. OIDC remains the live identity authority, not a legacy
+input. Each replacement slice deletes the OpenClaw or earlier OpenCrane path it supersedes.
 
 This is a simplification **only if the replacement is exclusive**. Keeping OpenClaw and the selected
 driver as permanent peers would create two loop contracts, two session models, two persona paths,
@@ -33,9 +32,8 @@ the most complex option and is explicitly out of scope.
 
 The target can be summarized as five rules:
 
-1. **One silo management authority:** Postgres behind the per-silo OpenCrane API owns agents,
-   assets, grants, persona, schedules, and runs. In fleet-managed mode, fleet lifecycle and
-   membership remain explicit upstream authorities with a fail-closed silo read model.
+1. **One management authority:** Postgres behind the per-ClusterTenant OpenCrane API owns
+   agents, assets, grants, persona, schedules, runs, and membership.
 2. **One agent loop:** the conformance-selected TypeScript driver in a pinned OpenCrane runtime
    image.
 3. **One artifact authority:** content-addressed files on a Kubernetes volume, with metadata in
@@ -43,8 +41,8 @@ The target can be summarized as five rules:
 4. **One agent-workload controller:** the only application identity allowed to create OpenCrane
    agent Deployments, CronJobs, and Jobs. Obot's separately confined upstream controller is the
    narrow exception for MCP-server workloads in its own namespace.
-5. **One management path:** OpenCrane API first, OpenCrane UI for people, and only a thin generated
-   automation client where a CLI is still justified.
+5. **One management path:** OpenCrane API first, OpenCrane UI for people, and generated clients
+   for automation. There is no separately maintained command-line product.
 
 ## Why this is the right boundary
 
@@ -61,11 +59,10 @@ already owns or intends to own almost every one of those concerns differently:
 - Kubernetes isolation, workload identity, and lifecycle;
 - company-wide assets, sharing, audit, and an operational console.
 
-The result is not a light OpenClaw installation. It is an OpenCrane platform translating its own
-state into OpenClaw's state. That translation currently includes a 609-line startup script, a
+The current result is not a light OpenClaw installation. It is an OpenCrane platform translating
+its own state into OpenClaw's state. That translation includes a 609-line startup script, a
 458-line generated ConfigMap, a 271-line OpenClaw schema, and 1,689 lines of frontend protocol and
-event adaptation before tests. OpenClaw remains the lower-risk short-term runtime because it already
-supplies session and loop behavior, but its long-term role is mostly compatibility work.
+event adaptation before tests. Those paths are deletion evidence, not a runtime to preserve.
 
 The leading Agents SDK candidate has the opposite shape. It supplies the bounded loop, tools,
 handoffs, streaming, sessions interface, MCP clients, approvals, guardrails, and tracing hooks. It
@@ -88,7 +85,7 @@ This proposal covers:
 - MCP tool use through Obot and memory through Cognee;
 - organization, department, team, personal, and direct-share authorization;
 - OIDC channel security, workload identity, Cilium policy, audit, observability, and consoles;
-- the OpenClaw-retained and owned-loop migration alternatives.
+- the OpenCrane-owned loop and deletion of the OpenClaw runtime it replaces.
 
 It does not create:
 
@@ -104,8 +101,8 @@ It does not create:
 ### What is structurally sound
 
 The accepted per-ClusterTenant silo decision remains the right containment boundary. Each silo owns
-its OpenCrane API/database, Cognee, Obot, LiteLLM, agent workloads, and storage. Fleet lifecycle—and
-membership in fleet-managed mode—and Zitadel authentication are cross-silo. This preserves
+its OpenCrane API/database, Cognee, Obot, LiteLLM, agent workloads, and storage. Zitadel
+authentication is the external identity boundary. This preserves
 independent data, credentials, resource limits, backup, and failure domains; see
 [ADR 0002](../adr/0002-per-clustertenant-silo-architecture.md).
 
@@ -122,12 +119,12 @@ The same platform also has separate or overlapping state for:
 
 - OpenClaw workspace files and central company/workspace document versions;
 - OpenClaw JSONL sessions and a disconnected `SessionScope` table;
-- Cognee datasets, bespoke Cognee credentials, and legacy awareness tables;
+- Cognee datasets, bespoke Cognee credentials, and superseded awareness tables;
 - MCP access policies, MCP grants, generic grants, credentials, installs, and an effective contract;
 - skill bytes in Postgres, OCI/Zot, runtime files, and now-removed shared-PVC assumptions;
 - OpenClaw pairing/device records although the browser uses a same-origin authenticated proxy.
 
-Repair loops, translation layers, fallback paths, and compatibility flags are symptoms of these
+Repair loops, translation layers, fallback paths, and transitional flags are symptoms of these
 multiple authorities. They should not be carried into the target.
 
 ### Documentation and backlog are not mutually current
@@ -205,11 +202,15 @@ a logical module in the OpenCrane API.
 | `apps/opencrane-ui` | Agent, asset, schedule, run, approval, access, and operations console | Client of the API only | Keep and complete |
 | `apps/channel-proxy` | Same-origin ingress, origin checks, delegated OpenCrane session/OIDC resolution, stream relay, rate limits | Internet-facing PEP; no session/policy storage or K8s mutation | Extract the existing gateway proxy without duplicating auth logic |
 | `apps/agent-controller` | Consume desired state through an authenticated OpenCrane internal API; reconcile AgentService records into Deployments/CronJobs/Jobs/KSAs/policies; report execution status | Sole general agent-workload K8s mutator; no direct business-policy writes | Extract controller/scheduler responsibility from the API process |
-| `apps/agent-runtime` | Pinned TypeScript image with the selected toolkit loop, normalized events, MCP and trusted tool adapters | Zero K8s API rights; per-run capability only | Create; replaces OpenClaw at cutover |
+| `apps/agent-runtime` | Pinned TypeScript image with the selected toolkit loop, normalized events, MCP and trusted tool adapters | Zero K8s API rights; per-run capability only | Create; delete the superseded OpenClaw runtime in the same replacement slice |
+| `apps/managed-agent-runtime` | Execute first-party and tenant-created managed AgentService revisions as controller-assigned Jobs or bounded Deployments | Zero K8s API rights; declared managed-agent capability only | Create one runtime owner; agents remain records, not nested app roots |
 | `apps/artifact-service` | Stage/scan/hash/stream canonical bytes, content-addressed versions, workspace leases, retention | Owns its PVC and enforces artifact capabilities; no policy store | Create; absorbs skill delivery bytes |
-| `apps/cognee` | Pinned upstream deployment, PVC, SA, probes, backup, upgrade tests; memory/index adapters | Derived memory/index data only | Promote embedded Helm templates to an app-owned unit |
-| `apps/obot` | Pinned upstream gateway/controller, credential custody, tool execution, constrained runtime namespace | MCP PEP; privileged controller isolated from callers | Promote embedded Helm templates and narrow RBAC |
-| `apps/opencrane-infra` | Per-silo umbrella composition and a small deployment profile | No feature ownership | Keep, but consume app-owned deploy units |
+| `apps/memory-gateway` | Authorize and execute online recall/capture against Cognee | Memory PEP; no business-policy store | Create as a distinct online trust and scaling boundary |
+| `apps/cognee-indexer` | Consume the artifact outbox and project canonical content into Cognee | Derived index writer; no user-facing ingress | Create as a distinct asynchronous lifecycle |
+| `apps/_infra/cognee` | Pinned upstream deployment, PVC, SA, probes, backup, and upgrade tests | Derived memory/index data only | Promote embedded Helm templates to an app-owned unit |
+| `apps/postgres` | Own the target CNPG Cluster resource, storage profile, backup, and readiness contract | Product database deployment owner; BYO CNPG remains the narrow owner of its generated instance ServiceAccount and Role | Create; replaces script-owned database provisioning |
+| `apps/_infra/obot` | Pinned upstream gateway/controller, credential custody, tool execution, constrained runtime namespace | MCP PEP; privileged controller isolated from callers | Promote embedded Helm templates and narrow RBAC |
+| `apps/_infra/deploy-k8s` | Per-silo umbrella composition and a small deployment profile | No feature ownership | Keep, but consume app-owned deploy units |
 | LiteLLM | Model routing, provider keys, aliases, budgets, capability matrix | Model/provider PEP | Keep pinned and per silo |
 
 Logical modules that should **not** become separate applications initially:
@@ -236,7 +237,7 @@ open-source systems remain replaceable modules, not mandatory core dependencies:
 | Policy rules over structured context | Typed code and shared conformance fixtures | [OPA](https://www.openpolicyagent.org/docs) when independently authored policy bundles and a distinct policy lifecycle are proven needs |
 | Scheduling/retry | Lightweight Kubernetes CronJob trigger + transactional AgentRun + controller-created one-attempt Job | [Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/) for real DAG execution; [Temporal](https://docs.temporal.io/) or [Restate](https://docs.restate.dev/) for frequent multi-day durable orchestration/compensation |
 | Artifact bytes | Thin POSIX content-addressed service on the existing K8s storage class | S3-compatible or distributed storage only when multi-writer scale, replication, or external object clients require it; no object API by default |
-| Agent loop | Conformance-selected OpenCrane `AgentLoopDriver`; OpenAI Agents SDK is the leading candidate | OpenClaw compatibility adapter during migration; no permanent second loop |
+| Agent loop | Conformance-selected OpenCrane `AgentLoopDriver`; OpenAI Agents SDK is the leading candidate | An alternate TypeScript toolkit only if it passes the same independently authored target fixtures and live LiteLLM conformance gates; OpenClaw is evidence for deletion, never a fixture source or oracle |
 | Memory/index | Cognee behind an OpenCrane gateway | Replaceable through the memory adapter; never the artifact authority |
 | MCP runtime | Obot behind a validating gateway | Replaceable through the MCP adapter; never the grant authority |
 | Operational telemetry | Existing OpenTelemetry pipeline and OpenCrane run ledger | Langfuse for optional prompt evaluation/annotation, not required platform operation |
@@ -289,9 +290,10 @@ Use actions such as `discover`, `read`, `write`, `invoke`, `trigger`, `revise`, 
 `publish`, `approve`, `readLogs`, and `administer`. Direct sharing is simply one or more grants to
 named users; it does not need a special Kubernetes primitive.
 
-The existing `project` scope cannot disappear implicitly. Gate 0 must either retain project as a
-first-class subject/group or migrate each project relationship to a named team/department construct
-with verified membership and access parity.
+`project` is a first-class containment dimension and may include people from different departments.
+Department membership neither grants nor prevents project membership. Project memberships and
+grants are created from the target model; earlier relationships, subjects, timestamps, and IDs are
+not copied or translated.
 
 The effective rights for a run are:
 
@@ -314,16 +316,11 @@ synchronization and operating problem before the resource/action model itself is
 
 ### Membership authority and freshness
 
-“Central port of authority” does not mean pretending fleet-owned membership is local. In a
-fleet-managed install, the fleet `OrgMembership` store remains authoritative and the silo has an
-explicit read model. In standalone mode, the silo owns the same membership contract locally.
-
-The read model needs source version, last successful sync, and freshness policy. Capability issuance
-must fail closed when membership is too stale for the requested action: no new membership-derived
-privilege or administrative capability is issued beyond the accepted freshness window, and existing
-short-lived capabilities expire naturally. Membership writes in fleet-managed mode go through the
-fleet authority; the silo never creates a competing local truth. Gate 0 must set the freshness/expiry
-SLO and outage behavior before the new authorization engine relies on this projection.
+Membership is native to the ClusterTenant authority. The membership record has a monotonically
+increasing revision and is changed only through the authorised management path. Capability
+issuance binds the revision it observed, and fails closed when that evidence is stale for the
+requested action; existing short-lived capabilities expire naturally. The freshness/expiry setting
+is a target authorization parameter, not a production-transition decision.
 
 ### Identity flow
 
@@ -418,6 +415,14 @@ Compile every run from four versioned layers:
 4. **Run context:** recalled memories, relevant company assets, thread history, and temporary
    conversational adaptation.
 
+The personal layer begins with a required onboarding interview, not a generic default persona. A
+versioned question set captures relationship/role, tone and language, answer structure,
+challenge-versus-support preference, initiative, approval/risk boundaries, working habits, and
+memory boundaries. The answer profile selects a reviewed `SOUL.md` template and infuses three to
+five explicit, provenance-linked interview insights. The user previews and approves the resulting
+first PersonaRevision before the first personal-agent session. `SOUL.md` is a versioned template
+source; the runtime receives a compiled PersonaRevision and never mutates a durable workspace file.
+
 This is not a rule against learning. It is a rule against silent, unauditable mutation:
 
 - explicit user statements such as “always give me the conclusion first” can become durable facts;
@@ -455,22 +460,31 @@ retroactive access to the conversation that produced the draft.
 
 Use ordinary filesystem semantics, not an S3 requirement:
 
+- an `Artifact` is the logical asset; an `ArtifactVersion` is its immutable content and metadata;
+  an `ArtifactRef` is an authorized reference from a message or run to that specific version;
+
 - canonical bytes live in a content-addressed layout on an `apps/artifact-service` PVC, for example
   `sha256/ab/<digest>`;
 - Postgres holds artifact IDs, versions, owner, MIME/type, size/hash, lineage, provenance, grants,
-  retention, and derived-index status;
+  deletion state, and derived-index status;
 - every upload is written to a temporary path, scanned, hashed, atomically promoted, and committed
   with an outbox event;
 - backup uses the chosen Kubernetes storage provider's snapshots plus database-consistent metadata;
 - the API hides the storage backend so an RWX filesystem or another blob backend can be introduced
-  later without changing agent contracts.
+  later without changing agent contracts;
+- every durable state path is an explicit persistent-volume mount on an online-expandable
+  StorageClass; capacity alerts and expansion occur before exhaustion;
+- canonical target data has no automatic TTL or expiry and is retained indefinitely until an
+  explicit authorized deletion;
+- runtime-local workspaces are mounted scratch only, never authoritative or backed up, and are
+  cleared when a Pod is replaced, scaled to zero, or its workspace lease expires.
 
 The write protocol preserves the single authority: OpenCrane authorizes and creates an upload lease;
 the artifact service stages, scans, hashes, and idempotently promotes the bytes into the CAS; then an
 authenticated internal finalize call commits ArtifactVersion metadata and the outbox event in one
 OpenCrane transaction. A failed finalize leaves only an unreferenced digest for garbage collection,
 never a visible metadata row pointing to incomplete bytes. Deletes are first marked in OpenCrane and
-are physically purged only after index-removal and retention gates complete **and** a transactional
+are physically purged only after index removal completes **and** a transactional
 live-reference/lease check proves no other ArtifactVersion uses the digest. Garbage collection uses
 a race-safe reference count or mark-and-sweep generation; deleting one logical version can never
 delete shared bytes still referenced by another.
@@ -484,14 +498,14 @@ Cognee is not the blob store. Artifact events drive indexing:
 
 - `ArtifactVersionPublished` queues extraction and `cognify` into the authorized dataset;
 - `ArtifactSharingChanged` updates the projected dataset relationship;
-- `ArtifactDeleted` removes the derived Cognee content before retention finally purges the bytes;
+- `ArtifactDeleted` removes the derived Cognee content before an explicit deletion purges the bytes;
 - failures retry from the outbox and are visible as index lag in the artifact/run console;
 - artifact version IDs and Cognee external IDs are recorded so removal is deterministic.
 
 Cognee's documented dataset permissions can implement a local projection of read/write/delete/share
 rights, but OpenCrane remains the source of those grants. Runtime access goes through a small memory
-gateway using run capabilities; per-user Cognee passwords and unrestricted direct pod access are
-removed after migration.
+gateway using run capabilities. Provision Cognee from the target contract with fresh credentials;
+delete per-user password handling and unrestricted direct pod access in that replacement slice.
 
 ### Multimodal and document authoring
 
@@ -558,8 +572,9 @@ Obot API keys can be scoped to servers/capabilities and expiry, but they are a d
 enforcement credential, not a replacement for the OpenCrane relationship model.
 
 The memory gateway and Cognee indexer shown in the topology are OpenCrane-owned adapter deployments
-packaged by `apps/cognee`; they are not separate policy authorities or separately configurable
-products. They may share one adapter process until measured load requires independent scaling.
+with distinct app roots because online authorization and asynchronous indexing have different
+identity, availability, scaling, and failure contracts. `apps/_infra/cognee` owns only the pinned upstream
+Cognee deployment.
 
 ## Scheduling and workflows
 
@@ -600,10 +615,8 @@ The UI needs six coherent views:
 6. **Security and operations:** effective access explorer, audit decisions, denied calls, component
    health, queue/index lag, runtime versions, and links to cluster telemetry.
 
-API endpoints remain authoritative. The frontend and any CLI use the same generated client. Issue
-[#216](https://github.com/italanta/opencrane/issues/216) should remove duplicated CLI business
-logic: retain only bootstrap, automation, and break-glass commands with proven users; otherwise
-retire the CLI after equivalent API/UI/runbook coverage exists.
+API endpoints remain authoritative. The frontend and automation use generated clients. Phase A
+retired the command-line app after equivalent API, UI, and runbook coverage was established.
 
 ## Observability and operational records
 
@@ -637,44 +650,60 @@ small:
 - submit an approval decision;
 - expose no OpenClaw admin, cron, channel, node, device, or configuration protocol.
 
-In the recommended OpenClaw-free target, OpenCrane owns the canonical transcript and event log. The
+OpenCrane owns the canonical transcript and event log. The
 selected driver receives an explicit context projection or a custom session adapter for each run;
 neither is the product's transcript authority. Compaction creates a versioned summary with
 provenance while retaining the immutable transcript under retention policy. Provider-specific
 compaction may be used when supported, but a provider-neutral fallback is required behind LiteLLM.
-A deliberately retained OpenClaw target instead leaves transcript/session authority in OpenClaw
-and accepts that continuing exception; it must not dual-write every event into a competing
-canonical transcript.
+Do not add a second transcript writer or an OpenClaw adapter to the target path.
 
-## Scenario comparison
+### Conversation, run, and file records
 
-### Scenario A — retain a lean OpenClaw runtime
+**What an `AgentRun` is, end to end.** An `AgentRun` is one execution of our internal Agentic
+Loop — the bounded, streamed model/tool loop OpenCrane owns and runs inside its reliability
+envelope. A single triggering event — an interactive message, a manual invocation, or a schedule
+firing — starts one `AgentRun`. Before any model call, the run freezes its `RunInputSnapshot`
+(persona revision, model route, tool/skill revisions, budgets, memory policy — fields below), so
+nothing decided after that point can change what this run does. The runtime then executes the
+Agentic Loop against that frozen snapshot: stream a model response, execute any tool calls, append
+results, and repeat until no tool calls or queued follow-ups remain — the loop mechanics live in
+the [OpenClaw agent-loop replacement plan](openclaw-agent-loop-replacement-plan.md#the-actual-inner-loop);
+every `AgentRun` is exactly one full execution of that loop, however many rounds it takes. Every
+round — each model call, tool call, and approval — is persisted and streamed live as an ordered
+`RunEvent`, so a run with ten tool calls is exactly as auditable as a run with one. If a step fails
+transiently, the run retries as a new attempt under the same `AgentRun` record, never a new run; if
+the failure is unsafe or attempts are exhausted, the run ends in one persisted terminal failure
+rather than silently disappearing. The run ends — completed, cancelled, or failed — with a terminal
+`RunEvent`; the thread's next message starts an entirely new `AgentRun` with its own fresh
+snapshot.
 
-Keep:
+There is no durable generic `Session` record. A `Thread` is the user-visible conversation and owns
+its immutable `Message` history. An interactive message creates an `AgentRun` for that thread;
+manual and scheduled managed-agent invocations create the same `AgentRun` without requiring a
+thread. A durable one-active-run lease serializes interactive work for a thread, while idempotency
+keys prevent a repeated send or trigger from creating a second external side effect.
 
-- OpenClaw loop, transcript/session engine, compaction, cancellation, and tool execution;
-- the OpenCrane OIDC proxy, cluster lifecycle, grants, Obot, Cognee, LiteLLM, artifact service, and
-  scheduler;
-- a narrow OpenClaw adapter behind `ConversationGateway`.
+Each `AgentRun` references an immutable `AgentRevision` and owns one `RunInputSnapshot`. The
+snapshot freezes the approved persona revision, effective grant/contract evidence, model route,
+tool and skill revisions, budgets, memory-query policy, artifact inputs, and prompt-compiler
+version. A later persona, grant, skill, or policy change cannot alter a run that was already
+accepted.
 
-Change immediately:
+`RunEvent` is the ordered, canonical event stream for a run. It records message output, tool
+lifecycle, approval, artifact, usage, and terminal events before the UI receives them. A
+`ToolInvocation` records the exact action, normalized argument hash, policy decision, dispatch
+idempotency key, side-effect state, and result reference. If the action needs consent, its
+`ApprovalRequest` binds the same run, revision, subject, action, and arguments; resumption uses
+that durable decision rather than a toolkit-local session.
 
-- build an immutable image containing a pinned OpenClaw and Cognee integration—no startup npm
-  installation or self-updater;
-- disable OpenClaw cron, channels, nodes, pairing/device auth, built-in memory, and configuration
-  mutation;
-- make central PersonaRevision and the effective runtime contract the only platform inputs;
-- remove dead shared-skills, CSV MCP policy, arbitrary config overrides, and unused CRD fields;
-- stop claiming editable pod workspace files are authoritative.
+An `Artifact` is the logical asset, such as a report or uploaded document. An `ArtifactVersion` is
+one immutable version of that asset. `ArtifactRef` is the governed link from a `Message`,
+`RunInputSnapshot`, or `RunEvent` to a specific version. The reference preserves provenance and
+access control without putting ungoverned filesystem paths into the conversation protocol.
 
-This is the shortest path to a safer next release. It still retains OpenClaw configuration/schema
-translation, gateway protocol and event folding, plugin upgrades, workspace compatibility,
-transcript semantics, and renderer/A2UI version lockstep. It is a cleaner bridge, not the leanest
-end state.
+## OpenCrane-owned toolkit loop
 
-### Scenario B — OpenCrane-owned toolkit loop
-
-Keep everything above OpenClaw: the product conversation interface, OIDC proxy, controller,
+Keep the product conversation interface, OIDC proxy, controller,
 workload builders, Obot, Cognee, artifacts, LiteLLM, grants, persona, and generic rendering.
 
 Build:
@@ -694,51 +723,46 @@ Use the selected TypeScript provider adapter against the existing LiteLLM OpenAI
 Pin it exactly and test the model/provider capability matrix. Do not use toolkit-local filesystem or
 session memory as durable user memory.
 
-After parity and migration, delete the entire OpenClaw installer/config/protocol/plugin/workspace
-compatibility surface. This has a larger delivery cost but one coherent personal and managed-agent
-runtime afterward.
+After the replacement passes its slice tests, delete the entire OpenClaw
+installer/config/protocol/plugin/workspace surface in the same slice. No OpenClaw state, schema,
+ID, or semantic decision enters the new runtime.
 
 ### Feature distance from the target
 
-Distance means engineering and migration distance, not product importance: **near** is mostly
+Distance means engineering and replacement distance, not product importance: **near** is mostly
 hardening/deletion, **medium** is a new contract or bounded component, and **far** is a new stateful
 capability with operational recovery and UI.
 
-| Feature | Current repo | Lean OpenClaw | OpenClaw-free end state | Final authority |
-|---|---|---|---|---|
-| Personal loop and streaming | Mature OpenClaw loop through a large adapter | **Near:** narrow and harden | **Far:** runner, event adapter, locks, recovery | Runtime plus Run ledger |
-| Threads/transcripts/compaction | OpenClaw JSONL; orphan SessionScope | **Near:** retain, connect scope | **Far:** canonical transcript/session/compaction | OpenCrane Postgres |
-| Stable persona and learning | Split workspace files, company docs, Cognee | **Medium:** prompt compiler to files | **Medium:** prompt compiler to run | PersonaRevision; Cognee evidence |
-| OIDC channel security | Same-origin proxy exists; pairing residue | **Near:** remove residue | **Near:** route new protocol | Channel proxy + OpenCrane authz |
-| Org/team/personal/direct-share RBAC | Grants exist but agent/run/actions are incomplete | **Medium** | **Medium** | OpenCrane authorization |
-| Workload identity/Cilium | Projected tokens partial; Cilium substrate incomplete | **Medium/high** | **Medium/high** | KSA + capabilities + Cilium PEP |
-| MCP/tool calling | OpenClaw tools plus incomplete Obot lifecycle | **Medium:** finish Obot boundary | **Medium:** direct MCP adapter | OpenCrane grants; Obot PEP |
-| Durable memory | Cognee plugin/account lifecycle exists | **Medium:** contain plugin | **Medium:** direct gateway adapter | Cognee data; OpenCrane policy |
-| Artifact storage/sharing | No canonical artifact service | **Far** | **Far** | Artifact service + Postgres metadata |
-| Multimodal intake | Runtime/provider-dependent, no governed pipeline | **Medium/high** | **Medium/high** | Artifact/preprocess pipeline |
-| Document authoring | Ad hoc tool/files, no versioned QA path | **Far** | **Far** | Artifact and trusted authoring Jobs |
-| Skill authoring and Python code | Multiple storage paths; lifecycle issue open | **Far** | **Far** | Skill catalog + artifact versions |
-| Managed agent registry | Central-agent issue/app is Slack-specific | **Far** | **Far** | AgentService/Revision |
-| Scheduling | OpenClaw cron unused; generic service scheduler absent | **Medium/high** | **Medium/high** | OpenCrane run ledger + K8s trigger/Job |
-| Approvals/durable workflows | No unified run/approval ledger | **Far** | **Medium/high:** toolkit pause state may help | OpenCrane Run/Approval state |
-| Run/operations console | Fragmented UI and infra consoles | **Far** | **Far** | OpenCrane UI/API |
-| Observability/audit | OTEL library exists; runtime correlation incomplete | **Medium** | **Medium** | OTEL plus business ledger |
-| Personal per-user isolation | UserTenant pod model exists | **Near** | **Medium:** reuse builders with new image | Agent controller/Kubernetes |
-| Runtime upgrades | Startup install/canary residue | **Medium:** immutable image | **Medium:** pin and conformance suite | Image release pipeline |
-
-Most of the requested company-platform work—artifacts, authorization, scheduling, skill lifecycle,
-and consoles—is required in **both** scenarios. OpenClaw mainly saves the first two rows. The owned
-runtime route is justified by eliminating the long-term adapter and letting personal and managed
-agents use the same run/security model, not by avoiding platform work.
+| Feature | Current repo | Target work | Final authority |
+|---|---|---|---|
+| Personal loop and streaming | OpenClaw loop through a large adapter | **Far:** runner, event adapter, locks, recovery | Runtime plus Run ledger |
+| Threads/transcripts/compaction | OpenClaw JSONL; orphan SessionScope | **Far:** canonical transcript/session/compaction with no imported history | OpenCrane Postgres |
+| Stable persona and learning | Split workspace files, company docs, Cognee | **Medium:** prompt compiler to run | PersonaRevision; Cognee evidence |
+| OIDC channel security | Same-origin proxy exists; pairing residue | **Near:** route new protocol and delete residue | Channel proxy + OpenCrane authz |
+| Org/team/personal/direct-share RBAC | Grants exist but agent/run/actions are incomplete | **Medium** | OpenCrane authorization |
+| Workload identity/Cilium | Projected tokens partial; Cilium substrate incomplete | **Medium/high** | KSA + capabilities + Cilium PEP |
+| MCP/tool calling | OpenClaw tools plus incomplete Obot lifecycle | **Medium:** direct MCP adapter | OpenCrane grants; Obot PEP |
+| Durable memory | Cognee plugin/account lifecycle exists | **Medium:** direct gateway adapter | Cognee data; OpenCrane policy |
+| Artifact storage/sharing | No canonical artifact service | **Far** | Artifact service + Postgres metadata |
+| Multimodal intake | Runtime/provider-dependent, no governed pipeline | **Medium/high** | Artifact/preprocess pipeline |
+| Document authoring | Ad hoc tool/files, no versioned QA path | **Far** | Artifact and trusted authoring Jobs |
+| Skill authoring and Python code | Multiple storage paths; lifecycle issue open | **Far** | Skill catalog + artifact versions |
+| Managed agent registry | Central-agent issue/app is Slack-specific | **Far** | AgentService/Revision |
+| Scheduling | OpenClaw cron unused; generic service scheduler absent | **Medium/high** | OpenCrane run ledger + K8s trigger/Job |
+| Approvals/durable workflows | No unified run/approval ledger | **Medium/high:** toolkit pause state may help | OpenCrane Run/Approval state |
+| Run/operations console | Fragmented UI and infra consoles | **Far** | OpenCrane UI/API |
+| Observability/audit | OTEL library exists; runtime correlation incomplete | **Medium** | OTEL plus business ledger |
+| Personal per-user isolation | UserTenant pod model exists | **Medium:** reuse generic builders with the new image | Agent controller/Kubernetes |
+| Runtime upgrades | Startup installer residue | **Medium:** pin images, run conformance, and complete each in-place application rollout in under five minutes | Image release pipeline |
 
 ## Keep, absorb, and remove
 
-### Keep and strengthen in either scenario
+### Keep and strengthen
 
 - per-ClusterTenant silo boundary and ClusterTenant CRD at the fleet contract;
-- `apps/opencrane`, `apps/opencrane-ui`, and `apps/opencrane-infra` composition role;
+- `apps/opencrane`, `apps/opencrane-ui`, and `apps/_infra/deploy-k8s` composition role;
 - `ConversationGateway` and generic conversation/rendering models;
-- OIDC proxy behavior, rate limiting, tenant target resolution, and full-runtime cut;
+- OIDC proxy behavior, rate limiting, tenant target resolution, and runtime-neutral routing;
 - LiteLLM model/provider/budget boundary;
 - Obot, Cognee, Postgres, projected ServiceAccount tokens, NetworkPolicy/Cilium, and the existing
   observability library;
@@ -755,29 +779,30 @@ agents use the same run/security model, not by avoiding platform work.
 - gateway proxy code moves to `apps/channel-proxy`;
 - tenant runtime reconciliation and scheduling move to `apps/agent-controller`.
 
-### Remove in either scenario after bounded gates
+### Remove in the slice that replaces it
 
 - dead shared-skills scanning/symlinks and `/shared-skills` image paths;
 - CSV MCP policy parsing and unused `Tenant.spec.mcpPolicy`/`channels` fields;
-- runtime self-install/update and the unused OpenClaw canary rollout path;
-- `/auth/pod-token`, BrokeredDevice recording, legacy pairing endpoints, and no-op gateway admin;
+- runtime self-install/update and the unused OpenClaw canary path;
+- `/auth/pod-token`, BrokeredDevice recording, superseded pairing endpoints, and no-op gateway admin;
 - arbitrary `configOverrides` and whole `org-shared-secrets` broadcast;
-- disconnected `SessionScope` CRUD unless replaced by a consumed signed run scope;
-- legacy awareness content/rollout/participation tables after data migration;
-- Postgres/OCI/runtime-file dual-write and fallback after artifact cutover;
+- disconnected `SessionScope` CRUD and every earlier reader; the target creates signed run scope
+  from the new authorization state;
+- superseded awareness content/rollout/participation tables;
+- Postgres/OCI/runtime-file dual-write and fallback when artifact authority lands;
 - Zot as a required core component unless external OCI distribution is proven;
 - Linkerd code after the Cilium baseline is live;
 - fleet, billing, shared-platform, and implicit topology values already moved or unused;
 - stale docs that describe removed CRDs, Obot polling, pairing, or shared skills.
 
-### Remove only after the OpenCrane runtime cutover
+### Remove when the OpenCrane runtime replacement lands
 
 - `apps/feat-openclaw-tenant` and its startup/config renderer/schema;
 - OpenClaw gateway protocol schemas, connection client, event folding, and version shims;
-- OpenClaw workspace marker/render compatibility and mutable workspace persona files;
+- OpenClaw workspace marker/render adapters and mutable workspace persona files;
 - OpenClaw-specific fields, URLs, env vars, tests, renderer/A2UI coupling, and naming;
 - Cognee plugin/account lifecycle used only to satisfy OpenClaw;
-- OpenClaw transcript/session/compaction compatibility.
+- OpenClaw transcript/session/compaction paths.
 
 ## Does this actually simplify operations?
 
@@ -797,29 +822,25 @@ agents use the same run/security model, not by avoiding platform work.
 
 - OpenCrane owns session correctness, stream reconnect, cancellation, recovery, compaction, and run
   persistence instead of inheriting them from OpenClaw;
-- the artifact service and controller become production components with backups, migrations, SLOs,
+- the artifact service and controller become product components with backups, schema evolution, SLOs,
   and on-call responsibility;
 - safe document/code authoring requires isolated Jobs and a publication pipeline;
 - Postgres-driven Kubernetes reconciliation needs an outbox, idempotency, status, and repair loop;
 - the selected toolkit, LiteLLM, and model-provider compatibility must be pinned and tested.
 
-Those costs are justified only because they implement OpenCrane's intended product behavior. They
-are not justified if OpenClaw remains a permanent second runtime. The strangler plan therefore uses
-deletion gates, a time-bounded dual-run window, and an explicit stop/go conformance spike. The
-rewrite-freeze plan instead uses a frozen blue release, isolated green construction, deterministic
-migration rehearsals, and atomic whole-silo cutovers.
+Those costs are justified because they implement OpenCrane's intended product behavior and leave
+one runtime. Every slice must have a target-contract test and a deletion check so a completed
+replacement cannot leave OpenClaw as a permanent second path.
 
-## Proposed decision gates
+## Accepted decision gates
 
-The following decisions should be accepted together before implementation issues are rewritten:
+The following decisions are accepted together and bind the implementation issues:
 
-1. The end state is one OpenCrane-owned, OpenClaw-free runtime with a conformance-selected loop
-   driver; choose one delivery strategy. Lean OpenClaw is a temporary bridge only in the strangler.
-   The rewrite-freeze green release contains no OpenClaw bridge.
-2. Postgres/OpenCrane is the source of truth for silo-owned business state; fleet-managed membership
-   and lifecycle remain explicit upstream contracts, and Kubernetes is execution state.
-3. The ClusterTenant CRD remains at the fleet/silo boundary; Tenant and AccessPolicy CRDs are
-   retired after migration.
+1. The product has one OpenCrane-owned, OpenClaw-free runtime with a conformance-selected loop
+   driver. Do not build an OpenClaw bridge or a parallel runtime path.
+2. Postgres/OpenCrane is the source of truth for ClusterTenant business state, and Kubernetes is execution state.
+3. The ClusterTenant CRD remains at the control-plane boundary; delete Tenant and AccessPolicy CRDs as
+   their target Postgres/OpenCrane model lands, and never use them to initialize the new authority.
 4. Artifact bytes live on a per-silo filesystem/PVC; Cognee is a downstream derived index.
 5. Authorization is a per-silo OpenCrane module first, with signed run capabilities; no global PDP.
 6. Cilium is a workload-network PEP, not user/team RBAC; Linkerd is removed.
@@ -828,6 +849,9 @@ The following decisions should be accepted together before implementation issues
 8. New Python code executes only through an isolated authoring/tool Job and immutable publication.
 9. OpenClaw and the selected replacement loop are not supported as permanent parallel product
    runtimes.
+10. Future application updates roll the one supported target version to ready Pods in under five
+    minutes per silo, remounting existing durable volumes and resuming from canonical state without
+    a parallel product runtime.
 
 ## Primary evidence
 
@@ -839,7 +863,7 @@ Repository evidence:
 - [cluster topology](../agents/cluster-architecture.md)
 - [MCP and skills platform brief](../briefs/mcp-skills-platform-brief.md)
 - [OpenClaw runtime entrypoint](../../apps/feat-openclaw-tenant/deploy/entrypoint.sh)
-- [OpenClaw config renderer](../../apps/opencrane/src/reconcilers/tenants/deploy/2-config-map.ts)
+- [OpenClaw config renderer](../../libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/2-config-map.ts)
 - [OpenClaw frontend adapter](../../libs/frontend/state/conversation/adapter/src/lib/openclaw-conversation-gateway.ts)
 
 Upstream evidence:

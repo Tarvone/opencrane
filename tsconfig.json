@@ -10,65 +10,113 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {
-      "@opencrane/backend/access-tokens": [
-        "./libs/backend/access-tokens/main/src/index.ts"
+      "@opencrane/backend/server/agents/agent-services": [
+        "./libs/backend/server/agents/agent-services/main/src/index.ts"
       ],
-      "@opencrane/backend/audit": [
-        "./libs/backend/audit/main/src/index.ts"
+      "@opencrane/backend/server/agents/channel-targets": [
+        "./libs/backend/server/agents/channel-targets/main/src/index.ts"
       ],
-      "@opencrane/backend/awareness": [
-        "./libs/backend/awareness/main/src/index.ts"
+      "@opencrane/backend/server/agents/artifacts": [
+        "./libs/backend/server/agents/artifacts/main/src/index.ts"
       ],
-      "@opencrane/backend/cluster-tenants": [
-        "./libs/backend/cluster-tenants/main/src/index.ts"
+      "@opencrane/backend/artifacts/store": [
+        "./libs/backend/artifacts/store/main/src/index.ts"
       ],
-      "@opencrane/backend/company-docs": [
-        "./libs/backend/company-docs/main/src/index.ts"
+      "@opencrane/backend/artifacts/filesystem": [
+        "./libs/backend/artifacts/filesystem/main/src/index.ts"
       ],
-      "@opencrane/backend/connections": [
-        "./libs/backend/connections/main/src/index.ts"
+      "@opencrane/backend/artifacts/authorization": [
+        "./libs/backend/artifacts/authorization/main/src/index.ts"
       ],
-      "@opencrane/backend/contract": [
-        "./libs/backend/contract/main/src/index.ts"
+      "@opencrane/backend/server/api-spec": [
+        "./libs/backend/server/api-spec/main/src/index.ts"
       ],
-      "@opencrane/backend/grants": [
-        "./libs/backend/grants/main/src/index.ts"
+      "@opencrane/backend/server/iam/audit": [
+        "./libs/backend/server/iam/audit/main/src/index.ts"
       ],
-      "@opencrane/backend/groups": [
-        "./libs/backend/groups/main/src/index.ts"
+      "@opencrane/backend/server/iam/authorization": [
+        "./libs/backend/server/iam/authorization/main/src/index.ts"
       ],
-      "@opencrane/backend/mcp": [
-        "./libs/backend/mcp/main/src/index.ts"
+      "@opencrane/backend/server/reporting/awareness": [
+        "./libs/backend/server/reporting/awareness/main/src/index.ts"
       ],
-      "@opencrane/backend/metrics": [
-        "./libs/backend/metrics/main/src/index.ts"
+      "@opencrane/backend/server/tenancy/cluster-tenants": [
+        "./libs/backend/server/tenancy/cluster-tenants/main/src/index.ts"
       ],
-      "@opencrane/backend/model-routing": [
-        "./libs/backend/model-routing/main/src/index.ts"
+      "@opencrane/backend/server/knowledge/company-docs": [
+        "./libs/backend/server/knowledge/company-docs/main/src/index.ts"
       ],
-      "@opencrane/backend/policies": [
-        "./libs/backend/policies/main/src/index.ts"
+      "@opencrane/backend/server/tenancy/connections": [
+        "./libs/backend/server/tenancy/connections/main/src/index.ts"
       ],
-      "@opencrane/backend/projection": [
-        "./libs/backend/projection/main/src/index.ts"
+      "@opencrane/backend/agents/personal/conversations": [
+        "./libs/backend/agents/personal/conversations/main/src/index.ts"
       ],
-      "@opencrane/backend/providers": [
-        "./libs/backend/providers/main/src/index.ts"
+      "@opencrane/backend/server/tenancy/contract": [
+        "./libs/backend/server/tenancy/contract/main/src/index.ts"
       ],
-      "@opencrane/backend/retrieval": [
-        "./libs/backend/retrieval/main/src/index.ts"
+      "@opencrane/backend/server/iam/grants": [
+        "./libs/backend/server/iam/grants/main/src/index.ts"
       ],
-      "@opencrane/backend/sessions": [
-        "./libs/backend/sessions/main/src/index.ts"
+      "@opencrane/backend/feat-openclaw-tenant": [
+        "./libs/backend/feat-openclaw-tenant/main/src/index.ts"
       ],
-      "@opencrane/backend/skills": [
-        "./libs/backend/skills/main/src/index.ts"
+      "@opencrane/backend/server/iam/groups": [
+        "./libs/backend/server/iam/groups/main/src/index.ts"
       ],
-      "@opencrane/backend/spend": [
-        "./libs/backend/spend/main/src/index.ts"
+      "@opencrane/backend/server/gateways/mcp": [
+        "./libs/backend/server/gateways/mcp/main/src/index.ts"
       ],
-      "@opencrane/backend/tenants": [
-        "./libs/backend/tenants/main/src/index.ts"
+      "@opencrane/backend/server/iam/identity": [
+        "./libs/backend/server/iam/identity/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/gateways/integrations": [
+        "./libs/backend/server/gateways/integrations/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/reporting/metrics": [
+        "./libs/backend/server/reporting/metrics/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/iam/membership": [
+        "./libs/backend/server/iam/membership/main/src/index.ts"
+      ],
+      "@opencrane/backend/agents/personal/memory": [
+        "./libs/backend/agents/personal/memory/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/gateways/model-routing": [
+        "./libs/backend/server/gateways/model-routing/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/iam/policies": [
+        "./libs/backend/server/iam/policies/main/src/index.ts"
+      ],
+      "@opencrane/backend/agents/personal/personas": [
+        "./libs/backend/agents/personal/personas/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/tenancy/projection": [
+        "./libs/backend/server/tenancy/projection/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/gateways/providers": [
+        "./libs/backend/server/gateways/providers/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/knowledge/retrieval": [
+        "./libs/backend/server/knowledge/retrieval/main/src/index.ts"
+      ],
+      "@opencrane/backend/agents/personal/runs": [
+        "./libs/backend/agents/personal/runs/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/agents/skills": [
+        "./libs/backend/server/agents/skills/main/src/index.ts"
+      ],
+      "@opencrane/backend/agents/personal/session": [
+        "./libs/backend/agents/personal/session/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/reporting/spend": [
+        "./libs/backend/server/reporting/spend/main/src/index.ts"
+      ],
+      "@opencrane/backend/server/tenancy/tenants": [
+        "./libs/backend/server/tenancy/tenants/main/src/index.ts"
+      ],
+      "@opencrane/backend/channel-proxy": [
+        "./libs/backend/channel-proxy/main/src/index.ts"
       ],
       "@opencrane/util": [
         "./libs/util/src/index.ts"
@@ -76,17 +124,38 @@
       "@opencrane/contracts": [
         "./libs/contracts/src/index.ts"
       ],
+      "@opencrane/models/agents": [
+        "./libs/models/agents/main/src/index.ts"
+      ],
+      "@opencrane/models/artifacts": [
+        "./libs/models/artifacts/main/src/index.ts"
+      ],
+      "@opencrane/models/authorization": [
+        "./libs/models/authorization/main/src/index.ts"
+      ],
+      "@opencrane/models/platform-policy": [
+        "./libs/models/platform-policy/main/src/index.ts"
+      ],
       "@opencrane/observability": [
         "./libs/observability/src/index.ts"
       ],
-      "@opencrane/infra/api": [
-        "./libs/infra/api/src/index.ts"
+      "@opencrane/server/_infra/api": [
+        "./libs/server/_infra/api/src/index.ts"
       ],
-      "@opencrane/infra/auth": [
-        "./libs/infra/auth/src/index.ts"
+      "@opencrane/server/_infra/auth": [
+        "./libs/server/_infra/auth/src/index.ts"
       ],
-      "@opencrane/infra/http": [
-        "./libs/infra/http/src/index.ts"
+      "@opencrane/server/_infra/channel-proxy": [
+        "./libs/server/_infra/channel-proxy/src/index.ts"
+      ],
+      "@opencrane/server/_infra/http": [
+        "./libs/server/_infra/http/src/index.ts"
+      ],
+      "@opencrane/server/_infra/obot-custody": [
+        "./libs/server/_infra/obot-custody/src/index.ts"
+      ],
+      "@opencrane/server/_infra/tenant-hosting": [
+        "./libs/server/_infra/tenant-hosting/src/index.ts"
       ],
       "@opencrane/observability/telemetry": [
         "./libs/observability/src/telemetry.ts"

@@ -11,17 +11,14 @@ OpenCrane — there's no special cloud dependency. Pick the path that fits you:
 Both install the same way — the only difference is the size and shape of the
 Kubernetes underneath.
 
-## Connect the command-line tool
+## Connect to the management API
 
-However you deploy, everything in these guides uses the `oc` CLI. Point it at your
-control plane:
+The management UI signs operators in through OIDC and makes same-origin requests with its
+session cookie. There is no static API token to copy into a terminal. Use the UI for operator
+actions and the [interactive API reference](/reference/api) to inspect the same contract.
 
-```bash
-export OPENCRANE_URL=https://<your-domain>
-export OPENCRANE_TOKEN=<your-access-token>
-
-oc auth me        # confirms you're connected
-```
+For TypeScript integrations, use the generated client described in the
+[Contracts SDK](/integrators/contracts-sdk).
 
 ## Then
 

@@ -29,7 +29,7 @@ This document covers the essential operational procedures for deploying, verifyi
 | `kubectl` | ≥ cluster version | Cluster management |
 | PostgreSQL | 14+ | Control-plane state |
 | Node.js | 22 LTS | Image builds |
-| pnpm | 9+ | Workspace builds |
+| npm | 10+ | Workspace builds |
 
 ### Local Installation (k3d)
 
@@ -38,13 +38,13 @@ This document covers the essential operational procedures for deploying, verifyi
 k3d cluster create opencrane --agents 1 --port "8080:80@loadbalancer"
 
 # 2. Bootstrap the full local stack (PostgreSQL + LiteLLM + opencrane-api + operator)
-libs/k8s-platform/tests/k3d-local.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-local.sh
 
 # 3. Verify all pods are running
 kubectl get pods -n opencrane
 
 # 4. Run smoke tests
-libs/k8s-platform/tests/k3d-e2e.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
 ```
 
 ### Production installation (fleet + silos)
@@ -59,7 +59,7 @@ apps/fleet-platform/deploy.sh \
     --cert-manager --acme-email ops@example.com --dns01-provider clouddns
 
 # Step 2: install one silo per ClusterTenant
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
     --base-domain prod.example.com \
     --cluster-tenant acme
 ```
@@ -75,7 +75,7 @@ export GOOGLE_CLOUD_PROJECT=your-project-id
 export GOOGLE_CLOUD_REGION=us-central1
 
 # 3. Apply Terraform infrastructure
-cd libs/k8s-platform/terraform
+cd apps/_infra/deploy-k8s/platform/terraform
 terraform init
 terraform apply -var-file environments/prod/terraform.tfvars
 
@@ -104,7 +104,6 @@ Set these via Helm values — the deploy scripts wire them automatically. The va
 |----------|----------|----------|-------------|
 | `DATABASE_URL` | Yes | `clustertenantManager.database.existingSecret` | Per-silo PostgreSQL connection string |
 | `LITELLM_MASTER_KEY` | Yes (if LiteLLM enabled) | `litellm.existingSecret` | LiteLLM master API key |
-| `OPENCRANE_API_TOKEN` | Yes | — | Bearer token for opencrane-api auth |
 | `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD` | No | — | Drift count before alert fires (0 = disabled) |
 | `OPENCRANE_DRIFT_WEBHOOK_URL` | No | — | Webhook URL for projection-drift alert delivery |
 
@@ -115,14 +114,8 @@ Set these via Helm values — the deploy scripts wire them automatically. The va
 ### Health Checks
 
 ```bash
-# Fleet-manager health (opencrane-system)
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<fleet-host>/api/v1/healthz
-# Expected response: {"status":"ok","db":true}
-
-# Silo clustertenant-manager health
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/healthz
+# Control-plane health (no operator token is required)
+curl --fail-with-body https://<control-plane-host>/healthz
 # Expected response: {"status":"ok","db":true}
 
 # LiteLLM health (per-silo namespace)
@@ -145,13 +138,13 @@ kubectl describe tenant acme -n opencrane-<ct>
 
 ```bash
 # Run the full k3d e2e smoke test
-libs/k8s-platform/tests/k3d-e2e.sh
+apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
 
 # Run workspace unit tests
-pnpm test
+npm test
 
 # Build all packages
-pnpm build
+npm run build
 ```
 
 ### Cognee health check
@@ -195,7 +188,7 @@ apps/fleet-platform/deploy.sh \
     --reuse-values
 
 # Upgrade a silo release
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
     --base-domain prod.example.com \
     --cluster-tenant acme \
     --reuse-values
@@ -231,17 +224,24 @@ kubectl rollout restart deployment/opencrane-fleet-manager -n opencrane-system
 kubectl rollout status deployment/opencrane-fleet-manager -n opencrane-system --timeout 5m
 ```
 
-### OpenClaw Version Update for a Tenant
+### Tenant runtime image update
 
 ```bash
-# Pin a tenant to a specific OpenClaw version (replace <ct> with the ClusterTenant name)
-kubectl patch tenant acme -n opencrane-<ct> \
-  --type merge \
-  --patch '{"spec":{"openclawVersion":"2026.5.1"}}'
+# Upgrade the immutable OpenClaw + Cognee runtime pair for one silo.
+helm upgrade opencrane-<ct> apps/_infra/deploy-k8s \
+  --namespace opencrane-<ct> \
+  --reuse-values \
+  --set tenant.defaultImage.tag=<tested-runtime-tag> \
+  --wait --timeout 10m
 
-# The operator reconciles on next event or restart the pod to trigger immediately
-kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
+# Verify the operator-selected image reached the tenant workloads.
+kubectl get pods -n opencrane-<ct> \
+  -l opencrane.io/tenant \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}'
 ```
+
+The image contains both executable components. Persistent tenant state is mounted
+separately and is never used as a runtime installation directory.
 
 ---
 
@@ -285,18 +285,16 @@ Prisma migrations do not have automatic down-migrations. For critical data rollb
    kubectl scale deployment/opencrane-clustertenant-manager -n opencrane-<ct> --replicas 1
    ```
 
-### Tenant Rollback (OpenClaw Version Pin)
+### Tenant runtime rollback
 
 ```bash
-# If a new OpenClaw version is causing failures, pin to the last known good version
-# (replace <ct> with the ClusterTenant name)
-kubectl patch tenant acme -n opencrane-<ct> \
-  --type merge \
-  --patch '{"spec":{"openclawVersion":"2026.4.15"}}'
-
-# Delete the pod to force an immediate restart with the pinned version
-kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
+# Roll back the silo release so the operator restores the previous immutable image.
+helm rollback opencrane-<ct> <previous-revision> \
+  --namespace opencrane-<ct> --wait --timeout 10m
 ```
+
+Confirm the tenant pods now reference the previous image tag or digest. The rollback
+restores OpenClaw and the Cognee plugin together.
 
 ---
 
@@ -348,7 +346,7 @@ kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
 4. Check database connectivity from LiteLLM
 5. If LiteLLM is permanently unavailable, disable it for recovery on the affected silo:
    ```bash
-   helm upgrade opencrane-<ct> apps/opencrane-infra/ \
+   helm upgrade opencrane-<ct> apps/_infra/deploy-k8s/ \
      --namespace opencrane-<ct> \
      --reuse-values \
      --set litellm.enabled=false \
@@ -393,131 +391,15 @@ kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
 
 ---
 
-## 6. Projection Drift Remediation
+## 6. Management operations
 
-Projection drift occurs when the PostgreSQL projection rows diverge from the Kubernetes CRD source of truth.
+Projection review and repair, LiteLLM-key lifecycle, assistant lifecycle operations, and MCP
+policy management are available from the OIDC-authenticated management UI. It calls the public
+same-origin API contract and records each write in the audit trail. Static bearer tokens and
+terminal automation are intentionally unsupported in the clean target.
 
-### Detect drift
-
-Drift is detected and repaired per silo. Replace `<silo-host>` with the URL of the affected silo's clustertenant-manager.
-
-```bash
-# Full drift report with lag metrics
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/metrics/projection-drift | jq .
-
-# Tenant-specific drift report
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/drift | jq .
-
-# Policy-specific drift report
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/policies/drift | jq .
-```
-
-### Repair drift
-
-```bash
-# Dry-run repair (shows what would change, does not write)
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/repair | jq .
-
-# Apply repair (write changes to PostgreSQL)
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "https://<silo-host>/api/v1/tenants/repair?dryRun=false" | jq .
-
-# Repair AccessPolicy projections
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  "https://<silo-host>/api/v1/policies/repair?dryRun=false" | jq .
-```
-
----
-
-## 7. LiteLLM Key Lifecycle
-
-LiteLLM keys are managed per silo. Replace `<silo-host>` with the clustertenant-manager URL of the relevant silo, and `<ct>` with the ClusterTenant name.
-
-### View active key for a tenant
-
-```bash
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/litellm-key | jq .
-```
-
-### Revoke and regenerate a key
-
-```bash
-# Revoke the current key
-curl -X POST -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/litellm-key/revoke
-
-# The operator will generate a new key on the next reconcile cycle.
-# Force reconcile by deleting the tenant pod:
-kubectl delete pod -n opencrane-<ct> -l opencrane.io/tenant=acme
-```
-
-### View tenant spend
-
-```bash
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/ai-budget/acme/spend | jq .
-```
-
----
-
-## 8. Tenant Lifecycle Operations
-
-Tenant lifecycle operations target a **silo's clustertenant-manager**. Replace `<silo-host>` with the URL of the target silo and `<ct>` with the ClusterTenant name.
-
-### Create a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  -H "Content-Type: application/json" \
-  https://<silo-host>/api/v1/tenants \
-  -d '{
-    "name": "acme",
-    "displayName": "ACME Corp",
-    "email": "owner@acme.com",
-    "team": "engineering",
-    "monthlyBudgetUsd": 200
-  }'
-```
-
-### Suspend a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme/suspend
-```
-
-### Resume a tenant
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme/resume
-```
-
-### Delete a tenant
-
-```bash
-curl -X DELETE \
-  -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<silo-host>/api/v1/tenants/acme
-```
-
-> **Note**: Deletion removes the Kubernetes deployment and service but retains the tenant's encryption key Secret for data recovery.
-
-### Apply MCP server restrictions to a tenant
-
-```bash
-kubectl patch tenant acme -n opencrane-<ct> \
-  --type merge \
-  --patch '{"spec":{"mcpPolicy":{"deny":["external-search"],"allow":["skills","retrieval"]}}}'
-```
+For read-only cluster diagnosis, use the Kubernetes commands in the sections above. For the
+route and response shapes used by the UI, see the [interactive API reference](/reference/api).
 
 ---
 

@@ -40,16 +40,16 @@ fresh context — do not assume the author's intent was correct.
 
 ### DIMENSION: correctness
 - Logic bugs, edge cases, off-by-one, unhandled null/undefined.
-- Unintended violations of the declared target contract. In rewrite-freeze GREEN mode, legacy
-  incompatibility is intentional and compatibility shims are defects; frozen-blue exceptions still
-  preserve the signed support contract.
+- Unintended violations of the declared target contract. In direct-replacement work, compatibility
+  shims, dual writes, old-protocol fallbacks, and preservation of code classified for deletion are
+  defects.
 - Failure handling: retries, timeouts, resource cleanup.
 - **Silent failures are a defect**: a bare `catch {}` or fail-closed
   `return null`/`continue` on an anomalous path with no structured log line
   (via `@opencrane/observability`, correct level, structured fields, no secrets)
   is a finding. Expected/benign early returns need no log.
 - Tests exist for changed behaviour and for the regression being fixed. When in
-  doubt run them: `pnpm --filter <pkg> test`.
+  doubt run them: `npx nx run <project>:test`.
 - **Operational correctness** (these cost real live-deploy iterations when missed —
   flag them at PR time):
   - *Persistence.* A workload that stores state it must not lose (database, vector/graph
@@ -78,14 +78,19 @@ fresh context — do not assume the author's intent was correct.
 
 ### DIMENSION: residue
 - New way added → hunt the OLD way still present (superseded route/module/env/flag/
-  config/spec entry). A migration is done only when the replaced path is gone.
+  config/spec entry). A replacement is done only when the replaced path is gone.
 - Classify each remnant: **dead** (no references — say "safe to delete"),
-  **superseded-but-wired** (migrate callers, then remove), **must-survive capability**
+  **superseded-but-wired** (switch callers, then remove), **must-survive capability**
   (mechanism changes, capability stays — never propose deleting it).
 - **Contract drift**: an `openapi/spec.ts` entry that no longer matches its handler
   breaks every generated client — always a finding.
-- Never recommend removing a working auth/security path before its replacement is
-  validated live. Give the removal **sequence**, not just "looks unused".
+- **Stale package README**: a diff that changes a package's exports, boundary, invariant,
+  owned Prisma models, or config without updating that package's `README.md` is incomplete
+  (`docs/agents/package-docs.md`). Missing READMEs and missing mandatory sections are caught
+  by the style script; *stale* content is yours to catch — compare the diff against the
+  README's "Public surface" and "What it owns" claims.
+- Never recommend removing a required auth/security capability before its replacement is covered by
+  contract and security tests. Remove the superseded mechanism in the same replacement slice.
 - `plan.md` status changes must be backed by implemented, validated evidence.
 
 ## Verify before you report (mandatory)

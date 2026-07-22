@@ -37,10 +37,10 @@ RBAC/network surface, and the `residue` finder when the change adds no replaceme
 an existing mechanism (pure addition). Say in the report which finders you skipped and
 why — never skip silently.
 
-**Rewrite-freeze override:** never skip the residue finder for R0-R10 green, migration, or
-decommission work, even when the diff looks purely additive. New green code must be checked for
-legacy imports/compatibility/fallback residue, and migration code must be checked for runtime reach
-and expiry. The dedicated `reaper` gate remains mandatory; this finder does not replace it.
+**Direct-replacement override:** never skip the residue finder for replacement or deletion work,
+even when the diff looks purely additive. New code must be checked for superseded imports,
+compatibility/fallback residue, and old wiring that should have been removed in the same slice. The
+dedicated `reaper` gate remains mandatory; this finder does not replace it.
 
 ## Tier 2 — adversarial verification
 

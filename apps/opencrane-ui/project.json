@@ -5,8 +5,9 @@
 	"sourceRoot": "apps/opencrane-ui/src",
 	"prefix": "wo",
 	"tags": [
-		"scope:app",
-		"type:app"
+		"type:app",
+		"layer:entrypoint",
+		"scope:opencrane-ui"
 	],
 	"targets": {
 		"container": {

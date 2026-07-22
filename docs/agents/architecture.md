@@ -24,16 +24,25 @@ The non-obvious shape of the system (verified June 2026). Read this before touch
 |-------|------|----------|
 | **opencrane-api** | API-first management surface (`/api/v1`), OIDC broker, source of truth for Tenants/AccessPolicies/Grants/MCP/Skills. Dual-writes CRDs + Postgres. | everything |
 | **operator** | Reconciles UserTenant (`Tenant`)/ClusterTenant/AccessPolicy CRs → namespaces, pods, Ingresses, NetworkPolicies, buckets. | Kubernetes API |
-| **Obot MCP gateway** | Config-slaved runtime gateway; **polls** opencrane-api `GET /api/internal/obot-registry`. Tenant pods reach MCP servers *through* Obot. | opencrane-api (poll), tenant pods |
-| **feat-skill-registry** | Entitlement-gated skill-bundle delivery; validates pod identity via TokenReview, proxies to opencrane-api. Non-entitled → **404** (existence-hiding). | opencrane-api, tenant pods |
+| **Obot MCP gateway** | MCP credential custody and tool-execution PEP. OpenCrane owns catalog and grants; tenant pods reach MCP servers *through* Obot. | tenant pods, MCP workloads |
 | **feat-central-agents** | Background ingestion worker (Slack connector → Postgres `OrgDocument`). Not API-first. | external sources, Postgres |
 
-**Identity is multi-credential** — five non-interchangeable types: (1) OIDC session cookie (human operators), (2) OpenClaw bootstrap token (short-lived, one-device pairing), (3) OpenClaw device token (gateway-issued), (4) **projected SA token** (audience-bound: `aud=obot-gateway|feat-skill-registry|opencrane-server`, ~600s rotated, in-cluster only, never handed to a browser), (5) static `OPENCRANE_API_TOKEN` (automation fallback, explicit migration target). One human OIDC login brokers the pod pairing — `POST /api/v1/auth/pod-token` resolves tenant **solely from the verified session email** (fail-closed `409 AMBIGUOUS_TENANT`), never from request input.
+**Target identity is purpose-specific**, with non-interchangeable credentials: (1) OIDC session
+cookies for human operators and (2) **projected SA tokens** for in-cluster workloads
+(audience-bound, short-lived, rotated, and never handed to a browser). Delete the static
+legacy static-token and temporary pod-token preflight mechanisms. Do not reproduce either
+mechanism in the new product. Emergency access, if approved, is short-lived, IAM-backed, and
+audited.
 
 **Two facts that catch agents out:**
 
-- **`___AuthMiddleware` does NOT enforce per-route roles today** (`apps/opencrane-api/src/infra/middleware/auth.middleware.ts`). It's a fallback chain: public paths → OIDC cookie → env token → DB access token → dev bypass. Role/capability claims are a *planned* target — do not assume RBAC at the route layer.
+- **`___AuthMiddleware` does NOT enforce per-route roles today** (`libs/server/_infra/auth/src/auth-middleware.ts`). It's a fallback chain: public paths → OIDC cookie → env token → DB access token → dev bypass. Role/capability claims are a *planned* target — do not assume RBAC at the route layer.
 - **State is dual-written: CRD is source of truth, Postgres is a projection.** Every Tenant/AccessPolicy mutation hits both. Drift between them is expected and has explicit tooling (`GET /tenants/drift`, `POST /tenants/repair`, projection-drift metrics). Don't "fix" a divergence by writing only one side.
+
+Existing OpenClaw identity, projection, and dual-write paths are implementation residue, not input
+to the new product. Do not port their rows, CRDs, subject bindings, credentials, configuration,
+schemas, protocols, or bytes. Refactor capabilities directly to the target contract and delete the
+replaced implementation in the same slice.
 
 **Effective contract:** each tenant's entitlements compile into one SHA256-keyed JSON blob (`GET /:name/effective-contract`) covering awareness datasets + MCP servers + skill bundles. Tenant pods re-pull it on a ~30s loop; on `contractId` change the pod gets a SIGHUP + a re-rendered config. This is the runtime authorization mechanism — changing a grant is not effective until the contract recompiles and the pod re-pulls.
 
@@ -42,7 +51,8 @@ The non-obvious shape of the system (verified June 2026). Read this before touch
 OpenCrane is IAM-first.
 
 - Prefer federated identity, Workload Identity, OIDC, and cloud IAM over static bearer tokens.
-- Treat bearer tokens as temporary compatibility shims or break-glass paths, not the default architecture.
+- Do not provide a static bearer-token compatibility or break-glass path. Any approved
+  emergency access is short-lived, federated/IAM-backed, and audited.
 - Every platform service and every tenant workload should have an explicit workload identity.
 - Every human operator should authenticate through centrally managed identity, not shared long-lived tokens.
 
@@ -59,7 +69,8 @@ Identity and authorization must be described centrally.
 ## Token Policy
 
 - Do not introduce new bearer-token control paths when IAM or OIDC can solve the problem.
-- Existing bearer-token paths should be treated as migration targets.
+- Existing bearer-token paths are direct revocation/deletion targets and must not enter replacement
+  code.
 - If a bearer token is unavoidable, document why IAM cannot be used, constrain its scope, and define a removal path.
 
 ## OpenCrane-Specific Direction

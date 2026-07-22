@@ -6,8 +6,8 @@ voice into a personalised agent without erasing it, and why none of this prose i
 trusted as a security boundary.
 
 > See also: [Architecture](/advanced/architecture) (how the pieces fit together),
-> [Obot MCP gateway](/integrators/mcp-gateway) and [Skill registry](/integrators/skill-registry)
-> (the planes that actually enforce access), and [Authentication](/security/identity)
+> [Obot MCP gateway](/integrators/mcp-gateway) (the tool-execution boundary),
+> [Share skills](/guide/skills), and [Authentication](/security/identity)
 > (the token audiences referenced below).
 
 ## Two kinds of control
@@ -83,11 +83,11 @@ Instead the control plane runs a governed, reviewable **three-way merge**. This 
 closest thing to "conditioning" an agent, and it is deliberately consensual.
 
 1. **Company publishes a new L1 version.** An admin edits the company `SOUL.md` via
-   `PUT /api/v1/org/workspace-docs/:name` ([company-docs.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/company-docs/main/src/routes/company-docs.ts)).
+   `PUT /api/v1/org/workspace-docs/:name` ([company-docs.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/server/knowledge/company-docs/main/src/routes/company-docs.ts)).
    It is stored as a new immutable version. Before storage, the **L0 guard** scans it and
    rejects anything asserting system mechanics.
 2. **Three-way merge is computed.** The reconciler
-   ([reconciliation.logic.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/company-docs/main/src/core/reconciliation.logic.ts))
+   ([reconciliation.logic.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/server/knowledge/company-docs/main/src/core/reconciliation.logic.ts))
    reads **base** (the version the tenant last reconciled), **ours** (the new company
    version) and **theirs** (the agent's current live `SOUL.md`). Policy: company wins, but
    lines the tenant genuinely added are preserved under a clearly-labelled section — never
@@ -103,7 +103,7 @@ closest thing to "conditioning" an agent, and it is deliberately consensual.
 
 ::: tip Implementation status
 The merge engine today is a deterministic *company-wins, preserve-tenant-additions* merger
-(`_DeterministicReconciler` in [reconciler.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/company-docs/main/src/core/reconciler.ts))
+(`_DeterministicReconciler` in [reconciler.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/server/knowledge/company-docs/main/src/core/reconciler.ts))
 — predictable and testable with no model in the loop. The locked design swaps a
 LiteLLM-backed, agent-driven merge in at a single seam (`_BuildDocMergeReconciler`); the
 orchestration around it is already final. 🔶
@@ -112,7 +112,7 @@ orchestration around it is already final. 🔶
 ## The L0 guard
 
 The model only works if company and tenant prose stays in its lane. The L0 guard
-([l0-guard.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/company-docs/main/src/core/l0-guard.ts))
+([l0-guard.ts](https://github.com/italanta/opencrane/blob/main/libs/backend/server/knowledge/company-docs/main/src/core/l0-guard.ts))
 is a hard gate on **both** the publish path and the reconciler output: if a document tries
 to assert platform mechanics, the write is rejected with a `422` before anything lands.
 
@@ -142,20 +142,19 @@ file **rendered from the contract**, not written by hand.
 - The entrypoint polls the effective contract roughly every **30 seconds**. When a grant is
   added or revoked, the new `TOOLS.md` is written and the agent is **SIGHUP**-ed to reload —
   so a skill promotion or revocation reflects within one poll interval, with no pod restart.
-- Awareness is **descriptive**; the Obot gateway and skill registry remain the authoritative
-  boundary, so a stale view can never become a privilege. The same allow-set drives both, so
-  what the agent *thinks* it can use stays aligned with what IAM *lets* it use.
+- Awareness is **descriptive**; target authorization and proof-bound capabilities remain the
+  authoritative boundary, so a stale view can never become a privilege.
 
 → The enforcement side of this is documented in
-[Obot MCP gateway](/integrators/mcp-gateway) and [Skill registry & delivery](/integrators/skill-registry).
+[Obot MCP gateway](/integrators/mcp-gateway).
 
 ## Platform invariants
 
 These hold for every agent regardless of anything written in any workspace file — they are
 the sentences in `AGENTS.md` that are actually backed by infrastructure.
 
-- **You cannot call MCP servers or use skills outside your entitlement grant.** Enforced at
-  the gateway and registry.
+- **You cannot call MCP servers or use skills outside your entitlement grant.** Enforced by
+  target authorization and proof-bound capabilities.
 - **You cannot access another tenant's data, workspace, or secrets.** Enforced by per-tenant
   isolation and network policy.
 - **Secrets are encrypted at rest and never leave the pod unencrypted.** Personal keys are

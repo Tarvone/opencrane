@@ -3,7 +3,7 @@
 OpenCrane's Stage 4 architecture splits platform management into two distinct managers — the cluster-wide **fleet-manager** and the per-ClusterTenant **clustertenant-manager** — so that fleet-level administration (ClusterTenant lifecycle, billing, Zitadel IAM, platform DNS) is cleanly separated from the tenant-facing runtime that lives inside each silo.
 
 > See also:
-> [Silo deployment model](/operators/silo-deployment) — how `apps/fleet-platform/deploy.sh` and `apps/opencrane-infra/deploy.sh` stamp out the fleet and silo releases.
+> [Silo deployment model](/operators/silo-deployment) — how `apps/fleet-platform/deploy.sh` and `apps/_infra/deploy-k8s/deploy.sh` stamp out the fleet and silo releases.
 > [Authentication](/security/identity) — how fleet OIDC and per-silo OIDC differ and how each is configured.
 > [Zitadel key rotation](/security/zitadel-key-rotation) — rotating the fleet-manager's Zitadel service-account key.
 > [Networking & isolation](/operators/networking) — the NetworkPolicy floor each silo enforces.
@@ -150,7 +150,7 @@ Per-org subdomain login is **not active** until the fleet provisions that organi
 
 ### Self-service gate
 
-The ClusterTenant management API, Zitadel-admin routes, and platform-DNS RBAC on the fleet-manager are all gated by `fleetManager.clusterTenantApi.enabled` (the flag `apps/fleet-platform/deploy.sh` sets to `true`; `apps/opencrane-infra/deploy.sh` sets it to `false`):
+The ClusterTenant management API, Zitadel-admin routes, and platform-DNS RBAC on the fleet-manager are all gated by `fleetManager.clusterTenantApi.enabled` (the flag `apps/fleet-platform/deploy.sh` sets to `true`; `apps/_infra/deploy-k8s/deploy.sh` sets it to `false`):
 
 ```yaml
 fleetManager:
@@ -193,13 +193,11 @@ The fleet operator also seeds the `<org>-default` Tenant CRD when the ClusterTen
 # Fleet-manager health
 kubectl logs -n opencrane-system deployment/opencrane-fleet-manager --tail 50
 
-# Confirm ClusterTenant routes are mounted (expect 200)
-curl -H "Authorization: Bearer $OPENCRANE_TOKEN" \
-  https://<fleet-host>/api/v1/cluster-tenants
+# Confirm the public health endpoint (expect 200)
+curl --fail-with-body https://<control-plane-host>/healthz
 
-# Zitadel SA key probe (platform-operator gated)
-oc --fleet-url https://<fleet-host> admin zitadel rotate-key --key-file /dev/null 2>&1 | head -5
-# Should fail with validation error (422), not auth error (403)
+# Verify ClusterTenant routes and the Zitadel key-rotation validation from the
+# OIDC-authenticated management UI. Reusable bearer-token probes are not supported.
 ```
 
 → For the SA-key rotation runbook, see [Zitadel key rotation](/security/zitadel-key-rotation).

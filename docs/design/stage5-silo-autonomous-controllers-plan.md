@@ -1,6 +1,7 @@
 # Stage 5 — silo-autonomous controllers
 
-Status: **planned, not started.** Architectural correction (Jente, 2026-06-28): the **fleet-manager
+Status: **historical implementation record; completed and superseded by the personal-agent rewrite
+freeze.** Architectural correction (Jente, 2026-06-28): the **fleet-manager
 stops at ClusterTenant lifecycle** and must watch **nothing inside** a silo; each
 **clustertenant-manager runs its own in-silo controllers** over its **own namespace**, so a silo
 stands on its own. This fixes the single-fleet-endpoint bug (the central operator injected one
@@ -11,7 +12,7 @@ fleet-namespace plane endpoint into every tenant) — a silo-local controller in
 | | fleet-manager (cluster-wide singleton) | clustertenant-manager (per silo) |
 |---|---|---|
 | Watches | the cluster-scoped **ClusterTenant** CR only | **Tenant** + **AccessPolicy** CRs in **its own namespace** |
-| Reconciles | CT lifecycle: namespace + quota/LimitRange + per-org domain/TLS + Zitadel org + registry/billing | the tenant runtime: openclaw pods/ConfigMaps/Services, LiteLLM keys, idle-suspend, plane drift-repair, rollout canary, Obot health, gateway-proxy |
+| Reconciles | CT lifecycle: namespace + quota/LimitRange + per-org domain/TLS + Zitadel org + registry/billing | the then-current tenant runtime, including controllers later retired by Phase A |
 | RBAC | cluster-scoped (namespaces/clustertenants/quota) | **namespaced** Role over its own ns (tenants/accesspolicies + pods/configmaps/services/deployments/secrets) |
 | Runs | ClusterTenantOperator + fleet API/registry/Zitadel | the API **+ all the in-silo controllers in one process** |
 
@@ -38,7 +39,7 @@ fleet-namespace plane endpoint into every tenant) — a silo-local controller in
    This slice is therefore NOT cleanly additive — it lands together with S5.2 (the controllers depend
    on these), so treat S5.1+S5.2 as one atomic relocation.
 2. **S5.2** `git mv` the 6 controller dirs fleet→silo; fix imports (config/watch/k8s from S5.1 lib;
-   `log` from the silo; contracts/infra-api unchanged).
+   `log` from the silo; contracts and backend server API unchanged).
 3. **S5.3** Silo bootstrap: start the controllers over its own ns (`WATCH_NAMESPACE`=silo ns;
    internal-API base = self); seed its own default Tenant; graceful stop.
 4. **S5.4** Trim fleet `index.ts` to ClusterTenantOperator + API only; revert step-5; drop the fleet

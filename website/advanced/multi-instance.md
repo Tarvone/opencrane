@@ -48,7 +48,7 @@ with `--skip-crds`.
 > single `opencrane.io` API group and one served CRD bundle version. Instances are isolated
 > by **namespace + RBAC + `WATCH_NAMESPACE`**, never by forking the schema. Per-instancing
 > the group would multiply the schema surface by the fleet size and break shared tooling
-> (the `oc` CLI, opencrane-api, awareness layer) that targets one group.
+> (opencrane-api, generated clients, awareness layer) that targets one group.
 
 ---
 
@@ -116,7 +116,7 @@ helm install oc-acme-fleet apps/fleet-platform \
   --set operator.watchNamespace=oc-acme-system
 
 # Silo for the acme fleet instance.
-helm install oc-acme apps/opencrane-infra \
+helm install oc-acme apps/_infra/deploy-k8s \
   --namespace oc-acme --create-namespace \
   --skip-crds \
   --set multiInstance.enabled=true \
@@ -241,8 +241,8 @@ helm install oc-acme-fleet apps/fleet-platform \
 
 Two ready-to-use instance value files demonstrate strict isolation in one cluster:
 
-- `libs/k8s-platform/values/multi-instance/oc-acme.yaml`
-- `libs/k8s-platform/values/multi-instance/oc-globex.yaml`
+- `apps/_infra/deploy-k8s/platform/values/multi-instance/oc-acme.yaml`
+- `apps/_infra/deploy-k8s/platform/values/multi-instance/oc-globex.yaml`
 
 Each enables `multiInstance` with namespaced RBAC, fail-closed watch scoping, and a
 per-instance cert Issuer + SecretStore, scoped to its own namespace.
@@ -250,7 +250,7 @@ per-instance cert Issuer + SecretStore, scoped to its own namespace.
 Validate the static isolation guarantees (no cluster — uses `helm template`):
 
 ```bash
-libs/k8s-platform/tests/multi-instance-conformance.sh
+apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh
 ```
 
 It asserts, per instance: fail-closed watch scope, namespaced RBAC with no
@@ -310,17 +310,8 @@ is needed to enforce this.
 
 ### 5.3 Managing cluster tenants (API-first)
 
-Everything is on the opencrane-api (`/api/v1/cluster-tenants`) and mirrored by the CLI —
-the frontend is just another client, never a privileged path:
-
-```bash
-oc cluster-tenant create acme --display-name "Acme Corp" \
-  --tier dedicatedNodes --compute dedicated --node-pool acme-pool \
-  --quota-cpu 8 --quota-memory 16Gi --quota-pods 40
-oc cluster-tenant list
-oc cluster-tenant show acme
-oc cluster-tenant status acme
-```
+ClusterTenant lifecycle is available from the management UI and its same-origin OIDC session.
+The frontend uses the public API contract; no privileged path or reusable bearer token exists.
 
 ### 5.4 Plugging in a `dedicatedCluster` backend without forking (AGPL-clean)
 
@@ -332,25 +323,14 @@ A private vendor (e.g. a hosted-opencrane-api product) implements that contract 
 service; nothing vendor-specific lives in the AGPL tree. See
 `enterprise-needs.md` for the licensing rationale and the Kamaji parking note.
 
-Configure it via Helm — leave it unset and `dedicatedCluster` stays unavailable (fail-closed):
-
-```yaml
-clusterTenant:
-  provisionerWebhook:
-    url: https://provisioner.internal.example/api   # must be https:// — refused otherwise
-    id: my-backend
-    existingSecret: cluster-tenant-provisioner
-    secretKey: CLUSTER_TENANT_PROVISIONER_WEBHOOK_TOKEN
-```
-
-The control plane refuses a non-`https://` URL at startup so the bearer token is never sent in
-plaintext.
+The direct external-webhook configuration has been removed from the clean target. Until a
+workload-identity-backed provisioner contract is designed, `dedicatedCluster` stays unavailable
+and fails closed.
 
 ### 5.5 Validation
 
-`helm template` proves the opt-in gate statically: with no flags the chart renders the
-`ClusterTenant` CRD but **no** provisioner env on the opencrane-api Deployment; setting
-`clusterTenant.provisionerWebhook.url` renders the env block. The per-`ClusterTenant` namespace,
+`helm template` proves the default posture statically: the chart renders the `ClusterTenant` CRD
+without a provisioner credential path. The per-`ClusterTenant` namespace,
 quota, and scheduling are reconciled at runtime by the operator (the live-infra seam), and the
-conformance script (`libs/k8s-platform/tests/multi-instance-conformance.sh`) carries the in-cluster
+conformance script (`apps/_infra/deploy-k8s/platform/tests/multi-instance-conformance.sh`) carries the in-cluster
 assertions for them (CT.5a–CT.5d).

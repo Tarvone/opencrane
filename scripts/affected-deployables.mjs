@@ -5,8 +5,9 @@ import { appendFileSync } from "node:fs";
 
 const _deployables = [
   { project: "opencrane", image: "opencrane-server", dockerfile: "apps/opencrane/deploy/Dockerfile" },
+  { project: "channel-proxy", image: "opencrane-channel-proxy", dockerfile: "apps/channel-proxy/deploy/Dockerfile" },
+  { project: "artifact-service", image: "opencrane-artifact-service", dockerfile: "apps/artifact-service/deploy/Dockerfile" },
   { project: "feat-openclaw-tenant", image: "opencrane-openclaw-tenant", dockerfile: "apps/feat-openclaw-tenant/deploy/Dockerfile" },
-  { project: "feat-skill-registry", image: "opencrane-skills-registry", dockerfile: "apps/feat-skill-registry/deploy/Dockerfile" },
   { project: "opencrane-ui", image: "opencrane-ui", dockerfile: "apps/opencrane-ui/deploy/Dockerfile" },
 ];
 
@@ -50,11 +51,28 @@ for (const project of affected)
 
 const deployables = _deployables.filter(function _affected(entry) { return affected.has(entry.project); });
 const changedFiles = _run("git", ["diff", "--name-only", base, head]).split("\n").filter(Boolean);
+
+// The deployment surface: umbrella + substrate charts, app-owned charts/deploy units, and the
+// pipeline itself. Only changes here can alter what a cluster receives, so only they require the
+// k3d e2e on pull requests — pushes to the integration branches always run it, and the nightly
+// workflow covers everything else.
 const platformChanged = changedFiles.some(function _platform(file) {
-  return file.startsWith("apps/opencrane-infra/") || file.startsWith("libs/k8s-platform/");
+  return file.startsWith("apps/_infra/")
+    || (file.startsWith("apps/") && (file.includes("/helm/") || file.includes("/deploy/")))
+    || file === ".github/workflows/docker.yml";
 });
 const apiContractChanged = affected.has("opencrane") || affected.has("contracts");
-const e2eRequired = platformChanged || affected.has("opencrane") || affected.has("feat-skill-registry");
+const e2eRequired = platformChanged;
+
+// The topology negative tests exercise the guard, not the repo: re-prove the guard only when the
+// guard, its registries, a chart, or the pipeline change.
+const guardInputsChanged = changedFiles.some(function _guard(file) {
+  return file.startsWith("scripts/phase-b-topology")
+    || file === "docs/agents/workload-ownership.json"
+    || file === "docs/agents/app-source-allowlist.json"
+    || file.includes("/helm/")
+    || file === ".github/workflows/docker.yml";
+});
 
 _output("nx_base", base);
 _output("nx_head", head);
@@ -62,3 +80,4 @@ _output("deployables", JSON.stringify({ include: deployables }));
 _output("has_deployables", String(deployables.length > 0));
 _output("api_contract_changed", String(apiContractChanged));
 _output("e2e_required", String(e2eRequired));
+_output("guard_inputs_changed", String(guardInputsChanged));

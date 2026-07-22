@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenCrane Helm values coherence guards",
+  "description": "Fail-fast guards for the demo-able shared-tier install (S1 / task_bbafd7e9). Deliberately PERMISSIVE: only the keys below are constrained, every other value passes through untouched. Helm validates the MERGED values on every install/template/lint, so an incoherent overlay (e.g. gatewayProxy enabled with no ingress IP) is rejected before the rollout half-installs.",
+  "type": "object",
+  "properties": {
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "externalIp": { "type": "string" }
+      }
+    },
+    "channelProxy": {
+      "type": "object",
+      "required": ["enabled", "image", "service", "targetHostSuffixes", "projectedTokenTtlSeconds"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "required": ["repository", "tag", "pullPolicy"],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string", "minLength": 1 },
+            "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
+        "service": {
+          "type": "object",
+          "required": ["port"],
+          "properties": {
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "allowedOrigins": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^https://[^/]+$" },
+          "uniqueItems": true
+        },
+        "targetHostSuffixes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^\\.[a-z0-9.-]+$" },
+          "uniqueItems": true
+        },
+        "projectedTokenTtlSeconds": { "type": "integer", "minimum": 600, "maximum": 3600 }
+      }
+    },
+    "gatewayProxy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "tenant": {
+      "type": "object",
+      "properties": {
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "trustedProxies": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "trustedProxiesAutoMask": {
+              "type": ["string", "integer"]
+            }
+          }
+        }
+      }
+    },
+    "crds": {
+      "type": "object",
+      "description": "Install the ClusterTenant/Tenant/AccessPolicy CRDs via templates/crds/. Default true; set false only when a shared CRD bundle already owns the same cluster-scoped resources.",
+      "properties": {
+        "install": {
+          "type": "boolean",
+          "description": "Render templates/crds/*.yaml (each carries helm.sh/resource-policy: keep so helm uninstall never deletes a CRD other silos still depend on)."
+        }
+      }
+    },
+    "externalSecrets": {
+      "type": "object",
+      "description": "External Secrets Operator integration. Off by default; when enabled, templates/external-secrets-store.yaml renders the (Cluster)SecretStore + its ServiceAccount for a standalone silo.",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider": {
+          "type": "string",
+          "description": "Only gcp-secret-manager has a provider block implemented today; azure-key-vault/aws-secrets-manager fail fast at render time until their provider block is added."
+        },
+        "serviceAccountAnnotations": { "type": "object" }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "mainNetworkDefaultDeny": {
+          "type": "object",
+          "description": "Platform-namespace default-deny floor (templates/networkpolicy-main-default-deny.yaml). Off by default; validate plane-to-plane connectivity before enabling in production. Mandatory (enforced by a Helm fail guard) when multiCt.enabled=true.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "allowOtelEgress": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["gatewayProxy"],
+        "properties": {
+          "gatewayProxy": {
+            "required": ["enabled"],
+            "properties": {
+              "enabled": { "const": true }
+            }
+          }
+        }
+      },
+      "then": {
+        "description": "When the per-org gateway proxy is enabled, the wildcard A records need an ingress IP and the tenant gateway needs at least one trusted proxy source (use [auto] to derive one) — otherwise every per-org host fails to resolve or every connection fails closed.",
+        "required": ["ingress", "tenant"],
+        "properties": {
+          "ingress": {
+            "required": ["externalIp"],
+            "properties": {
+              "externalIp": {
+                "type": "string",
+                "minLength": 7
+              }
+            }
+          },
+          "tenant": {
+            "required": ["gateway"],
+            "properties": {
+              "gateway": {
+                "required": ["trustedProxies"],
+                "properties": {
+                  "trustedProxies": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["externalSecrets"],
+        "properties": {
+          "externalSecrets": {
+            "required": ["enabled"],
+            "properties": {
+              "enabled": { "const": true }
+            }
+          }
+        }
+      },
+      "then": {
+        "description": "When externalSecrets.enabled=true, a provider must be named — otherwise the (Cluster)SecretStore this chart renders has no backend to bind to and fails fast at apply time instead of install time.",
+        "properties": {
+          "externalSecrets": {
+            "required": ["provider"],
+            "properties": {
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

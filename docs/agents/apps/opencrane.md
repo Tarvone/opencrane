@@ -1,95 +1,125 @@
 # App: opencrane (`@opencrane/server`)
 
 > Deep-dive for `apps/opencrane`. Index: [`../app-specific.md`](../app-specific.md). Identity model:
-> [`../architecture.md`](../architecture.md). Verified June 2026 (post fleet/silo split, v0.6.0).
+> [`../architecture.md`](../architecture.md). Verified July 2026.
 
-The **per-silo control plane** — one instance per **ClusterTenant**, running in that org's own
+The **current per-silo control plane** — one instance per **ClusterTenant**, running in that org's own
 namespace and served at the org host `<org>.<base>`. **Express 5 + Prisma (PostgreSQL) +
-`@kubernetes/client-node`.** Source of truth for that silo's tenants, policies, grants, MCP servers,
-and skills; OIDC broker + pod-token pairing; the only writer of **its silo's** Postgres projection.
+`@kubernetes/client-node`.** The target keeps this app as the business API and narrows it to target
+Postgres authorities, identity, grants, MCP, agents, artifacts, approvals, and audit. Existing
+OpenClaw, Tenant/AccessPolicy CRD, projection, pairing, and static-token responsibilities are direct
+deletion targets, not contracts to preserve.
 Listens on `PORT` (default **8080**).
 
-This is **not** the cross-silo hub — the cluster-wide [`fleet-operator`](./fleet-operator.md) owns
-ClusterTenant lifecycle, platform DNS, and Zitadel management and serves at the fleet host / apex.
-The silo serves the **UserTenant** endpoints (the per-user OpenClaw gateway, CRD kind `Tenant`) and
-the org-scoped management surface below; it READS the cluster-scoped `ClusterTenant` CR only as a
-**read-model** (to resolve a host's per-org login client). See
+This control plane owns its ClusterTenant lifecycle, platform DNS declarations, and per-org
+identity configuration. It serves the org-scoped management surface and reads the cluster-scoped
+`ClusterTenant` CR as the declared lifecycle contract. See
 [`cluster-architecture.md` → Tenancy Model](../cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant).
 
 ## Layout
 
-- `infra/` — cross-cutting: `auth/` (OIDC service, device-grant, pod-token pairing, brokered-device registry), `middleware/` (`___AuthMiddleware`, transport security), `db/` (Prisma client + healthcheck).
-- `core/` — domain logic (non-HTTP): `grants/` (grant compiler + Cognee sync), `awareness/` (rollout, participation, metrics), `cluster-tenants/` (own `<org>-default` Tenant seed — read-model only, no provisioner registry; that's fleet), `connections/` (kill-switch/gateway-admin), `oci/` (Zot bundle store + backfill), `personalisation/`, `sessions/`, `scanning/`, `ai-budget/`.
-- `features/` — higher-level workflows: `mcp-servers/`, `groups/`, `company-docs/`.
-- `routes/` — HTTP handlers (each a `*.ts` + `*.types.ts` pair); `routes/internal/` are the auth-less, NetworkPolicy-gated endpoints.
+`apps/opencrane/src` is deliberately small and closed by
+`docs/agents/app-source-allowlist.json`: process entrypoint/lifecycle composition, environment
+configuration, route assembly, instrumentation/logging, Prisma construction and migration, and the
+hosting-adapter factory. The app also owns Prisma schema/migrations and its Helm unit under
+`apps/opencrane/helm`.
+
+Implementation lives with its capability:
+
+- HTTP domains, identity/OIDC workflows, projection repair, and API specification live under `libs/backend/*/main`.
+- the OpenClaw Tenant controller, renderers, workspace assets, and runtime lifecycle under
+  `libs/backend/feat-openclaw-tenant/main` are deleted with the target controller/runtime slice;
+- auth primitives, transport security, channel proxy, and hosting adapters live under
+  `libs/server/_infra/{auth,http,channel-proxy,tenant-hosting}`.
 
 ## Bootstrap (`src/index.ts`)
 
 Middleware order: transport-security → `express.json()` → `pino-http` → session → **`___AuthRouter` (public, mounted before auth)** → `___AuthMiddleware` → routes → error handler. DI: `___CreatePrismaClient` + `KubeConfig.loadFromDefault()` yielding `CustomObjectsApi` (CRDs), `CoreV1Api` (pod kill-switch), `AuthenticationV1Api` (TokenReview). `createApp(...)` is exported for tests.
 
-On boot the silo also **starts the in-silo controllers over its own namespace** (`config.watchNamespace`) — the fleet watches nothing inside a silo, so each silo reconciles itself: `TenantOperator` (openclaw pods/ConfigMaps/Services + LiteLLM keys), `PolicyOperator` (AccessPolicy → NetworkPolicy), `IdleChecker`, `RuntimePlaneDriftRepairer`, the opt-in rollout canary controller, `ObotHealthChecker`, and the in-process identity-routing gateway proxy. It also **seeds its own `<org>-default` Tenant** (`_SeedOwnDefaultTenant`, discovering its org via `_ResolveOwnClusterTenant` — the CR whose `status.boundNamespace` is this namespace) and runs two periodic repairers: `TenantProjectionRepairer` (CRD→DB backstop) and `MembershipProjectionRepairer` (fleet→silo `OrgMembership` mirror; prunes rows the fleet lacks). Auth-side, the OIDC `onLoginEstablished` hook adopts a verified member into their org on first login (`_AdoptMemberOnLogin` — write-through to the fleet SoR when `FLEET_INTERNAL_URL` is set, local upsert standalone), seeds their subject-bound workspace, and mirrors `group:*` role claims into `Group.members` (`_MirrorGroupsOnLogin`). Controller bootstrap is fail-soft — a failure leaves the management API up but the tenant runtime not reconciling.
+The current boot path still starts OpenClaw, CRD projection, and in-process controller/proxy loops.
+Treat those imports and lifecycle calls as a deletion map: target apps own controller, channel,
+runtime, memory, index, artifact, and database deployment boundaries. Do not add behavior to the
+current composite boot path except to remove it with its replacement.
 
-## Router Inventory (`/api/v1`)
+## Current router inventory (`/api/v1`) and disposition
 
 CRUD + notable actions:
 
-- **tenants** (UserTenants — per-user OpenClaw gateways) — `+ suspend/resume`, `/drift`, `/repair`, `/datasets`, **`/effective-contract`** (compiled grants + rendered tools). Dual-writes CRD ↔ Postgres.
-- **policies** — `+ drift/repair`; best-effort Cognee propagation. Dual-writes CRD ↔ Postgres.
-- **mcp-servers** — `+ credentials` (static-fallback vs per-user OBO brokering).
-- **skills/catalog** — `+ /:id/scan`, promote-gate (publish only if scan passed), `/backfill` (DB→OCI dual-write).
-- **groups**, **third-party-sources**, **provider-keys**, **access-tokens** (CLI tokens), **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**, **sessions** (scope binding).
+- **tenants** and **policies** — current OpenClaw/CRD mutation, drift, and projection routes are
+  deleted when AgentService and target authorization APIs land; do not preserve dual writes.
+- **mcp-servers** — OBO credential brokering only.
+- **skills** — ArtifactStore-backed SkillRevision publication authority.
+- **groups**, **third-party-sources**, **provider-keys**, **access-tokens**, **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**.
 
-**Not served here (fleet-only since the split):** `cluster-tenants` lifecycle CRUD + provisioning, org membership, billing, `platform/dns`, and Zitadel administration moved to the [`fleet-operator`](./fleet-operator.md). The silo keeps `ClusterTenant` + `OrgMembership` as local **read-models** (per-org login + the org-admin gate) but does not mount their management routers.
+**Control-plane ownership:** ClusterTenant lifecycle, org membership, DNS, and Zitadel
+administration are local target authorities. There is no external membership mirror.
 
-**Internal (`/api/internal`, no `___AuthMiddleware`):** `obot-registry` (Obot polls), `bundles/:digest/content` (feat-skill-registry proxies, entitlement-gated), `contract/:name` (pod re-pull, TokenReview), `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
+**Internal (`/api/internal`, no `___AuthMiddleware`):** `contract/:name` (pod re-pull, TokenReview) and `awareness/participation` (TokenReview). Plus projection drift/repair helpers.
 
-## Auth Subsystem (`infra/auth/`)
+## Auth subsystem
 
-- **OIDC** — PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
-- **Device flow** — `POST /auth/device` → browser activate → poll `/auth/device/token` → mints a DB `AccessToken` (this is what `oc auth login` uses).
-- **pod-token pairing broker** — `POST /api/v1/auth/pod-token` resolves the tenant **solely from the verified session email** (fail-closed `409 AMBIGUOUS_TENANT`), returns `{ gatewayUrl, bootstrapToken, tenant, ingressHost }`, and records a `BrokeredDevice` for per-user kill-switch. `/pod-token/cut` revokes the caller's connections without touching the shared pod.
-- **`___AuthMiddleware` fallback chain** — public paths → OIDC session → `OPENCRANE_API_TOKEN` env → DB access token → dev bypass. **No per-route role enforcement yet** (roles are a planned target).
+- **OIDC** — `libs/backend/server/iam/identity/main`: PKCE login → session cookie (human operators). Email allow-list / domain allow-list optional.
+- **pod connection preflight** — `POST /api/v1/auth/pod-token` is a direct-deletion endpoint; target
+  channel/session resolution uses the target authorization and capability contracts.
+- **`___AuthMiddleware` fallback chain** — OIDC and target access tokens survive only through the
+  target authorization facade. Static-token and dev-bypass paths are deletion paths.
 - **TokenReview** — internal endpoints validate projected tokens with `aud=opencrane-server`, parsing the tenant from `system:serviceaccount:<ns>:<name>`.
 
-## Dual-Write & Grant Compiler
+## Current authority residue and target grant compiler
 
-Tenant/AccessPolicy mutations write both the CRD (operator's source of truth) and the Postgres row (API/UI projection). Drift is expected; `/drift` detects and `/repair` (dry-run by default) fixes CRD→DB. The **grant compiler** (`core/grants/`) resolves `(principal, payloadType ∈ Awareness|McpServer|SkillBundle)` over group membership with precedence `priority` > Deny-over-Allow > newest. It powers `effective-contract`, internal bundle gating (404 existence-hiding), and session-scope intersection.
+Tenant/AccessPolicy CRD writes, projections, drift, and repair are deleted when target Postgres
+authorities land. The target grant compiler preserves explicit priority and Deny-at-equal-priority,
+with project as a dimension separate from department/team; it does not derive authority from a CRD
+or dataset projection.
 
 ## Cognee Memory Wiring
 
-Boot-time (the `index.ts` in-silo IIFE) provisions Cognee's dependencies, all best-effort/idempotent: a **dedicated LiteLLM virtual key** (`cognee-litellm-key.ts` — Cognee's LLM+embedding spend is a separate budget identity, never a tenant's), a per-silo **Cognee owner account + Cognee Tenant** (`cognee-silo-tenant.ts`), and — per openclaw Tenant, in the reconcile loop — a **real per-tenant Cognee login** keyed to the tenant's owner email (`cognee-tenant-identity.ts`), which is registered, joined to the silo Cognee Tenant, and `tenants/select`-ed so the plugin's `company` scope is genuinely shared silo-wide (not a private dataset per tenant). The tenant pod authenticates as itself via `COGNEE_USERNAME`/`COGNEE_PASSWORD` (never Cognee's `default_user` fallback).
+The composed frozen runtime lifecycle provisions Cognee's dependencies, all best-effort/idempotent: a **dedicated LiteLLM virtual key** (`cognee-litellm-key.ts` — Cognee's LLM+embedding spend is a separate budget identity, never a tenant's), a per-silo **Cognee owner account + Cognee Tenant** (`cognee-silo-tenant.ts`), and — per openclaw Tenant, in the reconcile loop — a **real per-tenant Cognee login** keyed to the tenant's owner email (`cognee-tenant-identity.ts`), which is registered, joined to the silo Cognee Tenant, and `tenants/select`-ed so the plugin's `company` scope is genuinely shared silo-wide (not a private dataset per tenant). These files are under `libs/backend/feat-openclaw-tenant/main`. The tenant pod authenticates as itself via `COGNEE_USERNAME`/`COGNEE_PASSWORD` (never Cognee's `default_user` fallback).
 
 **Embeddings** run through LiteLLM via the stable `auto-embedding` alias — the embedding-side mirror of the chat `auto` selection, registered by the BYOK bootstrap (`provision-byok-key.ts` `_ensureProviderEmbeddingModel`, `mode:"embedding"`, and deliberately **no `ModelDefinition` row** so it never surfaces as a tenant-selectable chat model). It only exists when a provider with a catalogued `embeddingModel` is set (`byok-default-models.ts` — today `openai` only). Cognee uses `EMBEDDING_PROVIDER=openai_compatible` (values.yaml `clustertenantManager.cognee.embedding`) so the model name reaches the proxy **verbatim**; the older `custom` value routed through Cognee's litellm engine, which strips the provider prefix and 400s. A fleet-level shared self-hosted embedding model is planned (issue #185).
 
-## Prisma Schema (`prisma/schema.prisma`)
+## Prisma schema (`prisma/schema/`)
 
-PostgreSQL. ~30 models incl. `Tenant`, `ClusterTenant`, `AccessPolicy`, `Group`, `Grant`/`McpServerGrant`/`SkillEntitlement`, `McpServer`/`McpServerCredential`, `SkillBundle`/`SkillPromotion`, `ThirdPartySource(+Item)`, `BrokeredDevice`, `AccessToken`, `ProviderApiKey`, `AuditEntry`, `SessionScope`, `AwarenessRollout`, `ParticipationEvent`/`TenantParticipation`, `CompanyDoc(+Version)`/`TenantWorkspaceDoc`/`DocMergeProposal`, `OrgDocument`/`HarvestingCursor`, `TenantDatasetMembership`, budget/usage snapshots. Enums mirror `@opencrane/contracts` (GrantAccess/Scope/SubjectType, McpServer*, SkillBundle*, ClusterTenant*, etc.).
+The current schema contains legacy Tenant, AccessPolicy, awareness, workspace,
+projection, and `SessionScope` state. These are deletion targets. The first target persistence slice
+replaces the migration history with a fresh target initializer for AgentService/Revision/Run,
+Thread/Message/RunEvent, Approval, Persona, Artifact, SkillRevision, grants, audit, and membership
+projection; it does not retain legacy columns or readers.
 
 ## Key Env
 
-`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE` (the TenantOperator's reconcile + workspace-seed scope), `DEPLOYMENT_MODE` (`standalone` | `fleet-managed` — see "Deployment modes" below), `MANAGE_TENANT_NAMESPACES` (default false — fleet-manager owns per-org namespace creation; true only for a standalone silo with the gated ns-manage ClusterRole), `MANAGE_OWN_DOMAIN` (defaults from `DEPLOYMENT_MODE`), `FLEET_INTERNAL_URL` (fleet internal API base for the membership mirror + login write-through; unset = standalone membership ownership), `CLUSTER_TENANT_SEED_NAME`/`_DISPLAY_NAME`/`_OWNER_EMAIL`/`_OWNER_SUBJECT`/`_TIER` (standalone-only ClusterTenant self-seed), `OPENCRANE_API_TOKEN`, OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`), `SKILL_OCI_REGISTRY_URL`/`SKILL_OCI_REPOSITORY`, `COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`, `OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`, `OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, `OPENCRANE_FORCE_HTTPS`.
+`PORT` (8080), `DATABASE_URL`, `NAMESPACE` (projection-repair scope), `WATCH_NAMESPACE`
+(the TenantOperator's reconcile + workspace-seed scope), `MANAGE_TENANT_NAMESPACES` (default
+true), `MANAGE_OWN_DOMAIN` (default true), `CLUSTER_TENANT_SEED_NAME`/`_DISPLAY_NAME`/
+`_OWNER_EMAIL`/`_OWNER_SUBJECT`/`_TIER`, OIDC (`OIDC_ISSUER_URL`/`CLIENT_ID`/
+`CLIENT_SECRET`/`REDIRECT_URI`/`SESSION_SECRET`/`ALLOWED_EMAIL(_DOMAINS)`),
+`COGNEE_ENDPOINT`, `LITELLM_ENDPOINT`/`_MASTER_KEY`,
+`OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS`,
+`OPENCRANE_PROJECTION_DRIFT_ALERT_THRESHOLD`/`_DRIFT_WEBHOOK_URL`, and
+`OPENCRANE_FORCE_HTTPS`. Artifact bytes are reached through the internal ArtifactStore service;
+the server has no OCI-registry configuration.
 
-## Deployment modes (#151 item 4)
+## Deployment topology
 
-A silo runs in exactly one of two topologies, resolved to a single `DEPLOYMENT_MODE` value (`config.ts`'s `deploymentMode`) that every other standalone-vs-fleet-managed default in this app derives from:
+The control plane always owns its ClusterTenant lifecycle. On boot it can self-seed its
+cluster-scoped `ClusterTenant` CR, bind that CR to its namespace, own per-org namespace and
+domain provisioning, and seed the `<org>-default` workspace from the immutable CR owner.
 
-- **`fleet-managed`** — an external fleet-manager (the WeOwnAI control plane, italanta/opencrane#150) owns `ClusterTenant` lifecycle: it creates the CR, seeds `spec.owner`, creates/owns the org namespace, and this silo's `MembershipProjectionRepairer` mirrors membership from `FLEET_INTERNAL_URL`. The silo never creates or binds a `ClusterTenant` itself in this mode.
-- **`standalone`** — no fleet anywhere. This silo is the sole authority: it self-seeds its own cluster-scoped `ClusterTenant` CR on boot (`_SeedOwnClusterTenant`, gated on `deploymentMode === "standalone"` in `index.ts`), binds it to its own namespace, owns per-org namespace creation (`MANAGE_TENANT_NAMESPACES`) and domain provisioning (`MANAGE_OWN_DOMAIN`), and then seeds its own `<org>-default` workspace Tenant from that CR's owner (`_SeedOwnDefaultTenant`) — both boot seeds are best-effort/idempotent and run only in this mode (see the `if (config.deploymentMode === "standalone")` gate in `index.ts`, `~line 290`).
-
-`DEPLOYMENT_MODE` wins when set; otherwise the SAME fallback the chart itself uses applies: an empty `FLEET_INTERNAL_URL` derives `standalone`, a non-empty one derives `fleet-managed` — so a deployment that sets neither env var behaves exactly as it did before this switch existed.
-
-**Standalone quickstart** — via the chart (`apps/opencrane-infra`), no fleet checkout needed:
+**Quickstart** — via the chart (`apps/_infra/deploy-k8s`):
 
 ```bash
-helm dep build apps/opencrane-infra
-helm install my-silo apps/opencrane-infra \
-  -f apps/opencrane-infra/values/standalone.yaml \
+helm dep build apps/_infra/deploy-k8s
+helm install my-silo apps/_infra/deploy-k8s \
+  -f apps/_infra/deploy-k8s/values/standalone.yaml \
   --set ingress.domain=example.com \
   --set clustertenantManager.standaloneSeed.ownerEmail=owner@example.com \
   --set clustertenantManager.database.existingSecret=my-db-secret
 ```
 
-This sets `deploymentMode: standalone` (which fans out `manageTenantNamespaces`/`manageOwnDomain`/`DEPLOYMENT_MODE` coherently), leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults (#151 items 2/3), and self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are NOT installed by this chart — bring your own or run them via `libs/k8s-platform/k8s-deploy.sh` first. A `helm` `fail` guard (and a `values.schema.json` check, one step earlier) rejects a contradictory combination — `deploymentMode: fleet-managed` with an empty `fleetInternalUrl`, or `deploymentMode: standalone` with a non-empty one.
+This leaves `crds.install`/`certManager.selfManagedIssuer` at their self-sufficient defaults and
+self-seeds a `default` ClusterTenant owned by the given email on first boot. Cluster
+prerequisites (ingress-nginx, cert-manager, a reachable Postgres) are not installed by this
+chart — bring your own or run them via `apps/_infra/deploy-k8s/platform/k8s-deploy.sh` first.
 
 To bootstrap a standalone ClusterTenant by hand instead of via `clustertenantManager.standaloneSeed`, apply a CR directly with `spec.owner.email` set — the seed is a convenience, not the only path:
 
@@ -105,6 +135,8 @@ spec:
     email: owner@example.com
 ```
 
-## In-flight
+## Direct-deletion inventory
 
-OCI/Zot skill delivery is mid-cutover (dual-write DB + registry; resolve OCI-first, DB fallback). Awareness rollout `shadowMode` and the doc-reconciliation merge agent are partly scaffolded. AI-budget enforcement lives in LiteLLM; opencrane-server only reads spend.
+Delete retired registry skill delivery, DB/registry fallback, awareness rollout, the document-reconciliation
+merge agent, OpenClaw controllers, projection repair, pod-token, and static-token escape with their
+target replacements. Do not complete or stabilize these predecessor paths.

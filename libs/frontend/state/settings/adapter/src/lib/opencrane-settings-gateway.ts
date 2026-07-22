@@ -1,25 +1,10 @@
 import { Injectable, inject } from "@angular/core";
 
-import { ControlPlaneApiService, DatasetAccess, EgressDomain, SkillRow } from "@opencrane/core";
+import { ControlPlaneApiService, DatasetAccess, EgressDomain } from "@opencrane/core";
 
 import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity, SettingsGateway } from "./settings-gateway.types";
-import {
-	AccountTenantWire,
-	BudgetSpendWire,
-	DatasetsWire,
-	EffectiveContractWire,
-	PodTenantWire,
-	PolicyWire,
-	SkillCatalogWire,
-	_MapAccountProfile,
-	_MapAccountUpdateToTenantPatch,
-	_MapAwarenessContract,
-	_MapBudgetSpend,
-	_MapDatasetAccess,
-	_MapEgressDomains,
-	_MapPodIdentity,
-	_MapSkills
-} from "./settings-mapper.util";
+import { _MapAccountProfile, _MapAccountUpdateToTenantPatch, _MapAwarenessContract, _MapBudgetSpend, _MapDatasetAccess, _MapEgressDomains, _MapPodIdentity } from "./settings-mapper.util";
+import type { AccountTenantWire, BudgetSpendWire, DatasetsWire, EffectiveContractWire, PodTenantWire, PolicyWire } from "./settings-mapper.types";
 
 /**
  * Live SettingsGateway backed by the OpenCrane Tenants API.
@@ -107,16 +92,6 @@ export class OpenCraneSettingsGateway implements SettingsGateway
 	}
 
 	/** @inheritdoc */
-	public async getSkills(): Promise<SkillRow[]>
-	{
-		const { data, error } = await this._api.client.GET("/skills/catalog");
-		if (error || !data)
-		{
-			throw new Error(this._errorMessage(error, "failed to load skill catalogue"));
-		}
-		return _MapSkills(data as SkillCatalogWire[]);
-	}
-
 	/** @inheritdoc */
 	public async getEgressDomains(): Promise<EgressDomain[]>
 	{

@@ -1,6 +1,6 @@
 # ClusterTenant manager configuration reference
 
-**The opencrane-api (clustertenant-manager) runs in each silo and serves the tenant-facing API, auth, permissions, and organization data.** This reference documents every Helm configuration key under `clustertenantManager`, with defaults from `apps/opencrane-infra/values.yaml`.
+**The opencrane-api (clustertenant-manager) runs in each silo and serves the tenant-facing API, auth, permissions, and organization data.** This reference documents every Helm configuration key under `clustertenantManager`, with defaults from `apps/_infra/deploy-k8s/values.yaml`.
 
 > See also:
 > [Silo deployment model](/operators/silo-deployment) — fleet vs silo topology and the deploy sequence.
@@ -59,17 +59,13 @@ The Prisma migration Helm hook that runs `prisma migrate deploy` as a pre-instal
 
 ---
 
-## Fleet integration
+## Local lifecycle ownership
 
-Settings for connecting this silo to the fleet's authoritative registry and API.
+The control plane owns ClusterTenant lifecycle and membership locally.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `clustertenantManager.manageTenantNamespaces` | `false` | Whether this silo OWNS per-ClusterTenant namespace creation. Default false: the fleet-manager creates and owns each org's namespace, and the silo SA is granted no cluster-scoped `namespaces` RBAC. Set true ONLY for a standalone (non-fleet-managed) silo so it can create its own org namespaces. |
-| `clustertenantManager.fleetInternalUrl` | `""` | Fleet internal API base URL (e.g. `http://<fleet-fullname>-fleet-manager.<fleet-namespace>.svc:8080`). Empty = STANDALONE: the silo owns membership locally, and fleet→silo membership mirroring + first-login adoption write-through both idle. A fleet-managed silo MUST set this — without it, member adoptions never reach the fleet's authoritative registry and login-path seat caps are unenforced. |
-| `clustertenantManager.fleetApiToken` | `""` | Bearer token presented to the fleet internal API (the fleet's `OPENCRANE_API_TOKEN` — one shared service credential). Inline only for development. |
-| `clustertenantManager.fleetApiTokenExistingSecret` | `""` | Name of an existing Kubernetes Secret holding the fleet API token (preferred in production). |
-| `clustertenantManager.fleetApiTokenSecretKey` | `token` | Key within `fleetApiTokenExistingSecret` holding the token. |
+| `clustertenantManager.manageTenantNamespaces` | `true` | Whether this control plane creates per-ClusterTenant namespaces. Set false only when a separately managed namespace provisioner is explicitly responsible. |
 
 ---
 

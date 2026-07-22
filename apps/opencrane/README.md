@@ -1,104 +1,107 @@
-# @opencrane/server
+# @opencrane/server — per-silo control plane & authenticated API
 
-Express REST API that serves as the management layer for the OpenCrane platform. It provides endpoints for tenant lifecycle management, access policy administration, shared skills discovery, and audit log querying.
+> [apps](../README.md) › opencrane
 
-All mutations are dual-written: changes are applied to both Kubernetes CRDs (the operator's source of truth) and PostgreSQL via Prisma (the query store for dashboards and reporting).
+<!-- Deployable app. Import alias `@opencrane/server` (see package.json `name`). -->
 
-## Responsibilities
+A **deployable app** is a thin process that composes backend libraries and ships as one container. This
+one is the **OpenCrane server** — the *control plane* for a single silo. A **silo** is one customer's
+fully isolated slice of the platform (its own namespace, database, and users); a **control plane** is
+the brain that runs that slice — it answers the API and keeps the running system matching its
+configuration. One server runs per silo, so a silo stands on its own.
 
-| Route group | What it does |
-|-------------|-------------|
-| `GET/POST/DELETE /tenants` | Create, list, update, suspend/resume, and delete tenants. Writes to K8s CRD + Prisma. |
-| `GET/POST/DELETE /policies` | Manage `AccessPolicy` CRs controlling tenant egress and MCP server access |
-| `GET /skills` | Discover shared org/team skills from the mounted skills volume; upserts into Prisma for fast querying |
-| `GET /audit` | Query the audit log with tenant, action, and time-range filters |
-| `GET /healthz` | Liveness/readiness probe; reports DB connectivity status |
+This is the composition and deployment root of the whole backend: business logic lives in the libraries
+under [`libs/backend/*`](../../libs/backend/server/README.md), and this app wires them together and owns
+process bootstrap, config, routing, the database schema, and its own Helm deployment unit.
 
-## Source layout
+## What it owns
 
-The operator is composition + reconciler wiring: it mounts domain routers, manages reconcile loops, and proxies identity and MCP connections.
+OpenCrane is **API-first** — every capability is a REST endpoint, and the web UI is just one more client
+of that API. This server is where those endpoints live. It plays two roles at once:
 
-```
-src/
-├── index.ts              # Express app factory + Kubernetes reconcile loops
-├── routes.ts             # Route composition: mounts routers from @opencrane/backend-* packages
-├── config.ts             # Configuration + environment variables
-├── log.ts                # Logging setup
-├── instrument.ts         # OpenTelemetry instrumentation
-├── trusted-proxies.ts    # Trusted proxy configuration (CONN.9)
-├── infra/
-│   ├── membership-projection-repairer.ts  # Reconcile OrgMembership→ClusterTenant mapping
-│   └── tenant-projection-repairer.ts      # Reconcile ClusterTenant spec→status
-├── tenants/              # Tenant CRD reconciler
-│   ├── operator.ts       # Main watch + reconcile loop
-│   ├── deploy/           # Deployment builder for tenant pods
-│   └── internal/         # Resolution + isolation helpers
-├── policies/             # AccessPolicy CRD reconciler
-│   └── operator.ts       # Watch + reconcile loop
-├── tenant-rollout/       # Tenant pod rollout strategies (canary, rolling)
-├── gateway-proxy/        # Identity-routing proxy (OIDC session → tenant context)
-│   ├── auth-client.ts    # OIDC session validation
-│   └── origin.ts         # Request routing by org host
-├── mcp-gateway/          # MCP gateway deployment + health checks
-├── hosting/              # Hosting adapter (cloud metadata / secret provisioning)
-├── openapi/
-│   └── spec.ts           # OpenAPI schema generation for all domain routers
-├── scripts/
-│   └── migrate.ts        # Prisma migration runner (prisma migrate deploy)
-└── __tests__/            # Integration + reconciliation tests
-```
+- **Request path (synchronous).** It serves the authenticated REST API — tenant, policy, model, MCP
+  (Model Context Protocol, the standard for connecting tools to agents), skill, awareness, spend, audit,
+  and access-token routes — by mounting routers imported from the backend domain libraries behind a
+  shared auth, rate-limit, and logging pipeline.
+- **Reconcile path (background).** It runs **reconcilers** — loops that watch Kubernetes custom
+  resources (Tenant, AccessPolicy) and steadily drive the silo's namespace to match them, plus a
+  projection loop that repairs this silo's membership against the **fleet** (the cross-silo manager that
+  tracks which customers exist). A reconciler means "make reality match the spec, then check again",
+  forever.
 
 ```
-prisma/
-├── schema/
-│   ├── base.prisma       # Datasource + generator config
-│   ├── <domain>.prisma   # Per-domain models (tenants, policies, awareness, mcp, skills, etc.)
-│   └── […18 domain files…]
-└── migrations/           # Prisma migration history
+ signed-in client ─HTTPS /api/v1/*─► org ingress ─┐   Tenant / AccessPolicy CRs
+                                                   ▼            │ watch
+                              ┌────────────────────────────┐    ▼
+                              │  opencrane server ◄── HERE  │◄─ reconcile loops
+                              │  auth → domain routers      │   (namespace → spec)
+                              └──────────────┬─────────────┘
+                                     reads / writes
+                                             ▼
+                          Postgres  +  libs/backend/* domain logic
 ```
 
-## Configuration (environment variables)
+**In this flow:** [libs/backend/server](../../libs/backend/server/README.md) *(the domain routers +
+reconcilers it composes)* · [opencrane-ui](../opencrane-ui/README.md) *(the main API client)* ·
+[deploy-k8s](../_infra/deploy-k8s/README.md) *(the silo umbrella chart that deploys it)*
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP listen port |
-| `DATABASE_URL` | — | PostgreSQL connection string (`postgresql://user:pass@host/db`) |
-| `KUBECONFIG` / in-cluster | — | Kubernetes API access (auto-detected) |
-| `INGRESS_DOMAIN` | `opencrane.local` | The ClusterTenant base domain; used to derive per-user UserTenant gateway hosts (`{usertenant}.{domain}`). See [Tenancy Model](../../docs/agents/cluster-architecture.md#tenancy-model--clustertenant-vs-usertenant). |
-| `AUTH_TOKEN` | `""` | Bearer token for API access (empty = dev bypass) |
-| `NODE_ENV` | `development` | Set to `production` to enforce auth |
+Invariant: the public API and the tokenless internal API are served on **two separate listeners**
+(ports 8080 and 8081). The internal routes take no session/token auth — they are gated at the network
+layer — so keeping them off the public socket is what stops the internet-facing ingress ever reaching
+them. If that split were wrong, platform-only routes would become publicly reachable.
 
-## Database schema
+## Public surface
 
-```
-Tenant          — mirrors the Tenant CRD status in Postgres
-AccessPolicy    — mirrors the AccessPolicy CRD
-AuditEntry      — append-only audit trail for all mutations
-Skill           — discovered skills registry (name, scope, team, contentHash)
-```
+`Entrypoint: src/index.ts` — boots the process: creates the Prisma and Kubernetes clients, starts the
+public and internal listeners, starts the projection and OpenClaw-tenant lifecycles, and binds bounded
+`SIGTERM`/`SIGINT` shutdown that drains both listeners, disconnects Prisma, and flushes telemetry.
 
-Run migrations:
+- `createApp(prisma, customApi, coreApi, authApi)` — builds the public Express app (mounts every domain
+  router). Exported so tests can drive it with injected clients.
+- `createInternalApp(prisma, authApi)` — builds the tokenless internal-only Express app.
 
-```bash
-npm run db:migrate -w @opencrane/server   # prisma migrate deploy (production)
-npm run db:generate -w @opencrane/server  # regenerate Prisma client after schema changes
-npm run db:push -w @opencrane/server      # push schema without migrations (dev only)
-```
+## Boundary
 
-## Development
+Composition only: it must not contain business logic — that belongs in `libs/backend/*`. Reusable
+infrastructure (auth middleware, HTTP hardening, DB helpers) lives in `libs/server/_infra/*`. Nothing
+imports this app; it sits at the top of the dependency graph.
 
-```bash
-# From repo root
-npm run build                                    # compile TypeScript + generate Prisma client
-npm run build -w @opencrane/server  # build only this package
-npm run test                                    # run vitest integration tests
-npx nx run opencrane:test          # alternative NX command
-```
+## Dependency direction
 
-## Docker
+Tagged `type:app`, `layer:entrypoint`, `scope:opencrane`. As an entrypoint it may compose any
+`libs/backend/*` domain library, `libs/server/_infra/*`, and `@opencrane/observability`; no library may
+import back into it.
 
-Built from `deploy/Dockerfile` using the repo root as build context:
+## Data & persistence
 
-```bash
-docker build -f apps/opencrane/deploy/Dockerfile -t ghcr.io/opencrane/opencrane-server:latest .
-```
+Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, with applied migrations
+under `prisma/migrations/`. The migrate init-container runs `prisma migrate deploy` from this package
+root at rollout. This is the one place the silo's database shape is defined. The runs slice binds
+every `AgentRun` to exactly one `RunInputSnapshot` by run, digest, thread, silo, service, revision and
+effective-contract coordinates, so a partial or mismatched admission cannot commit.
+
+## Runtime & config
+
+Read from the environment at startup.
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `PORT` | Public listener port | `8080` |
+| `INTERNAL_PORT` | Tokenless internal listener port | `8081` |
+| `DATABASE_URL` | Postgres connection string (Prisma) | *(required)* |
+| `NAMESPACE` | Silo namespace the reconcilers act on | `default` |
+| `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |
+| `FLEET_INTERNAL_URL` | Fleet membership write-through URL; empty = standalone silo | *(empty)* |
+| `OPENCRANE_API_TOKEN` | Token for fleet-internal calls | *(empty)* |
+| `OPENCRANE_PROJECTION_REPAIR_INTERVAL_SECONDS` | Projection-repair loop cadence | `60` |
+
+Built into `dist/apps/opencrane` by esbuild and imaged from `deploy/Dockerfile`
+(`ghcr.io/italanta/opencrane-server`), with the repository root as build context. Its Helm chart under
+`helm/` is a named-template library (Deployment, RBAC, Services, ingress, certificate, NetworkPolicy)
+composed by the silo umbrella chart — see [`HELM.md`](./HELM.md).
+
+## See also
+
+- Parent index: [apps](../README.md)
+- Composed logic: [libs/backend/server](../../libs/backend/server/README.md)
+- Sibling apps: [opencrane-ui](../opencrane-ui/README.md) · [artifact-service](../artifact-service/README.md) · [feat-central-agents](../feat-central-agents/README.md)

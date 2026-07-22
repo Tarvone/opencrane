@@ -50,10 +50,10 @@ matter which principal carried either grant. Deny-over-Allow precedence is uncha
 and deterministic — it operates across the full merged candidate list.
 
 Source:
-[`grant-compiler.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/grants/main/src/core/grant-compiler.ts)
+[`grant-compiler.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/iam/grants/main/src/core/grant-compiler.ts)
 — `compileForPrincipals(principalIds, payloadType, prisma)`.
 
-[`tenant-contract.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/contract/main/src/routes/internal/tenant-contract.ts)
+[`tenant-contract.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/tenancy/contract/main/src/routes/internal/tenant-contract.ts)
 — the contract poll route that assembles the principal set and calls `compileForPrincipals`.
 
 ::: info Precedence rules
@@ -99,23 +99,9 @@ The sharer is stamped on every row (`Grant.sharedBy`). List and revoke only retr
 grants where `sharedBy` equals the caller — a sharer holds no power over grants
 created by others or by the platform admin path.
 
-### CLI
+### Authenticated API
 
-```bash
-# Share an MCP server you hold with a specific user
-oc share grant --type mcp-server --id <server-id> --with-user <oidc-subject>
-
-# Share a skill bundle with a group, scoped to a department
-oc share grant --type skill-bundle --id <bundle-id> --with-group <group-id> --scope department
-
-# List the shares you have created
-oc share list
-
-# Revoke a share you created
-oc share revoke <share-id>
-```
-
-### API
+Use these routes through the generated contracts client or with an authenticated REST request:
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -136,7 +122,7 @@ Request body for `POST`:
 }
 ```
 
-`payloadType` must be `mcp-server` or `skill-bundle`. `recipientType` must be `user`
+`payloadType` must be `mcp-server`. `recipientType` must be `user`
 or `group`. `scope` must be one of `org`, `department`, `project`, or `personal`
 (defaults to `personal`).
 
@@ -147,7 +133,7 @@ entitlement you do not currently hold, and sharing never escalates privilege.
 :::
 
 Source:
-[`routes/shares.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/grants/main/src/routes/shares.ts)
+[`routes/shares.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/iam/grants/main/src/routes/shares.ts)
 — the full share router with the least-privilege gate at step 5.
 
 ---
@@ -195,7 +181,7 @@ to Cognee. If they are identical, no write occurs. This **diff-gate** prevents
 redundant Cognee traffic on every contract poll.
 
 Source:
-[`core/grants/derive-dataset-membership.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/grants/main/src/core/derive-dataset-membership.ts).
+[`core/grants/derive-dataset-membership.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/iam/grants/main/src/core/derive-dataset-membership.ts).
 
 ### Resource share-groups (direct file and chat sharing)
 
@@ -204,20 +190,6 @@ Sharing a file or chat directly creates a **Personal-scoped resource group** —
 group's members are the sharer and the recipient. Because Personal-scoped groups
 populate the `personal` dataset tier via the derivation above, the recipient's agent
 gains Cognee access to the shared item through the normal group-expansion path.
-
-```bash
-# Share a file with a colleague (POST /api/v1/resource-shares)
-oc share resource --type file --id <file-id> --with <oidc-subject>
-
-# Share a chat transcript
-oc share resource --type chat --id <chat-id> --with <oidc-subject>
-
-# List resource shares you are a member of
-oc share resource list
-
-# Revoke a recipient from a resource share
-oc share resource revoke <group-id> --subject <oidc-subject>
-```
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -229,7 +201,7 @@ The least-privilege rule applies here too: only a current member of the resource
 group may add further recipients. A user who does not hold the resource cannot share it.
 
 Source:
-[`routes/resource-shares.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/grants/main/src/routes/resource-shares.ts).
+[`routes/resource-shares.ts`](https://github.com/italanta/opencrane/blob/main/libs/backend/server/iam/grants/main/src/routes/resource-shares.ts).
 
 ### Cognee sync mechanics
 

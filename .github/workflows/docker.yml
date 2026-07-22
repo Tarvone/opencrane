@@ -4,11 +4,17 @@ on:
   push:
     branches:
       - main
-      - feat/agent-platform-v2
+      - own-personal-ai-agent-setup
   pull_request:
     branches:
       - main
-      - feat/agent-platform-v2
+      - own-personal-ai-agent-setup
+
+# One live run per ref: a new push supersedes the in-flight PR validation of the stale commit.
+# Pushes to the integration branches are never cancelled mid-publish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   actions: read
@@ -28,6 +34,7 @@ jobs:
       has_deployables: ${{ steps.affected.outputs.has_deployables }}
       api_contract_changed: ${{ steps.affected.outputs.api_contract_changed }}
       e2e_required: ${{ steps.affected.outputs.e2e_required }}
+      guard_inputs_changed: ${{ steps.affected.outputs.guard_inputs_changed }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -38,13 +45,21 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Select the last successful base
         uses: nrwl/nx-set-shas@v5
         with:
-          main-branch-name: ${{ github.base_ref || (github.ref_name == 'feat/agent-platform-v2' && 'feat/agent-platform-v2' || 'main') }}
+          main-branch-name: ${{ github.base_ref || (github.ref_name == 'own-personal-ai-agent-setup' && 'own-personal-ai-agent-setup' || 'main') }}
 
       - name: Emit affected deployable matrix
         id: affected
@@ -67,8 +82,59 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Generate the database client
+        run: npm run db:generate -w @opencrane/server
+
+      - name: Install Helm for topology render validation
+        uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
+
+      - name: Enforce Phase A retired-reference and legacy-residue guards
+        run: ./scripts/phase-a-forbidden-references.sh
+
+      - name: Prove the Phase A residue guard fails closed
+        run: npm run test:phase-a-forbidden-references
+
+      - name: Enforce Phase B workload ownership and thin app roots
+        run: npm run check:phase-b-topology
+
+      - name: Prove Phase B topology guard rejects drift
+        # Tests the guard, not the repo — re-prove only when the guard or its inputs change.
+        if: needs.prepare.outputs.guard_inputs_changed == 'true' || github.event_name == 'push'
+        run: npm run test:phase-b-topology
+
+      - name: Enforce Phase D personal-agent namespace boundary
+        run: npm run check:phase-d-agent-namespaces
+
+      - name: Prove the Phase D namespace boundary rejects drift
+        run: npm run test:phase-d-agent-namespaces
+
+      - name: Enforce Phase A runtime contracts
+        run: |
+          ./apps/_infra/deploy-k8s/platform/tests/tenant-entrypoint-contract-policy.sh
+          ./apps/_infra/deploy-k8s/platform/tests/tenant-image-immutability.sh
+
+      - name: Restore the Nx computation cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
       - name: Build, test, and lint affected projects
         run: npx nx affected -t build test lint
@@ -89,7 +155,9 @@ jobs:
     name: k3d standalone-silo e2e smoke test
     runs-on: ubuntu-latest
     needs: [prepare, test]
-    if: needs.prepare.outputs.e2e_required == 'true'
+    # PRs pay for the e2e only when the deployment surface moved; integration-branch pushes
+    # always run it, and the nightly workflow re-validates the full battery.
+    if: needs.prepare.outputs.e2e_required == 'true' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v6
 
@@ -98,9 +166,13 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v5
+        with:
+          # Pinned to the version local deploys and the render-parity evidence used —
+          # renders must not drift with the runner image or a new Helm release.
+          version: v4.1.4
 
       - name: Run k3d e2e smoke test
-        run: ./libs/k8s-platform/tests/k3d-e2e.sh
+        run: ./apps/_infra/deploy-k8s/platform/tests/k3d-e2e.sh
         env:
           KEEP_CLUSTER: "0"
           TIMEOUT_SECONDS: "300"

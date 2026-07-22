@@ -45,7 +45,7 @@ OpenCrane is a **control plane for organizational AI**. It sits on top of agent 
 **Your organization stays in control:**
 - **Personal assistants at scale**: Deploy a private AI assistant for every employee in minutes—each one isolated, secure, and acting on behalf of that employee.
 - **One dedicated silo per organisation**: Every customer org runs its own isolated stack—dedicated operator, control plane, LLM proxy, MCP gateway, knowledge base, skill registry, and database—provisioned and managed by a central fleet. There is no shared singleton that mixes org data.
-- **Vendor independence and BYOK**: Choose your LLM provider—Claude, GPT, open-source models—without lock-in. Each org sets its own provider keys (Bring Your Own Key) through the platform API (with CLI coverage for day-to-day operations); keys are stored as Kubernetes Secrets and routed only through the org's LiteLLM proxy, never written to the database.
+- **Vendor independence and BYOK**: Choose your LLM provider—Claude, GPT, open-source models—without lock-in. Each org sets its own provider keys (Bring Your Own Key) through the platform API; keys are stored as Kubernetes Secrets and routed only through the org's LiteLLM proxy, never written to the database.
 - **Model routing and cost control**: Pin a model per skill or let the platform choose. The platform sets per-employee budgets and model allowlists, which the org's LiteLLM proxy enforces at request time; the control plane meters spend and warns as budgets approach. An eval-driven, human-gated optimisation loop surfaces "switch this skill's model to save N% at equal quality".
 - **Self-hosted, data-sovereign**: Deploy OpenCrane on your infrastructure. Your organizational data—documents, conversations, collected information—stays on your network, never sent to external vendors. Shared skills are stored and versioned in your repository.
 - **Security and governance**: Identity-keyed network isolation (Cilium + SPIFFE) gives every workload a cryptographic identity; each silo is default-deny. One fleet release manages identity, access control, skill deployment, cost tracking, audit, and RBAC-filtered access to organizational knowledge across all silos.
@@ -54,25 +54,31 @@ OpenCrane is a **control plane for organizational AI**. It sits on top of agent 
 
 ## How It Works
 
-Each employee gets their own **private AI assistant**—an isolated OpenClaw instance running as a Kubernetes pod. This assistant:
+Each employee gets their own **private AI assistant**—one continuous assistant that knows who
+they are, works on their behalf, and keeps their conversations and files private. Under the
+hood that assistant is a structured model with a set of durable conversations rather than a
+long-lived process, so a restart or scale-down never erases the relationship.
 
-- **Knows who you are**: Holds your personal access tokens and can read and write data across the organization's platforms *as you*
-- **Stays private**: Your conversations with the AI are stored locally in your pod's encrypted storage. OpenCrane enforces network-level policies and budget controls, but does not log or inspect conversation contents.
-- **Accesses organizational knowledge directly**: Uses the official Cognee memory plugin during the agentic loop, with company, user, and agent scopes bound to the tenant identity.
+- **Knows who you are**: Every run draws on an agent persona trained on your needs, working
+  style, and communication preferences—one that keeps learning and improving the more you use
+  it—plus your permitted company context, budget, and tools. The model may change between runs
+  as routing or cost policy improves, but every other input is frozen for the run already
+  underway, so a later policy or skill change never rewrites work in progress.
+- **Stays yours**: Conversations and files are private to their owner. Team agents and
+  scheduled company services run on the same foundation—without ever gaining access to a
+  person's private conversations or files.
+- **Never forgets a conversation**: A conversation is a thread with an ordered, durable history.
+  Each message starts one recorded run, which can be safely cancelled, resumed after approval, or
+  replayed in the UI without duplicate results.
+- **Tools with control**: Assistants can use approved integrations, company knowledge, files, and
+  governed skills. Higher-risk actions wait for the right person's approval before they happen.
+- **Files that remain useful**: Uploads and generated outputs are managed as versioned assets. A
+  conversation refers to a specific version of a file, which keeps sharing, history, and auditing
+  clear even when newer versions are created.
 
-OpenCrane also runs **company-wide information gathering agents** (dedicated tenant deployments with elevated permissions) that:
-- Continuously harvest organizational knowledge, starting with Slack, with further sources (Teams, email, ticketing systems) connecting through the MCP gateway as they land
-- Index this knowledge into a centralized Org Knowledge Index
-- Make it available to all tenant assistants via retrieval plugins (role-based access)
-
-OpenCrane orchestrates all of this by:
-- **Infrastructure Management**: Deploying and managing assistants for each employee. Supporting local or remote LLM models. Setting token budgets and cost limits per employee, enforced by the org's LLM proxy and metered by the control plane.
-- **Permissions Control Plane**: Managing dataset memberships and permissions in Cognee (for org/team/project/personal scopes) without sitting in the retrieval request path.
-- **Managed organizational memory**: Wiring each tenant runtime to its entitled Cognee scopes through the official OpenClaw memory plugin.
-- **Organizational Knowledge**: Company-wide agents harvest and index org data; direct tenant retrieval runtimes make it accessible based on role and dataset scope.
-- **Scalable architecture**: The same multi-tenant, Kubernetes-native design works from 10 to 10,000 employees.
-- **Skill sharing**: Managing skill updates and deployments across the organization.
-- **Secure storage**: All data stored in your organization's infrastructure, encrypted at rest.
+OpenCrane provides the surrounding control plane: it manages assistants, access, budgets, shared
+knowledge, integrations, skills, and durable assets while keeping each organisation's data in its
+own silo.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the capabilities shipped so far and [`plan-done.md`](plan-done.md) for the history behind them.
 
@@ -105,7 +111,7 @@ Legend:   [live] live today      [partial] partial / gated      [desired] desire
                            │ clustertenant-manager — THE control plane      [live]    │◄──►│ CNPG Postgres           [live] │
                            │ API + operator + gateway-proxy · one deployment          │    └────────────────────────────────┘
                            │ Obot config authority · MCP registry · contract API      │    ┌────────────────────────────────┐
-                           └──────────────────────────────────────────────────────────┘    │ Skill OCI store (Zot) [partial]│
+                           └──────────────────────────────────────────────────────────┘    │ ArtifactStore CAS (PVC) [target]│
                                              │                                             └────────────────────────────────┘
                                              │  (0) config · (1) grants · (2) effective-contract → pods
                                              ▼
@@ -141,10 +147,9 @@ Legend:   [live] live today      [partial] partial / gated      [desired] desire
 | Component | Path | Description |
 |-----------|------|-------------|
 | Silo operator | `apps/opencrane/` | Per-silo control plane: headless Express REST API (`/api/v1`) + in-silo controllers; emits `openapi.json` at build time |
-| Silo chart | `apps/opencrane-infra/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/opencrane-infra/deploy.sh`. |
-| Platform library | `libs/k8s-platform/` | Helm library chart (shared named templates), shared deploy engine (`k8s-deploy.sh`, `configure-oidc.sh`) + cluster provisioning (`provision.sh`, behind `--provision`), Terraform, migrations, tests, and `deploy-single-tenant.sh` |
-| CLI | `apps/cli/` | `oc` binary — administrative surface over the per-silo opencrane-server |
-| Contracts | `libs/contracts/` | Generated TypeScript client + DTOs from `openapi.json`; consumed by CLI and external surfaces |
+| Silo chart | `apps/_infra/deploy-k8s/` | Helm chart `opencrane-silo` — per-org silo: silo operator + planes (Cognee, LiteLLM, Obot, skill registry) + Langfuse + gateway. Deploy with `apps/_infra/deploy-k8s/deploy.sh`. |
+| Deployment platform | `apps/_infra/deploy-k8s/platform/` | Internal Helm helper chart, deploy engine (`k8s-deploy.sh`, `configure-oidc.sh`), cluster provisioning (`provision.sh`, behind `--provision`), Terraform, value profiles, tests, and `deploy-single-tenant.sh` |
+| Contracts | `libs/contracts/` | Generated TypeScript client + DTOs from `openapi.json`; used by the OpenCrane UI and external surfaces |
 | Docker | `apps/*/deploy/Dockerfile` | Per-app Dockerfiles (silo operator, tenant runtime, skill registry), built and published by `.github/workflows/docker.yml` |
 | Skills | `skills/shared/` | Org/team shared skill library |
 | Docs site | `website/` | VitePress documentation site published to GitHub Pages |
@@ -169,7 +174,7 @@ reference. The site is built with [VitePress](https://vitepress.dev) from
 | [MCP gateway (Obot)](https://opencrane.ai/integrators/mcp-gateway) | Connecting assistants to external tools over MCP |
 | [Skill registry & delivery](https://opencrane.ai/integrators/skill-registry) | Skill catalog, scan/entitle pipeline, and per-read delivery |
 | [Retrieval & memory](https://opencrane.ai/integrators/retrieval-memory) | Cognee retrieval plane: datasets, AccessPolicy mapping, freshness |
-| [API overview](https://opencrane.ai/reference/api-overview) · [CLI reference](https://opencrane.ai/reference/cli) · [Runbook](https://opencrane.ai/operators/runbook) | HTTP API reference · `oc` CLI reference · operational runbook |
+| [API overview](https://opencrane.ai/reference/api-overview) · [Interactive API reference](https://opencrane.ai/reference/api) · [Runbook](https://opencrane.ai/operators/runbook) | Authentication and API conventions · live endpoint reference · operational runbook |
 
 ## Quick Start
 
@@ -199,10 +204,10 @@ The deploy scripts can provision the cluster too — `--provision local|gke|vps`
 # check that out first, e.g.: ../weownai/apps/fleet-platform/deploy.sh --provision local --base-domain opencrane.local
 
 # Add an organisation (silo) once the fleet is up:
-apps/opencrane-infra/deploy.sh --cluster-tenant acme --base-domain opencrane.local
+apps/_infra/deploy-k8s/deploy.sh --cluster-tenant acme --base-domain opencrane.local
 ```
 
-For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k3d-local.sh` harness (k3d + local images; `LOCAL_PROFILE=strict` for prod-style Helm validation) remains available. The `strict` profile does not emulate GCP-only capabilities (Workload Identity, GCS, External Secrets, GCE ingress, Cloud DNS) — it validates the same core wiring with stricter chart inputs locally.
+For fast dev iteration with locally-built images, the `apps/_infra/deploy-k8s/platform/tests/k3d-local.sh` harness (k3d + local images; `LOCAL_PROFILE=strict` for prod-style Helm validation) remains available. The `strict` profile does not emulate GCP-only capabilities (Workload Identity, GCS, External Secrets, GCE ingress, Cloud DNS) — it validates the same core wiring with stricter chart inputs locally.
 
 ### GCP Deployment
 
@@ -213,30 +218,21 @@ For fast dev iteration with locally-built images, the `libs/k8s-platform/tests/k
 #   --project-id my-project --base-domain opencrane.ai
 
 # Add a silo for an organisation (once per org)
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
   --cluster-tenant acme --base-domain opencrane.ai
 
 # Or provision + deploy the fleet AND one seeded org in a single pass (FLEET_CHART_DIR must
 # point at a checked-out copy of WeOwnAI's apps/fleet-platform — see italanta/opencrane#150)
 FLEET_CHART_DIR=../weownai/apps/fleet-platform \
-libs/k8s-platform/deploy-single-tenant.sh --provision gke \
+apps/_infra/deploy-k8s/platform/deploy-single-tenant.sh --provision gke \
   --project-id my-project --base-domain opencrane.ai \
   --org-name acme --org-owner-email owner@acme.example
 
 # Prefer to manage infra yourself? Provision with Terraform
-# (libs/k8s-platform/terraform/environments/dev) and run the deploy scripts WITHOUT
+# (apps/_infra/deploy-k8s/platform/terraform/environments/dev) and run the deploy scripts WITHOUT
 # --provision against the resulting cluster.
 
-# 3. Create a tenant via the oc CLI
-export OPENCRANE_URL=https://opencrane.ai
-export OPENCRANE_TOKEN=<your-access-token>
-
-oc tenants create \
-  --name jente \
-  --display-name "Jente" \
-  --email jente@example.com
-
-# Or via CRD directly
+# 3. Create a tenant via its declarative cluster contract
 kubectl apply -f - <<EOF
 apiVersion: opencrane.io/v1alpha1
 kind: Tenant
@@ -250,38 +246,20 @@ EOF
 
 The operator provisions everything the tenant needs — storage, identity, an encryption key, and access through the org's ingress. Employees sign in at the org host (e.g. `https://acme.opencrane.ai`); the platform routes each session to their own pod internally. See [Set up your domain](https://opencrane.ai/guide/dns) for DNS and TLS.
 
-### CLI Quick Reference
+### API quick reference
 
-Every administrative capability is reachable through `oc`, the platform CLI:
+Human operators use the OIDC browser flow; the management UI makes same-origin API requests
+with its session cookie. Workload APIs use dedicated projected-token boundaries. Static API
+tokens and terminal bearer-token automation are deliberately not part of this target.
 
-```bash
-export OPENCRANE_URL=https://opencrane.ai
-export OPENCRANE_TOKEN=<your-access-token>
+See the [API overview](https://opencrane.ai/reference/api-overview) for authentication and conventions, and the [interactive API reference](https://opencrane.ai/reference/api) for the full endpoint list.
 
-oc tenants list              # list all employee assistants
-oc tenants suspend jente     # scale one to zero
-oc budget spend jente        # current spend for a tenant
-oc audit list --tenant jente # query the audit log
-```
+### Runtime updates
 
-See the [CLI reference](https://opencrane.ai/reference/cli) for the full command list and the [API reference](https://opencrane.ai/reference/api) for the HTTP API.
-
-### Version Pinning
-
-Pin a tenant to a specific OpenClaw version:
-
-```yaml
-apiVersion: opencrane.io/v1alpha1
-kind: Tenant
-metadata:
-  name: jente
-spec:
-  displayName: Jente
-  email: jente@example.com
-  openclawVersion: "2026.3.15"
-```
-
-Without `openclawVersion`, tenants install `latest` on first boot and can self-update via `openclaw update`.
+OpenClaw and its Cognee memory plugin ship together in a pinned, immutable tenant
+image. Operators upgrade that image through the silo Helm release, so every rollout
+and rollback restores a tested runtime/plugin pair rather than changing executable
+code inside an employee's persistent storage.
 
 ## License
 

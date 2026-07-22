@@ -46,7 +46,7 @@ The silo model eliminates both problems in the same move: each ClusterTenant get
 ┌───────────────────────────────────────────────────────────────┐
 │  SILO release (one per ClusterTenant)                         │
 │  namespace: opencrane-<cluster-tenant>                        │
-│  script: apps/opencrane-infra/deploy.sh --cluster-tenant <name>  │
+│  script: apps/_infra/deploy-k8s/deploy.sh --cluster-tenant <name>  │
 │                                                               │
 │  ┌───────────────────┐  ┌──────────┐  ┌─────────────────┐    │
 │  │ clustertenant-    │  │ operator │  │ Obot / MCP      │    │
@@ -57,8 +57,8 @@ The silo model eliminates both problems in the same move: each ClusterTenant get
 │  └───────────────────┘               └─────────────────┘    │
 │  ┌───────────────────┐               ┌─────────────────┐    │
 │  │  CNPG Postgres    │               │ LiteLLM         │    │
-│  │  (per-CT DB,      │               └─────────────────┘    │
-│  │   this NS only)   │               ┌─────────────────┐    │
+│  │  (one per-CT      │               └─────────────────┘    │
+│  │   server, this NS)│               ┌─────────────────┐    │
 │  └───────────────────┘               │ Cognee          │    │
 │                                      └─────────────────┘    │
 │  fleetManager.clusterTenantApi.enabled: false                 │
@@ -78,18 +78,18 @@ The silo model eliminates both problems in the same move: each ClusterTenant get
 | Fleet registry DB | Yes (`fleetManager.database.*`) | No |
 | Runtime planes (Obot, feat-skill-registry, LiteLLM, Cognee) | No | Yes |
 | Operator | No (fleet-manager reconciles ClusterTenants) | Yes (namespace-scoped to this silo) |
-| Per-silo Postgres | No | Yes — one CNPG `Cluster` CR per silo namespace |
+| Per-silo Postgres | No | Yes — one CNPG `Cluster` CR with isolated logical DBs per silo namespace |
 | Cluster-wide infra (ingress-nginx, external-dns, CNPG operator, cert-manager) | Installed here (once) | Reused from fleet release |
 
 ::: tip Two charts, two install profiles
-The fleet release uses the `opencrane-fleet` chart (`apps/fleet-platform`) and the silo release uses the `opencrane-silo` chart (`apps/opencrane-infra`). The deploy scripts set the appropriate profile flags (`fleetManager.clusterTenantApi.enabled`, `billing.enabled`, namespace) for each role.
+The fleet release uses the `opencrane-fleet` chart (`apps/fleet-platform`) and the silo release uses the `opencrane-silo` chart (`apps/_infra/deploy-k8s`). The deploy scripts set the appropriate profile flags (`fleetManager.clusterTenantApi.enabled`, `billing.enabled`, namespace) for each role.
 :::
 
 ---
 
 ## Deploy sequence
 
-You must install the fleet release first. The fleet release installs the cluster-wide singletons (ingress-nginx, external-dns, the CloudNativePG operator, cert-manager) that every silo reuses. `apps/opencrane-infra/deploy.sh` actively enforces this: it preflights for the CloudNativePG CRD (`clusters.postgresql.cnpg.io`) and exits with a clear error if the fleet release has not been installed.
+You must install the fleet release first. The fleet release installs the cluster-wide singletons (ingress-nginx, external-dns, the CloudNativePG operator, cert-manager) that every silo reuses. `apps/_infra/deploy-k8s/deploy.sh` actively enforces this: it preflights for the CloudNativePG CRD (`clusters.postgresql.cnpg.io`) and exits with a clear error if the fleet release has not been installed.
 
 ### Step 1 — install the fleet release
 
@@ -107,7 +107,7 @@ This installs the `opencrane-fleet` chart into `opencrane-system` with `fleetMan
 ### Step 2 — install one silo per ClusterTenant
 
 ```bash
-apps/opencrane-infra/deploy.sh \
+apps/_infra/deploy-k8s/deploy.sh \
     --base-domain dev.opencrane.ai \
     --cluster-tenant acme \
     [--namespace opencrane-acme] \
@@ -120,11 +120,11 @@ Repeat this command for each ClusterTenant. Each invocation:
 
 - installs into the silo namespace (`opencrane-<cluster-tenant>` by default);
 - passes `--no-ingress-nginx --no-external-dns --no-db-operator` so the cluster-wide singletons are not re-installed;
-- applies a dedicated CNPG `Cluster` CR in the silo namespace — one Postgres per silo, reconciled by the cluster-wide CNPG operator;
+- applies a dedicated CNPG `Cluster` CR in the silo namespace — one Postgres server per silo, with separate OpenCrane, Obot, LiteLLM, and Langfuse databases and credentials, reconciled by the cluster-wide CNPG operator;
 - sets `fleetManager.clusterTenantApi.enabled=false` and `billing.enabled=false`.
 
 ::: info One Postgres per silo
-Each silo gets its own CNPG `Cluster` in its own namespace. The silo's clustertenant-manager connects to its own database — there is no shared database and no cross-tenant query path. The cluster-wide CloudNativePG operator (installed by the fleet release) watches all namespaces and reconciles every silo's `Cluster` CR.
+Each silo gets its own CNPG `Cluster` in its own namespace. The server hosts separate databases and login roles for its planes; the clustertenant-manager receives only its OpenCrane credential. There is no cross-tenant server or query path. The cluster-wide CloudNativePG operator (installed by the fleet release) watches all namespaces and reconciles every silo's `Cluster` CR.
 :::
 
 ### Upgrade
@@ -152,18 +152,16 @@ Both the fleet-manager and clustertenant-manager deployments are always rendered
 - **Fleet-manager** renders its ClusterTenant lifecycle, billing, Zitadel-admin, and platform-DNS routes only when `fleetManager.clusterTenantApi.enabled=true`. The fleet-manager's cluster-scoped RBAC and the Zitadel rotation `Role`/`RoleBinding` are gated on the same flag.
 - **Clustertenant-manager** renders the tenant-facing surface (tenants, policies, groups, budgets, model routing, sessions) and holds ClusterTenant/OrgMembership as local read-models projected from the fleet.
 
-Source: [`apps/fleet-platform/templates/fleet-manager-deployment.yaml`](https://github.com/italanta/opencrane/blob/main/apps/fleet-platform/templates/fleet-manager-deployment.yaml) and [`apps/opencrane-infra/templates/clustertenant-manager-deployment.yaml`](https://github.com/italanta/opencrane/blob/main/apps/opencrane-infra/templates/clustertenant-manager-deployment.yaml).
+Source: [`apps/fleet-platform/templates/fleet-manager-deployment.yaml`](https://github.com/italanta/opencrane/blob/main/apps/fleet-platform/templates/fleet-manager-deployment.yaml), the app-owned [`apps/opencrane/helm/templates/_deployment.tpl`](https://github.com/italanta/opencrane/blob/main/apps/opencrane/helm/templates/_deployment.tpl), and the silo's [`app-rollups.yaml`](https://github.com/italanta/opencrane/blob/main/apps/_infra/deploy-k8s/templates/app-rollups.yaml) composition file.
 
 ---
 
 ## What is not yet automated
 
 ::: warning Future work
-Two significant pieces of automation are **not yet shipped** and must be done manually for now:
+One significant piece of automation is **not yet shipped** and must be done manually for now:
 
-**Silo provisioning on ClusterTenant creation.** When a new ClusterTenant is registered via the fleet API, the corresponding silo release is not automatically installed. You must run `apps/opencrane-infra/deploy.sh` by hand for each ClusterTenant. Automating this — so the fleet stamps out a silo release on ClusterTenant creation — is tracked as future work.
-
-**Data migration off the shared database.** Existing installations that used the old shared-singleton model (one Postgres for all tenants) must migrate each ClusterTenant's data into its own per-silo database. No automated migration tooling is shipped. Stage this migration carefully: provision each silo's database, copy the relevant rows, verify, then cut over the silo clustertenant-manager to its new database.
+**Silo provisioning on ClusterTenant creation.** When a new ClusterTenant is registered via the fleet API, the corresponding silo release is not automatically installed. You must run `apps/_infra/deploy-k8s/deploy.sh` by hand for each ClusterTenant. Automating this — so the fleet stamps out a silo release on ClusterTenant creation — is tracked as future work.
 :::
 
 ---

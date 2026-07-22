@@ -45,7 +45,6 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
-          { text: 'CLI', link: '/reference/cli' },
           { text: 'API (interactive)', link: '/reference/api' },
           { text: 'API overview', link: '/reference/api-overview' },
         ],
@@ -94,7 +93,6 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
-          { text: 'CLI reference', link: '/reference/cli' },
           { text: 'API reference (interactive)', link: '/reference/api' },
           { text: 'API overview', link: '/reference/api-overview' },
           { text: 'Contracts SDK', link: '/integrators/contracts-sdk' },
@@ -105,7 +103,7 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: 'Hosting & deployment', link: '/operators/hosting' },
-          { text: 'Fleet and silo operating model', link: '/operators/fleet-silo-model' },
+          { text: 'Control-plane operating model', link: '/operators/fleet-silo-model' },
           { text: 'Silo deployment model', link: '/operators/silo-deployment' },
           { text: 'ClusterTenant manager configuration', link: '/operators/clustertenantmanager-config' },
           { text: 'DNS configuration', link: '/operators/dns-config' },
@@ -126,7 +124,6 @@ export default defineConfig({
         items: [
           { text: 'Agent workspace & control', link: '/integrators/agent-workspace' },
           { text: 'MCP gateway (Obot)', link: '/integrators/mcp-gateway' },
-          { text: 'Skill registry & delivery', link: '/integrators/skill-registry' },
           { text: 'Retrieval & memory (Cognee)', link: '/integrators/retrieval-memory' },
           { text: 'Silo IAM: inheritance & sharing', link: '/integrators/silo-iam' },
         ],

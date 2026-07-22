@@ -18,9 +18,10 @@ function _runMigrations(): void
   {
     execSync("npx prisma migrate deploy", {
       stdio: "inherit",
-      // dist/scripts/migrate.js → up two levels to the opencrane-ui package root,
-      // where the per-domain `prisma/schema/` directory lives (the cwd `prisma migrate deploy` expects).
-      cwd: new URL("../../", import.meta.url).pathname,
+      // dist/apps/opencrane/scripts/migrate.js → up to the workspace root, then into the
+      // apps/opencrane package root, where the per-domain `prisma/schema/` directory lives
+      // (the cwd `prisma migrate deploy` expects).
+      cwd: new URL("../../../../apps/opencrane/", import.meta.url).pathname,
     });
     _log.info("migrations complete");
   }

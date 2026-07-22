@@ -8,9 +8,6 @@ CREATE SCHEMA IF NOT EXISTS "public";
 CREATE TYPE "AgentServiceKind" AS ENUM ('personal', 'managed');
 
 -- CreateEnum
-CREATE TYPE "AgentServiceOwnerScope" AS ENUM ('organization', 'department', 'team', 'project', 'personal', 'user');
-
--- CreateEnum
 CREATE TYPE "AgentServiceState" AS ENUM ('draft', 'active', 'paused', 'retired');
 
 -- CreateEnum
@@ -193,8 +190,6 @@ CREATE TABLE "agent_services" (
     "silo_id" TEXT NOT NULL,
     "kind" "AgentServiceKind" NOT NULL,
     "name" TEXT NOT NULL,
-    "owner_scope" "AgentServiceOwnerScope" NOT NULL,
-    "owner_subject_id" TEXT NOT NULL,
     "state" "AgentServiceState" NOT NULL DEFAULT 'draft',
     "active_revision_id" TEXT,
     "workload_profile" TEXT NOT NULL,
@@ -209,6 +204,9 @@ CREATE TABLE "agent_revisions" (
     "id" TEXT NOT NULL,
     "agent_service_id" TEXT NOT NULL,
     "revision" INTEGER NOT NULL,
+    "parent_revision_id" TEXT,
+    "source_revision_id" TEXT,
+    "change_message" TEXT NOT NULL DEFAULT '',
     "state" "AgentRevisionState" NOT NULL DEFAULT 'draft',
     "digest" TEXT NOT NULL,
     "prompt_policy_version" TEXT NOT NULL,
@@ -220,6 +218,16 @@ CREATE TABLE "agent_revisions" (
     "published_at" TIMESTAMP(3),
 
     CONSTRAINT "agent_revisions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "agent_revision_scope_attachments" (
+    "agent_revision_id" TEXT NOT NULL,
+    "scope" "GrantScope" NOT NULL,
+    "subject_type" "GrantSubjectType" NOT NULL,
+    "subject_id" TEXT NOT NULL,
+
+    CONSTRAINT "agent_revision_scope_attachments_pkey" PRIMARY KEY ("agent_revision_id","scope","subject_type","subject_id")
 );
 
 -- CreateTable
@@ -1579,9 +1587,6 @@ CREATE INDEX "runtime_dispatched_commands_run_id_attempt_idx" ON "runtime_dispat
 CREATE UNIQUE INDEX "runtime_dispatched_commands_run_id_attempt_sequence_key" ON "runtime_dispatched_commands"("run_id", "attempt", "sequence");
 
 -- CreateIndex
-CREATE INDEX "agent_services_silo_id_owner_scope_owner_subject_id_idx" ON "agent_services"("silo_id", "owner_scope", "owner_subject_id");
-
--- CreateIndex
 CREATE INDEX "agent_services_silo_id_kind_state_idx" ON "agent_services"("silo_id", "kind", "state");
 
 -- CreateIndex
@@ -1594,6 +1599,12 @@ CREATE UNIQUE INDEX "agent_services_id_silo_id_key" ON "agent_services"("id", "s
 CREATE INDEX "agent_revisions_digest_idx" ON "agent_revisions"("digest");
 
 -- CreateIndex
+CREATE INDEX "agent_revisions_parent_revision_id_idx" ON "agent_revisions"("parent_revision_id");
+
+-- CreateIndex
+CREATE INDEX "agent_revisions_source_revision_id_idx" ON "agent_revisions"("source_revision_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "agent_revisions_agent_service_id_revision_key" ON "agent_revisions"("agent_service_id", "revision");
 
 -- CreateIndex
@@ -1601,6 +1612,9 @@ CREATE UNIQUE INDEX "agent_revisions_agent_service_id_id_key" ON "agent_revision
 
 -- CreateIndex
 CREATE UNIQUE INDEX "agent_revisions_agent_service_id_digest_key" ON "agent_revisions"("agent_service_id", "digest");
+
+-- CreateIndex
+CREATE INDEX "agent_revision_scope_attachments_scope_subject_type_subject_idx" ON "agent_revision_scope_attachments"("scope", "subject_type", "subject_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "agent_revision_skill_assignments_agent_revision_id_skill_re_key" ON "agent_revision_skill_assignments"("agent_revision_id", "skill_revision_id");
@@ -2201,6 +2215,15 @@ ALTER TABLE "agent_services" ADD CONSTRAINT "agent_services_id_active_revision_i
 ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_agent_service_id_fkey" FOREIGN KEY ("agent_service_id") REFERENCES "agent_services"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_parent_revision_id_fkey" FOREIGN KEY ("parent_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_source_revision_id_fkey" FOREIGN KEY ("source_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agent_revision_scope_attachments" ADD CONSTRAINT "agent_revision_scope_attachments_agent_revision_id_fkey" FOREIGN KEY ("agent_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "agent_revision_skill_assignments" ADD CONSTRAINT "agent_revision_skill_assignments_agent_revision_id_fkey" FOREIGN KEY ("agent_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -2505,6 +2528,9 @@ BEGIN
     IF NEW."id" IS DISTINCT FROM OLD."id"
         OR NEW."agent_service_id" IS DISTINCT FROM OLD."agent_service_id"
         OR NEW."revision" IS DISTINCT FROM OLD."revision"
+        OR NEW."parent_revision_id" IS DISTINCT FROM OLD."parent_revision_id"
+        OR NEW."source_revision_id" IS DISTINCT FROM OLD."source_revision_id"
+        OR NEW."change_message" IS DISTINCT FROM OLD."change_message"
         OR NEW."digest" IS DISTINCT FROM OLD."digest"
         OR NEW."prompt_policy_version" IS DISTINCT FROM OLD."prompt_policy_version"
         OR NEW."persona_revision_id" IS DISTINCT FROM OLD."persona_revision_id"
@@ -3878,11 +3904,7 @@ $$;
 
 -- Check constraints
 ALTER TABLE "agent_services" ADD CONSTRAINT "agent_services_nonempty_check" CHECK (
-        btrim("silo_id") <> '' AND btrim("name") <> '' AND
-        btrim("owner_subject_id") <> '' AND btrim("workload_profile") <> ''
-    );
-ALTER TABLE "agent_services" ADD CONSTRAINT "agent_services_personal_owner_check" CHECK (
-        "kind" <> 'personal' OR "owner_scope" IN ('personal', 'user')
+        btrim("silo_id") <> '' AND btrim("name") <> '' AND btrim("workload_profile") <> ''
     );
 ALTER TABLE "agent_services" ADD CONSTRAINT "agent_services_active_revision_check" CHECK (
         "state" <> 'active' OR "active_revision_id" IS NOT NULL
@@ -3892,6 +3914,9 @@ ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_nonempty_check" CH
         btrim("agent_service_id") <> '' AND btrim("digest") <> '' AND
         btrim("prompt_policy_version") <> '' AND btrim("model_policy_id") <> '' AND
         btrim("authored_by") <> '' AND "digest" ~ '^sha256:[0-9a-f]{64}$'
+    );
+ALTER TABLE "agent_revision_scope_attachments" ADD CONSTRAINT "agent_revision_scope_attachments_nonempty_check" CHECK (
+        btrim("agent_revision_id") <> '' AND btrim("subject_id") <> ''
     );
 ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_publication_check" CHECK (
         ("state" = 'published' AND "published_at" IS NOT NULL) OR
@@ -4191,6 +4216,9 @@ CREATE CONSTRAINT TRIGGER "active_agent_revisions_remain_published"
     FOR EACH ROW EXECUTE FUNCTION "protect_active_agent_revision_publication"();
 CREATE TRIGGER "agent_revision_skill_assignments_immutable"
     BEFORE INSERT OR UPDATE OR DELETE ON "agent_revision_skill_assignments"
+    FOR EACH ROW EXECUTE FUNCTION "enforce_agent_revision_assignment_immutability"();
+CREATE TRIGGER "agent_revision_scope_attachments_immutable"
+    BEFORE INSERT OR UPDATE OR DELETE ON "agent_revision_scope_attachments"
     FOR EACH ROW EXECUTE FUNCTION "enforce_agent_revision_assignment_immutability"();
 CREATE TRIGGER "workload_assignments_current_attempt" BEFORE INSERT OR UPDATE OF "run_id", "attempt" ON "workload_assignments" FOR EACH ROW EXECUTE FUNCTION "enforce_current_workload_assignment_attempt"();
 CREATE TRIGGER "run_outbox_events_accepted_attempt" BEFORE INSERT OR UPDATE OF "run_id", "attempt" ON "run_outbox_events" FOR EACH ROW EXECUTE FUNCTION "enforce_accepted_outbox_attempt"();

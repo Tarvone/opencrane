@@ -335,10 +335,9 @@ is a target authorization parameter, not a production-transition decision.
    namespace, workload profile and workload UID. A suspended Job first receives a single-use
    bootstrap bound to its Job UID and projected only by that Job's pod template. After unsuspension,
    the controller registers the Job's first Pod UID before exchange is allowed; a different Pod UID
-   under that Job is rejected. A long-lived personal Deployment receives a one-time run assignment
-   challenge for its already registered Pod UID. The runtime cannot request an arbitrary run by ID.
+   under that Job is rejected. The runtime cannot request an arbitrary run by ID.
 5. The runtime authenticates with that bootstrap/assignment plus an explicitly projected KSA token
-   whose audience is `opencrane`; default token automount is disabled. OpenCrane TokenReviews the
+   whose audience is `opencrane-agent-runtime`; default token automount is disabled. OpenCrane TokenReviews the
    full namespace/SA/Pod UID, atomically consumes the bootstrap, verifies the controller assignment
    and Job ownership where applicable, and binds the context to an ephemeral pod/run proof key.
 6. OpenCrane returns a short-lived run context containing IDs, revision/grant hashes, allowed scopes,
@@ -380,8 +379,8 @@ unless an independent GitOps author must own them. The OpenCrane API is the only
 
 ### Personal and managed workloads
 
-- A personal agent normally has one stable Deployment per user inside the ClusterTenant. It may
-  scale to zero because transcript, persona, memory, and artifacts live outside the pod.
+- A personal agent run executes as a fresh controller-assigned Job. It carries no durable tenant
+  state because transcript, persona, memory, and artifacts live outside the pod.
 - A scheduled managed agent is represented by an AgentService and immutable AgentRevision. The
   controller renders a lightweight CronJob whose only job is to call an idempotent OpenCrane
   schedule-fire endpoint. OpenCrane transactionally creates the `AgentRun` and outbox command before

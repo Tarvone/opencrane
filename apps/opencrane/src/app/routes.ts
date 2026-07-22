@@ -18,26 +18,26 @@ import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/ret
 import { _BuildDocMergeReconciler, companyDocsRouter } from "@opencrane/backend/server/knowledge/company-docs";
 import { _CheckDbHealth, _OpenapiRouter } from "@opencrane/server/_infra/http";
 import { _RegisterInternalAgentRuntimeStream, type RuntimeCommandStreamAuthority, type RuntimeTokenReviewer, type RuntimeWorkloadIdentity } from "@opencrane/server/_infra/agent-runtime-stream";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 import { spec } from "@opencrane/backend/server/api-spec";
-
-/** Fixed projected-token audience for the outbound-only personal runtime shell. */
-const _AGENT_RUNTIME_TOKEN_AUDIENCE = "opencrane-agent-runtime";
 
 /**
  * Convert one reviewed Kubernetes subject into the identity accepted by the runtime transport.
  *
- * The expected namespace and ServiceAccount come from server-owned deployment configuration; the
- * caller may supply only its reviewed subject and Pod UID. Returning `null` on every mismatch keeps
- * authentication parsing from silently broadening which runtime workloads the server trusts.
+ * The expected namespace comes from server-owned deployment configuration. The reviewed
+ * ServiceAccount must satisfy the same bounded runtime-profile grammar used when building Jobs, and
+ * the Pod UID must come from TokenReview. Returning `null` on every mismatch keeps subject parsing
+ * from silently broadening which runtime workloads the server trusts.
  */
-function _ParseRuntimeSubject(subject: string, expectedNamespace: string, expectedServiceAccount: string, podUid: string | null): RuntimeWorkloadIdentity | null
+function _ParseRuntimeSubject(subject: string, expectedNamespace: string, podUid: string | null): RuntimeWorkloadIdentity | null
 {
   const parts = subject.split(":");
-	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || parts[3] !== expectedServiceAccount || !podUid)
+	const serviceAccountName = parts[3];
+	if (parts.length !== 4 || parts[0] !== "system" || parts[1] !== "serviceaccount" || parts[2] !== expectedNamespace || !serviceAccountName || !___IsAgentRuntimeServiceAccountName(serviceAccountName) || !podUid)
   {
     return null;
   }
-	return { subject, namespace: expectedNamespace, serviceAccountName: expectedServiceAccount, podUid };
+	return { subject, namespace: expectedNamespace, serviceAccountName, podUid };
 }
 
 /**
@@ -55,32 +55,28 @@ function _ReadReviewedPodUid(extra: Record<string, string[]> | undefined): strin
 /**
  * Build the app-owned Kubernetes TokenReview adapter for runtime projected credentials.
  *
- * Kubernetes remains the issuer and verifier. This adapter fixes the expected audience, namespace,
- * and ServiceAccount from deployment configuration, then exposes only the authenticated workload
- * identity needed by the transport; it never forwards the raw token or TokenReview response.
+ * Kubernetes remains the issuer and verifier. This adapter fixes the audience and namespace, then
+ * validates the reviewed ServiceAccount against the shared runtime-profile grammar and exposes only
+ * the workload identity needed by the transport. It never forwards the raw token or TokenReview
+ * response; a valid signature without all bindings is still unauthorised.
  */
 function _CreateRuntimeTokenReviewer(authApi: k8s.AuthenticationV1Api): RuntimeTokenReviewer
 {
   const expectedNamespace = process.env.POD_NAMESPACE?.trim() || "default";
-  const expectedServiceAccount = process.env.AGENT_RUNTIME_SERVICE_ACCOUNT_NAME?.trim();
   return {
     async __Review(token: string): Promise<RuntimeWorkloadIdentity | null>
     {
-      if (!expectedServiceAccount)
-      {
-        return null;
-      }
       const body = new k8s.V1TokenReview();
       body.spec = new k8s.V1TokenReviewSpec();
       body.spec.token = token;
-      body.spec.audiences = [_AGENT_RUNTIME_TOKEN_AUDIENCE];
+		body.spec.audiences = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE];
       const review = await authApi.createTokenReview({ body });
       const status = review.status;
-      if (!status?.authenticated || !status.audiences?.includes(_AGENT_RUNTIME_TOKEN_AUDIENCE))
+		if (!status?.authenticated || !status.audiences?.includes(AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE))
       {
         return null;
       }
-		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, expectedServiceAccount, _ReadReviewedPodUid(status.user?.extra));
+		return _ParseRuntimeSubject(status.user?.username ?? "", expectedNamespace, _ReadReviewedPodUid(status.user?.extra));
     },
   };
 }

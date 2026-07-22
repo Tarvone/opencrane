@@ -50,11 +50,15 @@ provider credentials or mutable source objects.
   `RunInputSnapshot`/`RunInputSnapshotIdentity`, `MemoryFactReference`, `TenantModelSet`, and
   domain-topology host builders. A memory fact reference pins an immutable content digest and its
   provenance rather than a mutable revision counter.
-- `AGENT_RUNTIME_PROTOCOL_V1`, `RuntimeStreamOpen`, `RuntimeCommandEnvelope`, and `RuntimeCandidate`
+- `AGENT_RUNTIME_PROTOCOL_V1`, `AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE`,
+  `___IsAgentRuntimeServiceAccountName`, `RuntimeStreamOpen`, `RuntimeCommandEnvelope`, and
+  `RuntimeCandidate`
   — the private workload protocol for a personal-agent process that opens its own authenticated
   stream to the control plane. The opening frame binds the ephemeral runtime instance to the Pod UID
-  independently verified from its Kubernetes credential; later commands and candidate output retain
-  that identity. These frames are not a browser or OpenAPI contract.
+  independently verified from its Kubernetes credential. The audience constant fixes workload
+  identity to `opencrane-agent-runtime`, and the shared validator keeps Job issuance and TokenReview
+  admission on one bounded ServiceAccount grammar. Later commands and candidate output retain that
+  identity. These frames are not a browser or OpenAPI contract.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

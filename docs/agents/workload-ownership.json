@@ -50,8 +50,7 @@
       "setValues": [
         "langfuse.inCluster.enabled=true",
         "controlPlaneSpa.enabled=true",
-        "channelProxy.enabled=true",
-        "agentRuntime.enabled=true"
+        "channelProxy.enabled=true"
       ],
       "expectedRenderedPodClasses": [
         "Deployment/opencrane-s3",
@@ -61,7 +60,6 @@
         "Deployment/opencrane-opencrane-ui-spa",
         "Deployment/opencrane-channel-proxy",
         "Deployment/opencrane-artifact-service",
-        "Deployment/opencrane-agent-runtime",
         "Deployment/opencrane-cognee",
         "Deployment/opencrane-litellm",
         "Deployment/opencrane-mcp-gateway",
@@ -87,6 +85,11 @@
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/deploy/3-deployment.ts",
       "anchor": "kind: \"Deployment\"",
       "workloadIds": ["openclaw-tenant-runtime"]
+    },
+    {
+      "path": "libs/backend/agents/runtime/k8s-launcher/src/agent-runtime-job.ts",
+      "anchor": "kind: \"Job\"",
+      "workloadIds": ["agent-runtime"]
     },
     {
       "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
@@ -117,7 +120,6 @@
         "opencrane-ui",
         "channel-proxy",
         "artifact-service",
-        "agent-runtime",
         "cognee",
         "litellm",
         "obot-gateway-controller",
@@ -236,13 +238,13 @@
     },
     {
       "id": "agent-runtime",
-      "podClass": "Deployment/agent-runtime",
-      "renderedPodClass": "Deployment/opencrane-agent-runtime",
+      "podClass": "Job/agent-runtime-attempt",
       "image": "ghcr.io/italanta/opencrane-agent-runtime:<release-tag>",
       "owner": "apps/agent-runtime",
       "localOwner": true,
-      "source": { "type": "file", "path": "apps/agent-runtime/helm/templates/_resources.tpl", "anchor": "kind: Deployment", "coversLocalTemplate": true },
-      "composition": { "path": "apps/_infra/deploy-k8s/templates/app-rollups.yaml", "anchor": "include \"opencrane.agentRuntime.resources\"" }
+      "source": { "type": "file", "path": "libs/backend/agents/runtime/k8s-launcher/src/agent-runtime-job.ts", "anchor": "kind: \"Job\"" },
+      "classification": "survivor",
+      "reason": "The agent controller creates one suspended, zero-retry Job per durable run attempt."
     },
     {
       "id": "cognee",

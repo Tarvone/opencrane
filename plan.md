@@ -99,6 +99,11 @@ tests fail closed; backup/restore reconstructs target-owned stores; no legacy co
 
 ### Phase E — personal runtime and AgentService plane (parallel work lanes)
 
+**In progress:** the active PR stack now defines immutable run input, the fenced runtime protocol,
+the outbound-only runtime process, and the suspended one-Job-per-attempt resource contract. Durable
+assignment/command dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
+capabilities below are not complete yet.
+
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
 `RunInputSnapshot`, the prompt compiler, independently authored target fixtures, toolkit conformance
 against the target LiteLLM matrix, one exact-pinned driver, the reliability envelope,

@@ -391,7 +391,7 @@ SELECT pg_temp.expect_failure(
             "pod_uid", "state", "expires_at", "registered_at"
         ) VALUES (
             'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-            'opencrane', 'runtime', 'tenant-silo-1', 'job', 'job-uid-invalid',
+            'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-invalid',
             'pod-uid-invalid', 'registered', clock_timestamp() + interval '1 hour', clock_timestamp()
         )
     $statement$,
@@ -403,7 +403,7 @@ INSERT INTO "workload_assignments" (
     "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "expires_at"
 ) VALUES (
     'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-    'opencrane', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1', clock_timestamp() + interval '1 hour'
+    'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1', clock_timestamp() + interval '1 hour'
 );
 
 SELECT pg_temp.expect_failure(
@@ -415,7 +415,7 @@ SELECT pg_temp.expect_failure(
             "claim_digest", "expires_at"
         ) VALUES (
             'bootstrap-too-early', 'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-            'opencrane', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
+            'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
             'sha256:' || repeat('0', 64), clock_timestamp() + interval '30 minutes'
         )
     $statement$,
@@ -433,7 +433,7 @@ SELECT pg_temp.expect_failure(
             "claim_digest", "expires_at", "consumed_at", "consumed_by_pod_uid", "receipt_id"
         ) VALUES (
             'bootstrap-consumed', 'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-            'opencrane', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
+            'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
             'sha256:' || repeat('f', 64), clock_timestamp() + interval '30 minutes',
             clock_timestamp(), 'pod-uid-1', 'receipt-invalid'
         )
@@ -447,7 +447,7 @@ INSERT INTO "workload_bootstraps" (
     "claim_digest", "expires_at"
 ) VALUES (
     'bootstrap-1', 'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-    'opencrane', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
+    'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1',
     'sha256:' || repeat('5', 64), clock_timestamp() + interval '30 minutes'
 );
 
@@ -513,7 +513,7 @@ SELECT pg_temp.expect_failure(
             "decided_at", "decided_by", "resume_token_hash"
         ) VALUES (
             'approval-invalid-initial', 'run-action', 1, 'rev-published', 'svc-main', 'silo-1',
-            'proof-key-1', repeat('k', 43), 'user-1', 'opencrane',
+            'proof-key-1', repeat('k', 43), 'user-1', 'opencrane-agent-runtime',
             'runtime', 'tenant-silo-1', 'job', 'job-uid-1', 'pod-uid-1',
             'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send',
             'message', 'message-1', 'send', 'sha256:' || repeat('8', 64), 'sha256:' || repeat('a', 64),
@@ -536,7 +536,7 @@ SELECT pg_temp.expect_failure(
             "approver_policy_revision", "effective_policy_digest", "expires_at", "created_at"
         ) VALUES (
             'approval-expired-initial', 'run-action', 1, 'rev-published', 'svc-main', 'silo-1',
-            'proof-key-1', repeat('k', 43), 'user-1', 'opencrane',
+            'proof-key-1', repeat('k', 43), 'user-1', 'opencrane-agent-runtime',
             'runtime', 'tenant-silo-1', 'job', 'job-uid-1', 'pod-uid-1',
             'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send',
             'message', 'message-expired', 'send', 'sha256:' || repeat('8', 64), 'sha256:' || repeat('b', 64),
@@ -556,7 +556,7 @@ INSERT INTO "approval_requests" (
     "approver_policy_revision", "effective_policy_digest", "expires_at"
 ) VALUES (
     'approval-1', 'run-action', 1, 'rev-published', 'svc-main', 'silo-1',
-    'proof-key-1', repeat('k', 43), 'user-1', 'opencrane',
+    'proof-key-1', repeat('k', 43), 'user-1', 'opencrane-agent-runtime',
     'runtime', 'tenant-silo-1', 'job', 'job-uid-1', 'pod-uid-1',
     'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send',
     'message', 'message-approval', 'send', 'sha256:' || repeat('8', 64), 'sha256:' || repeat('c', 64),
@@ -614,7 +614,7 @@ INSERT INTO "approval_requests" (
     "approver_policy_revision", "effective_policy_digest", "expires_at"
 ) VALUES (
     'approval-expiring', 'run-action', 1, 'rev-published', 'svc-main', 'silo-1',
-    'proof-key-1', repeat('k', 43), 'user-1', 'opencrane',
+    'proof-key-1', repeat('k', 43), 'user-1', 'opencrane-agent-runtime',
     'runtime', 'tenant-silo-1', 'job', 'job-uid-1', 'pod-uid-1',
     'catalog-1', 1, 'sha256:' || repeat('6', 64), 'email.send',
     'message', 'message-expiring', 'send', 'sha256:' || repeat('8', 64), 'sha256:' || repeat('d', 64),

@@ -21,18 +21,18 @@ const PUBLIC_JWK = KEY_PAIR.publicKey.export({ format: "jwk" }) as Es256PublicJw
 /** Verified thumbprint bound atomically during bootstrap. */
 const PROOF_KEY_THUMBPRINT = __ComputeEs256JwkThumbprint(PUBLIC_JWK);
 
-/** Creates a long-lived personal Deployment bootstrap claim with a proposed run key. */
+/** Creates a personal attempt Job bootstrap claim with a proposed run key. */
 function _bootstrap(): RuntimeBootstrapClaim
 {
 	return {
 		bootstrapId: "bootstrap-1",
 		siloId: "silo-1",
-		audience: "opencrane",
+		audience: "opencrane-agent-runtime",
 		subjectId: "user-1",
 		serviceAccountName: "agent-runtime",
 		namespace: "silo-1-runtime",
-		workloadKind: "deployment",
-		workloadUid: "deployment-uid-1",
+		workloadKind: "job",
+		workloadUid: "job-uid-1",
 		podUid: "pod-uid-1",
 		runId: "run-1",
 		agentServiceId: "agent-service-1",
@@ -49,12 +49,12 @@ function _bootstrapExpectation(): RuntimeBootstrapExpectation
 {
 	return {
 		siloId: "silo-1",
-		audience: "opencrane",
+		audience: "opencrane-agent-runtime",
 		subjectId: "user-1",
 		serviceAccountName: "agent-runtime",
 		namespace: "silo-1-runtime",
-		workloadKind: "deployment",
-		workloadUid: "deployment-uid-1",
+		workloadKind: "job",
+		workloadUid: "job-uid-1",
 		podUid: "pod-uid-1",
 		runId: "run-1",
 		agentServiceId: "agent-service-1",
@@ -277,11 +277,11 @@ describe("runtime bootstrap and capability replay", function _suite()
 	{
 		const cases: Array<[Partial<RuntimeBootstrapClaim>, string]> = [
 			[{ siloId: "silo-other" }, "silo_mismatch"],
-			[{ audience: "artifact-service" }, "projected_token_audience_mismatch"],
+			[{ audience: "artifact-service" as RuntimeBootstrapClaim["audience"] }, "projected_token_audience_mismatch"],
 			[{ subjectId: "user-other" }, "subject_mismatch"],
 			[{ serviceAccountName: "wrong-ksa" }, "service_account_mismatch"],
 			[{ namespace: "wrong-namespace" }, "namespace_mismatch"],
-			[{ workloadKind: "job" }, "workload_kind_mismatch"],
+			[{ workloadKind: "deployment" }, "workload_kind_mismatch"],
 			[{ workloadUid: "wrong-workload-uid" }, "workload_uid_mismatch"],
 			[{ podUid: "wrong-pod" }, "pod_mismatch"],
 			[{ runId: "run-other" }, "run_mismatch"],
@@ -298,7 +298,7 @@ describe("runtime bootstrap and capability replay", function _suite()
 		}
 	});
 
-	it("atomically binds a Deployment proof key once and rejects bootstrap replay", async function _bootstrapReplay()
+	it("atomically binds a Job proof key once and rejects bootstrap replay", async function _bootstrapReplay()
 	{
 		const repository = new _BootstrapRepository();
 		const first = await __ConsumeRuntimeBootstrap(repository, _bootstrap(), _bootstrapExpectation());
@@ -310,7 +310,7 @@ describe("runtime bootstrap and capability replay", function _suite()
 
 	it("rejects matching non-control-plane bootstrap audiences", async function _nonControlPlaneBootstrapAudience()
 	{
-		const result = await __ConsumeRuntimeBootstrap(new _BootstrapRepository(), { ..._bootstrap(), audience: "artifact-service" }, { ..._bootstrapExpectation(), audience: "artifact-service" });
+		const result = await __ConsumeRuntimeBootstrap(new _BootstrapRepository(), { ..._bootstrap(), audience: "artifact-service" as RuntimeBootstrapClaim["audience"] }, { ..._bootstrapExpectation(), audience: "artifact-service" as RuntimeBootstrapExpectation["audience"] });
 
 		expect(result).toEqual({ outcome: "denied", reason: "projected_token_audience_mismatch" });
 	});

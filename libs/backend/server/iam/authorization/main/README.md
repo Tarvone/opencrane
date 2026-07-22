@@ -50,7 +50,8 @@ mistake here can only ever refuse a legitimate request — never hand out access
 - `__VerifyCapabilityProof`, `__ComputeEs256JwkThumbprint`, `__NormalizeDpopTargetUri` — verify the
   cryptographic proof an agent presents that it is that workload and is calling this exact endpoint.
 - `__ConsumeRuntimeBootstrap` — validates and atomically spends a one-time startup token that binds a
-  run to its pod and attempt, so it cannot be reused.
+  run to its pod and attempt, and accepts only the `opencrane-agent-runtime` projected-token audience,
+  so it cannot be reused or confused with a service-specific action token.
 - `__ExecuteCapabilityAction` — verifies the proof, reserves its unique id durably, then runs the
   effect exactly once (or returns the earlier result on an allowed idempotent retry).
 - `__DigestCanonicalJson` — a stable hash of a request used across the checks above.

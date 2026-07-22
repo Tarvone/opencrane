@@ -609,7 +609,7 @@ INSERT INTO "workload_assignments" (
   "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "expires_at"
 ) VALUES (
   'run-race-action-authority', 1, 'svc-race-action-authority', 'rev-race-action-authority',
-  'silo-race-action', 'user-race', 'opencrane', 'runtime', 'tenant-race-action', 'job',
+  'silo-race-action', 'user-race', 'opencrane-agent-runtime', 'runtime', 'tenant-race-action', 'job',
   'job-race-action', clock_timestamp() + interval '1 hour'
 );
 UPDATE "agent_runs" SET "state" = 'assigned' WHERE "id" = 'run-race-action-authority';
@@ -619,7 +619,7 @@ INSERT INTO "workload_bootstraps" (
   "claim_digest", "expires_at"
 ) VALUES (
   'bootstrap-race-action', 'run-race-action-authority', 1, 'svc-race-action-authority',
-  'rev-race-action-authority', 'silo-race-action', 'user-race', 'opencrane', 'runtime',
+  'rev-race-action-authority', 'silo-race-action', 'user-race', 'opencrane-agent-runtime', 'runtime',
   'tenant-race-action', 'job', 'job-race-action', 'sha256:' || repeat('3', 64),
   clock_timestamp() + interval '30 minutes'
 );
@@ -655,7 +655,7 @@ INSERT INTO "approval_requests" (
 ) VALUES (
   'approval-race-action', 'run-race-action-authority', 1, 'rev-race-action-authority',
   'svc-race-action-authority', 'silo-race-action', 'proof-race-action', repeat('r', 43),
-  'user-race', 'opencrane', 'runtime', 'tenant-race-action', 'job', 'job-race-action',
+  'user-race', 'opencrane-agent-runtime', 'runtime', 'tenant-race-action', 'job', 'job-race-action',
   'pod-race-action', 'catalog-race-action', 1, 'sha256:' || repeat('4', 64), 'email.send',
   'message', 'message-race', 'send', 'sha256:' || repeat('5', 64), 'sha256:' || repeat('6', 64),
   'approver-v1', 'sha256:' || repeat('7', 64), clock_timestamp() + interval '1 hour'

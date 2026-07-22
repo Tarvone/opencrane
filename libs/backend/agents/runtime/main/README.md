@@ -1,6 +1,6 @@
 # @opencrane/backend/agents/runtime — runtime protocol authority
 
-> [backend](../../../../README.md) › [agents](../../../README.md) › runtime
+> [backend](../../../../README.md) › [agents](../../../README.md) › [runtime](../README.md) › main
 
 ## What it owns
 
@@ -60,6 +60,6 @@ adapter, model driver, or legacy runtime package.
 
 ## See also
 
-- Parent index: [agents](../../../README.md)
+- Parent group: [runtime](../README.md)
 - Wire contract: [`@opencrane/contracts`](../../../../../contracts/README.md)
 - Run authority: [personal/runs](../../personal/runs/main/README.md)

@@ -1,4 +1,5 @@
 import type { CapabilityProofExpectation, CapabilityProofFailureReason, Es256PublicJwk } from "@opencrane/models/authorization";
+import type { AgentRuntimeProjectedTokenAudience } from "@opencrane/contracts";
 
 /** One-time bootstrap claim bound to the exact runtime attempt and Pod identity. */
 export interface RuntimeBootstrapClaim
@@ -8,7 +9,7 @@ export interface RuntimeBootstrapClaim
 	/** Silo containing the runtime. */
 	readonly siloId: string;
 	/** Fixed control-plane audience for the projected workload token. */
-	readonly audience: string;
+	readonly audience: AgentRuntimeProjectedTokenAudience;
 	/** Subject authorized to bootstrap the runtime. */
 	readonly subjectId: string;
 	/** Exact projected Kubernetes service account. */
@@ -43,7 +44,7 @@ export interface RuntimeBootstrapExpectation
 	/** Expected silo. */
 	readonly siloId: string;
 	/** Fixed control-plane audience expected from the projected workload token. */
-	readonly audience: string;
+	readonly audience: AgentRuntimeProjectedTokenAudience;
 	/** Expected subject. */
 	readonly subjectId: string;
 	/** Expected projected Kubernetes service account. */

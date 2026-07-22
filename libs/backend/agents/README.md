@@ -18,7 +18,7 @@ are the per-employee agent looking after itself, not the operator looking after 
 | [`personal/personas`](./personal/personas/main/README.md) | Persona approval process. |
 | [`personal/runs`](./personal/runs/main/README.md) | Agent-run attempt authority. |
 | [`personal/session`](./personal/session/main/README.md) | Run input snapshot assembly. |
-| [`runtime`](./runtime/main/README.md) | Language-neutral runtime command and candidate admission. |
+| [`runtime`](./runtime/README.md) | Language-neutral command/candidate authority and agent-controller Job projection. |
 
 ```
               backend/agents/personal   (one employee's agent)

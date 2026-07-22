@@ -10,7 +10,7 @@ function _bootstrap(): RuntimeBootstrapClaim
 	return {
 		bootstrapId: "bootstrap-1",
 		siloId: "silo-1",
-		audience: "opencrane",
+		audience: "opencrane-agent-runtime",
 		subjectId: "user-1",
 		serviceAccountName: "runtime",
 		namespace: "silo-1-runtime",

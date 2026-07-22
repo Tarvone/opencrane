@@ -154,6 +154,9 @@
       "@opencrane/server/_infra/agent-runtime-stream": [
         "./libs/server/_infra/agent-runtime-stream/src/index.ts"
       ],
+      "@opencrane/backend/agents/runtime/k8s-launcher": [
+        "./libs/backend/agents/runtime/k8s-launcher/src/index.ts"
+      ],
       "@opencrane/server/_infra/http": [
         "./libs/server/_infra/http/src/index.ts"
       ],

@@ -5,13 +5,13 @@ import type { ActionCapability, CanonicalJsonSha256Digest } from "../capability.
 /** Valid canonical digest shared by the exact capability fixtures. */
 const DIGEST = `sha256:${"a".repeat(64)}` as CanonicalJsonSha256Digest;
 
-/** Action capability for a long-lived personal Deployment run attempt. */
+/** Generic action capability for a managed-runtime Deployment run attempt. */
 const CAPABILITY: ActionCapability = {
 	jti: "action-capability-1",
 	audience: "artifact-service",
 	siloId: "silo-a",
 	subjectId: "user-a",
-	serviceAccountName: "personal-agent-runtime",
+	serviceAccountName: "managed-agent-runtime",
 	namespace: "silo-a-runtimes",
 	workloadKind: "deployment",
 	workloadUid: "deployment-uid-1",
@@ -96,7 +96,7 @@ const EXPECTATION: CapabilityProofExpectation = {
 
 describe("exact action capability contract", function _suite()
 {
-	it("represents a personal Deployment and its exact registered Pod without a Job sentinel", function _deployment()
+	it("represents a managed-runtime Deployment and its exact registered Pod", function _deployment()
 	{
 		expect(EXPECTATION.capability.workloadKind).toBe("deployment");
 		expect(EXPECTATION.capability.workloadUid).toBe("deployment-uid-1");

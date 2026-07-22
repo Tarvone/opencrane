@@ -10,33 +10,31 @@ The agent runtime is the process in which one personal-agent attempt will eventu
 runs inside the customer's isolated Kubernetes namespace, opens its own authenticated connection to
 OpenCrane, and never accepts inbound network traffic.
 
-This first slice establishes the process and identity boundary only. The runtime proves which Pod it
-is by presenting a short-lived Kubernetes credential, then keeps one outbound command stream open.
-OpenCrane cannot send work yet: the server deliberately supplies an empty command authority until a
-later Phase E slice binds the process to a durable run assignment.
+This slice removes the shared long-lived Deployment and defines the fresh, initially suspended Job
+that will contain this process for one attempt. The next controller slice will create that Job from
+durable run authority; this slice does not submit or unsuspend it. The runtime itself still ignores
+commands until later dispatch/executor authority is connected.
 
 ```text
- personal run accepted by OpenCrane
-               │  later: assigned command
-               ▼
-     OpenCrane internal listener
-               ▲  projected identity + outbound stream
-               │
- ┌────────────────────────────┐
- │  agent-runtime  ◄── HERE    │  no inbound listener; no executor yet
- └────────────────────────────┘
-               │
-               └── bounded temporary scratch only
+ durable run attempt
+        │  next slice: controller creates and assigns the suspended Job
+        ▼
+ ┌──────────────────────────────┐
+ │  agent-runtime  ◄── HERE      │  outbound command stream; no listener
+ └──────────────┬───────────────┘
+                │ later: candidate events and action requests
+                ▼
+ OpenCrane server authority
 ```
 
 **In this flow:** [OpenCrane server](../opencrane/README.md) ·
-[runtime stream transport](../../libs/server/_infra/agent-runtime-stream/README.md) ·
-[runtime protocol](../../libs/contracts/README.md)
+[runtime resource builder](../../libs/backend/agents/runtime/k8s-launcher/README.md) ·
+[runtime stream](../../libs/server/_infra/agent-runtime-stream/README.md)
 
 Invariant: this process cannot choose its user, agent revision, run, tools, permissions, or durable
-state. If identity or server authority is unavailable, it reconnects with bounded backoff and does no
-work. A runtime compromise therefore does not become a route into Kubernetes or long-lived tenant
-storage.
+state. A failed or retried attempt receives a different Job identity, and runtime-local files
+disappear with its bounded scratch volume. If identity or server authority is unavailable, the
+process reconnects with bounded backoff and does no work.
 
 ## Public surface
 
@@ -47,14 +45,15 @@ executed; full command-size admission belongs to the later executor boundary.
 
 ## Boundary
 
-The app owns no HTTP listener, Service, Ingress, Kubernetes role, model-provider credential, tool
-implementation, database client, or persistent volume. It does not assemble run input, admit
-candidate events, or write durable state. Those decisions remain in OpenCrane's personal-agent
-authorities.
+The process has no listener, Service, Ingress, Kubernetes role-based access control (RBAC), model
+provider credential, tool implementation, artifact credential, database client, or persistent tenant
+mount. It does not decide which run it may execute; OpenCrane validates the exact Job, Pod,
+ServiceAccount, attempt, and revision before admitting work.
 
-Its only writable filesystem is a bounded `emptyDir`, which Kubernetes deletes with the Pod. Any
-future durable memory or artifact must cross an authenticated OpenCrane service boundary rather than
-remaining inside the runtime.
+It also has no static Helm workload. Installing one shared Deployment would blur user and attempt
+identity, so the image may run only as the fresh Job contract defined by this slice. Durable memory
+or artifacts must cross an authenticated OpenCrane service boundary rather than remaining inside the
+runtime.
 
 ## Dependency direction
 
@@ -64,19 +63,26 @@ of the dependency graph; libraries do not import it. The wire contract is owned 
 
 ## Runtime & config
 
-- `OPENCRANE_RUNTIME_STREAM_URL` — internal OpenCrane stream endpoint in the same silo.
-- `OPENCRANE_RUNTIME_TOKEN_PATH` — rotating projected-token file; reread for every connection.
-- `POD_UID` — immutable Pod identity supplied by the Kubernetes downward API.
+- `OPENCRANE_RUNTIME_STREAM_URL` — exact in-cluster OpenCrane stream endpoint.
+- `OPENCRANE_RUNTIME_TOKEN_PATH` — rotating audience-bound projected-token path.
+- `POD_UID` — immutable Pod identity supplied through the Kubernetes downward API.
+- Writable storage is only a per-attempt `emptyDir` capped at 1 GiB and mounted at `/tmp`.
 
-The image runs as numeric user and group `65532` with a read-only root filesystem. Its projected
-credential is group-readable (`0440`) only by that runtime group; it is never world-readable. The
-chart is disabled by default and supplies finite CPU/memory and `emptyDir` scratch defaults, which
-operators may override. This initial chart still accepts a mutable image tag; the next Job-launcher
-slice replaces it with an immutable digest requirement before any command execution is enabled.
+The Job builder requires an immutable image digest plus bounded CPU, memory, deadline, and scratch.
+The container runs as numeric user and group `65532` with a read-only root filesystem. Its projected
+credential is group-readable (`0440`) only by that runtime group; it is never world-readable.
+
+## Status
+
+The current image proves the identity and outbound-stream boundary but deliberately ignores command
+frames. The Job is a pure rendered contract until the next controller slice creates it. Durable
+dispatch and the selected model/tool executor are later Phase E slices, so this app cannot yet
+complete an agent run.
 
 ## See also
 
 - Parent index: [apps](../README.md)
 - Server transport: [agent-runtime-stream](../../libs/server/_infra/agent-runtime-stream/README.md)
+- Per-attempt resources: [runtime/k8s-launcher](../../libs/backend/agents/runtime/k8s-launcher/README.md)
 - Runtime protocol: [contracts](../../libs/contracts/README.md)
 - Deployment composer: [deploy-k8s](../_infra/deploy-k8s/README.md)

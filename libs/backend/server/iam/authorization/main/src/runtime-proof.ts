@@ -1,12 +1,10 @@
 import type { CapabilityProofExpectation } from "@opencrane/models/authorization";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
 import type { JsonValue } from "@opencrane/util";
 
 import { __ComputeEs256JwkThumbprint, __NormalizeDpopTargetUri, __VerifyCapabilityProof } from "./capability-proof.js";
 import { __DigestCanonicalJson } from "./canonical-json-digest.js";
 import type { CapabilityActionExecutor, CapabilityActionIntent, CapabilityActionReceipt, CapabilityActionReceiptRepository, ConsumeRuntimeBootstrapResult, ExecuteCapabilityActionCommand, ExecuteCapabilityActionResult, RuntimeBootstrapClaim, RuntimeBootstrapExpectation, RuntimeBootstrapFailureReason, RuntimeBootstrapRepository } from "./runtime-proof.types.js";
-
-/** Sole audience accepted for projected workload identity tokens. */
-const _PROJECTED_TOKEN_AUDIENCE = "opencrane";
 
 /** Returns whether a value is one of the two accepted controller workload kinds. */
 function _isWorkloadKind(value: string): value is "job" | "deployment"
@@ -45,7 +43,7 @@ function _validateBootstrap(claim: RuntimeBootstrapClaim, expectation: RuntimeBo
 
 	// 3. Compare every assignment and run-attempt field, then enforce the hard expiry.
 	if (claim.siloId !== expectation.siloId) return "silo_mismatch";
-	if (claim.audience !== _PROJECTED_TOKEN_AUDIENCE || expectation.audience !== _PROJECTED_TOKEN_AUDIENCE) return "projected_token_audience_mismatch";
+	if (claim.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE || expectation.audience !== AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE) return "projected_token_audience_mismatch";
 	if (claim.subjectId !== expectation.subjectId) return "subject_mismatch";
 	if (claim.serviceAccountName !== expectation.serviceAccountName) return "service_account_mismatch";
 	if (claim.namespace !== expectation.namespace) return "namespace_mismatch";
@@ -99,7 +97,15 @@ function _receiptMatchesIntent<TResult>(receipt: CapabilityActionReceipt<TResult
 		&& receipt.replayMode === intent.replayMode;
 }
 
-/** Validates and atomically consumes a one-time runtime bootstrap claim. */
+/**
+ * Validate and atomically consume a one-time runtime bootstrap claim.
+ * Cryptographic key shape and every independently observed workload coordinate are checked before
+ * persistence; a replay or repository conflict remains a denial and never returns prior authority.
+ * @param repository - Durable single-consumption and public-proof-key binding authority.
+ * @param claim - Candidate bootstrap and runtime-generated public proof key.
+ * @param expectation - Trusted assignment, TokenReview identity, attempt, and server time.
+ * @returns A receipt only for the first exact bootstrap consumption, otherwise a typed denial.
+ */
 export async function __ConsumeRuntimeBootstrap(repository: RuntimeBootstrapRepository, claim: RuntimeBootstrapClaim, expectation: RuntimeBootstrapExpectation): Promise<ConsumeRuntimeBootstrapResult>
 {
 	const failure = _validateBootstrap(claim, expectation);

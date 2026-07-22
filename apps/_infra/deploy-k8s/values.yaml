@@ -265,28 +265,6 @@ channelProxy:
       cpu: 250m
       memory: 256Mi
 
-# -- First-party personal-agent process boundary. Disabled until a controller can own current
-# assignments and command dispatch; enabling it creates only the projected-token shell, never a
-# legacy OpenClaw bridge, model driver, tool plane, listener, or persistent tenant mount.
-agentRuntime:
-  enabled: false
-  image:
-    repository: ghcr.io/italanta/opencrane-agent-runtime
-    tag: latest
-    pullPolicy: IfNotPresent
-  replicas: 1
-  # -- Empty derives the release-local internal OpenCrane route. It must not be an Internet URL.
-  openCraneRuntimeStreamUrl: ""
-  projectedTokenTtlSeconds: 600
-  scratchSize: 64Mi
-  resources:
-    requests:
-      cpu: 25m
-      memory: 64Mi
-    limits:
-      cpu: 250m
-      memory: 128Mi
-
 # -- Canonical artifact-byte boundary. It owns only content-addressed bytes on an expandable,
 # release-local PVC; OpenCrane remains the catalog and authorization authority.
 artifactService:

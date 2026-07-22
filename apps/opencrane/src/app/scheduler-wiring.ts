@@ -6,6 +6,7 @@ import type { ManagedRunAdmissionPort } from "@opencrane/backend/server/agents/a
 
 import { _createManagedRunAdmissionPort } from "./agent-services-wiring.js";
 import { _log } from "./log.js";
+import type { ScheduleTicker } from "./scheduler-wiring.types.js";
 
 /** Non-terminal run states that count as an in-flight scheduled run for overlap `skip`. */
 const _ACTIVE_RUN_STATES = [AgentRunState.Accepted, AgentRunState.Queued, AgentRunState.Assigned, AgentRunState.Running, AgentRunState.WaitingForApproval, AgentRunState.Cancelling];
@@ -13,8 +14,8 @@ const _ACTIVE_RUN_STATES = [AgentRunState.Accepted, AgentRunState.Queued, AgentR
 /** Stable subject recorded as the requester of every scheduled admission. */
 const _SCHEDULER_SUBJECT = "system:scheduler";
 
-/** Conservative default backoff for a transiently unavailable admission. */
-const _DEFAULT_BACKOFF: RetryBackoffPolicy = { baseDelayMs: 1_000, factor: 2, maxDelayMs: 60_000, maxAttempts: 5 };
+/** Conservative delay label for a transiently unavailable admission. */
+const _DEFAULT_BACKOFF: RetryBackoffPolicy = { baseDelayMs: 1_000, factor: 2, maxDelayMs: 60_000 };
 
 /** Maximum missed slots one schedule catches up per pass. */
 const _MAX_SLOTS_PER_TICK = 60;
@@ -29,22 +30,6 @@ function _createActiveScheduledRunLookup(prisma: PrismaClient): ActiveScheduledR
 			return count > 0;
 		},
 	};
-}
-
-/**
- * One managed-agent schedule ticker, composed INSIDE the control API.
- *
- * `runOnce` evaluates every enabled schedule at the given instant and admits due slots through the
- * SAME managed run-admission port the run-now surface uses — no new workload, process, or
- * run-creation path, and the same KSA/privilege as the control API. Each schedule advances its
- * cursor only as far as the tick actually admitted, so a transient admission failure is retried on
- * the next pass. Starting a periodic invocation of `runOnce` is the live-Obot proof concern gated
- * under #337; this composition provides the wiring, not a running timer.
- */
-export interface ScheduleTicker
-{
-	/** Evaluates every enabled schedule once at `now` and returns each schedule's tick result. */
-	runOnce(now: Date): Promise<readonly { readonly scheduleId: string; readonly result: ScheduleTickResult }[]>;
 }
 
 /**

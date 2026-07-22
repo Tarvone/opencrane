@@ -100,6 +100,11 @@
       "workloadIds": ["agent-runtime"]
     },
     {
+      "path": "libs/backend/agents/runtime/controller/src/agent-controller.ts",
+      "anchor": "kind: \"Job\"",
+      "workloadIds": ["agent-runtime"]
+    },
+    {
       "path": "apps/_infra/deploy-k8s/platform/k8s-deploy.sh",
       "anchor": "local postgres_args=(upgrade --install \"$POSTGRES_RELEASE\" \"$POSTGRES_CHART_DIR\"",
       "workloadIds": ["postgres-database"]

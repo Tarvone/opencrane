@@ -20,10 +20,10 @@ slot inside the window and admits them oldest-first.
         │  evaluate against "now"
         ▼
  ┌──────────────────────────────────┐
- │  scheduling  ◄── HERE             │  which minute-slots are due? overlap? suspended?
+│  scheduling  ◄── HERE             │  which minute-slots are due? overlap? suspended?
  │                                   │  key = sha256(service + revision + slot)
  └──────────────────────────────────┘
-        │  admit each due slot  (trigger: schedule)  through the EXISTING ManagedRunAdmissionPort
+        │  admit due slot(s)  (trigger: schedule)  through the EXISTING ManagedRunAdmissionPort
         ▼
  agent-services run admission  ->  one AgentRun per slot (deduped by @@unique([siloId, key]))
 ```
@@ -37,13 +37,17 @@ two concurrent ticks collapse to one durable run on the existing `@@unique([silo
 requestIdempotencyKey])` — one tick sees `accepted`, the other `idempotent`. A disabled schedule is
 suspended (no evaluation); a malformed cron or timezone fails closed.
 
+For overlap, `allow` admits every due catch-up slot. `skip` admits only the oldest due slot when no
+prior scheduled run is active, and skips every due slot when a prior scheduled run is active. That
+keeps a delayed scheduler from creating a burst of concurrent runs for the same managed agent.
+
 ## Public surface
 
 - `__RunScheduleTick` — evaluate one schedule at one instant and admit every due slot idempotently.
 - `__DueScheduledSlots`, `__ParseCronExpression`, `__CronMatchesWallClock`, `__WallClockInZone`,
   `__IsValidCronExpression`, `__IsValidTimezone` — the cron + timezone evaluation primitives.
 - `__ScheduledRunIdempotencyKey` — the deterministic per-slot key.
-- `__NextBackoffDelayMs` — deterministic exponential retry backoff for a transient admission failure.
+- `__NextBackoffDelayMs` — deterministic retry-delay hint for a transient admission failure.
 - Types: `AgentServiceSchedule`, `ScheduleOverlapPolicy`, `ScheduleTickDependencies`,
   `ScheduleTickResult`, `ScheduledSlotOutcome`, `ActiveScheduledRunLookup`, `RetryBackoffPolicy`,
   `ScheduleClock`, `CronExpression`, `WallClock`, `DueScheduledSlotsOptions`.

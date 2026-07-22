@@ -7,10 +7,12 @@ managedAgentRuntime:
   # Connector-scoped ServiceAccount. MUST match the bounded managed-agent-runtime-* identity class
   # (___IsManagedAgentRuntimeServiceAccountName) and NEVER the personal agent-runtime-* class.
   serviceAccountName: managed-agent-runtime-default
-  # In-cluster egress destinations the managed runtime is allowed to reach, by component label in
-  # the server namespace. Everything else is denied by the default-deny policy below.
+  # In-cluster egress destinations the managed runtime is allowed to reach. Runtime Pod selection is
+  # namespace-local; destination services may live in the server namespace or their own app namespace.
   egress:
+    runtimePodComponent: agent-runtime
     channelProxyComponent: channel-proxy
+    artifactNamespace: opencrane-artifacts
     artifactServiceComponent: artifact-service
     memoryGatewayComponent: opencrane-server
     litellmComponent: litellm

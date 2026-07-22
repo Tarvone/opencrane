@@ -24,6 +24,7 @@
     { "path": "apps/opencrane/src/app/prisma-run-input-compiler.ts", "owner": "apps/opencrane", "classification": "prisma-composition" },
     { "path": "apps/opencrane/src/app/routes.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/scheduler-wiring.ts", "owner": "apps/opencrane", "classification": "route-composition" },
+    { "path": "apps/opencrane/src/app/scheduler-wiring.types.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/harvesting-central-agent.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/app/__tests__/harvesting-central-agent.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/hosting/hosting-adapter.factory.ts", "owner": "apps/opencrane", "classification": "hosting-composition" },

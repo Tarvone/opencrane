@@ -26,7 +26,7 @@ export interface AgentServiceSchedule
 	readonly lastScheduledAt: string | null;
 }
 
-/** Deterministic exponential retry/backoff policy for a transiently unavailable admission. */
+/** Deterministic delay policy for a transiently unavailable admission. */
 export interface RetryBackoffPolicy
 {
 	/** Delay before the first retry, in milliseconds. */
@@ -35,8 +35,6 @@ export interface RetryBackoffPolicy
 	readonly factor: number;
 	/** Hard ceiling on any single backoff delay, in milliseconds. */
 	readonly maxDelayMs: number;
-	/** Maximum retry attempts before a transient denial is treated as terminal for the tick. */
-	readonly maxAttempts: number;
 }
 
 /** Server-owned clock injected so a tick is deterministic in tests. */
@@ -66,7 +64,7 @@ export interface ScheduleTickDependencies
 	readonly schedulerSubjectId: string;
 	/** Maximum slots admitted in one tick (catch-up ceiling). */
 	readonly maxSlotsPerTick: number;
-	/** Retry/backoff policy applied to a transiently unavailable admission. */
+	/** Delay policy reported for a transiently unavailable admission. */
 	readonly backoff: RetryBackoffPolicy;
 }
 
@@ -74,7 +72,7 @@ export interface ScheduleTickDependencies
 export type ScheduledSlotOutcome =
 	| { readonly slot: string; readonly outcome: "accepted" | "idempotent"; readonly runId: string; readonly idempotencyKey: string }
 	| { readonly slot: string; readonly outcome: "skipped_overlap"; readonly idempotencyKey: string }
-	| { readonly slot: string; readonly outcome: "retry_scheduled"; readonly reason: string; readonly retryAfterMs: number; readonly idempotencyKey: string }
+	| { readonly slot: string; readonly outcome: "retry_hint"; readonly reason: string; readonly retryAfterMs: number; readonly idempotencyKey: string }
 	| { readonly slot: string; readonly outcome: "denied"; readonly reason: string; readonly idempotencyKey: string };
 
 /** Result of evaluating one schedule at one instant. */

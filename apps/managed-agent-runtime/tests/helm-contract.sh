@@ -36,11 +36,14 @@ grep -Fq 'ingress: []' "$DENY"
 grep -Fq 'egress: []' "$DENY"
 test -s "$EGRESS"
 grep -Fq 'policyTypes: ["Egress"]' "$EGRESS"
+grep -Fq 'app.kubernetes.io/component: agent-runtime' "$EGRESS"
 grep -Fq 'k8s-app: kube-dns' "$EGRESS"
 grep -Fq 'app.kubernetes.io/component: channel-proxy' "$EGRESS"
 grep -Fq 'app.kubernetes.io/component: artifact-service' "$EGRESS"
+grep -Fq 'kubernetes.io/metadata.name: opencrane-artifacts' "$EGRESS"
 grep -Fq 'app.kubernetes.io/component: litellm' "$EGRESS"
 grep -Fq 'app.kubernetes.io/component: obot' "$EGRESS"
+grep -Fq 'const _COMPONENT_LABEL = "agent-runtime";' "$ROOT/libs/backend/agents/runtime/k8s-launcher/src/agent-runtime-job.ts"
 
 # A personal agent-runtime-* SA name must be rejected at render time (identity-class fence).
 if helm template mar "$CHART" --set-string managedAgentRuntime.serviceAccountName=agent-runtime-personal >/dev/null 2>&1; then

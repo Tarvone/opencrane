@@ -69,12 +69,13 @@ function _publicationFor(prisma: PrismaClient, caller: ManagementCaller): AgentS
 /**
  * Build the managed run-now admission port.
  *
- * run-now records an admission through the EXISTING run-admission repository with
- * `trigger: managed_invocation`; it never dispatches a Job or executes anything. Assembling a
- * managed run's immutable snapshot needs signed fleet-membership identity and effective-capability
- * compilation, which land with the executor in slice 6. Until then this fails closed inside the
- * admission transaction rather than fabricating signed identity evidence — mirroring the app's
- * other `__Unavailable*` composition-root defaults. Nothing is persisted while it is unavailable.
+ * run-now AND the scheduler both record an admission through the EXISTING run-admission repository
+ * (`trigger: managed_invocation` or `schedule`); it never dispatches a Job or executes anything.
+ * Assembling a managed run's immutable snapshot needs signed fleet-membership identity and
+ * effective-capability compilation — the managed executor, which lands with the #337 live-Obot
+ * adoption gate. Until then this fails closed inside the admission transaction rather than
+ * fabricating signed identity evidence — mirroring the app's other `__Unavailable*` composition-root
+ * defaults. Nothing is persisted while it is unavailable.
  *
  * @param prisma - Canonical product-authority client.
  * @returns A fail-closed managed run admission port bound to the real admission repository.
@@ -88,7 +89,8 @@ export function _createManagedRunAdmissionPort(prisma: PrismaClient): ManagedRun
 			const runId = randomUUID();
 			const result = await admission.admit(
 				{ runId, siloId: command.siloId, agentServiceId: command.agentServiceId, threadId: null, executionSubjectId: `agent-service:${command.agentServiceId}`, requestIdempotencyKey: command.requestIdempotencyKey },
-				// Slice 6 replaces this with real managed snapshot assembly (fleet membership + capability set).
+				// The managed executor (fleet-membership + capability-set snapshot assembly) lands with the
+				// #337 live-Obot adoption gate; until then managed execution stays fail-closed here.
 				async function _assembleManagedSnapshot() { return { outcome: "denied", reason: "run_admission_unavailable" } as const; },
 			);
 			if (result.outcome === "denied") return { outcome: "denied", reason: result.reason };

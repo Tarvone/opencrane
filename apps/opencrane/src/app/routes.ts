@@ -29,6 +29,7 @@ import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memor
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import { _CreateAgentServicesRouter } from "./agent-services-wiring.js";
+import type { ManagedRunAdmissionPort } from "@opencrane/backend/server/agents/agent-services";
 import { _log } from "./log.js";
 
 /** Read a bounded, server-owned seconds setting and return milliseconds. */
@@ -333,9 +334,10 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
  * @param customApi - Kubernetes custom objects client.
  * @param coreApi - Kubernetes core API client.
  * @param authApi - Kubernetes authentication API client.
+ * @param runAdmission - Shared, capacity-bounded admission path for managed run-now requests.
  * @returns The configured Express application.
  */
-export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k8s.CustomObjectsApi, coreApi: k8s.CoreV1Api, authApi: k8s.AuthenticationV1Api): Express
+export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k8s.CustomObjectsApi, coreApi: k8s.CoreV1Api, authApi: k8s.AuthenticationV1Api, runAdmission: ManagedRunAdmissionPort): Express
 {
   // NOTE: the internal (`/api/internal/*`) routers are mounted separately by
   // `_RegisterInternalRoutes`, which index.ts calls BEFORE `___AuthMiddleware` so the
@@ -348,7 +350,7 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/ai-budget", aiBudgetRouter(coreApi, prisma));
   app.use("/api/v1/token-usage", tokenUsageRouter(prisma));
   app.use("/api/v1/groups", groupsRouter(prisma));
-  app.use("/api/v1/agent-services", _CreateAgentServicesRouter(prisma));
+  app.use("/api/v1/agent-services", _CreateAgentServicesRouter(prisma, runAdmission));
   app.use("/api/v1/mcp-servers", mcpServersRouter(prisma));
   app.use("/api/v1/mcp", mcpOperatorRouter(prisma));
   app.use("/api/v1/shares", sharesRouter(prisma));

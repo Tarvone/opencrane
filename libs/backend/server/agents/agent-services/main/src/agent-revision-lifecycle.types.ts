@@ -123,7 +123,10 @@ export type AgentRevisionLifecycleDenial =
 	| "revision_service_mismatch"
 	| "transition_not_allowed"
 	| "service_not_runnable"
-	| "run_admission_unavailable";
+	| "run_admission_unavailable"
+	| "persistence_unavailable"
+	| "authority_conflict"
+	| "admission_concurrency_limited";
 
 /** Result of creating a managed service. */
 export type CreateManagedAgentServiceResult =
@@ -179,7 +182,7 @@ export interface AgentRevisionLifecycleRepository
 export type ManagedRunAdmissionResult =
 	| { readonly outcome: "accepted"; readonly runId: string }
 	| { readonly outcome: "idempotent"; readonly runId: string }
-	| { readonly outcome: "denied"; readonly reason: string };
+	| { readonly outcome: "denied"; readonly reason: AgentRevisionLifecycleDenial };
 
 /** App-owned boundary that records a managed run admission on the shared run substrate. */
 export interface ManagedRunAdmissionPort

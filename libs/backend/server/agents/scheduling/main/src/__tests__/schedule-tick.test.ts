@@ -159,6 +159,15 @@ describe("schedule tick", function _TickSuite()
 		expect(admission.commands).toHaveLength(1);
 	});
 
+	it("retries a capacity rejection without advancing the schedule cursor", async function _CapacityRetry()
+	{
+		const admission = new _DenyingAdmission("admission_concurrency_limited");
+		const result = await __RunScheduleTick(_schedule(), "rev-1", _deps(admission, "2026-07-01T02:30:00.000Z"));
+		if (result.status !== "ticked") throw new Error("expected ticked");
+		expect(result.outcomes[0]).toMatchObject({ outcome: "retry_hint", reason: "admission_concurrency_limited", retryAfterMs: 1_000 });
+		expect(result.nextLastScheduledAt).toBe("2026-07-01T00:00:00.000Z");
+	});
+
 	it("records a permanent denial and advances past it", async function _PermanentDeny()
 	{
 		const admission = new _DenyingAdmission("service_not_runnable");

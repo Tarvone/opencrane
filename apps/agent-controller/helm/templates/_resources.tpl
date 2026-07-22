@@ -556,7 +556,7 @@ spec:
         object.spec.template.spec.volumes[2].name == 'litellm-key' &&
         object.spec.template.spec.volumes[2].projected.defaultMode == 288 &&
         object.spec.template.spec.volumes[2].projected.sources.size() == 1 &&
-        object.spec.template.spec.volumes[2].projected.sources[0].secret.name.matches('^litellm-key-[a-f0-9]{32}$') &&
+         object.spec.template.spec.volumes[2].projected.sources[0].secret.name.matches('^litellm-key-[a-f0-9]{32}$') &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items.size() == 1 &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].key == 'key' &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].path == 'key' &&

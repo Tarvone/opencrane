@@ -15,6 +15,7 @@ function _Assignment(): AgentRuntimeJobAssignment
 		siloId: "silo-1",
 		namespace: "opencrane-silo-1-runtime",
 		bootstrapReference: "bootstrap-ref-1",
+		litellmKeySecretName: "agent-runtime-a2-litellm-key",
 	};
 }
 
@@ -25,6 +26,7 @@ function _Profile(): AgentRuntimeJobProfile
 		image: "ghcr.io/italanta/opencrane-agent-runtime@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		imagePullPolicy: "IfNotPresent",
 		runtimeStreamUrl: "http://opencrane-server.opencrane-silo-1.svc.cluster.local:3001/api/internal/agent-runtime",
+		litellmBaseUrl: "http://litellm.opencrane-silo-1.svc.cluster.local:4000",
 		serverNamespace: "opencrane-silo-1",
 		serviceAccountName: "agent-runtime-personal",
 		projectedTokenTtlSeconds: 600,
@@ -80,6 +82,12 @@ describe("personal-runtime attempt Job", function _Suite()
 		expect(bootstrapVolume).toEqual({ defaultMode: 0o440, items: [{ path: "reference", fieldRef: { fieldPath: "metadata.annotations['opencrane.ai/bootstrap-reference']" } }] });
 		expect(runtime?.volumeMounts).toContainEqual({ name: "runtime-bootstrap", mountPath: "/var/run/opencrane/bootstrap", readOnly: true });
 		expect(volumes?.find(volume => volume.name === "scratch")?.emptyDir).toEqual({ sizeLimit: "64Mi" });
+		const litellmVolume = volumes?.find(volume => volume.name === "litellm-key")?.projected;
+		expect(litellmVolume).toEqual({ defaultMode: 0o440, sources: [{ secret: { name: "agent-runtime-a2-litellm-key", items: [{ key: "key", path: "key" }] } }] });
+		expect(runtime?.volumeMounts).toContainEqual({ name: "litellm-key", mountPath: "/var/run/opencrane/litellm", readOnly: true });
+		expect(runtime?.env).toContainEqual({ name: "OPENCRANE_RUNTIME_LITELLM_KEY_PATH", value: "/var/run/opencrane/litellm/key" });
+		expect(runtime?.env).toContainEqual({ name: "OPENCRANE_RUNTIME_LITELLM_BASE_URL", value: "http://litellm.opencrane-silo-1.svc.cluster.local:4000" });
+		expect(runtime?.env).not.toContainEqual(expect.objectContaining({ name: expect.stringMatching(/KEY$/), value: expect.stringMatching(/^sk-/) }));
 		expect(serialized).not.toContain("persistentVolumeClaim");
 		expect(serialized).not.toContain("secretKeyRef");
 		expect(serialized).not.toContain("secretName");

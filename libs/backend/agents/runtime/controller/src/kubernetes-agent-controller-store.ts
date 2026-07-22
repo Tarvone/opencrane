@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
-import { Observable, type ConfigurationOptions, type ObservableMiddleware, type RequestContext, type ResponseContext, type V1Job, type V1ObjectMeta, type V1Pod } from "@kubernetes/client-node";
+import { Observable, type ConfigurationOptions, type ObservableMiddleware, type RequestContext, type ResponseContext, type V1Job, type V1ObjectMeta, type V1Pod, type V1Secret } from "@kubernetes/client-node";
 import { __DeriveAgentRuntimeReleaseDeadlineSeconds } from "@opencrane/backend/agents/runtime/k8s-launcher";
 import { ___DoWithTrace } from "@opencrane/observability";
 
@@ -305,6 +305,31 @@ export function __CreateKubernetesAgentControllerStore(options: AgentControllerK
 				}
 			});
 		},
+		async __EnsureAttemptKeySecret(expected: V1Secret): Promise<void>
+			{
+				const name = expected.metadata?.name;
+				const namespace = expected.metadata?.namespace;
+				if (!name || !namespace)
+				{
+					throw new Error("agent-controller attempt-key Secret requires deterministic namespaced metadata");
+				}
+				await ___DoWithTrace("agent_controller.secret.ensure", { name, namespace }, async function _ensureAttemptKeySecret(): Promise<void>
+				{
+					try
+					{
+						await options.coreApi.createNamespacedSecret({ namespace, body: expected }, _KubernetesRequestOptions(options.shutdownSignal, options.requestTimeoutMilliseconds));
+					}
+					catch (err)
+					{
+						// Create-only Role: an AlreadyExists response is the idempotent replay of this exact
+						// attempt's prior Secret creation. The name is attempt-deterministic and this
+						// controller is the sole principal with `secrets: create` in the isolated runtime
+						// namespace, so a colliding foreign Secret cannot exist; 409 is accepted without a read
+						// because the Role grants no `get`/`list`.
+						if (_StatusCode(err) !== 409) throw err;
+					}
+				});
+			},
 		async __EnsureRuntimeJobReleased(expected: V1Job, workloadUid: string, assignmentExpiresAt: string, releaseLeaseExpiresAt: string): Promise<V1Job>
 		{
 			const { name, namespace } = _Coordinates(expected);

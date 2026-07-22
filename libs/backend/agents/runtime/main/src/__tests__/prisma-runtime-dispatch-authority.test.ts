@@ -1,10 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import { AGENT_RUNTIME_PROTOCOL_V1, type RuntimeCandidate, type RuntimeCommandEnvelope } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROTOCOL_V1, type CompiledRunInput, type RuntimeCandidate, type RuntimeCommandEnvelope } from "@opencrane/contracts";
 
 import { PrismaRuntimeDispatchAuthority } from "../prisma-runtime-dispatch-authority.js";
-import type { RuntimeStreamWorkloadIdentity } from "../prisma-runtime-dispatch-authority.types.js";
+import type { RunInputCompiler, RuntimeStreamWorkloadIdentity } from "../prisma-runtime-dispatch-authority.types.js";
 
 /** Fixed reviewed identity for the registered runtime Pod under test. */
 const _identity: RuntimeStreamWorkloadIdentity = { subject: "system:serviceaccount:runtime-ns:agent-runtime-personal", namespace: "runtime-ns", serviceAccountName: "agent-runtime-personal", podUid: "pod-1" };
@@ -119,11 +119,17 @@ function _fakePrisma(options: FakeOptions): { prisma: PrismaClient; streams: Fak
 	return { prisma: client as unknown as PrismaClient, streams, commands };
 }
 
+/** Deterministic fake compiler: same snapshot digest always yields byte-identical compiled input. */
+const _compileRunInput: RunInputCompiler = async function _compile(snapshot): Promise<CompiledRunInput>
+{
+	return { promptCompilerVersion: "v1", runId: snapshot.runId, attempt: 1, instructions: "compiled", messages: [], tools: [], model: { modelAlias: "silo-default", maxOutputTokens: null }, budget: { maxTotalTokens: null, maxCostUsdMicros: null, maxToolInvocations: null, wallClockDeadlineEpochMs: null }, digest: `sha256:${snapshot.digest}` };
+};
+
 /** Build the adapter under test over a fake with the requested durable state. */
 function _authority(options: FakeOptions)
 {
 	const fake = _fakePrisma(options);
-	return { authority: new PrismaRuntimeDispatchAuthority(fake.prisma, { namespace: "runtime-ns", commandTtlMilliseconds: 60_000 }, _clock), ...fake };
+	return { authority: new PrismaRuntimeDispatchAuthority(fake.prisma, { namespace: "runtime-ns", commandTtlMilliseconds: 60_000 }, _compileRunInput, _clock), ...fake };
 }
 
 /** Build a runtime event candidate bound to a dispatched command. */
@@ -144,6 +150,7 @@ describe("PrismaRuntimeDispatchAuthority", function _describeDispatchAuthority()
 		expect(command?.sequence).toBe(1);
 		expect(context.commands).toHaveLength(1);
 		expect(context.streams[0]?.nextCommandSequence).toBe(2);
+		expect(command?.kind === "start_attempt" ? command.payload.compiledInput.digest : null).toBe("sha256:sha256:snap");
 	});
 
 	it("idempotently redelivers the same start command to a reconnecting instance", async function _redelivers()

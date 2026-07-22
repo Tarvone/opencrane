@@ -12,6 +12,8 @@ export interface AgentRuntimeJobProfile
 	readonly imagePullPolicy: AgentRuntimeImagePullPolicy;
 	/** Internal OpenCrane runtime-stream endpoint. */
 	readonly runtimeStreamUrl: string;
+	/** In-cluster LiteLLM proxy base URL the runtime reaches with its attempt-scoped key. */
+	readonly litellmBaseUrl: string;
 	/** OpenCrane server namespace, which must differ from the runtime Job namespace. */
 	readonly serverNamespace: string;
 	/** Bounded runtime-profile ServiceAccount selected by the controller. */
@@ -45,4 +47,6 @@ export interface AgentRuntimeJobAssignment
 	readonly namespace: string;
 	/** Opaque, non-secret reference to the one-use bootstrap held by OpenCrane. */
 	readonly bootstrapReference: string;
+	/** Name of the per-attempt Secret holding the attempt-scoped LiteLLM virtual key. */
+	readonly litellmKeySecretName: string;
 }

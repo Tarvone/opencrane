@@ -12,9 +12,10 @@ the target, refined by the
 [OpenClaw loop investigation](docs/design/openclaw-agent-loop-replacement-plan.md):
 
 1. **Product:** OpenCrane owns Thread, Message, Run, RunEvent, approvals, transcript, compaction,
-   retries, budgets, identity, memory, artifacts, and tool policy. A conformance-selected
-   **TypeScript** toolkit (`@openai/agents` primary spike, `ai`/`ToolLoopAgent` control) owns only
-   the bounded model/tool loop. Python remains isolated in tool Jobs.
+   retries, budgets, identity, memory, artifacts, and tool policy. The runtime is a replaceable
+   workload behind a **language-neutral** `AgentRuntimeProtocol v1` ([ADR 0010](docs/adr/0010-language-neutral-agent-runtime.md));
+   `pydantic-ai-slim` (Python) is the first qualification candidate for the bounded model/tool loop,
+   adopted only after it passes the live-LiteLLM conformance gate. Language is not a product contract.
 2. **Delivery:** refactor the repository directly to the target state. Delete OpenClaw and every
    obsolete schema, protocol, app, bridge, token path, database assumption, configuration switch,
    test, deployment unit, and document as its replacement becomes ready. Do not preserve, transform,
@@ -114,8 +115,9 @@ dispatch, toolkit selection, execution adapters, and the remaining E1/E2 product
 are not complete yet.
 
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
-`RunInputSnapshot`, the prompt compiler, independently authored target fixtures, toolkit conformance
-against the target LiteLLM matrix, one exact-pinned driver, the reliability envelope,
+`RunInputSnapshot`, the TypeScript-owned prompt compiler, the language-neutral `AgentRuntimeProtocol v1`
+([ADR 0010](docs/adr/0010-language-neutral-agent-runtime.md)), independently authored target fixtures,
+Pydantic-AI-first qualification against the target LiteLLM matrix, one exact-pinned driver, the reliability envelope,
 interview-generated PersonaRevision and PreferenceFact learning, multimodal and document authoring,
 and governed Python skill Jobs
 ([#222](https://github.com/italanta/opencrane/issues/222),

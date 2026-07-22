@@ -1,4 +1,4 @@
-import type { V1Job, V1Pod } from "@kubernetes/client-node";
+import type { V1Job, V1Pod, V1Secret } from "@kubernetes/client-node";
 import { ___GetContext, type Logger } from "@opencrane/observability";
 import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptClaim, AgentControllerRunWorkloadRegistrationCommand, AgentControllerRunWorkloadReleaseClaim } from "@opencrane/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +17,9 @@ function _Profiles(): AgentControllerRuntimeProfiles
 			image: "ghcr.io/italanta/opencrane-agent-runtime@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			imagePullPolicy: "IfNotPresent",
 			runtimeStreamUrl: "http://opencrane-server.silo-a.svc.cluster.local:3001/api/internal/agent-runtime",
-			serverNamespace: "silo-a",
-			serviceAccountName: "agent-runtime-default",
+				litellmBaseUrl: "http://litellm.silo-a.svc.cluster.local:4000",
+				serverNamespace: "silo-a",
+				serviceAccountName: "agent-runtime-default",
 			projectedTokenTtlSeconds: 600,
 			scratchSize: "64Mi",
 			activeDeadlineSeconds: 900,
@@ -33,7 +34,7 @@ function _Claim(): AgentControllerRunAttemptClaim
 {
 	return {
 		lease: { eventId: "event-1", claimedAt: "2026-07-20T00:00:00.000Z", deliveryCount: 2, expiresAt: "2026-07-20T00:01:00.000Z" },
-		attempt: { runId: "run-1", attempt: 3, siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", inputSnapshotDigest: "sha256:snapshot", namespace: "silo-a-runtime", workloadProfile: "personal-default", bootstrapReference: "bootstrap-ref-1" },
+		attempt: { runId: "run-1", attempt: 3, siloId: "silo-1", agentServiceId: "service-1", agentRevisionId: "revision-1", inputSnapshotDigest: "sha256:snapshot", namespace: "silo-a-runtime", workloadProfile: "personal-default", bootstrapReference: "bootstrap-ref-1", litellmKey: "sk-attempt-transient" },
 	};
 }
 
@@ -63,6 +64,7 @@ function _Kubernetes(overrides: Partial<AgentControllerKubernetesStore>): AgentC
 {
 	return {
 		async __EnsureSuspendedJob() { throw new Error("unexpected Job"); },
+		async __EnsureAttemptKeySecret() { throw new Error("unexpected Secret"); },
 		async __EnsureRuntimeJobReleased() { throw new Error("unexpected Job release"); },
 		async __FindFirstRuntimePod() { throw new Error("unexpected Pod list"); },
 		...overrides,
@@ -86,17 +88,31 @@ describe("agent-controller orchestration", function _Suite()
 	{
 		const calls: string[] = [];
 		let committed: AgentControllerRunAttemptAssignmentCommand | null = null;
+		let createdSecret: V1Secret | null = null;
+		let jobName: string | undefined;
 		const authority = _Authority({
 			async __Claim() { calls.push("claim"); return _Claim(); },
 			async __CommitAssignment(_eventId, command) { calls.push("commit"); committed = command; return { outcome: "assigned", runId: command.runId, attempt: command.attempt, workloadUid: command.workloadUid }; },
 		});
 		const kubernetes = _Kubernetes({
-			async __EnsureSuspendedJob(expected: V1Job) { calls.push("job"); return { ...expected, metadata: { ...expected.metadata, uid: "job-uid-1" } }; },
+			async __EnsureSuspendedJob(expected: V1Job) { calls.push("job"); jobName = expected.metadata?.name; return { ...expected, metadata: { ...expected.metadata, uid: "job-uid-1" } }; },
+			async __EnsureAttemptKeySecret(expected: V1Secret) { calls.push("secret"); createdSecret = expected; },
 		});
 
 		const result = await __ReconcileNextAgentRuntimeAttempt(_Options(authority, kubernetes), new AbortController().signal);
 
-		expect(calls).toEqual(["claim", "job", "commit"]);
+		// The Secret is created after the Job (so it can own it) and before the commit that lets the
+		// separate release reconcile unsuspend the Job.
+		expect(calls).toEqual(["claim", "job", "secret", "commit"]);
+		const secret = createdSecret as unknown as V1Secret;
+		expect(secret.immutable).toBe(true);
+		expect(secret.stringData).toEqual({ key: "sk-attempt-transient" });
+		expect(secret.metadata?.namespace).toBe("silo-a-runtime");
+		expect(typeof secret.metadata?.name).toBe("string");
+		// The Secret is owned by the exact suspended Job (its name + API-issued UID), so Kubernetes
+		// garbage-collects it with the Job and no delete RBAC is needed.
+		expect(secret.metadata?.ownerReferences).toEqual([{ apiVersion: "batch/v1", kind: "Job", name: jobName, uid: "job-uid-1", controller: true, blockOwnerDeletion: true }]);
+		expect(JSON.stringify(committed)).not.toContain("sk-attempt-transient");
 		expect(committed).toMatchObject({ claimedAt: _Claim().lease.claimedAt, deliveryCount: 2, runId: "run-1", attempt: 3, expectedWorkloadProfile: "personal-default", bootstrapReference: "bootstrap-ref-1", namespace: "silo-a-runtime", serviceAccountName: "agent-runtime-default", workloadUid: "job-uid-1" });
 		expect(result).toEqual({ outcome: "assigned", eventId: "event-1", runId: "run-1", attempt: 3, workloadUid: "job-uid-1" });
 	});

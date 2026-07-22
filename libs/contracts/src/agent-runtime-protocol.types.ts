@@ -1,6 +1,7 @@
 import type { AgentRunId } from "@opencrane/models/agents";
 import type { JsonValue } from "@opencrane/util";
 
+import type { CompiledRunInput } from "./compiled-run-input.types.js";
 import type { RunInputSnapshot } from "./run-input-snapshot.types.js";
 import type { RuntimeAssignment } from "./runtime-assignment.types.js";
 
@@ -58,11 +59,17 @@ export interface RuntimeCommandCoordinates
 	readonly assignment: RuntimeAssignment;
 }
 
-/** Starts one attempt with an exact immutable input snapshot. */
+/** Starts one attempt with an exact immutable input snapshot and its compiled literal input. */
 export interface StartAttemptCommand
 {
 	/** Canonical snapshot that is the sole runtime input authority. */
 	readonly snapshot: RunInputSnapshot;
+	/**
+	 * Control-plane-compiled literal input for the bounded model/tool loop. It is opaque to the
+	 * runtime, which consumes its fields without re-deriving persona, prompt, or tool assembly, and
+	 * its `promptCompilerVersion` and `digest` must agree with the accompanying snapshot.
+	 */
+	readonly compiledInput: CompiledRunInput;
 }
 
 /** Resumes a paused attempt only with control-plane-authorized deferred results. */

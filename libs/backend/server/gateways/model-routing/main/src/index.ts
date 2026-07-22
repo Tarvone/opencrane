@@ -1,6 +1,8 @@
 /**
  * @opencrane/backend/server/gateways/model-routing — public barrel.
  */
+export * from "./core/attempt-litellm-key.js";
+export type * from "./core/attempt-litellm-key.types.js";
 export * from "./core/byok-default-models.js";
 export type * from "./core/byok-default-models.types.js";
 export * from "./core/litellm-credential-registration.js";

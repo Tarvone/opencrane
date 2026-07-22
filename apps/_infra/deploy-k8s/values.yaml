@@ -349,6 +349,9 @@ agentController:
       digest: ""
       pullPolicy: IfNotPresent
     runtimeStreamUrl: ""
+    # -- Runtime-only in-cluster LiteLLM endpoint. The default is this silo's Service FQDN so the
+    #    runtime NetworkPolicy can allow precisely that workload and no arbitrary external model URL.
+    litellmBaseUrl: ""
     serviceAccountName: agent-runtime-default
     projectedTokenTtlSeconds: 600
     scratchSize: 1Gi

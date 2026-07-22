@@ -21,15 +21,24 @@ helm template opencrane-postgres "$CHART" \
   >"$OUTPUT"
 
 INSTANCE_POLICY="$(awk 'BEGIN { RS="---" } /kind: NetworkPolicy/ && /name: opencrane-postgres-ingress/ { print }' "$OUTPUT")"
-POOLER_POLICY="$(awk 'BEGIN { RS="---" } /kind: NetworkPolicy/ && /name: opencrane-postgres-pooler-ingress/ { print }' "$OUTPUT")"
+POOLER_POLICY="$(awk 'BEGIN { RS="---" } /kind: NetworkPolicy/ && /name: opencrane-postgres-pooler-boundary/ { print }' "$OUTPUT")"
 [[ -n "$INSTANCE_POLICY" ]]
 [[ -n "$POOLER_POLICY" ]]
 grep -q 'app.kubernetes.io/component: postgres-database-privileges' <<<"$INSTANCE_POLICY"
-grep -q 'app.kubernetes.io/component: postgres-pooler' <<<"$INSTANCE_POLICY"
+grep -q 'cnpg.io/poolerName: opencrane-postgres-pooler' <<<"$INSTANCE_POLICY"
 grep -q 'app.kubernetes.io/component: opencrane-server' <<<"$POOLER_POLICY"
 grep -q 'app.kubernetes.io/component: mcp-gateway' <<<"$POOLER_POLICY"
 grep -q 'app.kubernetes.io/component: litellm' <<<"$POOLER_POLICY"
 grep -q 'app.kubernetes.io/name: langfuse' <<<"$POOLER_POLICY"
+grep -q 'cnpg.io/poolerName: opencrane-postgres-pooler' <<<"$POOLER_POLICY"
+grep -q 'cnpg.io/cluster: opencrane-postgres' <<<"$POOLER_POLICY"
+grep -q '    - Egress' <<<"$POOLER_POLICY"
+grep -q '          port: 5432' <<<"$POOLER_POLICY"
+grep -q '          port: 53' <<<"$POOLER_POLICY"
+if grep -q 'namespaceSelector' <<<"$POOLER_POLICY"; then
+  echo "postgres pooler boundary must not admit cross-namespace clients or destinations" >&2
+  exit 1
+fi
 if grep -Eq 'app.kubernetes.io/(component: (opencrane-server|mcp-gateway|litellm|fleet-manager)|name: langfuse)' <<<"$INSTANCE_POLICY"; then
   echo "postgres instance policy allows an application to bypass the pooler" >&2
   exit 1

@@ -144,7 +144,8 @@ Built into `dist/apps/opencrane` by esbuild and imaged from `deploy/Dockerfile`
 composed by the silo umbrella chart — see [`HELM.md`](./HELM.md).
 The pod runs as uid/gid 1000 with `fsGroup: 1000`; projected ArtifactStore key files use mode `0440`,
 so the non-root server can read its private lease key without making that key world-readable.
-Its app-owned NetworkPolicy permits only the server's required egress classes: CNPG PostgreSQL,
+Its app-owned NetworkPolicy permits only the server's required egress classes: the CNPG-managed
+PgBouncer pooler,
 Kubernetes and external HTTPS, DNS, release-local LiteLLM/Cognee/Langfuse/OTEL services, tenant
 gateways, the GKE metadata endpoint when selected, and the cross-namespace ArtifactStore byte plane.
 Shared and BYO dependencies must use HTTPS; installations that need hostname-level external

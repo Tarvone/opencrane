@@ -18,9 +18,6 @@ spec:
       default_pool_size: {{ .Values.pooler.defaultPoolSize | quote }}
       reserve_pool_size: {{ .Values.pooler.reservePoolSize | quote }}
   template:
-    metadata:
-      labels:
-        app.kubernetes.io/component: postgres-pooler
     spec:
       containers:
         - name: pgbouncer

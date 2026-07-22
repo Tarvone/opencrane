@@ -76,7 +76,7 @@ runtime identity it reconciles.
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
-| Pinned PgBouncer image, pool size and client ingress selectors | Reconciling the `Pooler` into its Deployment and Service |
+| Pinned PgBouncer image, pool size, client ingress, and pooler-to-instance egress | Reconciling the `Pooler` into its Deployment and Service |
 | Supplying distinct application/admin Secret names, the app-owned target baseline reference, and database access | Bootstrapping the target SQL and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 

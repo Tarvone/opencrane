@@ -48,8 +48,9 @@ expired, is not stale, and is the newest accepted. If any check is uncertain, th
 
 - `__VerifyCurrentFleetMembership` — verifies the newest signed membership revision and, on success,
   atomically records its acceptance; returns a trusted window or a denial with a reason.
-- `__VerifyCurrentFleetMembershipEvidence` — performs the same fail-closed verification but returns
-  the exact signed provenance that a run may freeze into its immutable input snapshot.
+- `__VerifyCurrentFleetMembershipEvidence` — performs the same verification but returns the exact
+  signed issuer, key, assertion, subject, payload digest, revision, and trust window that a run may
+  freeze into its input snapshot.
 - `PrismaFleetMembershipAuthorityRepository` — the database-backed store of signed revisions and the
   highest-accepted high-water mark. It can own a transaction or join the run-admission transaction,
   so the snapshot and membership high-water mark cannot commit separately.
@@ -62,11 +63,10 @@ expired, is not stale, and is the newest accepted. If any check is uncertain, th
 Consumed by [authorization](../../authorization/main/README.md) as its `AuthorizationMembershipAuthority`
 first gate. The signature verifier itself is a port supplied by the caller — this package orchestrates
 the decision but does not own the cryptography. Fail-closed: a missing revision, a verifier that
-throws, a failed check, or a concurrent-acceptance conflict all return "denied".
-
-The personal-session assembler may supply its existing Prisma transaction. In that mode this
-package must not open a nested transaction: membership acceptance, its audit decision, and the
-resulting run snapshot share one commit or rollback together.
+throws, a failed check, or a concurrent-acceptance conflict all return "denied". A caller such as the
+personal-session assembler may supply its existing Prisma transaction. In that mode the repository
+must not open a nested transaction: membership acceptance, its audit decision, and the resulting run
+snapshot share one commit or rollback together.
 
 ## Dependency direction
 

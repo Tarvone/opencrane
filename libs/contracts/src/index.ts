@@ -53,6 +53,7 @@ export {
 } from "./model-routing.types.js";
 export { type DurableStatePolicy, type PlatformPolicy, type RuntimeFilesystemPolicy, type SiloUpdatePolicy } from "@opencrane/models/platform-policy";
 export { type RunInputSnapshot, type RunInputSnapshotIdentity } from "./run-input-snapshot.types.js";
+export { AGENT_RUNTIME_PROTOCOL_V1, type AgentRuntimeProtocolVersion, type CancelAttemptCommand, type ResumeAttemptCommand, type RuntimeCandidate, type RuntimeCandidateCoordinates, type RuntimeCommand, type RuntimeCommandCoordinates, type RuntimeCommandEnvelope, type RuntimeEventCandidate, type RuntimeExternalActionCandidate, type StartAttemptCommand } from "./agent-runtime-protocol.types.js";
 export { type RuntimeAssignment } from "./runtime-assignment.types.js";
 export { type TenantModelSet } from "./tenant-models.types.js";
 export {

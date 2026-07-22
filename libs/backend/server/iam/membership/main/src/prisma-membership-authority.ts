@@ -44,13 +44,17 @@ function _revision(row: { revision: number; issuerId: string; issuerKeyId: strin
 	};
 }
 
-/** Prisma-backed verified fleet-membership projection and monotonic acceptance head. */
+/**
+ * Prisma-backed verified fleet-membership projection and monotonic acceptance head.
+ * A full client opens the atomic acceptance transaction; a supplied transaction client deliberately
+ * reuses its caller's fence so membership evidence cannot commit separately from run admission.
+ */
 export class PrismaFleetMembershipAuthorityRepository implements FleetMembershipAuthorityRepository
 {
 	/** OpenCrane product-authority database client. */
 	private readonly prisma: PrismaClient | Prisma.TransactionClient;
 
-	/** Creates a membership adapter over canonical Postgres. */
+	/** Creates an adapter that owns a transaction only when the caller has not already selected one. */
 	constructor(prisma: PrismaClient | Prisma.TransactionClient)
 	{
 		this.prisma = prisma;

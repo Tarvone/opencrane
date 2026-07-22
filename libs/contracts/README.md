@@ -50,6 +50,9 @@ provider credentials or mutable source objects.
   `RunInputSnapshot`/`RunInputSnapshotIdentity`, `MemoryFactReference`, `TenantModelSet`, and
   domain-topology host builders. A memory fact reference pins an immutable content digest and its
   provenance rather than a mutable revision counter.
+- `AGENT_RUNTIME_PROTOCOL_V1`, `RuntimeCommandEnvelope`, and `RuntimeCandidate` — transport-neutral
+  command and candidate frames for a runtime that opens its own authenticated stream to the control
+  plane; these frames are not a browser or OpenAPI contract.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

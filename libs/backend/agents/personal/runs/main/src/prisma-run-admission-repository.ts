@@ -7,7 +7,11 @@ import type { JsonValue } from "@opencrane/util";
 
 import type { InitialRunAuthority, RunAdmissionBuild, RunAdmissionBuildResult, RunAdmissionClock, RunAdmissionCommand, RunAdmissionRepository, RunAdmissionResult, RunAdmissionTransaction } from "./run-admission.types.js";
 
-/** Prisma-backed initial-run admission that owns the logical run, snapshot, and run outbox. */
+/**
+ * Prisma-backed authority for the first durable instant of a logical run.
+ * It serialises the user-visible idempotency key before compilation and commits the run, its sole
+ * immutable snapshot, and both initial outbox events together; failure leaves none of them visible.
+ */
 export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 {
 	/** Canonical OpenCrane product-authority database client. */
@@ -30,7 +34,10 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 		this.log = log;
 	}
 
-	/** Deduplicates before compilation or commits every initial run coordinate in one transaction. */
+	/**
+	 * Returns the first frozen snapshot for duplicate delivery, otherwise compiles under the service
+	 * lock and exposes an accepted result only after every run/snapshot/outbox write can commit.
+	 */
 	async admit<TDenial>(command: RunAdmissionCommand, build: (transaction: RunAdmissionTransaction) => Promise<RunAdmissionBuildResult<TDenial>>): Promise<RunAdmissionResult<TDenial>>
 	{
 		const clock = this.clock;

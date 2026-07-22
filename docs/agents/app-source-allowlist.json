@@ -14,7 +14,6 @@
     { "path": "apps/opencrane/scripts/emit-openapi.mts", "owner": "apps/opencrane", "classification": "build-entrypoint" },
     { "path": "apps/opencrane/src/__tests__/config.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/__tests__/index.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
-    { "path": "apps/opencrane/src/__tests__/migrate.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/app/config.ts", "owner": "apps/opencrane", "classification": "app-config" },
     { "path": "apps/opencrane/src/app/instrument.ts", "owner": "apps/opencrane", "classification": "process-instrumentation" },
     { "path": "apps/opencrane/src/app/log.ts", "owner": "apps/opencrane", "classification": "process-logging" },

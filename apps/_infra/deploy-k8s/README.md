@@ -25,7 +25,7 @@ wires the pieces and the per-silo networking together.
  │  opencrane-silo umbrella chart  ◄── HERE                     │
  │    composes app-owned template libraries into one release:   │
  │    server · opencrane-ui · channel-proxy · artifact-service  │
- │    · database-schema Job · cognee · litellm · obot · langfuse│
+ │    · cognee · litellm · obot · langfuse                      │
  └────────────────────────────────────────────────────────────┘
         │  requires (external prerequisites, NOT installed here)
         ▼
@@ -78,10 +78,6 @@ package imports it.
   Helm library (labels, names, RBAC, endpoint/database/identity/observability helpers), the
   `k8s-deploy.sh` install engine, OIDC configuration, cluster provisioning, Terraform, values profiles,
   and the k3d conformance tests.
-- **[components/database-schema/README.md](components/database-schema/README.md)** — the pre-install /
-  pre-upgrade Prisma schema-reconciliation Job, which reuses the immutable server image and holds
-  database-only authority.
-
 ## See also
 
 - Parent index: [_infra](../README.md)

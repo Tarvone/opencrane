@@ -14,9 +14,6 @@ dependencies:
 - name: opencrane-artifact-service
   repository: file://../../artifact-service/helm
   version: 0.1.0
-- name: opencrane-database-schema
-  repository: file://components/database-schema
-  version: 0.1.0
 - name: opencrane-cognee
   repository: file://../cognee/helm
   version: 0.1.0
@@ -29,5 +26,5 @@ dependencies:
 - name: langfuse
   repository: https://langfuse.github.io/langfuse-k8s
   version: 1.5.37
-digest: sha256:19198b06731155489b511eac7b5d60b82e171a1d1a6bafd36619dbb6ee2b16fe
-generated: "2026-07-20T15:07:00.673041+03:00"
+digest: sha256:b80ff11cdb81208260f05838036c6dae7df7acf4297adbeecdbc3b143234aba3
+generated: "2026-07-22T12:05:26.022782+03:00"

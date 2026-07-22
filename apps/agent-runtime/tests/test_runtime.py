@@ -13,6 +13,7 @@ import os
 import tempfile
 import threading
 import unittest
+from urllib.error import HTTPError
 
 from src import runtime
 from src.runtime import (
@@ -26,6 +27,7 @@ from src.runtime import (
     _execute_start_attempt,
     _iter_commands,
     _normalize_event,
+    _post_candidate_with_retry,
     _read_checkpoint,
     _retry_delay,
     _rfc7638_thumbprint,
@@ -103,6 +105,89 @@ class RuntimeRetryDelayTests(unittest.TestCase):
     def test_retry_delay_is_bounded(self) -> None:
         """A permanently unavailable controller cannot make retries grow without bound."""
         self.assertLessEqual(_retry_delay(100), 31.0)
+
+    def test_retryable_candidate_response_replays_the_same_candidate_until_accepted(self) -> None:
+        """A pre-reservation 503 retries one unchanged candidate and never creates a second action."""
+        candidate = {"candidateId": "candidate-retry", "runId": "r1", "attempt": 1, "kind": "external_action"}
+        sent: list[dict] = []
+
+        def _post(_url: str, _token: str, body: dict, _timeout: float) -> int:
+            sent.append(body)
+            if len(sent) == 1:
+                raise HTTPError("https://control.example/candidates", 503, "retry", {}, io.BytesIO(b'{"accepted":false,"reason":"external_action_dispatch_retryable","retryable":true,"retryAfterMilliseconds":1}'))
+            return 202
+
+        _post_candidate_with_retry("https://control.example", "projected-token", candidate, threading.Event(), _post)
+
+        self.assertEqual(sent, [candidate, candidate])
+
+    def test_attempt_cancellation_stops_a_retry_wait_without_reposting_the_candidate(self) -> None:
+        """The active attempt's cancel signal interrupts a retry wait before a second submission."""
+        class _CancelsDuringWait(threading.Event):
+            """Set itself from the retry wait to model a cancel racing the server-selected delay."""
+
+            def __init__(self) -> None:
+                """Record entry into the retry wait for the assertion."""
+                super().__init__()
+                self.wait_entered = False
+
+            def wait(self, timeout: float | None = None) -> bool:
+                """Signal cancellation while the retry helper is waiting for the next submission."""
+                self.wait_entered = True
+                self.set()
+                return True
+
+        cancelled = _CancelsDuringWait()
+        candidate = {"candidateId": "candidate-cancelled-retry", "runId": "r1", "attempt": 1, "kind": "external_action"}
+        sent: list[dict] = []
+
+        def _post(_url: str, _token: str, body: dict, _timeout: float) -> int:
+            sent.append(body)
+            raise HTTPError("https://control.example/candidates", 503, "retry", {}, io.BytesIO(b'{"accepted":false,"reason":"external_action_dispatch_retryable","retryable":true,"retryAfterMilliseconds":1}'))
+
+        _post_candidate_with_retry("https://control.example", "projected-token", candidate, cancelled, _post)
+
+        self.assertTrue(cancelled.wait_entered)
+        self.assertEqual(sent, [candidate])
+
+    def test_server_retry_exhaustion_stops_the_client_retry_loop(self) -> None:
+        """A terminal server rejection ends retries after its durable budget is exhausted."""
+        candidate = {"candidateId": "candidate-exhausted", "runId": "r1", "attempt": 1, "kind": "external_action"}
+        sent: list[dict] = []
+
+        def _post(_url: str, _token: str, body: dict, _timeout: float) -> int:
+            sent.append(body)
+            if len(sent) <= 3:
+                raise HTTPError("https://control.example/candidates", 503, "retry", {}, io.BytesIO(b'{"accepted":false,"reason":"external_action_dispatch_retryable","retryable":true,"retryAfterMilliseconds":1}'))
+            raise HTTPError("https://control.example/candidates", 409, "exhausted", {}, io.BytesIO(b'{"accepted":false,"reason":"external_action_dispatch_retry_exhausted"}'))
+
+        with self.assertRaises(HTTPError) as raised:
+            _post_candidate_with_retry("https://control.example", "projected-token", candidate, threading.Event(), _post)
+
+        self.assertEqual(raised.exception.code, 409)
+        raised.exception.close()
+        self.assertEqual(sent, [candidate, candidate, candidate, candidate])
+
+    def test_retryable_candidate_response_does_not_terminalise_the_model_loop(self) -> None:
+        """A recovered same-candidate retry lets the attempt complete without a synthetic run error."""
+        posted: list[dict] = []
+        attempts = 0
+
+        def _post(_url: str, _token: str, body: dict, _timeout: float) -> int:
+            nonlocal attempts
+            attempts += 1
+            if body.get("kind") == "external_action" and attempts == 2:
+                raise HTTPError("https://control.example/candidates", 503, "retry", {}, io.BytesIO(b'{"accepted":false,"reason":"external_action_dispatch_retryable","retryable":true,"retryAfterMilliseconds":1}'))
+            return 202
+
+        def _post_candidate(candidate: dict) -> None:
+            posted.append(candidate)
+            _post_candidate_with_retry("https://control.example", "projected-token", candidate, threading.Event(), _post)
+
+        _execute_start_attempt(_start_command(), "instance-1", _post_candidate, event_source=lambda _compiled, _cancel, _steer: iter([{"type": "tool_call", "toolName": "alpha", "toolCallId": "t1", "arguments": "{}"}]))
+
+        self.assertEqual(attempts, 4)
+        self.assertEqual([candidate.get("eventType") for candidate in posted], ["run.started", None, "run.completed"])
 
 
 class RuntimeThumbprintTests(unittest.TestCase):

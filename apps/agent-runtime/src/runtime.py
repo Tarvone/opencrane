@@ -46,6 +46,7 @@ _DEFAULT_CHECKPOINT_DIR = "/tmp/opencrane/checkpoints"
 _CHECKPOINT_VERSION = 1
 _CHECKPOINT_FILENAME = "checkpoint.enc"
 _MAX_FRAME_BYTES = 65_536
+_MAX_CANDIDATE_RETRY_DELAY_SECONDS = 30.0
 
 # Process-lifetime symmetric cipher for local checkpoints. It is generated in memory at first use and
 # never written, logged, or exported; a restarted process cannot read a prior process's checkpoint,
@@ -140,6 +141,52 @@ def _post_json(url: str, token: str, body: dict[str, object], timeout: float) ->
     request = Request(url, data=json.dumps(body).encode("utf-8"), headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}, method="POST")
     with urlopen(request, timeout=timeout) as response:
         return response.status
+
+
+def _retryable_candidate_delay(error: HTTPError) -> float | None:
+    """Read one bounded retry delay from the explicit pre-reservation dispatch response.
+
+    Only the runtime transport's ``503`` result with an exact ``retryable`` JSON body may trigger a
+    same-candidate retry. Other HTTP failures remain ordinary protocol failures; this prevents a
+    rejected or malformed action from being retried as if it had no durable invocation receipt.
+    """
+    if error.code != 503:
+        return None
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    finally:
+        error.close()
+    if not isinstance(payload, dict) or payload.get("accepted") is not False or payload.get("retryable") is not True:
+        return None
+    delay_milliseconds = payload.get("retryAfterMilliseconds")
+    if not isinstance(delay_milliseconds, int) or delay_milliseconds < 1 or delay_milliseconds > int(_MAX_CANDIDATE_RETRY_DELAY_SECONDS * 1_000):
+        return None
+    return delay_milliseconds / 1_000
+
+
+def _post_candidate_with_retry(control_plane_url: str, token: str, candidate: dict[str, object], cancelled: threading.Event, post_json: Callable[[str, str, dict[str, object], float], int] = _post_json) -> None:
+    """Post one candidate until accepted or stream cancellation after bounded retryable responses.
+
+    A retry keeps the exact ``candidateId`` and action payload, so the durable admission fence treats
+    every retry as one candidate rather than authoring a second external action. It only handles the
+    server's explicit pre-reservation ``503`` response; a terminal denial, bad response, or transport
+    failure still follows the existing fail-closed execution path. Each server-selected delay is
+    bounded, and cancellation stops the retry loop without emitting a spurious ``run.error``.
+    """
+    while not cancelled.is_set():
+        try:
+            status = post_json(f"{control_plane_url.rstrip('/')}/candidates", token, candidate, 30)
+            if 200 <= status < 300:
+                return
+            raise RuntimeError(f"candidate admission returned unexpected status {status}")
+        except HTTPError as error:
+            delay_seconds = _retryable_candidate_delay(error)
+            if delay_seconds is None:
+                raise
+            _log("candidate_retry", runId=candidate.get("runId"), attempt=candidate.get("attempt"), candidateId=candidate.get("candidateId"), retry_in_seconds=delay_seconds)
+            cancelled.wait(delay_seconds)
 
 
 def _perform_bootstrap(control_plane_url: str, token: str, bootstrap_reference: str, proof_key: dict[str, object]) -> None:
@@ -814,8 +861,8 @@ def _open_stream(
     active_cancel: threading.Event | None = None
     active_gate: _TerminalGate | None = None
 
-    def _post_candidate(candidate: dict[str, object]) -> None:
-        _post_json(f"{control_plane_url.rstrip('/')}/candidates", token, candidate, timeout=30)
+    def _post_stream_candidate(candidate: dict[str, object]) -> None:
+        _post_candidate_with_retry(control_plane_url, token, candidate, stream_lost)
 
     try:
         with urlopen(request, timeout=45) as response:
@@ -829,13 +876,17 @@ def _open_stream(
                 if kind == "start_attempt":
                     active_cancel = threading.Event()
                     active_gate = _TerminalGate(active_cancel)
-                    threading.Thread(target=handle_start, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
+                    def _post_start_candidate(candidate: dict[str, object], cancelled: threading.Event = active_cancel) -> None:
+                        _post_candidate_with_retry(control_plane_url, token, candidate, cancelled)
+                    threading.Thread(target=handle_start, args=(command, runtime_instance_id, _post_start_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
                 elif kind == "resume_attempt":
                     active_cancel = threading.Event()
                     active_gate = _TerminalGate(active_cancel)
-                    threading.Thread(target=handle_resume, args=(command, runtime_instance_id, _post_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
+                    def _post_resume_candidate(candidate: dict[str, object], cancelled: threading.Event = active_cancel) -> None:
+                        _post_candidate_with_retry(control_plane_url, token, candidate, cancelled)
+                    threading.Thread(target=handle_resume, args=(command, runtime_instance_id, _post_resume_candidate), kwargs={"cancel_event": active_cancel, "terminal_gate": active_gate}, daemon=True).start()
                 elif kind == "cancel_attempt":
-                    handle_cancel(command, runtime_instance_id, _post_candidate, cancel_event=active_cancel, terminal_gate=active_gate)
+                    handle_cancel(command, runtime_instance_id, _post_stream_candidate, cancel_event=active_cancel, terminal_gate=active_gate)
                 else:
                     continue
                 _log("command_dispatched", runtime_instance_id=runtime_instance_id, command_kind=kind)

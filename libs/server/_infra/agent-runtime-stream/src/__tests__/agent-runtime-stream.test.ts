@@ -83,6 +83,16 @@ describe("_RegisterInternalAgentRuntimeStream", function _runtimeTransportSuite(
 		expect(admit).toHaveBeenCalledTimes(1);
 	});
 
+	it("returns a bounded retryable result for an admitted action whose durable reservation is unavailable", async function _retryableCandidateAdmission()
+	{
+		const admit = vi.fn<RuntimeCommandStreamAuthority["__AdmitCandidate"]>().mockResolvedValue({ accepted: false, reason: "external_action_dispatch_retryable", retryable: true, retryAfterMilliseconds: 1_000 });
+		await request(_CreateApp(admit))
+			.post("/candidates")
+			.set("Authorization", "Bearer valid-token")
+			.send(_candidate)
+			.expect(503, { accepted: false, reason: "external_action_dispatch_retryable", retryable: true, retryAfterMilliseconds: 1_000 });
+	});
+
 	it("rejects incomplete event candidates before the durable authority sees them", async function _malformedCandidate()
 	{
 		const admit = vi.fn<RuntimeCommandStreamAuthority["__AdmitCandidate"]>();

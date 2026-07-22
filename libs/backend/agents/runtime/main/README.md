@@ -40,6 +40,13 @@ failed, and cancelled runs; it is not a second runtime authority. Duplicate comm
 identifiers are idempotent; stale, expired, out-of-order, malformed, or mismatched frames are denied
 with a stable reason.
 
+An admitted external action can be replayed only before its runner creates a durable invocation
+receipt. That narrow failure returns an explicit bounded retry result from a server-owned per-candidate
+budget and deadline, so a reconnecting runtime cannot reset it. The runtime resubmits the same
+candidate identifier rather than falsely treating the action as accepted or emitting a terminal
+executor error. Once a runner records a durable refusal or result, that outcome is final and remains
+fail closed.
+
 It intentionally owns no HTTP listener, Kubernetes resource, model driver, provider credential,
 tool execution, or direct persistence adapter. The app composes it with the stream transport and
 the existing run/conversation authorities; a runtime can only submit candidates for those

@@ -60,7 +60,10 @@ AI types, ids, and checkpoints never cross that seam. Resume injects only contro
 deferred tool results; cancel is a positive signal that suppresses any late candidate; steering is
 absorbed only at the safe pre-model-request boundary. Any executor failure surfaces as a real
 `run.error` candidate rather than a silent acknowledgement, and a dropped stream bounds further
-candidate emission.
+candidate emission. The one exception is the control plane's explicit bounded retry response before
+an external action has a durable invocation receipt: the runtime resubmits that exact candidate id
+until the server accepts it, exhausts its durable retry budget, or the active attempt/stream is
+cancelled, without misreporting a dispatch outage as a model failure.
 
 ## Boundary
 

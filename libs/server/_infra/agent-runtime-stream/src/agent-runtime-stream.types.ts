@@ -38,6 +38,10 @@ export interface RuntimeCandidateAdmission
 	readonly accepted: boolean;
 	/** Machine-readable reason when the candidate was rejected. */
 	readonly reason?: string;
+	/** Whether the runtime must retry this exact candidate instead of terminalising its attempt. */
+	readonly retryable?: boolean;
+	/** Server-bounded retry delay for one retryable candidate admission. */
+	readonly retryAfterMilliseconds?: number;
 }
 
 /** Transport configuration that fixes bounded framing and heartbeat behavior. */

@@ -4,11 +4,14 @@ import { AgentRunState as PrismaAgentRunState, AgentRunTerminalReason, ApprovalR
 
 import { AGENT_RUNTIME_PROTOCOL_V1, type CancelAttemptCommand, type CompiledRunInput, type ResumeAttemptCommand, type RunInputSnapshot, type RunInputSnapshotIdentity, type RuntimeAssignment, type RuntimeCandidate, type RuntimeCommand, type RuntimeCommandEnvelope, type RuntimeExternalActionCandidate, type RuntimeStreamOpen } from "@opencrane/contracts";
 import type { JsonValue } from "@opencrane/util";
-import { ___DoWithTrace } from "@opencrane/observability";
+import { ___CreateLogger, ___DoWithTrace, type Logger } from "@opencrane/observability";
 
 import { __AdmitRuntimeCandidate, __AdmitRuntimeCommand } from "./runtime-protocol-authority.js";
 import type { RuntimeAdmissionRunState, RuntimeAttemptAuthority, RuntimeProtocolClock } from "./runtime-protocol-authority.types.js";
 import type { RunInputCompiler, RuntimeCandidateDispatchResult, RuntimeDispatchAuthorityConfig, RuntimeExternalActionRunner, RuntimeStreamWorkloadIdentity } from "./prisma-runtime-dispatch-authority.types.js";
+
+/** Fixed retry delay returned before an admitted action has a durable invocation receipt. */
+const _EXTERNAL_ACTION_DISPATCH_RETRY_AFTER_MILLISECONDS = 1_000;
 
 /** Immutable durable facts loaded and locked for one connected runtime Pod. */
 interface RuntimeDispatchContext
@@ -93,9 +96,11 @@ export class PrismaRuntimeDispatchAuthority
 	private readonly compileRunInput: RunInputCompiler;
 	/** Optional composition-root runner that reserves and dispatches admitted external actions. */
 	private readonly externalActionRunner: RuntimeExternalActionRunner | null;
+	/** Structured logger for dispatch failures that must be retried by the runtime. */
+	private readonly log: Logger;
 
 	/** Creates a dispatch adapter over canonical Postgres with a bounded command lifetime. */
-	constructor(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, compileRunInput: RunInputCompiler, externalActionRunner?: RuntimeExternalActionRunner, clock?: RuntimeProtocolClock)
+	constructor(prisma: PrismaClient, config: RuntimeDispatchAuthorityConfig, compileRunInput: RunInputCompiler, externalActionRunner?: RuntimeExternalActionRunner, clock?: RuntimeProtocolClock, log: Logger = ___CreateLogger("runtime-dispatch"))
 	{
 		if (!_configIsValid(config)) throw new Error("runtime dispatch authority requires a bounded namespace and command lifetime");
 		this.prisma = prisma;
@@ -103,6 +108,7 @@ export class PrismaRuntimeDispatchAuthority
 		this.compileRunInput = compileRunInput;
 		this.externalActionRunner = externalActionRunner ?? null;
 		this.clock = clock ?? { nowEpochMs(): number { return Date.now(); } };
+		this.log = log;
 	}
 
 	/** Returns the next server-issued command after the supplied sequence, or null while idle. */
@@ -124,19 +130,27 @@ export class PrismaRuntimeDispatchAuthority
 	{
 		if (identity.namespace !== this.config.namespace) return { accepted: false, reason: "namespace_mismatch" };
 		const prisma = this.prisma;
+		const config = this.config;
 		const clock = this.clock;
 		const compileRunInput = this.compileRunInput;
 		const externalActionRunner = this.externalActionRunner;
+		const log = this.log;
 		return ___DoWithTrace("runtime_dispatch.candidate.admit", { namespace: identity.namespace }, async function _traceAdmit(): Promise<RuntimeCandidateDispatchResult>
 		{
 			const admission = await _admitCandidate(prisma, clock, identity, candidate);
 			// After the fence-checked admission commits, dispatch accepted external actions outside the
-			// admission transaction. A transport or compilation error must reach the runtime so it retries
-			// the same candidate id; an idempotent replay then retries the durable reservation instead of
-			// silently losing an accepted side effect before its ToolInvocation exists.
+			// admission transaction. Only an explicit runner result that proves no ToolInvocation exists can
+			// use the server-owned retry budget; every post-reservation outcome stays terminal and fail closed.
 			if (admission.accepted && candidate.kind === "external_action" && externalActionRunner !== null)
 			{
-				await _dispatchExternalAction(prisma, compileRunInput, externalActionRunner, identity, candidate);
+				const outcome = await _dispatchExternalAction(prisma, compileRunInput, externalActionRunner, identity, candidate);
+				if (outcome.outcome === "denied") return { accepted: false, reason: "external_action_dispatch_denied" };
+				if (outcome.outcome === "retryable")
+				{
+					const retry = await _recordExternalActionRetry(prisma, clock, config, candidate);
+					log.error({ err: outcome.error, runId: candidate.runId, attempt: candidate.attempt, candidateId: candidate.candidateId, toolInvocationId: candidate.toolInvocationId, toolRevisionId: candidate.toolRevisionId, retryCount: retry.retryCount, failureKind: retry.result.retryable ? "external_action_dispatch_retryable" : "external_action_dispatch_retry_exhausted" }, "runtime external action dispatch failed before reservation");
+					return retry.result;
+				}
 			}
 			return admission;
 		});
@@ -161,7 +175,13 @@ function _configIsValid(config: RuntimeDispatchAuthorityConfig): boolean
 		&& config.namespace.length <= 63
 		&& Number.isSafeInteger(config.commandTtlMilliseconds)
 		&& config.commandTtlMilliseconds >= 1_000
-		&& config.commandTtlMilliseconds <= 300_000;
+		&& config.commandTtlMilliseconds <= 300_000
+		&& Number.isSafeInteger(config.externalActionRetryLimit)
+		&& config.externalActionRetryLimit >= 1
+		&& config.externalActionRetryLimit <= 10
+		&& Number.isSafeInteger(config.externalActionRetryWindowMilliseconds)
+		&& config.externalActionRetryWindowMilliseconds >= 1_000
+		&& config.externalActionRetryWindowMilliseconds <= 300_000;
 }
 
 /** Mint or redeliver one command for the connected runtime inside a single locked transaction. */
@@ -244,19 +264,47 @@ async function _admitCandidate(prisma: PrismaClient, clock: RuntimeProtocolClock
 }
 
 /** Reserve and dispatch one admitted external-action candidate through the composition-root runner. */
-async function _dispatchExternalAction(prisma: PrismaClient, compileRunInput: RunInputCompiler, runner: RuntimeExternalActionRunner, identity: RuntimeStreamWorkloadIdentity, candidate: RuntimeExternalActionCandidate): Promise<void>
+async function _dispatchExternalAction(prisma: PrismaClient, compileRunInput: RunInputCompiler, runner: RuntimeExternalActionRunner, identity: RuntimeStreamWorkloadIdentity, candidate: RuntimeExternalActionCandidate): ReturnType<RuntimeExternalActionRunner["run"]>
 {
 	// Reload the immutable snapshot and recompile its granted tools so the runner validates the
 	// candidate's revision against the exact authority the attempt was admitted under.
-	const loaded = await prisma.$transaction(async function _load(transaction: Prisma.TransactionClient): Promise<{ snapshot: RunInputSnapshot; tools: CompiledRunInput["tools"] } | null>
+	let loaded: { snapshot: RunInputSnapshot; tools: CompiledRunInput["tools"] } | null;
+	try
 	{
-		const context = await _loadContext(transaction, identity);
-		if (context === null || context.runId !== candidate.runId || context.attempt !== candidate.attempt) return null;
-		const compiled = await compileRunInput(context.snapshot, transaction);
-		return { snapshot: context.snapshot, tools: compiled.tools };
+		loaded = await prisma.$transaction(async function _load(transaction: Prisma.TransactionClient): Promise<{ snapshot: RunInputSnapshot; tools: CompiledRunInput["tools"] } | null>
+		{
+			const context = await _loadContext(transaction, identity);
+			if (context === null || context.runId !== candidate.runId || context.attempt !== candidate.attempt) return null;
+			const compiled = await compileRunInput(context.snapshot, transaction);
+			return { snapshot: context.snapshot, tools: compiled.tools };
+		});
+	}
+	catch (error)
+	{
+		return { outcome: "retryable", error };
+	}
+	if (loaded === null) return { outcome: "denied" };
+	return runner.run(candidate, loaded.snapshot, loaded.tools);
+}
+
+/** Consume one durable retry slot after the runner proves no invocation reservation exists. */
+async function _recordExternalActionRetry(prisma: PrismaClient, clock: RuntimeProtocolClock, config: RuntimeDispatchAuthorityConfig, candidate: RuntimeExternalActionCandidate): Promise<{ result: RuntimeCandidateDispatchResult; retryCount: number }>
+{
+	const now = new Date(clock.nowEpochMs());
+	return prisma.$transaction(async function _record(transaction: Prisma.TransactionClient): Promise<{ result: RuntimeCandidateDispatchResult; retryCount: number }>
+	{
+		const key = { runId: candidate.runId, attempt: candidate.attempt, candidateId: candidate.candidateId };
+		const existing = await transaction.runtimeExternalActionRetry.findUnique({ where: { runId_attempt_candidateId: key } });
+		if (existing === null)
+		{
+			await transaction.runtimeExternalActionRetry.create({ data: { ...key, retryCount: 1, retryDeadlineAt: new Date(now.getTime() + config.externalActionRetryWindowMilliseconds) } });
+			return { result: { accepted: false, reason: "external_action_dispatch_retryable", retryable: true, retryAfterMilliseconds: _EXTERNAL_ACTION_DISPATCH_RETRY_AFTER_MILLISECONDS }, retryCount: 1 };
+		}
+		if (existing.retryCount >= config.externalActionRetryLimit || existing.retryDeadlineAt.getTime() <= now.getTime()) return { result: { accepted: false, reason: "external_action_dispatch_retry_exhausted" }, retryCount: existing.retryCount };
+		const updated = await transaction.runtimeExternalActionRetry.updateMany({ where: { ...key, retryCount: existing.retryCount }, data: { retryCount: { increment: 1 } } });
+		if (updated.count !== 1) throw new Error("runtime dispatch lost its external action retry fence");
+		return { result: { accepted: false, reason: "external_action_dispatch_retryable", retryable: true, retryAfterMilliseconds: _EXTERNAL_ACTION_DISPATCH_RETRY_AFTER_MILLISECONDS }, retryCount: existing.retryCount + 1 };
 	});
-	if (loaded === null) return;
-	await runner.run(candidate, loaded.snapshot, loaded.tools);
 }
 
 /** Unbind the runtime instance from its stream if the closing connection still owns it. */

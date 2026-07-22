@@ -19,6 +19,10 @@ export interface RuntimeDispatchAuthorityConfig
 	readonly namespace: string;
 	/** Hard lifetime stamped on each minted command frame, bounded by the durable assignment lease. */
 	readonly commandTtlMilliseconds: number;
+	/** Maximum server-recorded pre-reservation retries for one external-action candidate. */
+	readonly externalActionRetryLimit: number;
+	/** Hard server-owned window in which one external-action candidate may use its retry budget. */
+	readonly externalActionRetryWindowMilliseconds: number;
 }
 
 /** Verified workload identity handed to the dispatch authority by the app-owned transport. */
@@ -40,13 +44,25 @@ export interface RuntimeStreamWorkloadIdentity
  * The dispatch authority admits the candidate against the live fence, then hands it to this injected
  * runner so the concrete MCP/artifact/memory/sandbox transports stay in the app root and never leak
  * into `scope:agent-runtime`. The runner performs reserve-before-dispatch via
- * `__ExecuteExternalAction`; its failure never rewrites the durable admission, since the reserved
- * ToolInvocation is the authoritative evidence.
+ * `__ExecuteExternalAction`. It returns `"completed"` only after a durable invocation result exists,
+ * returns `"denied"` for a durable fail-closed refusal, and throws only before reservation when the
+ * runtime may safely replay the exact admitted candidate.
+ */
+export type RuntimeExternalActionRunnerResult =
+	| { readonly outcome: "completed" | "denied" }
+	| { readonly outcome: "retryable"; readonly error: unknown };
+
+/**
+ * Result from the composition root after attempting one admitted external action.
+ *
+ * `retryable` proves that no ToolInvocation reservation was created. Every outcome after a
+ * reservation — including deferred-approval creation or executor persistence failures — is instead
+ * `denied`, so an admitted candidate can never re-dispatch an already-reserved side effect.
  */
 export interface RuntimeExternalActionRunner
 {
 	/** Reserve and dispatch one admitted external-action candidate against its validated tools. */
-	run(candidate: RuntimeExternalActionCandidate, snapshot: RunInputSnapshot, compiledTools: readonly CompiledToolDefinition[]): Promise<void>;
+	run(candidate: RuntimeExternalActionCandidate, snapshot: RunInputSnapshot, compiledTools: readonly CompiledToolDefinition[]): Promise<RuntimeExternalActionRunnerResult>;
 }
 
 /** Stable result returned after a candidate reaches the authoritative run boundary. */
@@ -56,4 +72,8 @@ export interface RuntimeCandidateDispatchResult
 	readonly accepted: boolean;
 	/** Machine-readable reason when the candidate was rejected. */
 	readonly reason?: string;
+	/** Whether the runtime must retry this exact candidate rather than terminalising its attempt. */
+	readonly retryable?: boolean;
+	/** Server-bounded delay before retrying the same candidate identifier. */
+	readonly retryAfterMilliseconds?: number;
 }

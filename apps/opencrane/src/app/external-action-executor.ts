@@ -1,6 +1,6 @@
 import type { JsonValue } from "@opencrane/util";
 import type { RuntimeExternalActionCandidate } from "@opencrane/contracts";
-import type { ExecuteExternalActionResult, ExternalActionExecutor, ExternalActionFailureReason } from "@opencrane/backend/agents/runtime";
+import type { ExternalActionExecutor } from "@opencrane/backend/agents/runtime";
 import type { ExternalActionExecutorDependencies } from "./external-action-executor.types.js";
 
 /** Typed failure raised for a candidate whose tool revision names no wired transport kind. */
@@ -12,27 +12,6 @@ export class UnsupportedExternalActionError extends Error
 		super(`no external-action transport is wired for tool revision ${toolRevisionId}`);
 		this.name = "UnsupportedExternalActionError";
 	}
-}
-
-/** Typed runtime-visible failure for an external action that the durable authority denied. */
-export class ExternalActionDispatchRejectedError extends Error
-{
-	/** Stable failure reason returned by the reserve-before-dispatch authority. */
-	readonly reason: ExternalActionFailureReason;
-
-	/** Creates a rejection that preserves the durable authority's machine-readable reason. */
-	constructor(reason: ExternalActionFailureReason)
-	{
-		super(`external action dispatch denied: ${reason}`);
-		this.name = "ExternalActionDispatchRejectedError";
-		this.reason = reason;
-	}
-}
-
-/** Throw a typed runtime-visible error when a durable external-action result is terminally denied. */
-export function _AssertExternalActionDispatchSucceeded<TResult>(result: ExecuteExternalActionResult<TResult>): void
-{
-	if (result.outcome === "denied") throw new ExternalActionDispatchRejectedError(result.reason);
 }
 
 /** Read a string field from a candidate's canonical argument object, or null when absent. */

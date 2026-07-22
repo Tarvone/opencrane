@@ -20,6 +20,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `database-schema` | [`apps/_infra/deploy-k8s/components/database-schema/README.md`](../../apps/_infra/deploy-k8s/components/database-schema/README.md) | Deploy-k8s-owned Prisma migration Job component. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
 | _(apps/_infra/deploy-k8s)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, owns deploy-only components such as the schema Job, and carries CRDs, issuers, external-secret wiring, and cross-plane defaults. |
 | _(apps/feat-openclaw-tenant)_ | — | Deletion target: remove this OpenClaw tenant image/build rollup with its controller and renderer when the personal-agent runtime replacement lands. |
+| _(apps/agent-runtime)_ | [apps/agent-runtime/README.md](../../apps/agent-runtime/README.md) | Disabled-by-default Python runtime shell. It opens only a projected-token-authenticated control-plane stream; no listener, model/tool driver, or durable tenant storage. |
 
 ## Libs (`libs/`)
 
@@ -29,6 +30,7 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `@opencrane/util` | [libs/util/README.md](../../libs/util/README.md) | Dependency-free pure helpers shared across domain packages (`scope:shared`). |
 | `libs/server/_infra/{api,auth,http}` | — | Kubernetes, authentication, and HTTP runtime seams owned by the OpenCrane server. |
 | `libs/server/_infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport owned by the OpenCrane server runtime. |
+| `libs/server/_infra/agent-runtime-stream` | [README](../../libs/server/_infra/agent-runtime-stream/README.md) | Runtime-initiated projected-token HTTP/SSE transport. It never owns assignments or durable run state. |
 | `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 
@@ -53,6 +55,9 @@ schema/migration ownership in [`prisma.md`](./prisma.md).
 Personal-agent product capabilities use the `backend-agents-personal-<d>` NX namespace under
 `libs/backend/agents/personal/<d>/main`: personas, conversations, runs, and memory. They own a
 person's approved persona, conversation events, run lifecycle, and memory catalogue respectively.
+The sibling `session/main` package owns the single assembler that turns those authorities into an
+immutable `RunInputSnapshot`; it is session orchestration, not a second source of persona or run
+truth.
 Fleet membership, proof-bound authorization, and agent-service publication remain in
 `libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
 A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.

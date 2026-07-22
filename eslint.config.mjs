@@ -115,6 +115,7 @@ export default [
             { sourceTag: "scope:awareness", onlyDependOnLibsWithTags: ["scope:awareness", "scope:shared"] },
             { sourceTag: "scope:auth", onlyDependOnLibsWithTags: ["scope:auth", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:channel-proxy", onlyDependOnLibsWithTags: ["scope:channel-proxy", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime-stream", onlyDependOnLibsWithTags: ["scope:agent-runtime-stream", "scope:shared"] },
             { sourceTag: "scope:cluster-tenants", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:company-docs", onlyDependOnLibsWithTags: ["scope:auth", "scope:company-docs", "scope:shared"] },
             { sourceTag: "scope:connections", onlyDependOnLibsWithTags: ["scope:auth", "scope:connections", "scope:shared"] },

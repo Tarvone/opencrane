@@ -12,6 +12,8 @@
 #       - Channel proxy: /api/internal/channel-targets:resolve (TokenReview + delegated session).
 #       - Tenant pods: /api/internal/contract/:name (runtime-contract re-pull; TokenReview
 #         inside the handler is the identity check, this is defence-in-depth).
+#       - Agent-runtime shell: outbound `/api/internal/agent-runtime/*` only; its projected
+#         ServiceAccount token is TokenReviewed inside the route, so this rule is only the L3/4 floor.
 #   The operator's own /api/internal/tenant-models fetch is a localhost call within the
 #   opencrane-ui pod, so it is not subject to this NetworkPolicy at all.
 #
@@ -47,6 +49,16 @@ spec:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: channel-proxy
+      ports:
+        - protocol: TCP
+          port: {{ .Values.clustertenantManager.service.internalPort }}
+    # The personal-agent runtime owns no listener and can only initiate this connection.
+    # TokenReview fixes its exact projected-token audience and ServiceAccount subject in-process.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: agent-runtime
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}

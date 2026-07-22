@@ -14,6 +14,7 @@
     { "path": "apps/opencrane/scripts/emit-openapi.mts", "owner": "apps/opencrane", "classification": "build-entrypoint" },
     { "path": "apps/opencrane/src/__tests__/config.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/__tests__/index.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
+    { "path": "apps/opencrane/src/__tests__/migrate.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/app/config.ts", "owner": "apps/opencrane", "classification": "app-config" },
     { "path": "apps/opencrane/src/app/instrument.ts", "owner": "apps/opencrane", "classification": "process-instrumentation" },
     { "path": "apps/opencrane/src/app/log.ts", "owner": "apps/opencrane", "classification": "process-logging" },
@@ -25,6 +26,7 @@
     { "path": "apps/opencrane/src/infra/artifacts/artifact-upload.factory.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/infra/artifacts/__tests__/artifact-upload.factory.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
     { "path": "apps/opencrane/src/scripts/migrate.ts", "owner": "apps/opencrane", "classification": "migration-entrypoint" },
+    { "path": "apps/opencrane/src/scripts/migrate.types.ts", "owner": "apps/opencrane", "classification": "migration-entrypoint" },
     { "path": "apps/opencrane/vitest.config.ts", "owner": "apps/opencrane", "classification": "test-config" },
 
     { "path": "apps/opencrane-ui/src/app/app.component.ts", "owner": "apps/opencrane-ui", "classification": "browser-composition" },
@@ -55,6 +57,9 @@
     { "path": "apps/artifact-service/src/__tests__/server.test.ts", "owner": "apps/artifact-service", "classification": "composition-test" },
     { "path": "apps/artifact-service/vitest.config.ts", "owner": "apps/artifact-service", "classification": "test-config" },
 
+    { "path": "apps/agent-runtime/src/runtime.py", "owner": "apps/agent-runtime", "classification": "process-entrypoint" },
+    { "path": "apps/agent-runtime/tests/test_runtime.py", "owner": "apps/agent-runtime", "classification": "composition-test" },
+
     { "path": "apps/feat-central-agents/src/__tests__/connectors/slack.connector.test.ts", "owner": "apps/feat-central-agents", "classification": "delete" },
     { "path": "apps/feat-central-agents/src/__tests__/ingestion.test.ts", "owner": "apps/feat-central-agents", "classification": "delete" },
     { "path": "apps/feat-central-agents/src/__tests__/org-index-schema-v2.test.ts", "owner": "apps/feat-central-agents", "classification": "delete" },
@@ -83,6 +88,7 @@
     "apps/_infra/obot/project.json",
     "apps/channel-proxy/project.json",
     "apps/artifact-service/project.json",
+    "apps/agent-runtime/project.json",
     "apps/postgres/project.json",
     "apps/opencrane/package.json",
     "apps/_infra/deploy-k8s/project.json",

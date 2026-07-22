@@ -9,6 +9,34 @@ metadata:
   Grant the OpenCrane server only over explicitly owned namespaces. A sibling artifact namespace
   is deliberately never listed here, so the catalog process cannot read its receipt-signing key.
 */}}
+---
+# TokenReview is cluster-scoped and is required only for projected workload credentials on
+# internal pod-identity routes. The runtime ServiceAccount receives no Kubernetes RBAC at all.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-tokenreview-{{ .Release.Namespace }}
+  labels:
+    {{- include "opencrane.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-tokenreview-{{ .Release.Namespace }}
+  labels:
+    {{- include "opencrane.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "opencrane.fullname" . }}-opencrane-server-tokenreview-{{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "opencrane.fullname" . }}-opencrane-server
+    namespace: {{ .Release.Namespace }}
 {{- $namespaces := include "opencrane.instanceNamespaces" . | fromJsonArray }}
 {{- range $ns := $namespaces }}
 ---

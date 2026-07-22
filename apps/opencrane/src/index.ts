@@ -105,6 +105,9 @@ export function createInternalApp(prisma: PrismaClient, authApi: k8s.Authenticat
 {
   const app = express();
   app.set("trust proxy", 1);
+  // The runtime route has a smaller fixed body boundary than other internal routes. Mount
+  // it before the generic parser because Express will not re-parse an already consumed body.
+  app.use("/api/internal/agent-runtime", express.json({ limit: 64 * 1024, strict: true }));
   app.use(express.json());
   app.use(___RequestContext());
   app.use(pinoHttp({ logger: log, genReqId: function _genReqId() { return ___GetContext()?.requestId ?? randomUUID(); } }));

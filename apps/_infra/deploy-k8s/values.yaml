@@ -236,9 +236,6 @@ channelProxy:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
-  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
-  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
-  maxUploadDurationMilliseconds: 300000
   service:
     port: 8080
   # -- Empty derives the release-local OpenCrane internal Service URL.
@@ -268,10 +265,35 @@ channelProxy:
       cpu: 250m
       memory: 256Mi
 
+# -- First-party personal-agent process boundary. Disabled until a controller can own current
+# assignments and command dispatch; enabling it creates only the projected-token shell, never a
+# legacy OpenClaw bridge, model driver, tool plane, listener, or persistent tenant mount.
+agentRuntime:
+  enabled: false
+  image:
+    repository: ghcr.io/italanta/opencrane-agent-runtime
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  # -- Empty derives the release-local internal OpenCrane route. It must not be an Internet URL.
+  openCraneRuntimeStreamUrl: ""
+  projectedTokenTtlSeconds: 600
+  scratchSize: 64Mi
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
 # -- Canonical artifact-byte boundary. It owns only content-addressed bytes on an expandable,
 # release-local PVC; OpenCrane remains the catalog and authorization authority.
 artifactService:
   enabled: true
+  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
+  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
+  maxUploadDurationMilliseconds: 300000
   # -- The isolated byte-plane namespace. It is never one of the server's RBAC-owned
   # namespaces, so the server cannot read the service-only receipt signing key.
   namespace: ""

@@ -3982,9 +3982,6 @@ CREATE CONSTRAINT TRIGGER "active_agent_revisions_remain_published"
 CREATE TRIGGER "agent_revision_skill_assignments_immutable"
     BEFORE INSERT OR UPDATE OR DELETE ON "agent_revision_skill_assignments"
     FOR EACH ROW EXECUTE FUNCTION "enforce_agent_revision_assignment_immutability"();
-CREATE TRIGGER "agent_revision_mcp_assignments_immutable"
-    BEFORE INSERT OR UPDATE OR DELETE ON "agent_revision_mcp_assignments"
-    FOR EACH ROW EXECUTE FUNCTION "enforce_agent_revision_assignment_immutability"();
 CREATE TRIGGER "workload_assignments_current_attempt" BEFORE INSERT OR UPDATE OF "run_id", "attempt" ON "workload_assignments" FOR EACH ROW EXECUTE FUNCTION "enforce_current_workload_assignment_attempt"();
 CREATE TRIGGER "run_outbox_events_accepted_attempt" BEFORE INSERT OR UPDATE OF "run_id", "attempt" ON "run_outbox_events" FOR EACH ROW EXECUTE FUNCTION "enforce_accepted_outbox_attempt"();
 CREATE TRIGGER "run_input_snapshots_immutable" BEFORE UPDATE OR DELETE ON "run_input_snapshots" FOR EACH ROW EXECUTE FUNCTION "reject_run_input_snapshot_mutation"();

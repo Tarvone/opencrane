@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 CHART_ROOT="${OPENCRANE_HELM_CHART_ROOT:-$ROOT/apps/_infra/deploy-k8s}"
+CONFORMANCE="$ROOT/apps/agent-controller/tests/admission-conformance.sh"
 MANIFEST="$(mktemp)"
 DISABLED="$(mktemp)"
 ROLE="$(mktemp)"
@@ -144,6 +145,12 @@ grep -Fq 'quantity(object.spec.template.spec.containers[0].resources.limits.memo
 grep -Fq "object.spec.template.spec.containers[0].env.size() == 5" "$ADMISSION"
 grep -Fq "object.spec.template.spec.containers[0].env[2].name == 'OPENCRANE_RUNTIME_LITELLM_BASE_URL'" "$ADMISSION"
 grep -Fq "object.spec.template.spec.containers[0].volumeMounts.size() == 4" "$ADMISSION"
+grep -Fq 'SERVER_INTERNAL_PORT="$4"' "$CONFORMANCE"
+grep -Fq 'LITELLM_PORT="$5"' "$CONFORMANCE"
+if grep -Fq 'cluster.local:3001' "$CONFORMANCE"; then
+  echo "Admission conformance must use the deployed internal server port" >&2
+  exit 1
+fi
 grep -Fq "object.spec.template.spec.volumes.size() == 4" "$ADMISSION"
 grep -Fq "object.spec.template.spec.volumes[2].name == 'litellm-key'" "$ADMISSION"
 grep -Fq "secret.name.matches('^litellm-key-[a-f0-9]{32}$')" "$ADMISSION"

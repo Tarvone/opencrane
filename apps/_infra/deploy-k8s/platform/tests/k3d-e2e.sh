@@ -68,6 +68,8 @@ BACKUP_MINIO_NAME="${BACKUP_MINIO_NAME:-opencrane-backup-minio}"
 BACKUP_NAME="${BACKUP_NAME:-opencrane-backup-smoke}"
 RESTORE_DB_RELEASE_NAME="${RESTORE_DB_RELEASE_NAME:-opencrane-postgres-restored}"
 BACKUP_MARKER="${BACKUP_MARKER:-opencrane-backup-restore-smoke-v1}"
+OPENCRANE_INTERNAL_PORT="${OPENCRANE_INTERNAL_PORT:-8081}"
+LITELLM_SERVICE_PORT="${LITELLM_SERVICE_PORT:-4000}"
 APP_POOLER_CLIENT_SELECTORS_JSON='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
 RESTORE_POOLER_CLIENT_SELECTORS_JSON='[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
 
@@ -1143,9 +1145,11 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set "clustertenantManager.standaloneSeed.tier=$ORG_TIER" \
   --set "clustertenantManager.database.existingSecret=${OPENCRANE_POSTGRES_APP_SECRET}" \
   --set "clustertenantManager.database.secretKey=uri" \
+  --set "clustertenantManager.service.internalPort=$OPENCRANE_INTERNAL_PORT" \
   --set-string "networkPolicy.postgresPoolerName=${RESTORE_DB_RELEASE_NAME}-pooler" \
   --set "litellm.existingDatabaseSecret=opencrane-litellm-db" \
   --set "litellm.databaseSecretKey=DATABASE_URL" \
+  --set "litellm.service.port=$LITELLM_SERVICE_PORT" \
   --set "bootstrap.providerKey.existingSecret=$BOOTSTRAP_SECRET_NAME" \
   --set agentController.enabled=true \
   --set agentController.replicas=0 \
@@ -1187,7 +1191,12 @@ echo "[e2e] PASS: agent-runtime network plane stays outbound-only after command 
 # Execute both controller trust boundaries against the live API server. Replicas stay at zero so
 # the probe owns every state transition: admission checks the exact Job shape, while a one-shot Job
 # proves the projected controller token reaches server-side TokenReview through both policies.
-bash "$ROOT_DIR/apps/agent-controller/tests/admission-conformance.sh" "$NAMESPACE" "$RUNTIME_NAMESPACE" "$RELEASE_NAME"
+bash "$ROOT_DIR/apps/agent-controller/tests/admission-conformance.sh" \
+  "$NAMESPACE" \
+  "$RUNTIME_NAMESPACE" \
+  "$RELEASE_NAME" \
+  "$OPENCRANE_INTERNAL_PORT" \
+  "$LITELLM_SERVICE_PORT"
 bash "$ROOT_DIR/apps/agent-controller/tests/identity-conformance.sh" "$NAMESPACE" "$RELEASE_NAME"
 
 # Wait for LiteLLM (a silo plane) when cost routing is enabled by chart values.

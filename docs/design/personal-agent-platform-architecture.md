@@ -676,11 +676,23 @@ rather than silently disappearing. The run ends — completed, cancelled, or fai
 `RunEvent`; the thread's next message starts an entirely new `AgentRun` with its own fresh
 snapshot.
 
+**A `Thread` is an ordered sequence of `AgentRun`s, not one long-running run.** Each `AgentRun` in
+that sequence freezes its own independent `RunInputSnapshot`, so two runs in the same thread can
+carry different persona revisions, model routes, or tool/skill revisions — the invariant is per-run
+("nothing decided after that point can change what this run does"), not per-thread. Today, the only
+thing that starts the next `AgentRun` in a thread is the next user message: an `AgentRun` always
+runs to a terminal `RunEvent` before anything else in that thread can begin. The runtime does not
+yet end a run early and start a successor mid-conversation without new user input — for example,
+ending a run after a round to reselect the model route before the next round — is intended future
+work, not current behavior. Until that lands, one `AgentRun` corresponds one-to-one with one user
+message and the turn it produces.
+
 There is no durable generic `Session` record. A `Thread` is the user-visible conversation and owns
-its immutable `Message` history. An interactive message creates an `AgentRun` for that thread;
-manual and scheduled managed-agent invocations create the same `AgentRun` without requiring a
-thread. A durable one-active-run lease serializes interactive work for a thread, while idempotency
-keys prevent a repeated send or trigger from creating a second external side effect.
+its immutable `Message` history; it is composed of the ordered `AgentRun`s described above. An
+interactive message creates an `AgentRun` for that thread; manual and scheduled managed-agent
+invocations create the same `AgentRun` without requiring a thread. A durable one-active-run lease
+serializes interactive work for a thread, while idempotency keys prevent a repeated send or trigger
+from creating a second external side effect.
 
 Each `AgentRun` references an immutable `AgentRevision` and owns one `RunInputSnapshot`. The
 snapshot freezes the approved persona revision, effective grant/contract evidence, model route,

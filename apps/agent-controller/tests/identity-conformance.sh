@@ -43,6 +43,14 @@ spec:
       serviceAccountName: agent-controller
       automountServiceAccountToken: false
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: tokenreview-conformance
           image: opencrane/opencrane-server:e2e

@@ -34,7 +34,8 @@ export default defineConfig({
         items: [
           { text: 'Employee assistants', link: '/guide/first-tenant' },
           { text: 'Organize your company', link: '/guide/organize' },
-          { text: 'Share skills', link: '/guide/skills' },
+          { text: 'Agent skills', link: '/guide/skills' },
+          { text: 'Agent delegation (child runs)', link: '/guide/child-runs' },
           { text: 'Manage tools (MCP)', link: '/guide/tools' },
           { text: 'Organizational knowledge', link: '/guide/knowledge' },
           { text: 'Control access', link: '/guide/permissions' },
@@ -81,7 +82,8 @@ export default defineConfig({
         items: [
           { text: 'Employee assistants', link: '/guide/first-tenant' },
           { text: 'Organize your company', link: '/guide/organize' },
-          { text: 'Share skills across teams', link: '/guide/skills' },
+          { text: 'Agent skills', link: '/guide/skills' },
+          { text: 'Agent delegation (child runs)', link: '/guide/child-runs' },
           { text: 'Manage tools (MCP)', link: '/guide/tools' },
           { text: 'Organizational knowledge', link: '/guide/knowledge' },
           { text: 'Control who can access what', link: '/guide/permissions' },

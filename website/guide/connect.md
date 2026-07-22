@@ -34,5 +34,5 @@ you don't need it to get started.
 
 Right now it's a capable chat assistant. Give it real powers:
 
-- **[Share skills](/guide/skills)** · **[Connect tools](/guide/tools)** ·
+- **[Agent skills](/guide/skills)** · **[Connect tools](/guide/tools)** ·
   **[Add knowledge](/guide/knowledge)** · **[Control access](/guide/permissions)**

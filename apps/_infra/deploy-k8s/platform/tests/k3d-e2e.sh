@@ -68,6 +68,8 @@ BACKUP_MINIO_NAME="${BACKUP_MINIO_NAME:-opencrane-backup-minio}"
 BACKUP_NAME="${BACKUP_NAME:-opencrane-backup-smoke}"
 RESTORE_DB_RELEASE_NAME="${RESTORE_DB_RELEASE_NAME:-opencrane-postgres-restored}"
 BACKUP_MARKER="${BACKUP_MARKER:-opencrane-backup-restore-smoke-v1}"
+APP_POOLER_CLIENT_SELECTORS_JSON='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
+RESTORE_POOLER_CLIENT_SELECTORS_JSON='[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
 
 # Standalone self-seed identity (#151 item 4). The operator creates + binds THIS
 # ClusterTenant on boot, then seeds its `<org>-default` workspace Tenant.
@@ -611,7 +613,7 @@ function _install_postgres_server()
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
-    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
+    --set-json "pooler.clientPodSelectors=$APP_POOLER_CLIENT_SELECTORS_JSON"
   kubectl wait --for=condition=Ready "cluster/$OPENCRANE_DB_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=create "deployment/${OPENCRANE_DB_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=condition=available "deployment/${OPENCRANE_DB_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
@@ -788,7 +790,7 @@ EOF
     --set storage.storageClass=local-path \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
-    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}}]' \
+    --set-json "pooler.clientPodSelectors=$RESTORE_POOLER_CLIENT_SELECTORS_JSON" \
     --set restore.enabled=true \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set-string "restore.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME" \

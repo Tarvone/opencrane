@@ -58,7 +58,7 @@ GCP Cloud Logging + Cloud Trace (Helm `observability.otel`, default off), contex
   `startTelemetry`-equivalent before any instrumented module loads (ESM ordering). It is a
   no-op without an OTLP endpoint, so it is always safe to add.
 - Lifecycle: long-running services flush on `SIGTERM`/`SIGINT` via the lib's shutdown
-  function before exit; short-lived migration processes flush after their work resolves.
+  function before exit; short-lived one-shot processes flush after their work resolves.
 
 ### Infra wiring (when a new deployable app appears)
 - Add the `@opencrane/observability` workspace dep, the `instrument.ts`, and (for servers)

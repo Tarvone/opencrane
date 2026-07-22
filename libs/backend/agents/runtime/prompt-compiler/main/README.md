@@ -35,7 +35,7 @@ than being silently compiled by a mismatched version.
 
 - `__CompileRunInput` — hydrate a snapshot into the literal, digest-sealed `CompiledRunInput`.
 - `PROMPT_COMPILER_VERSION` — the exact version this compiler stamps and requires on every snapshot.
-- `PromptCompilerRepositories` — the injected read ports the app implements over control-plane
+- `PromptCompilerRepositories` — the injected read ports the runtime authority implements over control-plane
   persona, conversation, tool, memory, artifact, skill, and model-routing records.
 
 ## Boundary

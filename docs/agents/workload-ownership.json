@@ -14,6 +14,7 @@
     "openclaw-tenant-runtime",
     "obot-dynamic-mcp-child",
     "postgres-database",
+    "postgres-pooler",
     "postgres-database-privileges",
     "ingress-nginx-controller",
     "ingress-nginx-admission-create",
@@ -141,6 +142,11 @@
     }
   ],
   "nonProducingRuntimeMatches": [
+    {
+      "path": "libs/backend/agents/runtime/controller/src/agent-controller.ts",
+      "anchor": "kind: \"Job\"",
+      "reason": "Owner reference only; it binds the immutable key Secret to an already-created Job and cannot create a pod."
+    },
     {
       "path": "libs/backend/feat-openclaw-tenant/main/src/reconcilers/tenants/destroy/tenant-cleanup.ts",
       "anchor": "kind: \"Deployment\"",
@@ -327,6 +333,16 @@
       "source": { "type": "file", "path": "apps/postgres/helm/templates/database-privileges-job.yaml", "anchor": "kind: Job", "coversLocalTemplate": true },
       "classification": "survivor",
       "reason": "apps/postgres owns the bounded credential-fed hook that removes PostgreSQL PUBLIC access from each logical database."
+    },
+    {
+      "id": "postgres-pooler",
+      "podClass": "Deployment/CNPG-pgbouncer-pooler",
+      "image": "ghcr.io/cloudnative-pg/pgbouncer:1.25.1",
+      "owner": "apps/postgres",
+      "localOwner": true,
+      "source": { "type": "file", "path": "apps/postgres/helm/templates/pooler.yaml", "anchor": "kind: Pooler" },
+      "classification": "survivor",
+      "reason": "apps/postgres owns the pinned CNPG Pooler contract that bounds every application connection before PostgreSQL."
     },
     {
       "id": "ingress-nginx-controller",

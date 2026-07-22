@@ -4,7 +4,8 @@ import type { CompiledMessage, CompiledModelRoute, CompiledRunInput, CompiledToo
 import type { JsonValue } from "@opencrane/util";
 import { __CompileRunInput } from "@opencrane/backend/agents/runtime/prompt-compiler";
 import type { PromptCompilerRepositories } from "@opencrane/backend/agents/runtime/prompt-compiler";
-import type { RunInputCompiler } from "@opencrane/backend/agents/runtime";
+
+import type { RunInputCompiler } from "./prisma-runtime-dispatch-authority.types.js";
 
 /** Canonical lowercase turn roles the compiled input uses. */
 const _MESSAGE_ROLE: Record<string, CompiledMessage["role"]> = { User: "user", Assistant: "assistant", Tool: "tool", System: "system" };
@@ -18,7 +19,7 @@ const _MESSAGE_ROLE: Record<string, CompiledMessage["role"]> = { User: "user", A
  *
  * @returns A compiler bound to per-attempt transaction reads.
  */
-export function _CreatePrismaRunInputCompiler(): RunInputCompiler
+export function __CreatePrismaRunInputCompiler(): RunInputCompiler
 {
 	return function _compile(snapshot: RunInputSnapshot, transaction: Prisma.TransactionClient): Promise<CompiledRunInput>
 	{

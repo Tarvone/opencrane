@@ -36,6 +36,10 @@ databaseAdmin:
 # and immutable. Recovery never attaches this input because the physical backup already
 # contains the authoritative schema.
 bootstrap:
+  # Full identity embedded by the superuser-owned baseline envelope. The privileges
+  # hook compares this value with the protected row inside fresh and restored databases.
+  targetBaseline:
+    sha256: ""
   initdb:
     postInitApplicationSQLRefs:
       configMapRefs: []
@@ -58,7 +62,7 @@ resources:
 # below `postgresql.maxConnections` (80). `maxClientConnections` bounds queued
 # client connections at the pooler instead of consuming PostgreSQL connections.
 pooler:
-  enabled: true
+  image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
   instances: 1
   poolMode: session
   maxClientConnections: 50
@@ -76,8 +80,6 @@ pooler:
         app.kubernetes.io/name: langfuse
     - matchLabels:
         app.kubernetes.io/component: fleet-manager
-    - matchLabels:
-        app.kubernetes.io/component: postgres-database-privileges
 
 networkPolicy:
   enabled: true
@@ -85,11 +87,9 @@ networkPolicy:
   operatorNamespace: cnpg-system
   operatorPodLabels:
     app.kubernetes.io/name: cloudnative-pg
-  # All database clients in this ClusterTenant namespace. PostgreSQL roles and
-  # per-database credentials, not NetworkPolicy, enforce logical-database isolation.
+  # Direct instance clients required for database reconciliation. Applications use
+  # pooler.clientPodSelectors and cannot bypass the PgBouncer connection budget.
   clientPodSelectors:
-    - matchLabels:
-        app.kubernetes.io/component: opencrane-server
     - matchLabels:
         app.kubernetes.io/component: postgres-database-privileges
 
@@ -109,9 +109,6 @@ backup:
 restore:
   enabled: false
   sourceName: source
-  # Content-addressed baseline identity recorded on the source Cluster. Recovery
-  # never executes this ConfigMap; it carries provenance for later deploy checks.
-  sourceBaselineConfigMap: ""
   targetTime: ""
   plugin:
     name: ""

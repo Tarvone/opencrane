@@ -28,8 +28,9 @@ clean target baseline remain, and every model/enum has exactly one owning domain
    Do not add incremental scripts or a runtime schema runner.
 4. **CNPG `initdb` is the only application-schema setup boundary.** The deployment publisher
    prepends `SET ROLE` for the configured application owner and exposes the canonical SQL through
-   one immutable, content-addressed ConfigMap. Physical recovery restores the existing schema and
-   never attaches the fresh-database baseline.
+   one immutable, content-addressed ConfigMap. Its superuser envelope records the full baseline
+   digest in a protected database schema. Physical recovery restores that marker with the existing
+   schema, never attaches fresh setup SQL, and must pass the digest-checking Postgres hook.
 
 ## Why this exists
 

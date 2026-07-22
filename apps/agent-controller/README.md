@@ -90,6 +90,10 @@ the exact one-time `suspend: true` to `false` release. Enabling this controller 
 LiteLLM endpoint is rejected because this runtime boundary deliberately permits only the same-silo
 Service and port.
 
+Kubernetes API egress accepts exact Service CIDRs/port and optional exact backing endpoint
+CIDRs/port. Supply both on CNIs that apply NetworkPolicy after Service destination translation;
+Kubernetes intentionally leaves the ordering of that translation implementation-defined.
+
 Runtime-profile CPU values use whole cores or millicores such as `1` or `100m`; memory values use
 `Ki`, `Mi`, or `Gi`. Helm rejects malformed or non-string quantities before it can install an
 admission policy that would deny every runtime Job.

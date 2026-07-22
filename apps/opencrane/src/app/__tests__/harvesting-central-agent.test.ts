@@ -11,18 +11,13 @@ describe("harvesting central-agent definition", function _DefinitionSuite()
 	it("is expressible as a valid packaged managed agent", function _Expressible()
 	{
 		const definition = _HarvestingCentralAgentDefinition("obot-ref-slack-opaque");
-		// A managed agent never carries a persona.
 		expect(definition.content.personaRevisionId).toBeNull();
-		// Positive budget ceilings.
 		expect(definition.content.budget.maxTurns).toBeGreaterThan(0);
 		expect(definition.content.budget.maxTokens).toBeGreaterThan(0);
-		// One Obot MCP integration with a non-empty tool allow-list and the opaque custody reference.
 		expect(definition.content.integrationAssignments).toHaveLength(1);
 		expect(definition.content.integrationAssignments[0].allowedTools.length).toBeGreaterThan(0);
 		expect(definition.content.integrationAssignments[0].custodyReferenceId).toBe("obot-ref-slack-opaque");
-		// Cognee dataset/scope targets.
 		expect(definition.content.scopeAttachments.length).toBeGreaterThan(0);
-		// A well-formed recurring schedule.
 		expect(__IsValidCronExpression(definition.schedule.cron)).toBe(true);
 		expect(definition.schedule.overlapPolicy).toBe("skip");
 	});
@@ -35,12 +30,9 @@ describe("harvesting Obot MCP invocation (stubbed transport)", function _McpSuit
 		const definition = _HarvestingCentralAgentDefinition("obot-ref-slack-opaque");
 		const assignment = definition.content.integrationAssignments[0];
 		const transport = new __FakeObotMcpInvocationAdapter({ content: { channels: ["general"] } });
-
 		const result = await transport.invokeTool({ siloId: "silo-1", integrationId: assignment.integrationId, obotCustodyReference: assignment.custodyReferenceId, toolName: "slack.listChannels", arguments: {}, allowedTools: assignment.allowedTools });
 		expect(result.content).toEqual({ channels: ["general"] });
 		expect(transport.invocations[0].obotCustodyReference).toBe("obot-ref-slack-opaque");
-
-		// A tool outside the harvester's allow-list is rejected fail-closed, never dispatched.
 		await expect(transport.invokeTool({ siloId: "silo-1", integrationId: assignment.integrationId, obotCustodyReference: assignment.custodyReferenceId, toolName: "slack.postMessage", arguments: {}, allowedTools: assignment.allowedTools })).rejects.toBeInstanceOf(ObotMcpToolNotAllowedError);
 		expect(HARVESTING_ALLOWED_TOOLS).not.toContain("slack.postMessage");
 	});
@@ -53,7 +45,6 @@ describe("harvested record provenance", function _ProvenanceSuite()
 		const provenance: MemoryProvenance = { centralAgentId: "svc-harvester", agentRevisionId: "rev-1", runId: "run-42", recordedAt: "2026-07-21T09:00:00.000Z", sourceRef: "slack:C123/1720000000.000100" };
 		expect(() => __AssertMemoryProvenanceComplete(provenance)).not.toThrow();
 	});
-
 	it("refuses to inject a record missing its run provenance", function _Incomplete()
 	{
 		const provenance: MemoryProvenance = { centralAgentId: "svc-harvester", agentRevisionId: "rev-1", runId: "", recordedAt: "2026-07-21T09:00:00.000Z", sourceRef: "slack:C123" };

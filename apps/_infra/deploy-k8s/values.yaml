@@ -331,6 +331,11 @@ agentController:
   # For a single API Service use its /32 (IPv4) or /128 (IPv6); never use a whole pod/service range.
   kubernetesApiServerCidrs: []
   kubernetesApiServerPort: 443
+  # -- Exact backing endpoint CIDRs and port for CNIs that enforce NetworkPolicy after
+  # Service destination translation. Kubernetes leaves pre/post-translation policy behavior
+  # implementation-defined, so portable installs should supply both the Service and endpoint paths.
+  kubernetesApiServerEndpointCidrs: []
+  kubernetesApiServerEndpointPort: 443
   # -- Aggregate ceiling for the dedicated runtime namespace. Per-Job admission fixes the shape;
   # this quota limits how many conforming Jobs a compromised controller can consume concurrently.
   runtimeQuota:
@@ -376,6 +381,23 @@ agentController:
 
 # -- Control plane settings
 clustertenantManager:
+  # -- The server image runs as the Node.js uid/gid. The fsGroup makes projected
+  #    artifact signing keys readable at 0440 without widening them to every uid.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+
   # -- Whether this control plane owns per-ClusterTenant namespace creation. Default true;
   #    the app-owned OpenCrane Helm unit renders its gated namespace-management ClusterRole
   #    and injects MANAGE_TENANT_NAMESPACES=true. Set false only when a separate namespace
@@ -1350,7 +1372,7 @@ langfuse:
   #    injected via --set at deploy time.
   postgresql:
     deploy: false
-    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-rw.<namespace>.svc.cluster.local
+    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-pooler.<namespace>.svc.cluster.local
     host: ""
     auth:
       username: "opencrane"

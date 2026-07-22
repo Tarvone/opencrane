@@ -147,6 +147,7 @@ k3d cluster create "$CLUSTER_NAME" --agents 1
 # 4a. Pre-pulling the official CloudNativePG database image.
 echo "[local] Pre-pulling official CloudNativePG database image"
 docker pull ghcr.io/cloudnative-pg/postgresql:17.5
+docker pull ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 
 # 4b. Import locally built images into the k3d runtime.
 echo "[local] Importing images into k3d"
@@ -154,6 +155,7 @@ k3d image import opencrane/operator:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/opencrane-server:local --cluster "$CLUSTER_NAME"
 k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
+k3d image import ghcr.io/cloudnative-pg/pgbouncer:1.25.1 --cluster "$CLUSTER_NAME"
 
 echo "[local] Using profile '$LOCAL_PROFILE' with values '$VALUES_FILE'"
 
@@ -194,6 +196,9 @@ OPENCRANE_BASELINE_CONFIG_MAP="$(bash "$ROOT_DIR/apps/postgres/scripts/publish-i
   "$NAMESPACE" \
   "$SILO_POSTGRES_OWNER" \
   "$ROOT_DIR/apps/opencrane/prisma/bootstrap/target-baseline.sql")"
+OPENCRANE_BASELINE_SHA256="$(kubectl get configmap "$OPENCRANE_BASELINE_CONFIG_MAP" \
+  -n "$NAMESPACE" \
+  -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
 
 function _install_postgres_server()
 {
@@ -204,11 +209,12 @@ function _install_postgres_server()
     --set-json "databases=$databases_json" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
+    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
   kubectl wait --for=condition=Ready "cluster/$POSTGRES_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=create "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"

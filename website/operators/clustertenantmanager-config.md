@@ -21,6 +21,24 @@
 | `clustertenantManager.resources.limits.cpu` | `500m` | CPU hard limit per pod. |
 | `clustertenantManager.resources.limits.memory` | `512Mi` | Memory hard limit per pod. |
 
+### Pod security
+
+These defaults match the `node` user in the server image. The group-readable Secret mode is paired
+with `fsGroup: 1000`; changing one side without the other can make projected ArtifactStore keys
+unreadable or expose them more broadly than intended.
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `clustertenantManager.podSecurityContext.runAsNonRoot` | `true` | Rejects a container that would run as uid 0. |
+| `clustertenantManager.podSecurityContext.runAsUser` | `1000` | Runs the pod as the server image's `node` uid. |
+| `clustertenantManager.podSecurityContext.runAsGroup` | `1000` | Runs the pod as the server image's `node` gid. |
+| `clustertenantManager.podSecurityContext.fsGroup` | `1000` | Makes projected key volumes readable by the server group. |
+| `clustertenantManager.podSecurityContext.fsGroupChangePolicy` | `OnRootMismatch` | Avoids recursive ownership changes when the volume root already has the expected group. |
+| `clustertenantManager.podSecurityContext.seccompProfile.type` | `RuntimeDefault` | Applies the container runtime's default syscall filter. |
+| `clustertenantManager.securityContext.allowPrivilegeEscalation` | `false` | Prevents the process from gaining more privileges than its parent. |
+| `clustertenantManager.securityContext.capabilities.drop` | `[ALL]` | Drops every Linux capability. |
+| `clustertenantManager.securityContext.readOnlyRootFilesystem` | `false` | Leaves the image root writable for current server runtime needs. |
+
 ---
 
 ## Network & APIs
@@ -48,7 +66,8 @@ Set to the container as `DATABASE_URL`. Rendered into the clustertenant-manager 
 
 ::: info Database shape is fixed before application startup
 The deploy engine publishes the reviewed target SQL as an immutable, content-addressed ConfigMap and
-CloudNativePG applies it once during `initdb`. Physical recovery uses the schema in the backup. The
+CloudNativePG applies it once during `initdb`. Physical recovery uses the schema and protected
+baseline marker in the backup; a Postgres hook checks that marker before deployment continues. The
 clustertenant-manager has no schema-update Job or startup mutation path.
 :::
 

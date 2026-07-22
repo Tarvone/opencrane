@@ -82,7 +82,7 @@ create `libs/utils/` beside it just to satisfy this document.
   path.
 - Prevent cycles. If two libraries need each other, move the shared contract downward or merge the
   libraries when they are actually one capability.
-- Keep dependency-light models/contracts usable by backend, frontend, migrations, and tests without
+- Keep dependency-light models/contracts usable by backend, frontend, target-baseline tooling, and tests without
   pulling runtime frameworks or external-I/O clients.
 - Tag every project on three distinct dimensions: project type (`type:app|lib`), functional layer
   (`layer:entrypoint|model|contract|util|backend|frontend|infra`), and bounded-capability ownership

@@ -19,10 +19,14 @@ spec:
         app.kubernetes.io/component: opencrane-server
     spec:
       serviceAccountName: {{ include "opencrane.fullname" . }}-opencrane-server
+      securityContext:
+        {{- toYaml .Values.clustertenantManager.podSecurityContext | nindent 8 }}
       containers:
         - name: opencrane-ui
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
           imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.clustertenantManager.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.clustertenantManager.service.port }}
@@ -194,7 +198,7 @@ spec:
                    Secret created by k8s-deploy.sh (never appear in rendered manifests). */ -}}
             {{- if .Values.langfuse.inCluster.enabled }}
             - name: LANGFUSE_HOST
-              value: "http://{{ .Release.Name }}-langfuse.{{ .Release.Namespace }}.svc.cluster.local:3000"
+              value: "http://{{ .Release.Name }}-langfuse-web.{{ .Release.Namespace }}.svc.cluster.local:3000"
             - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -379,7 +383,7 @@ spec:
         - name: artifact-keys
           secret:
             secretName: {{ required "artifactService.keys.catalogExistingSecret is required" .Values.artifactService.keys.catalogExistingSecret | quote }}
-            defaultMode: 0400
+            defaultMode: 0440
             items:
               - key: lease-private.pem
                 path: lease-private.pem

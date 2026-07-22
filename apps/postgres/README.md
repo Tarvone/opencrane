@@ -51,7 +51,8 @@ database is published by
 `scripts/publish-app-connection-secret.sh`, which adds the `uri` without sharing credentials across
 authorities or leaking them into command arguments or logs. Clean setup publishes the baseline with
 `scripts/publish-initdb-baseline-config-map.sh`; physical recovery does not execute that SQL because
-the backup already contains the schema, but records the source baseline identity as provenance.
+the backup already contains the schema and its protected, superuser-owned baseline marker. The
+privileges hook verifies that in-database marker before application deployment can continue.
 
 The pooler is deliberately part of the data boundary rather than an optional optimisation. Its default
 budget permits at most ten server connections per logical database (fifty across the deployed
@@ -75,6 +76,7 @@ runtime identity it reconciles.
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
+| Pinned PgBouncer image, pool size and client ingress selectors | Reconciling the `Pooler` into its Deployment and Service |
 | Supplying distinct application/admin Secret names, the app-owned target baseline reference, and database access | Bootstrapping the target SQL and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 
@@ -86,6 +88,7 @@ repair database credentials.
 `Entrypoint:` the Helm chart under `helm/`. No importable code. Prerequisites the chart expects:
 
 - a compatible CloudNativePG operator and CRDs, installed outside the OpenCrane release;
+- access to the pinned `ghcr.io/cloudnative-pg/pgbouncer:1.25.1` Pooler image;
 - one pre-created `kubernetes.io/basic-auth` Secret per logical database (`username`/`password`, where
   `username` equals that database's owner);
 - one separate basic-auth Secret for the operational database administrator; its `username` must
@@ -93,6 +96,8 @@ repair database credentials.
   owner/Secret;
 - one immutable target-baseline ConfigMap published from
   `apps/opencrane/prisma/bootstrap/target-baseline.sql` before a fresh install;
+- the ConfigMap's full `opencrane.ai/baseline-sha256` identity supplied as
+  `bootstrap.targetBaseline.sha256` for both fresh setup and physical recovery;
 - a mounted `ReadWriteOnce` StorageClass with volume expansion enabled.
 
 ## Boundary
@@ -114,10 +119,14 @@ Install the database **before** the server release; grow the PVC request as dura
 kubectl create namespace opencrane --dry-run=client -o yaml | kubectl apply -f -
 BASELINE_CONFIG_MAP="$(bash apps/postgres/scripts/publish-initdb-baseline-config-map.sh \
   opencrane opencrane apps/opencrane/prisma/bootstrap/target-baseline.sql)"
+BASELINE_SHA256="$(kubectl get configmap "$BASELINE_CONFIG_MAP" \
+  --namespace opencrane \
+  -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
 helm upgrade --install opencrane-postgres apps/postgres/helm \
   --namespace opencrane \
   --set databaseAdmin.name=opencrane_database_admin \
   --set databaseAdmin.credentialsSecret=opencrane-postgres-admin \
+  --set-string bootstrap.targetBaseline.sha256="$BASELINE_SHA256" \
   --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name="$BASELINE_CONFIG_MAP" \
   --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql \
   --set databases[0].credentialsSecret=opencrane-postgres-bootstrap \
@@ -129,12 +138,13 @@ kubectl wait --for=condition=Ready cluster/opencrane-postgres \
 ```
 
 The chart requires exactly one target baseline for `initdb` and renders no SQL reference on
-`recovery`. A recovery instead requires `restore.sourceBaselineConfigMap`, the content-addressed
-identity recorded on its source Cluster, so later deploys can verify schema provenance without
-executing setup again. A changed baseline does not update a running Cluster: recreate an empty database or restore a compatible
-physical backup. The k3d acceptance path server-dry-runs both contracts against the pinned CNPG CRDs, installs a pinned
+`recovery`. Both paths require the full expected digest. A hook reads the protected marker restored
+inside the application database and fails when it differs, so a caller cannot relabel an incompatible
+backup as current. A changed baseline does not update a running Cluster: recreate an empty database
+or restore a compatible physical backup. The k3d acceptance path server-dry-runs both contracts against the pinned CNPG CRDs, installs a pinned
 Barman Cloud plugin and MinIO test target, writes a marker, completes an on-demand physical backup,
-recovers a fresh Cluster, and verifies the marker through the recovered application Secret.
+recovers a fresh Cluster, proves a false baseline claim is rejected, and verifies the data marker
+through the recovered application Secret.
 
 ## See also
 

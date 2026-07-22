@@ -60,7 +60,8 @@ follows [Keep a Changelog](https://keepachangelog.com/); the project uses
 - **Operators can create a silo database directly from one reviewed target definition.** Per-domain
   Prisma files keep model ownership visible, while a content-addressed immutable baseline is applied
   once during CloudNativePG `initdb` as the application owner. Server startup never changes schema,
-  physical recovery reuses the schema in the backup, and a changed target requires a clean database.
+  physical recovery reuses the schema in the backup, and a protected in-database digest prevents an
+  incompatible backup from being relabelled as current. A changed target requires a clean database.
 
 - **Org admins can supply their own upstream provider key and get a full tier-structured model
   catalog from a single credential.** Calling `PUT /api/v1/providers/byok/:provider` (org-admin

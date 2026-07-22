@@ -73,7 +73,7 @@ module "artifact_registry"
   repository_id = "opencrane"
 }
 
-# ---- Phase 4: Application (OpenCrane core; chart applies schema revisions) ----
+# ---- Phase 4: Application (PostgreSQL bootstraps schema before OpenCrane core) ----
 
 module "app_deploy"
 {

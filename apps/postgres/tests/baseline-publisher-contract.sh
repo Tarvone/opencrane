@@ -59,17 +59,16 @@ config_map_name="$(PATH="$TEST_DIR/bin:$PATH" bash "$PUBLISHER" opencrane 'owner
 [[ "$config_map_name" =~ ^opencrane-database-baseline-[a-f0-9]{16}$ ]]
 grep -q '^immutable: true$' "$CAPTURE_FILE"
 grep -q 'opencrane.ai/baseline-sha256:' "$CAPTURE_FILE"
+grep -q 'CREATE SCHEMA "opencrane_bootstrap" AUTHORIZATION CURRENT_USER;' "$CAPTURE_FILE"
+grep -q 'REVOKE ALL ON SCHEMA "opencrane_bootstrap" FROM PUBLIC;' "$CAPTURE_FILE"
+grep -q 'GRANT SELECT ON TABLE "opencrane_bootstrap"."target_baseline" TO "owner""quoted";' "$CAPTURE_FILE"
+grep -Eq 'VALUES \(TRUE, '\''[0-9a-f]{64}'\''\);' "$CAPTURE_FILE"
 grep -q 'SET ROLE "owner""quoted";' "$CAPTURE_FILE"
 grep -q 'OpenCrane target database baseline' "$CAPTURE_FILE"
 
 expected_sql="$TEST_DIR/expected-target-baseline.sql"
-printf 'SET ROLE "%s";\n\n' 'owner""quoted' >"$expected_sql"
-cat "$BASELINE" >>"$expected_sql"
-if command -v sha256sum >/dev/null 2>&1; then
-  baseline_digest="$(sha256sum "$expected_sql" | awk '{print $1}')"
-else
-  baseline_digest="$(shasum -a 256 "$expected_sql" | awk '{print $1}')"
-fi
+"$REAL_KUBECTL" patch --local -f "$CAPTURE_FILE" --type=merge -p '{}' -o jsonpath='{.data.target-baseline\.sql}' >"$expected_sql"
+baseline_digest="$("$REAL_KUBECTL" patch --local -f "$CAPTURE_FILE" --type=merge -p '{}' -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
 export FAKE_BASELINE_DIGEST="$baseline_digest"
 export FAKE_EXISTING_SQL_FILE="$expected_sql"
 

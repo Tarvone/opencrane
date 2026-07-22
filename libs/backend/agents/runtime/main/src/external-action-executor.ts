@@ -1,7 +1,7 @@
 import type { JsonValue } from "@opencrane/util";
 import type { RuntimeExternalActionCandidate } from "@opencrane/contracts";
-import type { ExternalActionExecutor } from "@opencrane/backend/agents/runtime";
 import type { ExternalActionExecutorDependencies } from "./external-action-executor.types.js";
+import type { ExternalActionExecutor } from "./external-action-authority.types.js";
 
 /** Typed failure raised for a candidate whose tool revision names no wired transport kind. */
 export class UnsupportedExternalActionError extends Error
@@ -38,7 +38,7 @@ function _stringArgument(candidate: RuntimeExternalActionCandidate, key: string)
  * @param dependencies - Injected concrete transports and correlation identity.
  * @returns An executor whose `execute` performs exactly one routed, fail-closed tool call.
  */
-export function _CreateExternalActionExecutor(candidate: RuntimeExternalActionCandidate, dependencies: ExternalActionExecutorDependencies): ExternalActionExecutor<JsonValue>
+export function __CreateExternalActionExecutor(candidate: RuntimeExternalActionCandidate, dependencies: ExternalActionExecutorDependencies): ExternalActionExecutor<JsonValue>
 {
 	return {
 		async execute(): Promise<JsonValue>

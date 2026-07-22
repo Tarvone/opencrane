@@ -288,6 +288,18 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.agentController.kubernetesApiServerPort }}
+    {{- if .Values.agentController.kubernetesApiServerEndpointCidrs }}
+    # Some CNIs enforce egress after Service destination translation. Admit the exact
+    # discovered API endpoint as well as the stable Service IP above.
+    - to:
+        {{- range .Values.agentController.kubernetesApiServerEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.agentController.kubernetesApiServerEndpointPort }}
+    {{- end }}
     {{- if .Values.observability.otel.enabled }}
     - to:
         - podSelector:
@@ -374,8 +386,8 @@ metadata:
     app.kubernetes.io/component: agent-runtime
 spec:
   failurePolicy: Fail
-  matchPolicy: Exact
   matchConstraints:
+    matchPolicy: Exact
     resourceRules:
       - apiGroups: ["batch"]
         apiVersions: ["v1"]

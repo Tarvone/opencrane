@@ -2,7 +2,7 @@ import type { ObotCustodyPort } from "@opencrane/server/_infra/obot-custody";
 import type { SandboxJobExecutor } from "@opencrane/server/_infra/sandbox-execution";
 import type { MemoryGatewayClient } from "@opencrane/server/_infra/memory-gateway-client";
 
-/** Concrete transports the composition root injects into the external-action router. */
+/** Concrete transport ports the composition root injects into the external-action router. */
 export interface ExternalActionExecutorDependencies
 {
 	/** Silo owning the invocation, used as remote correlation context. */

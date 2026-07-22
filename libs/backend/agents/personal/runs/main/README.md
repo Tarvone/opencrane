@@ -16,6 +16,7 @@ use, then governs later attempts without changing the logical run or its frozen 
  ┌──────────────────────────────────────────┐
  │   runs  ◄── HERE                          │  run + one snapshot + ordered outbox
  │   · PrismaRunAdmissionRepository          │  duplicate returns the first snapshot
+ │   · RunAdmissionConcurrencyGate            │  bounded wait before a DB connection
  │   · PrismaRunCancellationRepository       │  fence first; clean exact Job; then terminal
  │   · __StartNextRunAttempt                 │  terminal run: attempt N → N+1
  │   · __ValidateRunWorkloadAssignment       │  Job/Pod identity == current attempt?
@@ -35,6 +36,13 @@ later time. A new request locks the AgentService, lets the session assembler rev
 inside that transaction, and commits the `AgentRun`, its only `RunInputSnapshot`, and the ordered
 `RunAccepted` and `RunAttemptRequested` outbox events together. The canonical digest covers every
 snapshot field except its own digest.
+
+`RunAdmissionConcurrencyGate` is the upstream overload boundary for a live admission entrypoint.
+It partitions capacity by `(siloId, AgentServiceId)`, starts only the configured number of admissions,
+and holds a bounded FIFO queue **before** its work can open a PostgreSQL transaction. A full queue is
+rejected with `admission_concurrency_limited`; it does not turn a hot service row lock into an
+unbounded connection pool. The production entrypoint must use this gate before calling
+`PrismaRunAdmissionRepository.admit()` and must keep its policy aligned with the database pool budget.
 
 `__StartNextRunAttempt` is a **compare-and-swap** retry state machine: it reads the run and its
 AgentService authority as one snapshot, refuses unless the run is in a retryable terminal state and the
@@ -109,6 +117,8 @@ uncertainty fails closed.
   inputs without digesting the self-referential `digest` field.
 - `PrismaRunAdmissionRepository` — serialise duplicate requests and atomically persist the initial
   run, snapshot and ordered outbox events around a caller-supplied assembly callback.
+- `RunAdmissionConcurrencyGate` — bound active and queued admissions for one silo and AgentService
+  before the caller can acquire a persistence connection.
 - `RunAdmissionRepository`, `RunAdmissionCommand`, `RunAdmissionTransaction`,
   `RunAdmissionBuildResult` and `RunAdmissionResult` — the transaction-fenced initial-admission port
   and its input/output vocabulary.

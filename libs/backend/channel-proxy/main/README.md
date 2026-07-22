@@ -45,6 +45,11 @@ instant the browser disconnects. Invariant: a request reaches an internal servic
 same-origin, carries no forged identity, resolves to an allowlisted live target, and stays within every
 bound — otherwise it gets a small non-sensitive error and nothing is forwarded.
 
+Every `POST /v1/commands` body must contain one opaque `threadId`, and the request must carry an
+opaque `Idempotency-Key` header. The proxy sends only those coordinates to OpenCrane before it asks for
+a route, while keeping the rest of the command body opaque. This prevents a retry from being routed
+without a canonical conversation or a durable delivery key.
+
 ## Public surface
 
 - `__ForwardCommand(request, dependencies)` — validate, authorise, rate-limit, then forward one bounded POST command.

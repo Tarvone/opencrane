@@ -15,16 +15,19 @@ FLEET_POSTGRES_CREDENTIALS_SECRET="${FLEET_POSTGRES_CREDENTIALS_SECRET:-opencran
 OBOT_POSTGRES_CREDENTIALS_SECRET="${OBOT_POSTGRES_CREDENTIALS_SECRET:-opencrane-obot-postgres-credentials}"
 LITELLM_POSTGRES_CREDENTIALS_SECRET="${LITELLM_POSTGRES_CREDENTIALS_SECRET:-opencrane-litellm-postgres-credentials}"
 LANGFUSE_POSTGRES_CREDENTIALS_SECRET="${LANGFUSE_POSTGRES_CREDENTIALS_SECRET:-opencrane-langfuse-postgres-credentials}"
+POSTGRES_ADMIN_CREDENTIALS_SECRET="${POSTGRES_ADMIN_CREDENTIALS_SECRET:-opencrane-postgres-admin-credentials}"
 SILO_POSTGRES_OWNER="${SILO_POSTGRES_OWNER:-opencrane_local}"
 FLEET_POSTGRES_OWNER="${FLEET_POSTGRES_OWNER:-opencrane_fleet_local}"
 OBOT_POSTGRES_OWNER="${OBOT_POSTGRES_OWNER:-obot_local}"
 LITELLM_POSTGRES_OWNER="${LITELLM_POSTGRES_OWNER:-litellm_local}"
 LANGFUSE_POSTGRES_OWNER="${LANGFUSE_POSTGRES_OWNER:-langfuse_local}"
+POSTGRES_ADMIN_NAME="${POSTGRES_ADMIN_NAME:-opencrane_database_admin}"
 DB_PASSWORD="${DB_PASSWORD:-opencrane-local-password}"
 FLEET_DB_PASSWORD="${FLEET_DB_PASSWORD:-opencrane-fleet-local-password}"
 OBOT_DB_PASSWORD="${OBOT_DB_PASSWORD:-obot-local-password}"
 LITELLM_DB_PASSWORD="${LITELLM_DB_PASSWORD:-litellm-local-password}"
 LANGFUSE_DB_PASSWORD="${LANGFUSE_DB_PASSWORD:-langfuse-local-password}"
+POSTGRES_ADMIN_PASSWORD="${POSTGRES_ADMIN_PASSWORD:-opencrane-admin-local-password}"
 CNPG_CHART_VERSION="${CNPG_CHART_VERSION:-0.29.0}"
 LITELLM_SECRET_NAME="${LITELLM_SECRET_NAME:-opencrane-litellm}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-opencrane-local-master-key}"
@@ -144,6 +147,7 @@ k3d cluster create "$CLUSTER_NAME" --agents 1
 # 4a. Pre-pulling the official CloudNativePG database image.
 echo "[local] Pre-pulling official CloudNativePG database image"
 docker pull ghcr.io/cloudnative-pg/postgresql:17.5
+docker pull ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 
 # 4b. Import locally built images into the k3d runtime.
 echo "[local] Importing images into k3d"
@@ -151,6 +155,7 @@ k3d image import opencrane/operator:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/tenant:local --cluster "$CLUSTER_NAME"
 k3d image import opencrane/opencrane-server:local --cluster "$CLUSTER_NAME"
 k3d image import ghcr.io/cloudnative-pg/postgresql:17.5 --cluster "$CLUSTER_NAME"
+k3d image import ghcr.io/cloudnative-pg/pgbouncer:1.25.1 --cluster "$CLUSTER_NAME"
 
 echo "[local] Using profile '$LOCAL_PROFILE' with values '$VALUES_FILE'"
 
@@ -186,6 +191,34 @@ _create_database_credentials "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGR
 _create_database_credentials "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" "$OBOT_DB_PASSWORD"
 _create_database_credentials "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" "$LITELLM_DB_PASSWORD"
 _create_database_credentials "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_OWNER" "$LANGFUSE_DB_PASSWORD"
+_create_database_credentials "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME" "$POSTGRES_ADMIN_PASSWORD"
+OPENCRANE_BASELINE_CONFIG_MAP="$(bash "$ROOT_DIR/apps/postgres/scripts/publish-initdb-baseline-config-map.sh" \
+  "$NAMESPACE" \
+  "$SILO_POSTGRES_OWNER" \
+  "$ROOT_DIR/apps/opencrane/prisma/bootstrap/target-baseline.sql")"
+OPENCRANE_BASELINE_SHA256="$(kubectl get configmap "$OPENCRANE_BASELINE_CONFIG_MAP" \
+  -n "$NAMESPACE" \
+  -o jsonpath='{.metadata.annotations.opencrane\.ai/baseline-sha256}')"
+
+function _kubernetes_api_host_cidr()
+{
+  local address="$1"
+  if [[ "$address" == *:* ]]; then
+    printf '%s/128' "$address"
+  else
+    printf '%s/32' "$address"
+  fi
+}
+
+KUBERNETES_API_SERVICE_IP="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.clusterIP}')"
+KUBERNETES_API_SERVICE_PORT="$(kubectl get service kubernetes -n default -o jsonpath='{.spec.ports[0].port}')"
+KUBERNETES_API_ENDPOINT_IP="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')"
+KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].ports[0].port}')"
+POSTGRES_KUBERNETES_API_ARGS=(
+  --set-string "networkPolicy.kubernetesApiServerCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_SERVICE_IP")"
+  --set "networkPolicy.kubernetesApiServerPort=$KUBERNETES_API_SERVICE_PORT"
+  --set-string "networkPolicy.kubernetesApiServerEndpointCidrs[0]=$(_kubernetes_api_host_cidr "$KUBERNETES_API_ENDPOINT_IP")"
+  --set "networkPolicy.kubernetesApiServerEndpointPort=$KUBERNETES_API_ENDPOINT_PORT")
 
 function _install_postgres_server()
 {
@@ -193,11 +226,19 @@ function _install_postgres_server()
   echo "[local] Installing one PostgreSQL server with isolated logical databases"
   helm upgrade --install "$POSTGRES_RELEASE_NAME" "$ROOT_DIR/apps/postgres/helm" \
     --namespace "$NAMESPACE" \
+    "${POSTGRES_KUBERNETES_API_ARGS[@]}" \
     --set-json "databases=$databases_json" \
+    --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
+    --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.targetBaseline.sha256=$OPENCRANE_BASELINE_SHA256" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager-migrate"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
+    --set-json 'pooler.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}}]'
   kubectl wait --for=condition=Ready "cluster/$POSTGRES_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  kubectl wait --for=create "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
+  kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE_NAME}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   for database_resource in fleet obot litellm langfuse; do
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${POSTGRES_RELEASE_NAME}-${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   done
@@ -224,7 +265,7 @@ function _publish_database_connection()
   local app_secret="$2"
   local database_name="$3"
   bash "$ROOT_DIR/apps/postgres/scripts/publish-app-connection-secret.sh" \
-    "$NAMESPACE" "$credentials_secret" "$app_secret" "${POSTGRES_RELEASE_NAME}-rw" "$database_name"
+    "$NAMESPACE" "$credentials_secret" "$app_secret" "${POSTGRES_RELEASE_NAME}-pooler" "$database_name"
 }
 
 OPENCRANE_POSTGRES_APP_SECRET="${POSTGRES_RELEASE_NAME}-opencrane-app"

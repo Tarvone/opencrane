@@ -54,6 +54,10 @@ bounded `SIGTERM`/`SIGINT` shutdown that drains in-flight requests and flushes t
 HTTP endpoints served: `POST /v1/commands` (bounded command forwarding), `GET /v1/events`
 (server-sent-event relay), and `/livez` · `/readyz` health probes. Any other path is `404`.
 
+Commands are JSON envelopes that include an opaque `threadId` and use the standard `Idempotency-Key`
+request header. The proxy validates those routing coordinates before asking OpenCrane to authorize a
+target; it otherwise leaves the command payload uninterpreted.
+
 ## Boundary
 
 Stateless and product-logic-free: it holds no database and no session, and consumers behind it (the
@@ -88,6 +92,8 @@ Built into `dist/apps/channel-proxy` by esbuild and imaged from `deploy/Dockerfi
 (`ghcr.io/italanta/opencrane-channel-proxy`). Its Helm chart under `helm/` is a named-template
 library composed by the silo umbrella chart
 ([`apps/_infra/deploy-k8s`](../_infra/deploy-k8s/README.md)).
+The final image pins the upstream Node user's numeric UID and GID (`1000:1000`) so Kubernetes can
+enforce the chart's `runAsNonRoot` policy before the container starts.
 
 ## See also
 

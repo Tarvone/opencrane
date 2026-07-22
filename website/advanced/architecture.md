@@ -102,7 +102,7 @@ A new assistant can chat, but it can't reach any skill, tool, or knowledge until
 </svg>
 </figure>
 
-→ Learn how in [Control access](/guide/permissions), [Share skills](/guide/skills),
+→ Learn how in [Control access](/guide/permissions), [Agent skills](/guide/skills),
 [Manage tools](/guide/tools), and [Organizational knowledge](/guide/knowledge).
 
 ## Built identity-first

@@ -40,8 +40,10 @@ right now. Effective access is the **intersection** of two sets of grants — wh
 allowed *and* what the agent's assigned role is allowed — so an agent can never do more than its
 human. Current signed membership is a mandatory first gate and is never inferred from grants. Every
 proof it accepts is remembered by its unique id, so the same proof can never be replayed to run an
-action twice. It is deliberately strict: anything missing, altered, or out of date is a "no". A
-mistake here can only ever refuse a legitimate request — never hand out access it should not.
+action twice. When the run owner begins cancellation, it calls this package inside the same database
+transaction to cancel every still-pending approval and clear its resume token. It is deliberately
+strict: anything missing, altered, or out of date is a "no". A mistake here can only ever refuse a
+legitimate request — never hand out access it should not.
 
 ## Public surface
 
@@ -50,9 +52,12 @@ mistake here can only ever refuse a legitimate request — never hand out access
 - `__VerifyCapabilityProof`, `__ComputeEs256JwkThumbprint`, `__NormalizeDpopTargetUri` — verify the
   cryptographic proof an agent presents that it is that workload and is calling this exact endpoint.
 - `__ConsumeRuntimeBootstrap` — validates and atomically spends a one-time startup token that binds a
-  run to its pod and attempt, so it cannot be reused.
+  run to its pod and attempt, and accepts only the `opencrane-agent-runtime` projected-token audience,
+  so it cannot be reused or confused with a service-specific action token.
 - `__ExecuteCapabilityAction` — verifies the proof, reserves its unique id durably, then runs the
   effect exactly once (or returns the earlier result on an allowed idempotent retry).
+- `__CancelPendingRunApprovalAuthority` — closes only pending approvals for an exact run attempt on
+  a caller-owned database transaction, clearing every late-resume token atomically with cancellation.
 - `__DigestCanonicalJson` — a stable hash of a request used across the checks above.
 - `PrismaRuntimeAuthorityRepository`, `PrismaAuthorizationGrantRepository` — the database-backed
   stores for accepted proofs/receipts and for candidate grants.
@@ -64,7 +69,9 @@ mistake here can only ever refuse a legitimate request — never hand out access
 Consumed by the runtime action path that carries out an agent's effects. It only decides and records;
 it never performs the outside effect itself — the caller supplies the executor. Fail-closed
 throughout: an invalid command, denied or stale membership, a proof that does not verify, or a
-replayed id all return a denial, never an allow.
+replayed id all return a denial, never an allow. The personal-runs domain owns run cancellation but
+must delegate approval-row cancellation through this package's transaction-level port; it never
+writes authorization tables directly.
 
 ## Dependency direction
 

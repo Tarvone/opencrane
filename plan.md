@@ -12,9 +12,10 @@ the target, refined by the
 [OpenClaw loop investigation](docs/design/openclaw-agent-loop-replacement-plan.md):
 
 1. **Product:** OpenCrane owns Thread, Message, Run, RunEvent, approvals, transcript, compaction,
-   retries, budgets, identity, memory, artifacts, and tool policy. A conformance-selected
-   **TypeScript** toolkit (`@openai/agents` primary spike, `ai`/`ToolLoopAgent` control) owns only
-   the bounded model/tool loop. Python remains isolated in tool Jobs.
+   retries, budgets, identity, memory, artifacts, and tool policy. The runtime is a replaceable
+   workload behind a **language-neutral** `AgentRuntimeProtocol v1` ([ADR 0010](docs/adr/0010-language-neutral-agent-runtime.md));
+   `pydantic-ai-slim` (Python) is the first qualification candidate for the bounded model/tool loop,
+   adopted only after it passes the live-LiteLLM conformance gate. Language is not a product contract.
 2. **Delivery:** refactor the repository directly to the target state. Delete OpenClaw and every
    obsolete schema, protocol, app, bridge, token path, database assumption, configuration switch,
    test, deployment unit, and document as its replacement becomes ready. Do not preserve, transform,
@@ -34,8 +35,10 @@ the target, refined by the
    isolated; controller and channel-proxy trust boundaries are separate apps; legacy CRDs and
    OpenClaw authorities disappear.
 
-Toolkit selection remains evidence-driven: the Phase E conformance run chooses one exact-pinned
-driver (→ [#246](https://github.com/italanta/opencrane/issues/246)).
+Toolkit selection remains evidence-driven: the offline Phase E conformance harness and fault-injection
+matrix are built and CI-runnable, but choosing and adopting the exact-pinned driver waits on the
+live-LiteLLM conformance leg, gated on [#337](https://github.com/italanta/opencrane/issues/337)
+(→ [#246](https://github.com/italanta/opencrane/issues/246)).
 
 ## Current state
 
@@ -99,9 +102,40 @@ tests fail closed; backup/restore reconstructs target-owned stores; no legacy co
 
 ### Phase E — personal runtime and AgentService plane (parallel work lanes)
 
+**In progress:** the active PR stack now defines immutable run input, the fenced runtime protocol,
+the outbound-only runtime process, the suspended one-Job-per-attempt resource contract, and a
+crash-safe controller boundary that exactly creates/adopts suspended Jobs before persisting their
+Kubernetes UID as the pending assignment. This dependent slice adds a durable release claim,
+conditionally unsuspends only that assigned Job, and records its unique first Pod before bootstrap
+exchange can begin. A further dependent slice adds cancellation-owned cleanup of abandoned
+suspended Jobs: a nonterminal `Cancelling` run state fences the current assignment, proof key, and
+pending approvals before any Job is touched; `PrismaRunCancellationRepository` then issues an
+assigned or delayed-orphan cleanup claim, and only its confirmed deletion or authoritative absence
+moves the run to `Cancelled`. The runtime protocol and channel-target admission fences close on
+`cancelling` the same way they close on a terminal state. Bootstrap exchange and the full runtime
+command lifecycle now land: the dispatch authority mints `start_attempt`, `resume_attempt`, and a
+positive `cancel_attempt` stop signal (with exactly-once terminal reporting under a race); the runtime
+surfaces model tool calls as external-action candidates validated against the immutable snapshot and
+reserved before dispatch through an injected tool-invocation authority. A tool grant flagged
+`requiresApproval` defers: the reserved invocation opens a pending `ApprovalRequest`, so the
+pause is reachable end to end. The deferred-tool DECIDE authority and single-use resume feed
+(`resumeTokenHash`-consumed) are built and unit-covered, and steering is absorbed only at safe
+pre-model boundaries with an exactly-once ordered claim that advances a fenced input generation. The
+runtime also writes encrypted, version-tagged, replaceable LOCAL checkpoints subordinate to canonical
+state (no server-side checkpoint model). The MCP, memory, and sandbox execution transports are ports
+with fail-closed stubs wired only in the composition root. NOT yet built: the human
+approval-DECISION HTTP endpoint and the steering-INGEST HTTP surface are the operator/product plane in
+Phase F (#224), so approval and steering are not end-to-end live. The offline conformance harness and
+fault-injection matrix ARE built and CI-runnable (runtime protocol/reliability, attempt-scoped
+credential rejection, observability evidence); still gated on
+[#337](https://github.com/italanta/opencrane/issues/337) are the live-LiteLLM conformance leg,
+driver adoption evidence, and OpenClaw loop deletion — none of which has happened. The remaining
+E1/E2 product capabilities below are also incomplete.
+
 **Runtime lane** (→ [#246](https://github.com/italanta/opencrane/issues/246)): implement
-`RunInputSnapshot`, the prompt compiler, independently authored target fixtures, toolkit conformance
-against the target LiteLLM matrix, one exact-pinned driver, the reliability envelope,
+`RunInputSnapshot`, the TypeScript-owned prompt compiler, the language-neutral `AgentRuntimeProtocol v1`
+([ADR 0010](docs/adr/0010-language-neutral-agent-runtime.md)), independently authored target fixtures,
+Pydantic-AI-first qualification against the target LiteLLM matrix, one exact-pinned driver, the reliability envelope,
 interview-generated PersonaRevision and PreferenceFact learning, multimodal and document authoring,
 and governed Python skill Jobs
 ([#222](https://github.com/italanta/opencrane/issues/222),
@@ -109,10 +143,31 @@ and governed Python skill Jobs
 
 **AgentService lane:** implement AgentService/Revision/Run, organization/department/team/project/
 personal/user sharing, schedules, one-attempt Jobs, approvals, effective access, audit, cost, and the
-one-way personal→managed boundary ([#129](https://github.com/italanta/opencrane/issues/129)). Port
-useful Slack behavior only as schedule + MCP + skill + checkpoint; delete the interval worker and
-direct Cognee writes. Conversation-initiated config changes (always-granted `upgrade_session` tool,
+one-way personal→managed boundary ([#129](https://github.com/italanta/opencrane/issues/129)).
+**Central agents** — org-, department-, team-, or otherwise shared managed AgentServices that run on a
+schedule or a specific trigger to do one bounded task — run on the same runtime substrate as personal
+agents but under a narrower, connector-scoped workload identity independent of any human user. They
+reach external systems only through Obot-custodied MCP servers, instantiable per connected source. The
+legacy ingestion interval worker and its direct Cognee writes are deleted.
+Conversation-initiated config changes (always-granted `upgrade_session` tool,
 logged persona refresh, apply-at-next-snapshot) → [#318](https://github.com/italanta/opencrane/issues/318).
+
+**Central-agents sub-lane** (slice 6, [#332](https://github.com/italanta/opencrane/issues/332) — closes
+[#129](https://github.com/italanta/opencrane/issues/129)): BUILT (offline) — the scheduler semantics
+(`backend-server-agent-scheduling`, composed inside `apps/opencrane`: cron+timezone eval, missed-run
+catch-up, overlap/backoff/suspension, idempotent run creation through the existing
+`ManagedRunAdmissionPort` with `trigger: schedule`), the `AgentServiceSchedule` model + management
+API, the connector-scoped managed identity (`managed-agent-runtime-*` SA class + distinct token
+audience, the launcher's selectable identity profile, and the chart-only `apps/managed-agent-runtime`
+plane), execution authority via the Obot MCP-invocation port (allow-list enforced) and
+memory-gateway scoped read/write with mandatory provenance, the attach-authority + runtime
+effective-access intersection over the grant compiler (closes the slice-5 deferral; scope-isolation
+tested), and the first packaged central-agent DEFINITION (the harvester expressed as a managed
+`AgentService` + schedule + Obot MCP assignment, Obot stubbed). NOT done — a NAMED LATER GATE:
+**the harvesting-central-agent live-Obot proof**, which blocks the reaper deletion of
+`apps/feat-central-agents`, its bespoke Slack connector, and the `HarvestingCursor` table; tracked
+under [#337](https://github.com/italanta/opencrane/issues/337). Until that proof lands,
+`apps/feat-central-agents` and `HarvestingCursor` stay in place untouched.
 
 Exit: the canonical runtime and managed-agent lifecycle pass failure, replay, authorization,
 isolation, cancellation, provider, and artifact tests with no OpenClaw compatibility surface.

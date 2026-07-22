@@ -18,6 +18,7 @@ are the per-employee agent looking after itself, not the operator looking after 
 | [`personal/personas`](./personal/personas/main/README.md) | Persona approval process. |
 | [`personal/runs`](./personal/runs/main/README.md) | Agent-run attempt authority. |
 | [`personal/session`](./personal/session/main/README.md) | Run input snapshot assembly. |
+| [`runtime`](./runtime/README.md) | Language-neutral command/candidate authority and agent-controller Job projection. |
 
 ```
               backend/agents/personal   (one employee's agent)
@@ -28,6 +29,9 @@ are the per-employee agent looking after itself, not the operator looking after 
    │ admission transaction
  session  (freezes one immutable input snapshot per run)
 ```
+
+`runtime/` sits beside `personal/` because it validates the language-neutral execution boundary
+for both personal and managed runs. It owns neither the model loop nor a second run/event store.
 
 ## Dependency rule for this tier
 
@@ -43,6 +47,10 @@ One deliberate exception: `personal/session` (`scope:personal-session`) is the a
 sits *across* the domains, so its constraint additionally allows `scope:personal-runs` (the
 admission transaction it compiles into), `scope:membership` (verified identity evidence), and
 `scope:artifacts` — see the `depConstraint` in `eslint.config.mjs`.
+
+The `runtime` domain may additionally consume the shared agent model, run/conversation/authorization
+ports, and contracts required to validate an attempt. It cannot import an app, transport adapter,
+or model driver.
 
 ## See also
 

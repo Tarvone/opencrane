@@ -22,7 +22,7 @@ spec:
       automountServiceAccountToken: false
       restartPolicy: Never
       containers:
-        {{- range $database := .Values.databases }}
+        {{- range $databaseIndex, $database := .Values.databases }}
         - name: {{ printf "%s-privileges" $database.name | trunc 63 | trimSuffix "-" }}
           image: {{ $.Values.image | quote }}
           command: ["/bin/sh", "-ceu"]
@@ -36,7 +36,14 @@ spec:
                 fi
                 sleep 2
               done
-              until psql -v ON_ERROR_STOP=1 -d "$PGDATABASE" -v database_admin="{{ $.Values.databaseAdmin.name }}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = :'database_admin'" | grep -qx '1'; do
+              {{- if eq $databaseIndex 0 }}
+              recorded_baseline="$(psql --no-psqlrc -v ON_ERROR_STOP=1 -d "$PGDATABASE" -tA -c 'SELECT "baseline_sha256" FROM "opencrane_bootstrap"."target_baseline" WHERE "singleton" = TRUE')"
+              if [ "$recorded_baseline" != "$EXPECTED_BASELINE_SHA256" ]; then
+                echo "Database '$PGDATABASE' records baseline '$recorded_baseline', but '$EXPECTED_BASELINE_SHA256' is required" >&2
+                exit 1
+              fi
+              {{- end }}
+              until echo "SELECT 1 FROM pg_roles WHERE rolname = :'database_admin'" | psql -v ON_ERROR_STOP=1 -d "$PGDATABASE" -v database_admin="{{ $.Values.databaseAdmin.name }}" -tA | grep -qx '1'; do
                 if [ "$(date +%s)" -ge "$deadline" ]; then
                   echo "Timed out waiting for database admin role '{{ $.Values.databaseAdmin.name }}'" >&2
                   exit 1
@@ -63,4 +70,8 @@ spec:
               value: {{ printf "%s-rw" (include "opencrane.postgres.fullname" $) | quote }}
             - name: PGDATABASE
               value: {{ $database.name | quote }}
+            {{- if eq $databaseIndex 0 }}
+            - name: EXPECTED_BASELINE_SHA256
+              value: {{ $.Values.bootstrap.targetBaseline.sha256 | quote }}
+            {{- end }}
         {{- end }}

@@ -7,7 +7,7 @@ trusted as a security boundary.
 
 > See also: [Architecture](/advanced/architecture) (how the pieces fit together),
 > [Obot MCP gateway](/integrators/mcp-gateway) (the tool-execution boundary),
-> [Share skills](/guide/skills), and [Authentication](/security/identity)
+> [Agent skills](/guide/skills), and [Authentication](/security/identity)
 > (the token audiences referenced below).
 
 ## Two kinds of control

@@ -7,7 +7,11 @@ import type { JsonValue } from "@opencrane/util";
 
 import type { InitialRunAuthority, RunAdmissionBuild, RunAdmissionBuildResult, RunAdmissionClock, RunAdmissionCommand, RunAdmissionRepository, RunAdmissionResult, RunAdmissionTransaction } from "./run-admission.types.js";
 
-/** Prisma-backed initial-run admission that owns the logical run, snapshot, and run outbox. */
+/**
+ * Prisma-backed authority for the first durable instant of a logical run.
+ * It serialises the user-visible idempotency key before compilation and commits the run, its sole
+ * immutable snapshot, and both initial outbox events together; failure leaves none of them visible.
+ */
 export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 {
 	/** Canonical OpenCrane product-authority database client. */
@@ -30,7 +34,10 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 		this.log = log;
 	}
 
-	/** Deduplicates before compilation or commits every initial run coordinate in one transaction. */
+	/**
+	 * Returns the first frozen snapshot for duplicate delivery, otherwise compiles under the service
+	 * lock and exposes an accepted result only after every run/snapshot/outbox write can commit.
+	 */
 	async admit<TDenial>(command: RunAdmissionCommand, build: (transaction: RunAdmissionTransaction) => Promise<RunAdmissionBuildResult<TDenial>>): Promise<RunAdmissionResult<TDenial>>
 	{
 		const clock = this.clock;
@@ -41,10 +48,15 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 				// 1. Serialize the user-visible key before loading inputs so a duplicate never recompiles at a later instant.
 				await transaction.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${command.siloId}\u0000${command.requestIdempotencyKey}`}, 0))`);
 				const existing = await transaction.agentRun.findUnique({ where: { siloId_requestIdempotencyKey: { siloId: command.siloId, requestIdempotencyKey: command.requestIdempotencyKey } } });
-				const existingSnapshot = existing === null ? null : await transaction.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
-				if (existingSnapshot !== null)
+				if (existing !== null)
 				{
-					return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+					if (!_matchesIdempotencyScope(existing, command)) return { outcome: "denied", reason: "authority_conflict" };
+					const existingSnapshot = await transaction.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
+					if (existingSnapshot !== null)
+					{
+						if (!_matchesSnapshotScope(existingSnapshot, command)) return { outcome: "denied", reason: "authority_conflict" };
+						return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+					}
 				}
 
 				// 2. Lock the service before every source revalidates its inputs, preserving the established run lock order.
@@ -53,7 +65,7 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 				const admittedAt = admittedAtDate.toISOString();
 				const compiled = await build({ prisma: transaction, admittedAt, admittedAtEpochMs: admittedAtDate.getTime() });
 				if (compiled.outcome === "denied") return compiled;
-				if (!_matchesCommand(compiled.value, command)) return { outcome: "denied", reason: "authority_conflict" };
+				if (!_matchesCommand(compiled.value, command) || !_matchesInteractiveDelegation(compiled.value.authority, command)) return { outcome: "denied", reason: "authority_conflict" };
 
 				// 3. Insert both sides of the deferred snapshot relation plus ordered acceptance and dispatch events in one commit.
 				await _persistInitialAdmission(transaction, command, compiled.value, admittedAtDate);
@@ -67,8 +79,16 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 				try
 				{
 					const existing = await this.prisma.agentRun.findUnique({ where: { siloId_requestIdempotencyKey: { siloId: command.siloId, requestIdempotencyKey: command.requestIdempotencyKey } } });
-					const existingSnapshot = existing === null ? null : await this.prisma.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
-					if (existingSnapshot !== null) return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+					if (existing !== null)
+					{
+						if (!_matchesIdempotencyScope(existing, command)) return { outcome: "denied", reason: "authority_conflict" };
+						const existingSnapshot = await this.prisma.runInputSnapshot.findUnique({ where: { runId_digest: { runId: existing.id, digest: existing.inputSnapshotDigest } } });
+						if (existingSnapshot !== null)
+						{
+							if (!_matchesSnapshotScope(existingSnapshot, command)) return { outcome: "denied", reason: "authority_conflict" };
+							return { outcome: "idempotent", snapshot: _snapshot(existingSnapshot) };
+						}
+					}
 				}
 				catch (recoveryError)
 				{
@@ -80,6 +100,29 @@ export class PrismaRunAdmissionRepository implements RunAdmissionRepository
 			return { outcome: "denied", reason: "persistence_unavailable" };
 		}
 	}
+}
+
+/** Returns whether an existing same-key row has the durable coordinates needed before loading its snapshot. */
+function _matchesIdempotencyScope(existing: { siloId: string; agentServiceId: string; threadId: string | null; trigger: string; delegatedUserId: string | null }, command: RunAdmissionCommand): boolean
+{
+	return existing.siloId === command.siloId
+		&& existing.agentServiceId === command.agentServiceId
+		&& existing.threadId === command.threadId
+		&& (existing.trigger !== "Interactive" || existing.delegatedUserId === command.executionSubjectId);
+}
+
+/** Returns whether a recovered immutable snapshot belongs to the exact execution subject requesting it. */
+function _matchesSnapshotScope(snapshot: { siloId: string; agentServiceId: string; threadId: string | null; identitySnapshot: Prisma.JsonValue }, command: RunAdmissionCommand): boolean
+{
+	if (snapshot.siloId !== command.siloId || snapshot.agentServiceId !== command.agentServiceId || snapshot.threadId !== command.threadId) return false;
+	if (!snapshot.identitySnapshot || typeof snapshot.identitySnapshot !== "object" || Array.isArray(snapshot.identitySnapshot)) return false;
+	return snapshot.identitySnapshot["executionSubjectId"] === command.executionSubjectId;
+}
+
+/** Returns whether interactive run custody and its signed snapshot are bound to the same subject. */
+function _matchesInteractiveDelegation(authority: InitialRunAuthority, command: RunAdmissionCommand): boolean
+{
+	return authority.trigger !== "interactive" || authority.delegatedUserId === command.executionSubjectId;
 }
 
 /** Returns whether the transaction-fenced authority exactly matches immutable caller coordinates. */

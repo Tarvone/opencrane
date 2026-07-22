@@ -31,7 +31,7 @@ A brand-new assistant starts locked down — it can chat, but it can't reach com
 tools, skills, or knowledge until you allow it. Build it up:
 
 - **[Let Alice sign in](/guide/connect)**
-- **[Share skills with her](/guide/skills)** — reusable abilities
+- **[Give her agent skills](/guide/skills)** — reusable abilities
 - **[Connect tools](/guide/tools)** — Slack, Jira, your CRM
 - **[Add company knowledge](/guide/knowledge)** — so it answers with real facts
 - **[Control access](/guide/permissions)** — decide exactly what it can use

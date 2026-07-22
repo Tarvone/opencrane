@@ -13,6 +13,9 @@
       "@opencrane/backend/server/agents/agent-services": [
         "./libs/backend/server/agents/agent-services/main/src/index.ts"
       ],
+      "@opencrane/backend/server/agents/scheduling": [
+        "./libs/backend/server/agents/scheduling/main/src/index.ts"
+      ],
       "@opencrane/backend/server/agents/channel-targets": [
         "./libs/backend/server/agents/channel-targets/main/src/index.ts"
       ],
@@ -103,6 +106,9 @@
       "@opencrane/backend/agents/personal/runs": [
         "./libs/backend/agents/personal/runs/main/src/index.ts"
       ],
+      "@opencrane/backend/agents/runtime": [
+        "./libs/backend/agents/runtime/main/src/index.ts"
+      ],
       "@opencrane/backend/server/agents/skills": [
         "./libs/backend/server/agents/skills/main/src/index.ts"
       ],
@@ -148,11 +154,29 @@
       "@opencrane/server/_infra/channel-proxy": [
         "./libs/server/_infra/channel-proxy/src/index.ts"
       ],
+      "@opencrane/server/_infra/agent-runtime-stream": [
+        "./libs/server/_infra/agent-runtime-stream/src/index.ts"
+      ],
+      "@opencrane/backend/agents/runtime/k8s-launcher": [
+        "./libs/backend/agents/runtime/k8s-launcher/src/index.ts"
+      ],
+      "@opencrane/backend/agents/runtime/controller": [
+        "./libs/backend/agents/runtime/controller/src/index.ts"
+      ],
+      "@opencrane/backend/agents/runtime/prompt-compiler": [
+        "./libs/backend/agents/runtime/prompt-compiler/main/src/index.ts"
+      ],
       "@opencrane/server/_infra/http": [
         "./libs/server/_infra/http/src/index.ts"
       ],
       "@opencrane/server/_infra/obot-custody": [
         "./libs/server/_infra/obot-custody/src/index.ts"
+      ],
+      "@opencrane/server/_infra/sandbox-execution": [
+        "./libs/server/_infra/sandbox-execution/src/index.ts"
+      ],
+      "@opencrane/server/_infra/memory-gateway-client": [
+        "./libs/server/_infra/memory-gateway-client/src/index.ts"
       ],
       "@opencrane/server/_infra/tenant-hosting": [
         "./libs/server/_infra/tenant-hosting/src/index.ts"

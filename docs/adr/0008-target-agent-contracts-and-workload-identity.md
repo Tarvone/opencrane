@@ -83,11 +83,11 @@ omitted from the network column for brevity.
 | `apps/opencrane` | Control API | `opencrane-api` | none | Postgres, artifact-service, memory-gateway, channel-proxy, agent-controller, Obot, LiteLLM |
 | `apps/opencrane-ui` | Browser bundle | none | none | public HTTPS to opencrane only |
 | `apps/channel-proxy` | Channel trust boundary | `channel-proxy` | none | opencrane, agent-runtime, managed-agent-runtime |
-| `apps/agent-controller` | Sole agent-workload mutator | `agent-controller` | bounded create/watch/patch/delete for target runtime Pods and Jobs only | Kubernetes API, opencrane |
+| `apps/agent-controller` | Sole agent-workload mutator | `agent-controller` in the server namespace | Runtime-namespace-only `get/create/patch` Jobs and `list` Pods; no other resources or verbs | Kubernetes API, opencrane |
 | `apps/artifact-service` | ArtifactStore CAS API and maintenance Jobs | `artifact-service` | none | Postgres and its mounted artifact volume |
 | `apps/memory-gateway` | Scoped memory API | `memory-gateway` | none | Cognee, opencrane |
 | `apps/cognee-indexer` | Artifact-to-memory indexing Job | `cognee-indexer` | none | artifact-service, memory-gateway, Cognee |
-| `apps/agent-runtime` | Personal agent Pods | per-workload projected `agent-runtime` identity | none | channel-proxy, artifact-service, memory-gateway, LiteLLM, Obot |
+| `apps/agent-runtime` | Personal agent Pods in the dedicated restricted runtime namespace | fixed projected `agent-runtime` identity | none | OpenCrane internal runtime stream only in this foundation slice |
 | `apps/managed-agent-runtime` | Managed-agent Pods | per-workload projected `managed-agent-runtime` identity | none | channel-proxy, declared artifact inputs, memory-gateway, LiteLLM, Obot |
 | `apps/_infra/cognee` | Durable memory engine | `cognee` | none | its mounted stores, LiteLLM |
 | `apps/_infra/litellm` | Model gateway | `litellm` | none | approved model providers and its mounted store |

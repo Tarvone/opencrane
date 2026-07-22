@@ -36,7 +36,9 @@ defined precedence so overlaps never resolve ambiguously. Derived dataset member
 of the grants, never a second source of truth. Share creation, listing and revocation derive the
 sharer only from the authenticated OpenID Connect (OIDC) session subject (falling back to the email
 stored in that authenticated session when no subject is present), never from a request-body
-identity; missing identity fails with `401`.
+identity; missing identity fails with `401`. The API accepts only its explicit scope, recipient and
+allow semantics; generated database enum objects are not a second runtime contract, so packaging
+changes cannot silently widen who receives access.
 
 ## Public surface
 

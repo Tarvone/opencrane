@@ -1,5 +1,11 @@
 # OpenClaw agent-loop investigation and replacement plan
 
+> **Superseded on the language/toolkit question by [ADR 0010](../adr/0010-language-neutral-agent-runtime.md)
+> (2026-07-21).** The runtime is now language-neutral behind `AgentRuntimeProtocol v1`, with
+> `pydantic-ai-slim` (Python) as the first qualification candidate. The TypeScript bake-off
+> (`@openai/agents` vs `ai`/`ToolLoopAgent`) and the L3/L4 toolkit sections below are retained as
+> historical investigation; the parity gates they define still apply to whichever candidate qualifies.
+
 Status: **adopted direct-refactor plan — 2026-07-18.** This document is an implementation-level
 investigation of the OpenClaw runtime pinned by this repository and the plan for replacing its
 agentic behavior directly with a smaller toolkit-backed OpenCrane runtime.

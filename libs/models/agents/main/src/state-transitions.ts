@@ -21,11 +21,12 @@ const _AGENT_REVISION_TRANSITIONS: Readonly<Record<AgentRevisionState, readonly 
 
 /** Legal next states for each durable agent-run state. */
 const _AGENT_RUN_TRANSITIONS: Readonly<Record<AgentRunState, readonly AgentRunState[]>> = {
-	accepted: ["queued", "failed", "cancelled"],
-	queued: ["assigned", "failed", "cancelled"],
-	assigned: ["running", "failed", "cancelled"],
-	running: ["waiting_for_approval", "completed", "failed", "cancelled"],
-	waiting_for_approval: ["running", "failed", "cancelled"],
+	accepted: ["queued", "failed", "cancelling"],
+	queued: ["assigned", "failed", "cancelling"],
+	assigned: ["running", "failed", "cancelling"],
+	running: ["waiting_for_approval", "completed", "failed", "cancelling"],
+	waiting_for_approval: ["running", "failed", "cancelling"],
+	cancelling: ["cancelled"],
 	completed: [],
 	failed: [],
 	cancelled: [],

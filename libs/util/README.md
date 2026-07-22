@@ -9,12 +9,13 @@ across domain packages. "Pure" means every function returns a value computed onl
 arguments — no database, no network, no clock, no global state — so the results are identical every
 time and safe to call anywhere.
 
-It owns two things:
+It owns three things:
 
 - **Collection helpers** — `___SortBy` (stable sort by an optional key), `___SomeArray` and
   `___SomeRecord` (typed "does any element/value match?" checks). Small, but shared so the same
   behaviour is used everywhere rather than re-implemented.
-- **Canonical JSON** — `___CanonicalizeJson` serialises a JSON value to the one canonical string
+- **Canonical JSON and digest grammar** — `___CanonicalizeJson` serialises a JSON value to the one
+  canonical string
   form defined by RFC 8785 (JSON Canonicalization Scheme): object keys sorted, whitespace and number
   formatting fixed. Two values that are equal produce byte-identical text, which is what makes a
   stable hash possible. `___CloneCanonicalJson` round-trips through that form to produce a detached,

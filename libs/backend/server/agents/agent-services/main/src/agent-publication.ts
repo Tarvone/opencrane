@@ -42,13 +42,14 @@ function _deny(reason: PublishAgentRevisionFailureReason): PublishAgentRevisionR
 export async function __PublishAgentRevision(repository: AgentServicePublicationRepository, command: PublishAgentRevisionCommand): Promise<PublishAgentRevisionResult>
 {
 	// 1. Reject malformed identifiers and time before consulting authority state.
-	if (!_isPresent(command.agentServiceId) || !_isPresent(command.agentRevisionId) || !Number.isFinite(Date.parse(command.publishedAt)))
+	if (!_isPresent(command.siloId) || !_isPresent(command.agentServiceId) || !_isPresent(command.agentRevisionId) || !Number.isFinite(Date.parse(command.publishedAt)))
 	{
 		return _deny("invalid_command");
 	}
 
-	// 2. Load the stable identity and immutable draft independently so missing authority fails closed.
-	const service = await repository.getService(command.agentServiceId);
+	// 2. Load the stable identity and immutable draft silo-scoped so foreign-silo authority fails closed.
+	//    A service or revision in another silo resolves as not-found — never a distinct 409 oracle.
+	const service = await repository.getService(command.agentServiceId, command.siloId);
 	if (service === null)
 	{
 		return _deny("service_not_found");
@@ -57,7 +58,7 @@ export async function __PublishAgentRevision(repository: AgentServicePublication
 	{
 		return _deny("service_retired");
 	}
-	const revision = await repository.getRevision(command.agentRevisionId);
+	const revision = await repository.getRevision(command.agentRevisionId, command.siloId);
 	if (revision === null)
 	{
 		return _deny("revision_not_found");

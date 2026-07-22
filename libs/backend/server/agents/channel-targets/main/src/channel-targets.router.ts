@@ -54,9 +54,9 @@ function _parseCommand(request: Request, workloadToken: string): ResolveChannelT
 {
 	if (!request.body || typeof request.body !== "object" || Array.isArray(request.body)) return null;
 	const body = request.body as Record<string, unknown>;
-	if (!_isAction(body["action"]) || typeof body["trustedHost"] !== "string" || typeof body["threadId"] !== "string" || (body["cursor"] !== undefined && typeof body["cursor"] !== "string")) return null;
+	if (!_isAction(body["action"]) || typeof body["trustedHost"] !== "string" || typeof body["threadId"] !== "string" || (body["requestIdempotencyKey"] !== undefined && typeof body["requestIdempotencyKey"] !== "string") || (body["cursor"] !== undefined && typeof body["cursor"] !== "string")) return null;
 	const delegatedAuthorization = request.header("x-opencrane-session-authorization");
-	return { workloadToken, cookie: request.header("cookie"), delegatedAuthorization, trustedHost: body["trustedHost"], action: body["action"], threadId: body["threadId"], cursor: body["cursor"] as string | undefined };
+	return { workloadToken, cookie: request.header("cookie"), delegatedAuthorization, trustedHost: body["trustedHost"], action: body["action"], threadId: body["threadId"], requestIdempotencyKey: body["requestIdempotencyKey"] as string | undefined, cursor: body["cursor"] as string | undefined };
 }
 
 /** Returns a bearer value only for one unambiguous standard Authorization header. */

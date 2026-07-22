@@ -39,7 +39,7 @@ OpenCrane organises all cluster traffic into **two distinct planes**: a narrow p
 │  PLANE 2 — INTERNAL CLUSTER NETWORK (ClusterIP only)                │
 │                                                                     │
 │  opencrane-api :8080    mcp-gateway :8080    feat-skill-registry :5000   │
-│  litellm :4000          cognee :8000         postgres (CNPG) :5432  │
+│  litellm :4000          cognee :8000         PgBouncer (CNPG) :5432 │
 │                                                                     │
 │  per-org namespaces (opencrane-<org>):                              │
 │    openclaw-<tenant> :18789  (no Ingress, no public DNS)            │
@@ -104,7 +104,7 @@ All platform services are ClusterIP-only. No plane service exposes an Ingress or
 | feat-skill-registry | 5000 | opencrane-system |
 | litellm | 4000 | opencrane-system |
 | cognee | 8000 | opencrane-system |
-| Postgres (CNPG) | 5432 | opencrane-system |
+| PgBouncer pooler (CNPG-managed) | 5432 | opencrane-system |
 | openclaw-`<tenant>` (per-org) | 18789 | opencrane-`<org>` |
 
 Tenant (openclaw) pods run in per-org namespaces (`opencrane-<org>`), one pod per user. They have no Ingress and no public DNS record. The ClusterIP Service for each tenant pod is `openclaw-<tenant>`.
@@ -193,6 +193,8 @@ The baseline above is keyed on namespaces and ports. On top of it, the platform 
 See [Identity & network isolation (Cilium + SPIFFE)](/operators/cilium-spiffe-identity) for the full model — the two kinds of identity, the who-can-talk-to-whom rules, and how a workload gets its identity. See [ADR 0003 — Cilium + SPIFFE identity substrate](https://github.com/italanta/opencrane/blob/main/docs/adr/0003-cilium-spiffe-identity-substrate.md) for the substrate decision (it supersedes the earlier Linkerd choice in ADR 0001).
 
 Egress is bounded the same way: `CiliumNetworkPolicy` `toFQDN` rules give each silo a per-hostname allow-list (e.g. only `api.openai.com`), so a silo reaches DNS and its approved provider/tool endpoints and nothing else. An `AccessPolicy` with `egressRules` narrows this further per tenant.
+
+The OpenCrane server also owns a portable egress policy. It admits the CNPG-managed PgBouncer pooler, Kubernetes and external HTTPS, DNS, release-local LiteLLM/Cognee/Langfuse/OTEL services, tenant gateways, the GKE metadata endpoint when selected, and the cross-namespace ArtifactStore byte plane. Kubernetes API rules can carry both the exact Service address and exact backing endpoint because CNIs may enforce policy before or after Service destination translation. Shared LiteLLM and bring-your-own Cognee endpoints must use HTTPS. Standard `NetworkPolicy` can restrict that external traffic only by port; use the Cilium FQDN layer when it must be narrowed to named hosts.
 
 ---
 

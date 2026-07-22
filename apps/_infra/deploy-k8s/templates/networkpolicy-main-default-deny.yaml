@@ -33,13 +33,17 @@ metadata:
     {{- include "opencrane.labels" . | nindent 4 }}
     app.kubernetes.io/component: platform-default-deny
 spec:
-  # ArtifactStore has an app-owned, server-only policy. Excluding it here prevents the generic
-  # platform allow-list from widening its ingress/egress through Kubernetes' additive semantics.
+  # ArtifactStore, agent-controller, and the PostgreSQL pooler have app-owned policies; each
+  # agent-runtime Job has a controller-built policy. Excluding them prevents this generic
+  # allow-list from widening their stricter boundaries. CNPG identifies generated pooler pods
+  # with cnpg.io/poolerName rather than preserving the Pooler CR's application labels.
   podSelector:
     matchExpressions:
       - key: app.kubernetes.io/component
         operator: NotIn
-        values: [artifact-service]
+        values: [artifact-service, agent-controller, agent-runtime]
+      - key: cnpg.io/poolerName
+        operator: DoesNotExist
   policyTypes:
     - Ingress
     - Egress
@@ -127,6 +131,16 @@ spec:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: opencrane-ui-spa
+    # 5. Database consumers -> CNPG-managed PgBouncer. The Pooler chart has a separate
+    #    Helm release identity, so it cannot use this umbrella chart's selectorLabels.
+    #    Its app-owned ingress policy remains the authority over which consumers are admitted.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/poolerName: {{ printf "%s-postgres-pooler" .Release.Name | trunc 63 | trimSuffix "-" }}
+      ports:
+        - protocol: TCP
+          port: 5432
     {{- if .Values.networkPolicy.allowDNS }}
     # 6. DNS resolution (cluster DNS lives outside this namespace).
     - ports:

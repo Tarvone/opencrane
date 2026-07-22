@@ -1,6 +1,8 @@
 # ADR 0005 — OpenCrane-owned agent runtime
 
-- **Status:** Accepted; amended 2026-07-18 by [ADR 0007](0007-direct-target-refactor.md)
+- **Status:** Accepted; amended 2026-07-18 by [ADR 0007](0007-direct-target-refactor.md); the
+  TypeScript-toolkit clause and Gate L4 framing superseded 2026-07-21 by [ADR 0010](0010-language-neutral-agent-runtime.md)
+  (language-neutral runtime). The end-to-end OpenCrane ownership decision below otherwise stands.
 - **Date:** 2026-07-16
 - **Task:** `#245` — Phase A decision record
 - **Supersedes / superseded by:** supersedes the 2026-06-19 decision to retain OpenClaw as the

@@ -13,8 +13,8 @@ BEGIN
 END;
 $$;
 
-INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile", "updated_at")
-VALUES ('channel-service', 'silo-channel', 'managed', 'Channel agent', 'organization', 'organization-1', 'managed-agent', clock_timestamp());
+INSERT INTO "agent_services" ("id", "silo_id", "kind", "name", "workload_profile", "updated_at")
+VALUES ('channel-service', 'silo-channel', 'managed', 'Channel agent', 'managed-agent', clock_timestamp());
 INSERT INTO "agent_revisions" ("id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version", "model_policy_id", "budget", "authored_by", "published_at")
 VALUES ('channel-revision', 'channel-service', 1, 'published', 'sha256:' || repeat('a', 64), 'prompt-v1', 'model-v1', '{}', 'user-1', clock_timestamp());
 UPDATE "agent_services" SET "state" = 'active', "active_revision_id" = 'channel-revision' WHERE "id" = 'channel-service';

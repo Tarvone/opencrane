@@ -236,9 +236,6 @@ channelProxy:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
-  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
-  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
-  maxUploadDurationMilliseconds: 300000
   service:
     port: 8080
   # -- Empty derives the release-local OpenCrane internal Service URL.
@@ -272,6 +269,9 @@ channelProxy:
 # release-local PVC; OpenCrane remains the catalog and authorization authority.
 artifactService:
   enabled: true
+  # -- An absolute wall-clock cap, additionally bounded by each signed lease expiry. This is not
+  # an inactivity timeout: a client dripping bytes cannot hold a private PVC connection forever.
+  maxUploadDurationMilliseconds: 300000
   # -- The isolated byte-plane namespace. It is never one of the server's RBAC-owned
   # namespaces, so the server cannot read the service-only receipt signing key.
   namespace: ""
@@ -300,8 +300,104 @@ artifactService:
       cpu: 500m
       memory: 512Mi
 
+# -- Personal-runtime workload controller. Disabled until an immutable runtime image digest and
+# exact Kubernetes API Service CIDR are supplied; enabling it never starts a runtime Job directly.
+agentController:
+  enabled: false
+  # -- Dedicated namespace containing only personal-runtime Jobs, Pods, their zero-RBAC KSA, and
+  # Helm-owned runtime policies. Empty derives `<release-fullname>-runtime`. It must never equal the
+  # server release namespace.
+  runtimeNamespace: ""
+  image:
+    repository: ghcr.io/italanta/opencrane-agent-controller
+    digest: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  openCraneInternalUrl: ""
+  pollIntervalMs: 1000
+  # -- The controller runs retention separately from the fast desired-state polling loop.
+  outboxPruneIntervalMs: 3600000
+  # -- Database/server-owned fencing windows. The controller receives their resulting expiries but
+  # cannot propose or extend them in its claim/commit requests.
+  claimLeaseSeconds: 30
+  assignmentTtlSeconds: 3600
+  # -- Delivered commands are operational handshakes, not the permanent run audit record.
+  # The controller deletes only successful records older than this window in bounded batches.
+  outboxRetentionSeconds: 604800
+  outboxPruneBatchSize: 100
+  projectedTokenTtlSeconds: 600
+  kubernetesTokenTtlSeconds: 600
+  # -- Exact Kubernetes Service IP CIDRs admitted by the controller's app-owned NetworkPolicy.
+  # For a single API Service use its /32 (IPv4) or /128 (IPv6); never use a whole pod/service range.
+  kubernetesApiServerCidrs: []
+  kubernetesApiServerPort: 443
+  # -- Exact backing endpoint CIDRs and port for CNIs that enforce NetworkPolicy after
+  # Service destination translation. Kubernetes leaves pre/post-translation policy behavior
+  # implementation-defined, so portable installs should supply both the Service and endpoint paths.
+  kubernetesApiServerEndpointCidrs: []
+  kubernetesApiServerEndpointPort: 443
+  # -- Aggregate ceiling for the dedicated runtime namespace. Per-Job admission fixes the shape;
+  # this quota limits how many conforming Jobs a compromised controller can consume concurrently.
+  runtimeQuota:
+    pods: 20
+    jobs: 20
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      cpu: "20"
+      memory: 20Gi
+  runtimeProfile:
+    name: personal-default
+    image:
+      repository: ghcr.io/italanta/opencrane-agent-runtime
+      digest: ""
+      pullPolicy: IfNotPresent
+    runtimeStreamUrl: ""
+    # -- Runtime-only in-cluster LiteLLM endpoint. The default is this silo's Service FQDN so the
+    #    runtime NetworkPolicy can allow precisely that workload and no arbitrary external model URL.
+    litellmBaseUrl: ""
+    serviceAccountName: agent-runtime-default
+    projectedTokenTtlSeconds: 600
+    scratchSize: 1Gi
+    activeDeadlineSeconds: 3600
+    # -- Delete the terminal Job/Pod immediately after its assignment-bound active deadline so
+    # runtime-local emptyDir scratch cannot persist beyond durable authority.
+    ttlSecondsAfterFinished: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 # -- Control plane settings
 clustertenantManager:
+  # -- The server image runs as the Node.js uid/gid. The fsGroup makes projected
+  #    artifact signing keys readable at 0440 without widening them to every uid.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+
   # -- Whether this control plane owns per-ClusterTenant namespace creation. Default true;
   #    the app-owned OpenCrane Helm unit renders its gated namespace-management ClusterRole
   #    and injects MANAGE_TENANT_NAMESPACES=true. Set false only when a separate namespace
@@ -357,16 +453,6 @@ clustertenantManager:
     existingSecret: ""
     # -- Key within the Secret that holds the connection string
     secretKey: DATABASE_URL
-  # -- Prisma migration Helm hook. Runs `prisma migrate deploy` as a
-  #    pre-install/pre-upgrade Job so EVERY deploy reconciles the schema, even when
-  #    the opencrane-ui pod template is unchanged (a plain `helm upgrade` won't roll
-  #    the pod, so the db-migrate initContainer alone can leave the schema behind when
-  #    the database is recreated under a running pod). The initContainer remains a
-  #    belt-and-suspenders guard so a pod never serves an un-migrated database.
-  migrationJob:
-    enabled: true
-    # -- Retries before the migration hook is considered failed (fails the deploy).
-    backoffLimit: 3
   # -- Cognee integration for opencrane-ui permission synchronization
   cognee:
     # -- Install an in-cluster Cognee as part of this release. Cognee is a REQUIRED
@@ -1286,7 +1372,7 @@ langfuse:
   #    injected via --set at deploy time.
   postgresql:
     deploy: false
-    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-rw.<namespace>.svc.cluster.local
+    # -- Hostname injected by k8s-deploy.sh: <release>-postgres-pooler.<namespace>.svc.cluster.local
     host: ""
     auth:
       username: "opencrane"

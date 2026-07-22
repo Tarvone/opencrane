@@ -1,9 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
+import type { AuthenticationV1Api } from "@kubernetes/client-node";
 import express from "express";
 import type { Express } from "express";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, AGENT_RUNTIME_PROTOCOL_V1, type RuntimeCandidate } from "@opencrane/contracts";
 import { ___AuthMiddleware } from "@opencrane/server/_infra/auth";
 import { _CheckDbHealth, _RateLimit } from "@opencrane/server/_infra/http";
 
@@ -50,8 +52,70 @@ function _buildAuthApp(): Express
   return app;
 }
 
+/** Build the internal runtime candidate route around one mocked TokenReview identity. */
+async function _BuildRuntimeCandidateApp(username: string, audiences: string[] = [AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE]): Promise<Express>
+{
+  const { _RegisterInternalRoutes } = await import("../app/routes.js");
+  // The real Prisma dispatch authority runs inside a transaction and loads the live assignment for
+  // the reviewed Pod. Returning no assignment lets an authenticated runtime reach the authority and
+  // receive its real fail-closed candidate denial instead of a hardcoded stub reason.
+  const prisma = {
+    $transaction: vi.fn(async function _transaction(run: (tx: unknown) => Promise<unknown>)
+    {
+      return run({
+        $queryRaw: vi.fn().mockResolvedValue([]),
+        workloadAssignment: { findUnique: vi.fn().mockResolvedValue(null) },
+      });
+    }),
+  } as unknown as PrismaClient;
+  const authApi = {
+    createTokenReview: vi.fn().mockResolvedValue({
+      status: {
+        authenticated: true,
+        audiences,
+        user: {
+          username,
+          extra: { "authentication.kubernetes.io/pod-uid": ["11111111-1111-4111-8111-111111111111"] },
+        },
+      },
+    }),
+  } as unknown as AuthenticationV1Api;
+  const app = express();
+  app.use(express.json());
+  _RegisterInternalRoutes(app, prisma, authApi);
+  return app;
+}
+
+/** Create a syntactically valid runtime event candidate for identity-bound route tests. */
+function _RuntimeCandidate(): RuntimeCandidate
+{
+  return {
+    protocolVersion: AGENT_RUNTIME_PROTOCOL_V1,
+    runtimeInstanceId: "runtime-1",
+    commandId: "command-1",
+    candidateId: "candidate-1",
+    runId: "run-1",
+    attempt: 1,
+    fence: 1,
+    kind: "event",
+    eventType: "run.started",
+    payload: {},
+  };
+}
+
 describe("Control Plane", () =>
 {
+  beforeEach(function _RuntimeNamespaceBoundary()
+  {
+    vi.stubEnv("POD_NAMESPACE", "opencrane-silo");
+    vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "opencrane-silo-runtime");
+  });
+
+  afterEach(function _RestoreEnvironment()
+  {
+    vi.unstubAllEnvs();
+  });
+
   it("healthz endpoint returns ok", async () =>
   {
     const app = _buildHealthApp(true);
@@ -116,6 +180,42 @@ describe("Control Plane", () =>
       expect(internal.status).toBe(200);
       expect(internal.body).toEqual({ models: [], defaultModel: null });
       expect(gateRan).toBe(false);
+    });
+
+    it("accepts only the bounded runtime-profile ServiceAccount naming contract", async function _RuntimeServiceAccountIdentity()
+    {
+      const acceptedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo-runtime:agent-runtime-personal");
+      const rejectedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo:agent-runtime-personal");
+
+      const accepted = await request(acceptedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+      const rejected = await request(rejectedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+
+      // A reviewed runtime SA reaches the real dispatch authority, which fails closed with a
+      // contract reason (no live assignment for this Pod) rather than a stubbed placeholder string.
+      expect(accepted.status).toBe(409);
+      expect(accepted.body).toEqual({ accepted: false, reason: "unknown_workload" });
+      // A subject outside the bounded runtime namespace/SA grammar never reaches the authority.
+      expect(rejected.status).toBe(401);
+    });
+
+    it("requires one explicit runtime namespace separate from the server", async function _RuntimeNamespaceSeparation()
+    {
+      const { _RegisterInternalRoutes } = await import("../app/routes.js");
+      const app = express();
+      vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "");
+      expect(function _MissingRuntimeNamespace() { _RegisterInternalRoutes(app, {} as PrismaClient, {} as AuthenticationV1Api); }).toThrow(/different from POD_NAMESPACE/);
+
+      vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "opencrane-silo");
+      expect(function _SameRuntimeNamespace() { _RegisterInternalRoutes(app, {} as PrismaClient, {} as AuthenticationV1Api); }).toThrow(/different from POD_NAMESPACE/);
+    });
+
+    it("rejects a reviewed token when Kubernetes omits the runtime audience", async function _RuntimeAudienceMismatch()
+    {
+      const app = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo-runtime:agent-runtime-personal", ["opencrane"]);
+
+      const response = await request(app).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
+
+      expect(response.status).toBe(401);
     });
   });
 });

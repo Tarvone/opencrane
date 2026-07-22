@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_FILE="$SCRIPT_DIR/phase-d-authority-integration.sql"
 
 if command -v psql >/dev/null 2>&1; then
-  : "${DATABASE_URL:?Set DATABASE_URL to an empty database with all migrations applied}"
+  : "${DATABASE_URL:?Set DATABASE_URL to an empty database with the target baseline applied}"
   run_psql() {
     psql "$DATABASE_URL" --no-psqlrc --set=ON_ERROR_STOP=1 "$@"
   }
@@ -26,6 +26,7 @@ fi
 
 run_psql < "$TEST_FILE"
 run_psql < "$SCRIPT_DIR/run-input-snapshot-admission.sql"
+run_psql < "$SCRIPT_DIR/run-dispatch-terminalization.sql"
 
 RACE_DIR="$(mktemp -d)"
 trap 'rm -rf "$RACE_DIR"' EXIT
@@ -76,10 +77,106 @@ wait_for_holder_sleeping() {
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
+  "workload_profile", "updated_at"
+) VALUES (
+  'dispatch-lock-service', 'dispatch-lock-silo', 'personal', 'Dispatch lock service',
+  'personal-default', clock_timestamp()
+);
+INSERT INTO "agent_revisions" (
+  "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
+  "model_policy_id", "budget", "authored_by"
+) VALUES (
+  'dispatch-lock-revision', 'dispatch-lock-service', 1, 'draft',
+  'sha256:' || repeat('e', 64), 'prompt-v1', 'model-v1', '{}', 'dispatch-lock-user'
+);
+UPDATE "agent_revisions"
+SET "state" = 'published', "published_at" = clock_timestamp()
+WHERE "id" = 'dispatch-lock-revision';
+UPDATE "agent_services"
+SET "state" = 'active', "active_revision_id" = 'dispatch-lock-revision'
+WHERE "id" = 'dispatch-lock-service';
+INSERT INTO "conversation_threads" ("id", "silo_id", "agent_service_id", "updated_at")
+VALUES ('dispatch-lock-thread', 'dispatch-lock-silo', 'dispatch-lock-service', clock_timestamp());
+INSERT INTO "agent_runs" (
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "thread_id", "trigger",
+  "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
+) VALUES (
+  'dispatch-lock-run', 'dispatch-lock-silo', 'dispatch-lock-service', 'dispatch-lock-revision',
+  'dispatch-lock-thread', 'interactive', 'dispatch-lock-request', 'dispatch-lock-run',
+  'sha256:' || repeat('f', 64), 'sha256:' || repeat('0', 64)
+);
+INSERT INTO "run_outbox_events" (
+  "id", "run_id", "attempt", "sequence", "kind", "idempotency_key", "payload"
+) VALUES (
+  'dispatch-lock-outbox', 'dispatch-lock-run', 1, 1, 'run.attempt_requested',
+  'dispatch-lock-run:attempt:1', '{"runId":"dispatch-lock-run","attempt":1}'
+);
+SQL
+
+(
+  set +e
+  run_psql >"$RACE_DIR/dispatch-event-holder.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-dispatch-event-holder';
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtextextended('dispatch-lock-run', 0));
+SELECT pg_sleep(3);
+INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload", "occurred_at")
+VALUES ('dispatch-lock-run', 1, 'run.started', '{}', clock_timestamp());
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/dispatch-event-holder.status"
+) &
+dispatch_event_holder_pid=$!
+wait_for_holder_sleeping 'phase-e-dispatch-event-holder'
+(
+  set +e
+  run_psql >"$RACE_DIR/dispatch-terminalizer.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-dispatch-terminalizer';
+BEGIN;
+SELECT "id" FROM "agent_services" WHERE "id" = 'dispatch-lock-service' FOR UPDATE;
+SELECT pg_advisory_xact_lock(hashtextextended('dispatch-lock-run', 0));
+SELECT "id" FROM "agent_runs" WHERE "id" = 'dispatch-lock-run' FOR UPDATE;
+SELECT "id" FROM "run_outbox_events" WHERE "id" = 'dispatch-lock-outbox' FOR UPDATE;
+UPDATE "run_outbox_events"
+SET "claimed_at" = clock_timestamp(), "delivery_count" = 1,
+    "failed_at" = clock_timestamp(), "failure_code" = 'RUN_DISPATCH_SNAPSHOT_INVALID'
+WHERE "id" = 'dispatch-lock-outbox';
+UPDATE "agent_runs"
+SET "state" = 'failed', "terminal_reason" = 'invalid_input', "finished_at" = clock_timestamp()
+WHERE "id" = 'dispatch-lock-run';
+INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload", "occurred_at")
+VALUES (
+  'dispatch-lock-run', 2, 'run.failed',
+  '{"terminalReason":"invalid_input","failureCode":"RUN_DISPATCH_SNAPSHOT_INVALID"}',
+  clock_timestamp()
+);
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/dispatch-terminalizer.status"
+) &
+dispatch_terminalizer_pid=$!
+wait_for_blocked_session 'phase-e-dispatch-terminalizer'
+wait "$dispatch_event_holder_pid"
+wait "$dispatch_terminalizer_pid"
+if [[ "$(<"$RACE_DIR/dispatch-event-holder.status")" != "0" ]]; then
+  cat "$RACE_DIR/dispatch-event-holder.out" >&2
+  echo 'FAIL: concurrent conversation event append failed' >&2
+  exit 1
+fi
+if [[ "$(<"$RACE_DIR/dispatch-terminalizer.status")" != "0" ]]; then
+  cat "$RACE_DIR/dispatch-terminalizer.out" >&2
+  echo 'FAIL: dispatch terminalisation deadlocked with a conversation event append' >&2
+  exit 1
+fi
+echo 'PASS: dispatch terminalisation serializes behind concurrent conversation event append without deadlock'
+
+run_psql <<'SQL'
+INSERT INTO "agent_services" (
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-assignment', 'silo-race', 'managed', 'Assignment race', 'organization', 'org-race',
+  'svc-race-assignment', 'silo-race', 'managed', 'Assignment race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -135,10 +232,10 @@ echo 'PASS: concurrent publication serializes and rejects a late revision assign
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-assignment-first', 'silo-race', 'managed', 'Assignment first race', 'organization', 'org-race',
+  'svc-race-assignment-first', 'silo-race', 'managed', 'Assignment first race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -193,10 +290,10 @@ echo 'PASS: pre-publication assignment commits before serialized revision public
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-activation', 'silo-race', 'managed', 'Activation race', 'organization', 'org-race',
+  'svc-race-activation', 'silo-race', 'managed', 'Activation race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -250,10 +347,10 @@ echo 'PASS: concurrent activation serializes and rejects active revision retirem
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-retirement', 'silo-race', 'managed', 'Retirement race', 'organization', 'org-race',
+  'svc-race-retirement', 'silo-race', 'managed', 'Retirement race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -307,10 +404,10 @@ echo 'PASS: concurrent retirement serializes and rejects stale AgentService acti
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-run-rollover', 'silo-race', 'managed', 'Run rollover race', 'organization', 'org-race',
+  'svc-race-run-rollover', 'silo-race', 'managed', 'Run rollover race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -375,10 +472,10 @@ echo 'PASS: concurrent rollover serializes and rejects a run on the superseded r
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id",
+  "id", "silo_id", "kind", "name",
   "workload_profile", "created_at", "updated_at"
 ) VALUES (
-  'svc-race-run-first', 'silo-race', 'managed', 'Run first race', 'organization', 'org-race',
+  'svc-race-run-first', 'silo-race', 'managed', 'Run first race',
   'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
@@ -567,11 +664,11 @@ echo 'PASS: pre-acceptance assertion commits before the serialized membership se
 
 run_psql <<'SQL'
 INSERT INTO "agent_services" (
-  "id", "silo_id", "kind", "name", "owner_scope", "owner_subject_id", "workload_profile",
+  "id", "silo_id", "kind", "name", "workload_profile",
   "created_at", "updated_at"
 ) VALUES (
   'svc-race-action-authority', 'silo-race-action', 'managed', 'Action authority race',
-  'organization', 'org-race', 'standard', clock_timestamp(), clock_timestamp()
+  'standard', clock_timestamp(), clock_timestamp()
 );
 INSERT INTO "agent_revisions" (
   "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
@@ -606,11 +703,11 @@ COMMIT;
 UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-race-action-authority';
 INSERT INTO "workload_assignments" (
   "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
-  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "expires_at"
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "workload_profile", "expires_at"
 ) VALUES (
   'run-race-action-authority', 1, 'svc-race-action-authority', 'rev-race-action-authority',
-  'silo-race-action', 'user-race', 'opencrane', 'runtime', 'tenant-race-action', 'job',
-  'job-race-action', clock_timestamp() + interval '1 hour'
+  'silo-race-action', 'user-race', 'opencrane-agent-runtime', 'runtime', 'tenant-race-action', 'job',
+  'job-race-action', 'personal-small', clock_timestamp() + interval '1 hour'
 );
 UPDATE "agent_runs" SET "state" = 'assigned' WHERE "id" = 'run-race-action-authority';
 INSERT INTO "workload_bootstraps" (
@@ -619,7 +716,7 @@ INSERT INTO "workload_bootstraps" (
   "claim_digest", "expires_at"
 ) VALUES (
   'bootstrap-race-action', 'run-race-action-authority', 1, 'svc-race-action-authority',
-  'rev-race-action-authority', 'silo-race-action', 'user-race', 'opencrane', 'runtime',
+  'rev-race-action-authority', 'silo-race-action', 'user-race', 'opencrane-agent-runtime', 'runtime',
   'tenant-race-action', 'job', 'job-race-action', 'sha256:' || repeat('3', 64),
   clock_timestamp() + interval '30 minutes'
 );
@@ -655,7 +752,7 @@ INSERT INTO "approval_requests" (
 ) VALUES (
   'approval-race-action', 'run-race-action-authority', 1, 'rev-race-action-authority',
   'svc-race-action-authority', 'silo-race-action', 'proof-race-action', repeat('r', 43),
-  'user-race', 'opencrane', 'runtime', 'tenant-race-action', 'job', 'job-race-action',
+  'user-race', 'opencrane-agent-runtime', 'runtime', 'tenant-race-action', 'job', 'job-race-action',
   'pod-race-action', 'catalog-race-action', 1, 'sha256:' || repeat('4', 64), 'email.send',
   'message', 'message-race', 'send', 'sha256:' || repeat('5', 64), 'sha256:' || repeat('6', 64),
   'approver-v1', 'sha256:' || repeat('7', 64), clock_timestamp() + interval '1 hour'
@@ -754,3 +851,108 @@ if [[ "$(<"$RACE_DIR/action-receipt-reserve.status")" == "0" ]] \
   exit 1
 fi
 echo 'PASS: receipt reservation waits for assignment authority and rejects after revocation'
+
+run_psql <<'SQL'
+INSERT INTO "agent_services" (
+  "id", "silo_id", "kind", "name",
+  "workload_profile", "updated_at"
+) VALUES (
+  'svc-race-cancel-proof', 'silo-race-cancel-proof', 'personal', 'Cancellation proof race',
+  'personal-default', clock_timestamp()
+);
+INSERT INTO "agent_revisions" (
+  "id", "agent_service_id", "revision", "state", "digest", "prompt_policy_version",
+  "model_policy_id", "budget", "authored_by"
+) VALUES (
+  'rev-race-cancel-proof', 'svc-race-cancel-proof', 1, 'draft', 'sha256:' || repeat('9', 64),
+  'prompt-v1', 'model-v1', '{}', 'user-race-cancel-proof'
+);
+UPDATE "agent_revisions"
+SET "state" = 'published', "published_at" = clock_timestamp()
+WHERE "id" = 'rev-race-cancel-proof';
+UPDATE "agent_services"
+SET "state" = 'active', "active_revision_id" = 'rev-race-cancel-proof'
+WHERE "id" = 'svc-race-cancel-proof';
+INSERT INTO "agent_runs" (
+  "id", "silo_id", "agent_service_id", "agent_revision_id", "trigger",
+  "request_idempotency_key", "root_run_id", "effective_contract_digest", "input_snapshot_digest"
+) VALUES (
+  'run-race-cancel-proof', 'silo-race-cancel-proof', 'svc-race-cancel-proof',
+  'rev-race-cancel-proof', 'interactive', 'request-race-cancel-proof', 'run-race-cancel-proof',
+  'sha256:' || repeat('a', 64), 'sha256:' || repeat('b', 64)
+);
+UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-race-cancel-proof';
+INSERT INTO "workload_assignments" (
+  "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid",
+  "workload_profile", "expires_at"
+) VALUES (
+  'run-race-cancel-proof', 1, 'svc-race-cancel-proof', 'rev-race-cancel-proof',
+  'silo-race-cancel-proof', 'user-race-cancel-proof', 'opencrane-agent-runtime', 'runtime',
+  'tenant-race-cancel-proof', 'job', 'job-race-cancel-proof', 'personal-default',
+  clock_timestamp() + interval '1 hour'
+);
+UPDATE "agent_runs" SET "state" = 'assigned' WHERE "id" = 'run-race-cancel-proof';
+INSERT INTO "workload_bootstraps" (
+  "id", "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid",
+  "claim_digest", "expires_at"
+) VALUES (
+  'bootstrap-race-cancel-proof', 'run-race-cancel-proof', 1, 'svc-race-cancel-proof',
+  'rev-race-cancel-proof', 'silo-race-cancel-proof', 'user-race-cancel-proof',
+  'opencrane-agent-runtime', 'runtime', 'tenant-race-cancel-proof', 'job',
+  'job-race-cancel-proof', 'sha256:' || repeat('c', 64), clock_timestamp() + interval '30 minutes'
+);
+UPDATE "workload_assignments"
+SET "state" = 'registered', "pod_uid" = 'pod-race-cancel-proof', "registered_at" = clock_timestamp()
+WHERE "run_id" = 'run-race-cancel-proof' AND "attempt" = 1;
+UPDATE "workload_bootstraps"
+SET "consumed_at" = clock_timestamp(), "consumed_by_pod_uid" = 'pod-race-cancel-proof',
+    "receipt_id" = 'receipt-race-cancel-proof'
+WHERE "id" = 'bootstrap-race-cancel-proof';
+SQL
+
+(
+  set +e
+  run_psql >"$RACE_DIR/cancellation-proof-fence.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-cancellation-proof-fence';
+BEGIN;
+UPDATE "agent_runs" SET "state" = 'cancelling' WHERE "id" = 'run-race-cancel-proof';
+SELECT pg_sleep(3);
+COMMIT;
+SQL
+  echo "$?" >"$RACE_DIR/cancellation-proof-fence.status"
+) &
+cancellation_proof_fence_pid=$!
+wait_for_holder_sleeping 'phase-e-cancellation-proof-fence'
+(
+  set +e
+  run_psql >"$RACE_DIR/cancellation-proof-mint.out" 2>&1 <<'SQL'
+SET application_name = 'phase-e-cancellation-proof-mint';
+INSERT INTO "run_proof_keys" (
+  "id", "bootstrap_id", "run_id", "attempt", "workload_kind", "workload_uid", "pod_uid",
+  "public_key_jwk", "key_thumbprint", "expires_at"
+) VALUES (
+  'proof-race-cancel-proof', 'bootstrap-race-cancel-proof', 'run-race-cancel-proof', 1,
+  'job', 'job-race-cancel-proof', 'pod-race-cancel-proof', '{}', repeat('q', 43),
+  clock_timestamp() + interval '20 minutes'
+);
+SQL
+  echo "$?" >"$RACE_DIR/cancellation-proof-mint.status"
+) &
+cancellation_proof_mint_pid=$!
+wait_for_blocked_session 'phase-e-cancellation-proof-mint'
+wait "$cancellation_proof_fence_pid"
+wait "$cancellation_proof_mint_pid"
+if [[ "$(<"$RACE_DIR/cancellation-proof-fence.status")" != "0" ]]; then
+  cat "$RACE_DIR/cancellation-proof-fence.out" >&2
+  echo 'FAIL: cancellation proof fence did not commit' >&2
+  exit 1
+fi
+if [[ "$(<"$RACE_DIR/cancellation-proof-mint.status")" == "0" ]] \
+  || ! grep -q 'RunProofKey requires the current Assigned attempt' "$RACE_DIR/cancellation-proof-mint.out"; then
+  cat "$RACE_DIR/cancellation-proof-mint.out" >&2
+  echo 'FAIL: proof mint bypassed the concurrent cancellation fence' >&2
+  exit 1
+fi
+echo 'PASS: proof mint waits for run authority and rejects after cancellation begins'

@@ -19,25 +19,14 @@ spec:
         app.kubernetes.io/component: opencrane-server
     spec:
       serviceAccountName: {{ include "opencrane.fullname" . }}-opencrane-server
-      initContainers:
-        # Apply pending Prisma migrations before the server starts (prisma migrate
-        # deploy). Runs the same image so the schema/migrations match the binary;
-        # the server never boots against an un-migrated database. Idempotent — a
-        # no-op when the DB is already at the latest migration. This is a
-        # belt-and-suspenders guard for pod (re)creation BETWEEN deploys: the
-        # deploy-time migration authority is the pre-upgrade hook Job
-        # (`opencrane-database-schema` component), which an unchanged `helm upgrade`
-        # cannot skip the way it skips an unchanged pod template.
-        - name: db-migrate
-          image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
-          imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
-          command: ["node", "dist/apps/opencrane/scripts/migrate.js"]
-          env:
-            {{- include "opencrane.clustertenantManagerDatabaseEnv" . | nindent 12 }}
+      securityContext:
+        {{- toYaml .Values.clustertenantManager.podSecurityContext | nindent 8 }}
       containers:
         - name: opencrane-ui
           image: "{{ .Values.clustertenantManager.image.repository }}:{{ .Values.clustertenantManager.image.tag }}"
           imagePullPolicy: {{ .Values.clustertenantManager.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.clustertenantManager.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.clustertenantManager.service.port }}
@@ -60,6 +49,17 @@ spec:
             # Second (internal-only) listener for /api/internal/*.
             - name: INTERNAL_PORT
               value: {{ .Values.clustertenantManager.service.internalPort | quote }}
+            - name: AGENT_CONTROLLER_CLAIM_LEASE_SECONDS
+              value: {{ .Values.agentController.claimLeaseSeconds | quote }}
+            - name: AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS
+              value: {{ .Values.agentController.assignmentTtlSeconds | quote }}
+            - name: AGENT_RUNTIME_OUTBOX_RETENTION_SECONDS
+              value: {{ .Values.agentController.outboxRetentionSeconds | quote }}
+            - name: AGENT_RUNTIME_OUTBOX_PRUNE_BATCH_SIZE
+              value: {{ .Values.agentController.outboxPruneBatchSize | quote }}
+            # The server accepts runtime assignments only for this Helm-owned restricted namespace.
+            - name: AGENT_RUNTIME_NAMESPACE
+              value: {{ include "opencrane.agentController.runtimeNamespace" . | quote }}
             {{- include "opencrane.observabilityEnv" (dict "ctx" $ "component" "opencrane-server") | nindent 12 }}
             - name: INGRESS_DOMAIN
               value: {{ .Values.ingress.domain | quote }}
@@ -198,7 +198,7 @@ spec:
                    Secret created by k8s-deploy.sh (never appear in rendered manifests). */ -}}
             {{- if .Values.langfuse.inCluster.enabled }}
             - name: LANGFUSE_HOST
-              value: "http://{{ .Release.Name }}-langfuse.{{ .Release.Namespace }}.svc.cluster.local:3000"
+              value: "http://{{ .Release.Name }}-langfuse-web.{{ .Release.Namespace }}.svc.cluster.local:3000"
             - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -383,7 +383,7 @@ spec:
         - name: artifact-keys
           secret:
             secretName: {{ required "artifactService.keys.catalogExistingSecret is required" .Values.artifactService.keys.catalogExistingSecret | quote }}
-            defaultMode: 0400
+            defaultMode: 0440
             items:
               - key: lease-private.pem
                 path: lease-private.pem

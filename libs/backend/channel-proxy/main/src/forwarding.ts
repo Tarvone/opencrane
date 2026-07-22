@@ -34,6 +34,11 @@ export async function __ForwardCommand(request: Request, dependencies: ChannelPr
 	{
 		return _Problem(413, "command_too_large");
 	}
+	const command = _CommandCoordinates(body, request.headers.get("idempotency-key"));
+	if (command === null)
+	{
+		return _Problem(400, "invalid_command");
+	}
 
 	// 2. Delegate identity, membership, resource and action decisions to OpenCrane.
 	let target: AuthorizedChannelTarget;
@@ -41,7 +46,7 @@ export async function __ForwardCommand(request: Request, dependencies: ChannelPr
 	{
 		target = await ___DoWithTrace("channel.authority.resolve", { action: "command.forward" }, function _resolveTarget()
 		{
-			return dependencies.resolver.resolve({ session, action: "command.forward" }, request.signal);
+			return dependencies.resolver.resolve({ session, action: "command.forward", threadId: command.threadId, requestIdempotencyKey: command.requestIdempotencyKey }, request.signal);
 		});
 	}
 	catch
@@ -89,6 +94,27 @@ export async function __ForwardCommand(request: Request, dependencies: ChannelPr
 	{
 		clearTimeout(timeoutHandle);
 	}
+}
+
+/** Parses only the command coordinates required before the proxy asks OpenCrane to authorize a route. */
+function _CommandCoordinates(body: Uint8Array, requestIdempotencyKey: string | null): { readonly threadId: string; readonly requestIdempotencyKey: string } | null
+{
+	// 1. Parse the bounded JSON body so the route authority never receives a body-only thread assertion.
+	let value: unknown;
+	try
+	{
+		value = JSON.parse(new TextDecoder().decode(body)) as unknown;
+	}
+	catch
+	{
+		return null;
+	}
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+	// 2. Require opaque coordinates before resolution so a retry cannot create an unaddressable run.
+	const record = value as Record<string, unknown>;
+	if (typeof record.threadId !== "string" || !_OpaqueIdentifierAllowed(record.threadId) || !requestIdempotencyKey || !_OpaqueIdentifierAllowed(requestIdempotencyKey)) return null;
+	return { threadId: record.threadId, requestIdempotencyKey };
 }
 
 /** Relay one authenticated SSE event stream from its persisted replay cursor. */

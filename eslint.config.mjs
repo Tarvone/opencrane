@@ -86,8 +86,12 @@ export default [
               ],
             },
             {
+              // `scope:grants` is re-opened for slice 6 (#332) WITH a real import: the
+              // PrismaScopeGrantResolver calls the grant compiler so an attach-authority check and
+              // the runtime effective-access intersection grant nothing beyond the agent's actual
+              // compiled grants. See scope-attachment-authority.ts + prisma-scope-grant-resolver.ts.
               sourceTag: "scope:agent-services",
-              onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:audit", "scope:authorization", "scope:shared"],
+              onlyDependOnLibsWithTags: ["scope:agent-services", "scope:agents", "scope:audit", "scope:authorization", "scope:grants", "scope:shared"],
             },
             {
               sourceTag: "scope:api-spec",
@@ -115,6 +119,10 @@ export default [
             { sourceTag: "scope:awareness", onlyDependOnLibsWithTags: ["scope:awareness", "scope:shared"] },
             { sourceTag: "scope:auth", onlyDependOnLibsWithTags: ["scope:auth", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:channel-proxy", onlyDependOnLibsWithTags: ["scope:channel-proxy", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime-stream", onlyDependOnLibsWithTags: ["scope:agent-runtime-stream", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime-launcher", onlyDependOnLibsWithTags: ["scope:agent-runtime-launcher", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime-controller", onlyDependOnLibsWithTags: ["scope:agent-runtime-controller", "scope:agent-runtime-launcher", "scope:shared"] },
+            { sourceTag: "scope:agent-controller", onlyDependOnLibsWithTags: ["scope:agent-controller", "scope:agent-runtime-controller", "scope:shared"] },
             { sourceTag: "scope:cluster-tenants", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:k8s-api", "scope:shared"] },
             { sourceTag: "scope:company-docs", onlyDependOnLibsWithTags: ["scope:auth", "scope:company-docs", "scope:shared"] },
             { sourceTag: "scope:connections", onlyDependOnLibsWithTags: ["scope:auth", "scope:connections", "scope:shared"] },
@@ -151,6 +159,8 @@ export default [
             { sourceTag: "scope:membership", onlyDependOnLibsWithTags: ["scope:audit", "scope:authorization", "scope:membership", "scope:shared"] },
             { sourceTag: "scope:personal-memory", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:personal-memory", "scope:shared"] },
             { sourceTag: "scope:obot-custody", onlyDependOnLibsWithTags: ["scope:obot-custody", "scope:shared"] },
+            { sourceTag: "scope:sandbox-execution", onlyDependOnLibsWithTags: ["scope:sandbox-execution", "scope:shared"] },
+            { sourceTag: "scope:memory-gateway-client", onlyDependOnLibsWithTags: ["scope:memory-gateway-client", "scope:shared"] },
             { sourceTag: "scope:model-routing", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:shared"] },
             { sourceTag: "scope:policies", onlyDependOnLibsWithTags: ["scope:grants", "scope:k8s-api", "scope:policies", "scope:projection", "scope:shared"] },
             { sourceTag: "scope:personal-personas", onlyDependOnLibsWithTags: ["scope:personal-personas", "scope:shared"] },
@@ -159,6 +169,7 @@ export default [
             { sourceTag: "scope:providers", onlyDependOnLibsWithTags: ["scope:auth", "scope:cluster-tenants", "scope:model-routing", "scope:providers", "scope:shared"] },
             { sourceTag: "scope:retrieval", onlyDependOnLibsWithTags: ["scope:retrieval", "scope:shared"] },
             { sourceTag: "scope:personal-runs", onlyDependOnLibsWithTags: ["scope:agents", "scope:authorization", "scope:personal-runs", "scope:shared"] },
+            { sourceTag: "scope:agent-runtime", onlyDependOnLibsWithTags: ["scope:agent-runtime", "scope:agents", "scope:authorization", "scope:personal-conversations", "scope:personal-runs", "scope:obot-custody", "scope:sandbox-execution", "scope:memory-gateway-client", "scope:shared"] },
             { sourceTag: "scope:skills", onlyDependOnLibsWithTags: ["scope:artifacts", "scope:cluster-tenants", "scope:grants", "scope:shared", "scope:skills"] },
             { sourceTag: "scope:spend", onlyDependOnLibsWithTags: ["scope:shared", "scope:spend"] },
             { sourceTag: "scope:tenant-hosting", onlyDependOnLibsWithTags: ["scope:shared", "scope:tenant-hosting"] },

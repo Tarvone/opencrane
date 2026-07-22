@@ -21,6 +21,24 @@
 | `clustertenantManager.resources.limits.cpu` | `500m` | CPU hard limit per pod. |
 | `clustertenantManager.resources.limits.memory` | `512Mi` | Memory hard limit per pod. |
 
+### Pod security
+
+These defaults match the `node` user in the server image. The group-readable Secret mode is paired
+with `fsGroup: 1000`; changing one side without the other can make projected ArtifactStore keys
+unreadable or expose them more broadly than intended.
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `clustertenantManager.podSecurityContext.runAsNonRoot` | `true` | Rejects a container that would run as uid 0. |
+| `clustertenantManager.podSecurityContext.runAsUser` | `1000` | Runs the pod as the server image's `node` uid. |
+| `clustertenantManager.podSecurityContext.runAsGroup` | `1000` | Runs the pod as the server image's `node` gid. |
+| `clustertenantManager.podSecurityContext.fsGroup` | `1000` | Makes projected key volumes readable by the server group. |
+| `clustertenantManager.podSecurityContext.fsGroupChangePolicy` | `OnRootMismatch` | Avoids recursive ownership changes when the volume root already has the expected group. |
+| `clustertenantManager.podSecurityContext.seccompProfile.type` | `RuntimeDefault` | Applies the container runtime's default syscall filter. |
+| `clustertenantManager.securityContext.allowPrivilegeEscalation` | `false` | Prevents the process from gaining more privileges than its parent. |
+| `clustertenantManager.securityContext.capabilities.drop` | `[ALL]` | Drops every Linux capability. |
+| `clustertenantManager.securityContext.readOnlyRootFilesystem` | `false` | Leaves the image root writable for current server runtime needs. |
+
 ---
 
 ## Network & APIs
@@ -46,16 +64,12 @@ The per-silo Postgres connection used by the clustertenant-manager and operator.
 Set to the container as `DATABASE_URL`. Rendered into the clustertenant-manager and operator deployments.
 :::
 
----
-
-## Database migrations
-
-The Prisma migration Helm hook that runs `prisma migrate deploy` as a pre-install/pre-upgrade Job.
-
-| Key | Default | Purpose |
-|-----|---------|---------|
-| `clustertenantManager.migrationJob.enabled` | `true` | When true, renders a Job that runs schema migrations before the opencrane-api pod starts. Reconciles the database schema even when the pod template is unchanged (a plain `helm upgrade` without this would not roll the pod, leaving the schema behind). |
-| `clustertenantManager.migrationJob.backoffLimit` | `3` | Number of retries before the migration Job fails (fails the entire deploy). |
+::: info Database shape is fixed before application startup
+The deploy engine publishes the reviewed target SQL as an immutable, content-addressed ConfigMap and
+CloudNativePG applies it once during `initdb`. Physical recovery uses the schema and protected
+baseline marker in the backup; a Postgres hook checks that marker before deployment continues. The
+clustertenant-manager has no schema-update Job or startup mutation path.
+:::
 
 ---
 
@@ -153,7 +167,7 @@ The silo's OIDC above is for per-org **login only** and never holds the IAM_OWNE
 
 ## Ingress same-origin routing
 
-Same-origin hosting is the only mode: the opencrane-api host's Ingress serves the org-admin SPA at `/`, the public API at `/api`, and the OpenClaw gateway WS proxy at `/gateway` (when `gatewayProxy.enabled`) from one origin, so the browser gets first-party cookies with no CORS. Helm owns these rules, so the frontend layer never kubectl-patches the Ingress out-of-band. The legacy `*.<domain>` wildcard Ingress and the bare `/`→opencrane-api layout were removed once every silo migrated.
+Same-origin hosting is the only mode: the opencrane-api host's Ingress serves the org-admin SPA at `/`, the public API at `/api`, and the OpenClaw gateway WS proxy at `/gateway` (when `gatewayProxy.enabled`) from one origin, so the browser gets first-party cookies with no CORS. Helm owns these rules, so the frontend layer never kubectl-patches the Ingress out-of-band. The legacy `*.<domain>` wildcard Ingress and the bare `/`→opencrane-api layout are no longer rendered.
 
 | Key | Default | Purpose |
 |-----|---------|---------|

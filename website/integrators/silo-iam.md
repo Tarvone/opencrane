@@ -41,9 +41,9 @@ contract is compiled over the **principal set** `{tenant-name, subject}`.
 └─────────────────────────────────────────────────────────┘
 ```
 
-`tenant.subject` is the OIDC `sub` stored on the `Tenant` row at creation time (bound
-via `Tenant.subject` — migration 0025). Tenants created before S4a that have no bound
-subject compile over the tenant name only (the legacy path, unchanged).
+`tenant.subject` is the OIDC `sub` stored on the `Tenant` row at creation time. The field remains
+nullable at the current deletion boundary, so a tenant without a bound subject compiles over the
+tenant name only.
 
 The key consequence: **a user-level Deny always overrides a tenant-level Allow**, no
 matter which principal carried either grant. Deny-over-Allow precedence is unchanged

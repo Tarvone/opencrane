@@ -20,6 +20,7 @@ import { ___CreatePrismaClient } from "./infra/db/db.js";
 import { _CreateArtifactUploadGateway } from "./infra/artifacts/artifact-upload.factory.js";
 import { _log as log } from "./app/log.js";
 import { _RegisterInternalRoutes, _RegisterRoutes } from "./app/routes.js";
+import { _CreateScheduleTicker } from "./app/scheduler-wiring.js";
 import { OpenClawTenantLifecycle } from "@opencrane/backend/feat-openclaw-tenant";
 
 // In-silo controllers (Stage 5). The silo runs every in-silo reconcile loop over its OWN
@@ -105,6 +106,9 @@ export function createInternalApp(prisma: PrismaClient, authApi: k8s.Authenticat
 {
   const app = express();
   app.set("trust proxy", 1);
+  // The runtime route has a smaller fixed body boundary than other internal routes. Mount
+  // it before the generic parser because Express will not re-parse an already consumed body.
+  app.use("/api/internal/agent-runtime", express.json({ limit: 64 * 1024, strict: true }));
   app.use(express.json());
   app.use(___RequestContext());
   app.use(pinoHttp({ logger: log, genReqId: function _genReqId() { return ___GetContext()?.requestId ?? randomUUID(); } }));
@@ -159,6 +163,20 @@ const internalServer = internalApp.listen(internalPort, function _onInternalList
   log.info({ internalPort }, "control plane internal API listening");
 });
 
+// Managed-agent scheduler, composed INSIDE this control-API process (no new workload; same KSA and
+// privilege). Each tick evaluates enabled schedules and admits due slots through the existing
+// run-admission path. It is off by default: enabling a live periodic tick is part of the
+// harvesting-central-agent live-Obot proof gated under #337. The interval is unref'd so it never
+// holds the process open, and it is cleared on shutdown.
+/** Managed-agent schedule ticker bound to canonical Postgres and the shared admission port. */
+const scheduleTicker = _CreateScheduleTicker(prisma);
+/** Milliseconds between schedule passes when the scheduler is enabled. */
+const schedulerIntervalMs = Math.max(1_000, Number(process.env.OPENCRANE_SCHEDULER_INTERVAL_MS ?? "60000"));
+const schedulerHandle = process.env.OPENCRANE_SCHEDULER_ENABLED === "true"
+  ? setInterval(function _tick() { void scheduleTicker.runOnce(new Date()).catch(function _onError(err: unknown) { log.error({ err }, "managed-agent schedule tick failed"); }); }, schedulerIntervalMs)
+  : null;
+schedulerHandle?.unref();
+
 /** Frozen-blue OpenClaw tenant runtime composed behind its library lifecycle contract. */
 const openClawTenantLifecycle = new OpenClawTenantLifecycle({
   kubeConfig: kc,
@@ -186,7 +204,8 @@ async function _shutdown(signal: string): Promise<void>
   const hardExit = setTimeout(function _force() { process.exit(1); }, 10_000);
   hardExit.unref();
 
-  // Stop the in-silo controller before disconnecting its database dependencies.
+  // Stop the schedule ticker and the in-silo controller before disconnecting their DB dependencies.
+  if (schedulerHandle !== null) clearInterval(schedulerHandle);
   await openClawTenantLifecycle.stop();
 
   try

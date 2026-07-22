@@ -11,6 +11,7 @@ authentication, Kubernetes access, and hosting adapters do not look like busines
 | [`_infra/api`](./_infra/api/) | Typed Kubernetes API operations, CRD constants, watch loops, and apply/error helpers. | The OpenCrane server and backend domains that reconcile Kubernetes resources. |
 | [`_infra/auth`](./_infra/auth/) | OIDC sessions, identity claims, organization membership, and server auth middleware. | The OpenCrane server and identity/access backend domains. |
 | [`_infra/channel-proxy`](./_infra/channel-proxy/) | Trusted-origin checks, auth forwarding, rate limiting, and WebSocket proxy transport. | The OpenCrane server channel entrypoint. |
+| [`_infra/agent-runtime-stream`](./_infra/agent-runtime-stream/) | Projected-token HTTP/SSE framing initiated by runtime Jobs. | The personal-runtime process and controller authority. |
 | [`_infra/http`](./_infra/http/) | Health, OpenAPI routing, transport security, trusted proxies, rate limiting, and error handling. | The OpenCrane server process. |
 | [`_infra/obot-custody`](./_infra/obot-custody/) | The runtime-neutral port for delegating integration-credential custody to the external Obot authority; write-only, fail-closed by default. | The `integrations` backend gateway. |
 | [`_infra/tenant-hosting`](./_infra/tenant-hosting/) | GCP and on-prem storage/hosting adapters, including mounted tenant state volumes. | The OpenCrane server hosting factory and tenant lifecycle operations. |

@@ -14,8 +14,11 @@ never look like a business capability. Each is owned by the server and by nothin
 | [`api`](./api/README.md) | Kubernetes API plumbing. |
 | [`auth`](./auth/README.md) | OIDC login and authorization substrate. |
 | [`channel-proxy`](./channel-proxy/README.md) | The blue OpenClaw gateway proxy. *(frozen — see below)* |
+| [`agent-runtime-stream`](./agent-runtime-stream/README.md) | Projected-token runtime-initiated HTTP/SSE framing; never run state. |
 | [`http`](./http/README.md) | Express transport plumbing. |
+| [`memory-gateway-client`](./memory-gateway-client/README.md) | The personal-memory gateway port. |
 | [`obot-custody`](./obot-custody/README.md) | The Obot credential-custody port. |
+| [`sandbox-execution`](./sandbox-execution/README.md) | The sandboxed tool-execution port. |
 | [`tenant-hosting`](./tenant-hosting/README.md) | The hosting-substrate adapter. |
 
 ```
@@ -27,6 +30,7 @@ never look like a business capability. Each is owned by the server and by nothin
    tenant-hosting ◄───────┤
    obot-custody ◄─────────┘
    channel-proxy ── blue OpenClaw gateway path (frozen)
+   agent-runtime-stream ◄── outbound personal-agent shell (green, no executor yet)
 ```
 
 `channel-proxy` here is the **blue** proxy — bound to the frozen OpenClaw runtime and slated for

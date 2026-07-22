@@ -57,7 +57,6 @@ describe("canonical model exports", function ()
       siloId: "silo-1",
       kind: "personal",
       name: "My agent",
-      owner: { scope: "personal", subjectId: "user-1" },
       state: "active",
       activeRevisionId: "revision-1",
       workloadProfile: "personal-agent",

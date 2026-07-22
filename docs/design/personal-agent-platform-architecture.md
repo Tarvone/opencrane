@@ -335,10 +335,9 @@ is a target authorization parameter, not a production-transition decision.
    namespace, workload profile and workload UID. A suspended Job first receives a single-use
    bootstrap bound to its Job UID and projected only by that Job's pod template. After unsuspension,
    the controller registers the Job's first Pod UID before exchange is allowed; a different Pod UID
-   under that Job is rejected. A long-lived personal Deployment receives a one-time run assignment
-   challenge for its already registered Pod UID. The runtime cannot request an arbitrary run by ID.
+   under that Job is rejected. The runtime cannot request an arbitrary run by ID.
 5. The runtime authenticates with that bootstrap/assignment plus an explicitly projected KSA token
-   whose audience is `opencrane`; default token automount is disabled. OpenCrane TokenReviews the
+   whose audience is `opencrane-agent-runtime`; default token automount is disabled. OpenCrane TokenReviews the
    full namespace/SA/Pod UID, atomically consumes the bootstrap, verifies the controller assignment
    and Job ownership where applicable, and binds the context to an ephemeral pod/run proof key.
 6. OpenCrane returns a short-lived run context containing IDs, revision/grant hashes, allowed scopes,
@@ -380,8 +379,8 @@ unless an independent GitOps author must own them. The OpenCrane API is the only
 
 ### Personal and managed workloads
 
-- A personal agent normally has one stable Deployment per user inside the ClusterTenant. It may
-  scale to zero because transcript, persona, memory, and artifacts live outside the pod.
+- A personal agent run executes as a fresh controller-assigned Job. It carries no durable tenant
+  state because transcript, persona, memory, and artifacts live outside the pod.
 - A scheduled managed agent is represented by an AgentService and immutable AgentRevision. The
   controller renders a lightweight CronJob whose only job is to call an idempotent OpenCrane
   schedule-fire endpoint. OpenCrane transactionally creates the `AgentRun` and outbox command before
@@ -677,11 +676,23 @@ rather than silently disappearing. The run ends — completed, cancelled, or fai
 `RunEvent`; the thread's next message starts an entirely new `AgentRun` with its own fresh
 snapshot.
 
+**A `Thread` is an ordered sequence of `AgentRun`s, not one long-running run.** Each `AgentRun` in
+that sequence freezes its own independent `RunInputSnapshot`, so two runs in the same thread can
+carry different persona revisions, model routes, or tool/skill revisions — the invariant is per-run
+("nothing decided after that point can change what this run does"), not per-thread. Today, the only
+thing that starts the next `AgentRun` in a thread is the next user message: an `AgentRun` always
+runs to a terminal `RunEvent` before anything else in that thread can begin. The runtime does not
+yet end a run early and start a successor mid-conversation without new user input — for example,
+ending a run after a round to reselect the model route before the next round — is intended future
+work, not current behavior. Until that lands, one `AgentRun` corresponds one-to-one with one user
+message and the turn it produces.
+
 There is no durable generic `Session` record. A `Thread` is the user-visible conversation and owns
-its immutable `Message` history. An interactive message creates an `AgentRun` for that thread;
-manual and scheduled managed-agent invocations create the same `AgentRun` without requiring a
-thread. A durable one-active-run lease serializes interactive work for a thread, while idempotency
-keys prevent a repeated send or trigger from creating a second external side effect.
+its immutable `Message` history; it is composed of the ordered `AgentRun`s described above. An
+interactive message creates an `AgentRun` for that thread; manual and scheduled managed-agent
+invocations create the same `AgentRun` without requiring a thread. A durable one-active-run lease
+serializes interactive work for a thread, while idempotency keys prevent a repeated send or trigger
+from creating a second external side effect.
 
 Each `AgentRun` references an immutable `AgentRevision` and owns one `RunInputSnapshot`. The
 snapshot freezes the approved persona revision, effective grant/contract evidence, model route,
@@ -747,7 +758,7 @@ capability with operational recovery and UI.
 | Multimodal intake | Runtime/provider-dependent, no governed pipeline | **Medium/high** | Artifact/preprocess pipeline |
 | Document authoring | Ad hoc tool/files, no versioned QA path | **Far** | Artifact and trusted authoring Jobs |
 | Skill authoring and Python code | Multiple storage paths; lifecycle issue open | **Far** | Skill catalog + artifact versions |
-| Managed agent registry | Central-agent issue/app is Slack-specific | **Far** | AgentService/Revision |
+| Managed agent registry | Central-agent issue/app is single-connector (ingestion-only) | **Far** | AgentService/Revision |
 | Scheduling | OpenClaw cron unused; generic service scheduler absent | **Medium/high** | OpenCrane run ledger + K8s trigger/Job |
 | Approvals/durable workflows | No unified run/approval ledger | **Medium/high:** toolkit pause state may help | OpenCrane Run/Approval state |
 | Run/operations console | Fragmented UI and infra consoles | **Far** | OpenCrane UI/API |

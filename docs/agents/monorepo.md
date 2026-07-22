@@ -33,8 +33,8 @@ that process boundary and has no useful independent contract.
 Charts may aggregate deployables, but aggregation does not erase app ownership: every rendered
 workload must map back to its own `apps/<name>` or `apps/_infra/<name>` root. An umbrella such as
 `apps/_infra/deploy-k8s` composes app-owned deployment units and release values; it does not become
-the anonymous owner of their Pods. A deploy-only component explicitly registered to the composer,
-such as its database-schema hook, remains visible as that app's owned component. A distinct image or
+the anonymous owner of their Pods. A deploy-only component explicitly registered to the composer
+remains visible as that app's owned component. A distinct image or
 process role otherwise gets a distinct app root. A Job using the exact same image, entrypoint, trust
 boundary, and lifecycle as an existing app may remain owned by it.
 
@@ -82,7 +82,7 @@ create `libs/utils/` beside it just to satisfy this document.
   path.
 - Prevent cycles. If two libraries need each other, move the shared contract downward or merge the
   libraries when they are actually one capability.
-- Keep dependency-light models/contracts usable by backend, frontend, migrations, and tests without
+- Keep dependency-light models/contracts usable by backend, frontend, target-baseline tooling, and tests without
   pulling runtime frameworks or external-I/O clients.
 - Tag every project on three distinct dimensions: project type (`type:app|lib`), functional layer
   (`layer:entrypoint|model|contract|util|backend|frontend|infra`), and bounded-capability ownership

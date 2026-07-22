@@ -146,7 +146,7 @@ describe("ES256 capability proof", function _suite()
 		expect(__VerifyCapabilityProof(_signProof(HEADER, CLAIMS), EXPECTATION)).toEqual({ valid: true, proofKeyThumbprint: CAPABILITY.proofKeyThumbprint, claims: CLAIMS });
 	});
 
-	it("verifies the long-lived personal Deployment workload class without a Job sentinel", function _deploymentWorkload()
+	it("verifies the generic managed-runtime Deployment workload class", function _deploymentWorkload()
 	{
 		const capability = { ...CAPABILITY, workloadKind: "deployment" as const, workloadUid: "deployment-uid-7" };
 		const expectation = _expectation({ capability, binding: { ...EXPECTATION.binding, workloadKind: "deployment", workloadUid: "deployment-uid-7" } });

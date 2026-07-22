@@ -17,9 +17,11 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | _(apps/opencrane-ui)_ | — | Org-admin Angular SPA, ported in from WeOwnAI (#152). PrimeNG, zoneless/signals, standalone components — see [`angular.md`](./angular.md). Just another client of the opencrane-api (API-First Rule below). `npx nx build\|serve opencrane-ui`. |
 | `cognee`, `litellm`, `obot` | Local `README.md` | Deployment-only Nx apps under `apps/_infra/<name>`. Each owns its pinned image contract, identity, service, policy, and Helm templates; the upstream product source remains external. |
 | `langfuse` | [`apps/_infra/langfuse/README.md`](../../apps/_infra/langfuse/README.md) | Pinned upstream deployment wrapper with all six bundled workload classes registered explicitly. |
-| `database-schema` | [`apps/_infra/deploy-k8s/components/database-schema/README.md`](../../apps/_infra/deploy-k8s/components/database-schema/README.md) | Deploy-k8s-owned Prisma migration Job component. It runs the exact server image with DB-only reachability and no mounted ServiceAccount token. |
-| _(apps/_infra/deploy-k8s)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units, owns deploy-only components such as the schema Job, and carries CRDs, issuers, external-secret wiring, and cross-plane defaults. |
+| _(apps/_infra/deploy-k8s)_ | — | Silo umbrella and deploy entrypoint. It composes app-owned Helm library units and carries CRDs, issuers, external-secret wiring, and cross-plane defaults. Clean database setup is composed from the OpenCrane-owned target baseline and the PostgreSQL CNPG chart. |
 | _(apps/feat-openclaw-tenant)_ | — | Deletion target: remove this OpenClaw tenant image/build rollup with its controller and renderer when the personal-agent runtime replacement lands. |
+| _(apps/agent-runtime)_ | [apps/agent-runtime/README.md](../../apps/agent-runtime/README.md) | Controller-assigned one-attempt Job image. Its current Python shell opens only a projected-token-authenticated stream; no listener, model/tool driver, or durable tenant storage. |
+| _(apps/agent-controller)_ | [apps/agent-controller/README.md](../../apps/agent-controller/README.md) | Thin outbound-only process and app-owned least-privilege boundary for suspended-Job assignment, fenced release, and first-Pod registration. |
+| _(apps/managed-agent-runtime)_ | [apps/managed-agent-runtime/README.md](../../apps/managed-agent-runtime/README.md) | Chart/deploy-only managed (central) agent plane: dedicated namespace, connector-scoped `managed-agent-runtime-*` ServiceAccount (`automountServiceAccountToken:false`), default-deny + explicit-egress NetworkPolicies. Reuses the `agent-runtime` image; ships no source. |
 
 ## Libs (`libs/`)
 
@@ -29,6 +31,9 @@ linked below** — read it before non-trivial work in that package. The whole-cl
 | `@opencrane/util` | [libs/util/README.md](../../libs/util/README.md) | Dependency-free pure helpers shared across domain packages (`scope:shared`). |
 | `libs/server/_infra/{api,auth,http}` | — | Kubernetes, authentication, and HTTP runtime seams owned by the OpenCrane server. |
 | `libs/server/_infra/channel-proxy` | — | Trusted origin/auth/rate-limit/WebSocket transport owned by the OpenCrane server runtime. |
+| `libs/server/_infra/agent-runtime-stream` | [README](../../libs/server/_infra/agent-runtime-stream/README.md) | Runtime-initiated projected-token HTTP/SSE transport. It never owns assignments or durable run state. |
+| `libs/backend/agents/runtime/k8s-launcher` | [README](../../libs/backend/agents/runtime/k8s-launcher/README.md) | Pure suspended-Job projection; Helm owns the dedicated runtime namespace and its network policy. |
+| `libs/backend/agents/runtime/controller` | [README](../../libs/backend/agents/runtime/controller/README.md) | Crash-safe controller orchestration: exact assignment, conditional Job release, and strict first-Pod registration. Composed only by `apps/agent-controller`. |
 | `libs/server/_infra/tenant-hosting` | — | GCP and on-prem tenant-storage adapters owned by the OpenCrane server runtime; the app retains only factory composition. |
 | _(libs/onboarding)_ | — | **Empty placeholder** — not registered as an NX project and has no code yet. |
 
@@ -46,16 +51,26 @@ personal-agent runtime replacement lands.
 Each owns its routes, core services, API types, tests, and (where applicable) a
 `prisma/schema/<d>.prisma` slice. Layout, bounded `scope:<capability>` rules, and the
 add-a-domain checklist live in [`libs/backend/README.md`](../../libs/backend/README.md);
-schema/migration ownership in [`prisma.md`](./prisma.md).
+schema/baseline ownership in [`prisma.md`](./prisma.md).
 
 ## Personal-agent domains (`libs/backend/agents/personal/*/main`)
 
 Personal-agent product capabilities use the `backend-agents-personal-<d>` NX namespace under
 `libs/backend/agents/personal/<d>/main`: personas, conversations, runs, and memory. They own a
 person's approved persona, conversation events, run lifecycle, and memory catalogue respectively.
+The sibling `session/main` package owns the single assembler that turns those authorities into an
+immutable `RunInputSnapshot`; it is session orchestration, not a second source of persona or run
+truth.
 Fleet membership, proof-bound authorization, and agent-service publication remain in
 `libs/backend/server/` because they are control-plane authorities, not personal-agent behaviour.
 A future Silo-integration custody authority belongs there too; it is not present in this checkout yet.
+
+## Agent-runtime domains (`libs/backend/agents/runtime/*`)
+
+Runtime packages sit beside `personal/` because they govern the language-neutral execution boundary
+for personal and managed agents. `runtime/main` admits commands and candidate output only when the
+current run, attempt, workload assignment, sequence, expiry, and lease fence still match. It owns no
+transport, Kubernetes workload, model loop, tool implementation, or second durable event store.
 
 ## Frontend libs (`libs/frontend/*`)
 

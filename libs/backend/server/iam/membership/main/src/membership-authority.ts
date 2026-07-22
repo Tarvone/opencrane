@@ -17,7 +17,11 @@ export async function __VerifyCurrentFleetMembership(repository: FleetMembership
 	return { outcome: "trusted", revision: result.evidence.revision, trustedUntilEpochMs: result.evidence.trustedUntilEpochMs };
 }
 
-/** Verifies current membership and returns only the signed evidence that may be frozen into a run input. */
+/**
+ * Verifies current membership and returns only signer-produced evidence safe to freeze into a run.
+ * The result never echoes caller claims as proof, and the acceptance high-watermark advances before
+ * trusted evidence is returned so concurrent rollback attempts fail closed.
+ */
 export async function __VerifyCurrentFleetMembershipEvidence(repository: FleetMembershipAuthorityRepository, verifier: FleetMembershipSignatureVerifier, command: VerifyFleetMembershipCommand): Promise<VerifyFleetMembershipEvidenceResult>
 {
 	// 1. Resolve only the freshest locally available signed revision; absence cannot imply membership.

@@ -93,7 +93,7 @@ export async function __ResolveChannelTarget(dependencies: ChannelTargetResoluti
 	let runId: string | null = null;
 	if (command.action === "command.forward")
 	{
-		const run = await dependencies.runStart.prepareInteractiveRun({ subjectId, siloId: hostBinding.siloId, threadId: thread.threadId, agentServiceId: thread.agentServiceId, authorizationDigest: authorization.authorizationDigest });
+		const run = await dependencies.runStart.prepareInteractiveRun({ subjectId, siloId: hostBinding.siloId, threadId: thread.threadId, agentServiceId: thread.agentServiceId, authorizationDigest: authorization.authorizationDigest, requestIdempotencyKey: command.requestIdempotencyKey! });
 		if (run.outcome === "unavailable") return { outcome: "denied", reason: "run_unavailable" };
 		if (run.outcome !== "ready" || !run.runId.trim()) return { outcome: "denied", reason: "run_denied" };
 		runId = run.runId;
@@ -152,6 +152,7 @@ function _commandIsValid(command: ResolveChannelTargetCommand): boolean
 		&& /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?$/u.test(command.trustedHost)
 		&& /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(command.threadId)
 		&& (command.action === "command.forward" || command.action === "events.read")
+		&& (command.action !== "command.forward" || (command.requestIdempotencyKey !== undefined && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(command.requestIdempotencyKey)))
 		&& (command.cursor === undefined || /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(command.cursor));
 }
 

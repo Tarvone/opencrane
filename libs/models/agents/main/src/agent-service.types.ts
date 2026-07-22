@@ -6,18 +6,6 @@ export type AgentServiceKind = "personal" | "managed";
 /** Lifecycle state of a stable agent service identity. */
 export type AgentServiceState = "draft" | "active" | "paused" | "retired";
 
-/** Independent containment dimensions supported by agent ownership. */
-export type AgentOwnerScope = "organization" | "department" | "team" | "project" | "personal" | "user";
-
-/** Owner of an agent service within one explicit containment dimension. */
-export interface AgentOwner
-{
-	/** Containment dimension under which the owner is resolved. */
-	readonly scope: AgentOwnerScope;
-	/** Identifier meaningful within the selected containment dimension. */
-	readonly subjectId: string;
-}
-
 /** Stable product identity for a personal or managed agent. */
 export interface AgentService
 {
@@ -29,8 +17,6 @@ export interface AgentService
 	readonly kind: AgentServiceKind;
 	/** Human-readable service name shown in product surfaces. */
 	readonly name: string;
-	/** Explicit owner, including its independent containment dimension. */
-	readonly owner: AgentOwner;
 	/** Current lifecycle state. */
 	readonly state: AgentServiceState;
 	/** Immutable revision activated for new runs, or null before publication. */

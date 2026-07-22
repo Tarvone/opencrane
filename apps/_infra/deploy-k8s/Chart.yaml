@@ -35,9 +35,6 @@ dependencies:
   - name: opencrane-artifact-service
     version: 0.1.0
     repository: "file://../../artifact-service/helm"
-  - name: opencrane-database-schema
-    version: 0.1.0
-    repository: "file://components/database-schema"
   - name: opencrane-cognee
     version: 0.1.0
     repository: "file://../cognee/helm"

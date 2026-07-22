@@ -83,18 +83,13 @@ import back into it.
 
 ## Data & persistence
 
-Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, and one greenfield
-initializer at `prisma/migrations/0001_target_baseline/migration.sql`. The runs slice binds every
-`AgentRun` to exactly one immutable
-`RunInputSnapshot` by run, digest, thread, silo, service, revision and effective-contract coordinates,
-and commits its initial acceptance and dispatch events in the same transaction. A partial or
-mismatched admission therefore cannot commit. The initializer includes the reviewed PostgreSQL
-functions and triggers that enforce authority invariants Prisma cannot express.
-The migrate init-container applies it to a new database with `prisma migrate deploy`. During a CNPG
-restore it waits at most three wall-clock minutes for the PostgreSQL Service endpoint to accept a TCP
-connection, then runs Prisma exactly once. Schema, permissions, and migration-history errors still
-fail immediately. OpenCrane does not carry an upgrade path or data migration from an older product
-schema.
+Owns the silo's Prisma schema, split per domain under `prisma/schema/*.prisma`, and one app-owned
+target database definition at `prisma/bootstrap/target-baseline.sql`. CloudNativePG applies that SQL
+once, during `initdb` for an empty database, as the configured application owner. Physical recovery
+uses the schema already stored in the backup, and server startup never mutates database shape.
+OpenCrane does not carry an upgrade or data-conversion path from an older product schema. The runs slice binds every `AgentRun`
+to exactly one `RunInputSnapshot` by run, digest, thread, silo, service, revision and
+effective-contract coordinates, so a partial or mismatched admission cannot commit.
 
 ## Runtime & config
 

@@ -265,6 +265,19 @@ describe("PrismaRuntimeDispatchAuthority", function _describeDispatchAuthority()
 		expect(ran).toBe(1);
 	});
 
+	it("returns a dispatch failure so the runtime can retry its admitted external action", async function _surfacesExternalActionFailure()
+	{
+		let attempts = 0;
+		const context = _authority({ runState: "Running", externalActionRunner: { async run(): Promise<void> { attempts += 1; throw new Error("temporary tool authority outage"); } } });
+		const start = await context.authority.__NextCommand(_identity, _open, 0);
+		const candidate: RuntimeCandidate = { protocolVersion: AGENT_RUNTIME_PROTOCOL_V1, runtimeInstanceId: "instance-1", commandId: start?.commandId ?? "command-1", candidateId: "candidate-ext-retry", runId: "run-1", attempt: 1, fence: 1, kind: "external_action", toolRevisionId: "mcp-server:server-1", toolInvocationId: "invocation-retry", argumentsDigest: "sha256:d", arguments: { q: "a" } };
+
+		await expect(context.authority.__AdmitCandidate(_identity, candidate)).rejects.toThrow("temporary tool authority outage");
+		await expect(context.authority.__AdmitCandidate(_identity, candidate)).rejects.toThrow("temporary tool authority outage");
+
+		expect(attempts).toBe(2);
+	});
+
 	it("returns null when no live assignment exists for the reviewed Pod", async function _unknownWorkload()
 	{
 		const context = _authority({ runState: "Running", podUid: null });

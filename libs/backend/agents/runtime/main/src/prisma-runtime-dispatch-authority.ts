@@ -130,14 +130,13 @@ export class PrismaRuntimeDispatchAuthority
 		return ___DoWithTrace("runtime_dispatch.candidate.admit", { namespace: identity.namespace }, async function _traceAdmit(): Promise<RuntimeCandidateDispatchResult>
 		{
 			const admission = await _admitCandidate(prisma, clock, identity, candidate);
-			// After the fence-checked admission commits, an accepted external action is reserved and
-			// dispatched through the injected composition-root runner, outside the admission transaction.
-			// The reserved ToolInvocation is the durable evidence, so a runner failure never rewrites the
-			// admission result the runtime already observed.
+			// After the fence-checked admission commits, dispatch accepted external actions outside the
+			// admission transaction. A transport or compilation error must reach the runtime so it retries
+			// the same candidate id; an idempotent replay then retries the durable reservation instead of
+			// silently losing an accepted side effect before its ToolInvocation exists.
 			if (admission.accepted && candidate.kind === "external_action" && externalActionRunner !== null)
 			{
-				try { await _dispatchExternalAction(prisma, compileRunInput, externalActionRunner, identity, candidate); }
-				catch { /* durable ToolInvocation state records the outcome; admission stays accepted. */ }
+				await _dispatchExternalAction(prisma, compileRunInput, externalActionRunner, identity, candidate);
 			}
 			return admission;
 		});

@@ -3,7 +3,7 @@
 # OpenCrane — install onto ANY Kubernetes cluster
 #
 # Installs OpenCrane onto the cluster your current kubectl context points at:
-# the app-owned PostgreSQL chart → the OpenCrane Helm chart → DB migrations.
+# the app-owned PostgreSQL chart (including clean target baseline) → the OpenCrane Helm chart.
 # Uses the published ghcr.io/opencrane images and the cluster's
 # default StorageClass — pure, provider-agnostic Kubernetes.
 #
@@ -139,6 +139,12 @@ fi
 POSTGRES_CONNECTION_PUBLISHER="$SCRIPT_DIR/../../../postgres/scripts/publish-app-connection-secret.sh"
 if [[ ! -f "$POSTGRES_CONNECTION_PUBLISHER" ]]; then
   echo "[k8s-deploy] PostgreSQL connection Secret publisher is missing at '$POSTGRES_CONNECTION_PUBLISHER'." >&2
+  exit 1
+fi
+POSTGRES_BASELINE_PUBLISHER="$SCRIPT_DIR/../../../postgres/scripts/publish-initdb-baseline-config-map.sh"
+POSTGRES_BASELINE_FILE="$SCRIPT_DIR/../../../opencrane/prisma/bootstrap/target-baseline.sql"
+if [[ ! -f "$POSTGRES_BASELINE_PUBLISHER" || ! -s "$POSTGRES_BASELINE_FILE" ]]; then
+  echo "[k8s-deploy] OpenCrane database baseline publisher or target SQL is missing." >&2
   exit 1
 fi
 
@@ -603,6 +609,10 @@ if ! kubectl get crd databases.postgresql.cnpg.io >/dev/null 2>&1; then
   err "CloudNativePG Database CRD is required (databases.postgresql.cnpg.io is absent). Install a compatible operator before OpenCrane."
   exit 1
 fi
+if ! kubectl get crd poolers.postgresql.cnpg.io >/dev/null 2>&1; then
+  err "CloudNativePG Pooler CRD is required (poolers.postgresql.cnpg.io is absent). Install a compatible operator before OpenCrane."
+  exit 1
+fi
 _require_postgres_bootstrap() {
   local authority="$1"
   local credentials_secret="$2"
@@ -641,11 +651,21 @@ _require_postgres_bootstrap langfuse "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$L
 _require_postgres_bootstrap database-admin "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_NAME"
 
 POSTGRES_RELEASE="${RELEASE}-postgres"
+if kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" >/dev/null 2>&1; then
+  POSTGRES_BASELINE_CONFIG_MAP="$(bash "$POSTGRES_BASELINE_PUBLISHER" "$NAMESPACE" "$POSTGRES_OWNER" "$POSTGRES_BASELINE_FILE" --verify-only)"
+  installed_baseline="$(kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.opencrane\.ai/database-baseline-config-map}')"
+  if [[ "$installed_baseline" != "$POSTGRES_BASELINE_CONFIG_MAP" ]]; then
+    err "PostgreSQL '$POSTGRES_RELEASE' was not created from target baseline '$POSTGRES_BASELINE_CONFIG_MAP'. Recreate it from a clean database or restore a compatible physical backup; OpenCrane does not migrate existing schemas."
+    exit 1
+  fi
+else
+  POSTGRES_BASELINE_CONFIG_MAP="$(bash "$POSTGRES_BASELINE_PUBLISHER" "$NAMESPACE" "$POSTGRES_OWNER" "$POSTGRES_BASELINE_FILE")"
+fi
 _install_postgres_server() {
-  local client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
+  local client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
   local databases_json="[{\"name\":\"opencrane\",\"owner\":\"$POSTGRES_OWNER\",\"credentialsSecret\":\"$POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"obot\",\"owner\":\"$OBOT_POSTGRES_OWNER\",\"credentialsSecret\":\"$OBOT_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"litellm\",\"owner\":\"$LITELLM_POSTGRES_OWNER\",\"credentialsSecret\":\"$LITELLM_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"langfuse\",\"owner\":\"$LANGFUSE_POSTGRES_OWNER\",\"credentialsSecret\":\"$LANGFUSE_POSTGRES_CREDENTIALS_SECRET\"}]"
   if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
-    client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager-migrate"}}]'
+    client_selectors_json='[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}},{"matchLabels":{"app.kubernetes.io/component":"fleet-manager"}}]'
     databases_json="[{\"name\":\"opencrane\",\"owner\":\"$POSTGRES_OWNER\",\"credentialsSecret\":\"$POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"obot\",\"owner\":\"$OBOT_POSTGRES_OWNER\",\"credentialsSecret\":\"$OBOT_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"litellm\",\"owner\":\"$LITELLM_POSTGRES_OWNER\",\"credentialsSecret\":\"$LITELLM_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"langfuse\",\"owner\":\"$LANGFUSE_POSTGRES_OWNER\",\"credentialsSecret\":\"$LANGFUSE_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"fleet\",\"owner\":\"$FLEET_POSTGRES_OWNER\",\"credentialsSecret\":\"$FLEET_POSTGRES_CREDENTIALS_SECRET\"}]"
   fi
   local postgres_args=(upgrade --install "$POSTGRES_RELEASE" "$POSTGRES_CHART_DIR"
@@ -653,6 +673,8 @@ _install_postgres_server() {
     --set-json "databases=$databases_json"
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME"
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET"
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$POSTGRES_BASELINE_CONFIG_MAP"
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql"
     --set-json "networkPolicy.clientPodSelectors=$client_selectors_json")
   [[ -n "$POSTGRES_VALUES_FILE" ]] && postgres_args+=(--values "$POSTGRES_VALUES_FILE")
   [[ -n "$STORAGE_CLASS" ]] && postgres_args+=(--set-string "storage.storageClass=$STORAGE_CLASS")
@@ -660,9 +682,18 @@ _install_postgres_server() {
     postgres_args+=(--reset-then-reuse-values)
   fi
 
-  log "Installing PostgreSQL server with isolated logical databases…"
+  log "Reconciling PostgreSQL server against target baseline '$POSTGRES_BASELINE_CONFIG_MAP'…"
   helm "${postgres_args[@]}"
   kubectl wait --for=condition=Ready "cluster/${POSTGRES_RELEASE}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
+  local reconciled_baseline
+  reconciled_baseline="$(kubectl get "cluster/$POSTGRES_RELEASE" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.opencrane\.ai/database-baseline-config-map}')"
+  if [[ "$reconciled_baseline" != "$POSTGRES_BASELINE_CONFIG_MAP" ]]; then
+    err "PostgreSQL '$POSTGRES_RELEASE' restored baseline '$reconciled_baseline', but this release requires '$POSTGRES_BASELINE_CONFIG_MAP'. Restore a compatible physical backup or recreate the database; OpenCrane does not migrate schemas."
+    exit 1
+  fi
+  # CNPG Pooler resources do not publish a Kubernetes Ready condition; the managed Deployment does.
+  kubectl wait --for=create "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
+  kubectl wait --for=condition=available "deployment/${POSTGRES_RELEASE}-pooler" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
   for database_resource in "${POSTGRES_RELEASE}-obot" "${POSTGRES_RELEASE}-litellm" "${POSTGRES_RELEASE}-langfuse"; do
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT}s"
   done
@@ -675,9 +706,15 @@ _install_postgres_server() {
 _publish_database_connection() {
   local credentials_secret="$1"
   local app_secret="$2"
-  local database_name="$3"
+  local host="$3"
+  local database_name="$4"
+  local connection_options="${5:-}"
+  local publisher_args=("$NAMESPACE" "$credentials_secret" "$app_secret" "$host" "$database_name")
+  if [[ -n "$connection_options" ]]; then
+    publisher_args+=("$connection_options")
+  fi
   bash "$POSTGRES_CONNECTION_PUBLISHER" \
-    "$NAMESPACE" "$credentials_secret" "$app_secret" "${POSTGRES_RELEASE}-rw" "$database_name"
+    "${publisher_args[@]}"
 }
 
 _copy_cnpg_uri_secret() {
@@ -699,14 +736,18 @@ OBOT_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-obot-app"
 LITELLM_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-litellm-app"
 LANGFUSE_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-langfuse-app"
 POSTGRES_ADMIN_APP_SECRET="${POSTGRES_RELEASE}-admin"
-_publish_database_connection "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_APP_SECRET" opencrane
-_publish_database_connection "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_APP_SECRET" obot
-_publish_database_connection "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_APP_SECRET" litellm
-_publish_database_connection "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_APP_SECRET" langfuse
-_publish_database_connection "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_APP_SECRET" opencrane
+POSTGRES_POOLER_HOST="${POSTGRES_RELEASE}-pooler"
+# The one replica of the OpenCrane server gets five Prisma connections at most.
+# This leaves 75 of the 80 physical-server connections outside Prisma's process
+# pool and keeps the 50-connection PgBouncer database budget authoritative.
+_publish_database_connection "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_APP_SECRET" "$POSTGRES_POOLER_HOST" opencrane "sslmode=disable&connection_limit=5&pool_timeout=5"
+_publish_database_connection "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_APP_SECRET" "$POSTGRES_POOLER_HOST" obot
+_publish_database_connection "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_APP_SECRET" "$POSTGRES_POOLER_HOST" litellm
+_publish_database_connection "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_APP_SECRET" "$POSTGRES_POOLER_HOST" langfuse
+_publish_database_connection "$POSTGRES_ADMIN_CREDENTIALS_SECRET" "$POSTGRES_ADMIN_APP_SECRET" "$POSTGRES_POOLER_HOST" opencrane
 if [[ "$INSTALL_FLEET_DATABASE" == "1" ]]; then
   FLEET_POSTGRES_APP_SECRET="${POSTGRES_RELEASE}-fleet-app"
-  _publish_database_connection "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_APP_SECRET" fleet
+  _publish_database_connection "$FLEET_POSTGRES_CREDENTIALS_SECRET" "$FLEET_POSTGRES_APP_SECRET" "$POSTGRES_POOLER_HOST" fleet
 fi
 
 _assert_distinct_cnpg_app_credentials() {
@@ -1199,7 +1240,7 @@ TN_TAG="${TENANT_TAG:-$IMAGE_TAG}"
 [[ -n "$BASE_DOMAIN" ]] && helm_args+=(--set "ingress.domain=$BASE_DOMAIN")
 # Langfuse has its own database and role on this ClusterTenant's shared PostgreSQL server.
 # It never receives the OpenCrane, Obot, or LiteLLM credential.
-helm_args+=(--set-string "langfuse.postgresql.host=${POSTGRES_RELEASE}-rw.${NAMESPACE}.svc.cluster.local")
+helm_args+=(--set-string "langfuse.postgresql.host=${POSTGRES_POOLER_HOST}.${NAMESPACE}.svc.cluster.local")
 helm_args+=(--set-string "langfuse.postgresql.auth.username=$LANGFUSE_POSTGRES_OWNER")
 helm_args+=(--set-string "langfuse.postgresql.auth.existingSecret=$LANGFUSE_POSTGRES_APP_SECRET")
 helm_args+=(--set-string "langfuse.postgresql.auth.secretKeys.userPasswordKey=password")
@@ -1267,14 +1308,8 @@ elif helm status "$RELEASE" -n "$NAMESPACE" >/dev/null 2>&1; then
 fi
 helm "${helm_args[@]}"
 
-# 4. Wait for the core workloads.
-# Database schema revisions run via deploy-k8s's pre-upgrade hook Job
-# (prisma migrate deploy), which `helm upgrade` above blocks on before the
-# rollout — so EVERY deploy reconciles the schema, even when the OpenCrane server
-# pod template is unchanged (a plain `helm upgrade` won't roll an unchanged pod,
-# so the db-migrate initContainer alone could leave the schema behind when the
-# database was recreated under a running pod). The initContainer remains a
-# belt-and-suspenders guard for pod (re)creation between deploys. Idempotent.
+# 4. Wait for the core workloads. The database schema was fixed during CNPG initdb;
+# application startup never mutates it. A changed baseline requires a clean database.
 # Wait only on the deployment(s) this chart actually rendered: the fleet chart ships
 # the fleet-manager, the silo chart the clustertenant-manager. A fleet-only (or silo-only)
 # install has just one, so guard each wait on the deployment existing rather than waiting

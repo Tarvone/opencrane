@@ -125,9 +125,14 @@ and governed Python skill Jobs
 
 **AgentService lane:** implement AgentService/Revision/Run, organization/department/team/project/
 personal/user sharing, schedules, one-attempt Jobs, approvals, effective access, audit, cost, and the
-one-way personal→managed boundary ([#129](https://github.com/italanta/opencrane/issues/129)). Port
-useful Slack behavior only as schedule + MCP + skill + checkpoint; delete the interval worker and
-direct Cognee writes.
+one-way personal→managed boundary ([#129](https://github.com/italanta/opencrane/issues/129)).
+**Central agents** — org-, department-, team-, or otherwise shared managed AgentServices that run on a
+schedule or a specific trigger to do one bounded task — run on the same runtime substrate as personal
+agents but under a narrower, connector-scoped workload identity independent of any human user. They
+reach external systems only through Obot-custodied MCP servers, instantiable per connected source. The
+legacy ingestion interval worker and its direct Cognee writes are deleted.
+Conversation-initiated config changes (always-granted `upgrade_session` tool,
+logged persona refresh, apply-at-next-snapshot) → [#318](https://github.com/italanta/opencrane/issues/318).
 
 Exit: the canonical runtime and managed-agent lifecycle pass failure, replay, authorization,
 isolation, cancellation, provider, and artifact tests with no OpenClaw compatibility surface.
@@ -187,6 +192,7 @@ to create, share, schedule, observe, revoke, and delete agents and assets.
 | [#227](https://github.com/italanta/opencrane/issues/227) | Delete packages and images when their replacement slice lands |
 | [#231](https://github.com/italanta/opencrane/issues/231) | Introduce final target names directly; do not preserve legacy DNS or aliases |
 | [#255](https://github.com/italanta/opencrane/issues/255) | Close pre-pivot PRs #247 (superseded by ADR 0007 and this plan) and #241; port #241's Obot custody/credential/discovery slices at Phase D |
+| [#318](https://github.com/italanta/opencrane/issues/318) | Conversation-initiated config changes: always-granted `upgrade_session` tool, logged persona refresh, user-editable params in the product UI |
 
 ## Deferred research
 

@@ -137,6 +137,7 @@ grep -Fq "object.spec.template.spec.containers[0].env[2].name == 'OPENCRANE_RUNT
 grep -Fq "object.spec.template.spec.containers[0].volumeMounts.size() == 4" "$ADMISSION"
 grep -Fq "object.spec.template.spec.volumes.size() == 4" "$ADMISSION"
 grep -Fq "object.spec.template.spec.volumes[2].name == 'litellm-key'" "$ADMISSION"
+grep -Fq "secret.name.matches('^litellm-key-[a-f0-9]{32}$')" "$ADMISSION"
 grep -Fq 'quantity(object.spec.template.spec.volumes[3].emptyDir.sizeLimit).compareTo(quantity("1Gi")) == 0' "$ADMISSION"
 if grep -Eq 'resources\.(requests|limits)\.[a-z]+ == quantity|emptyDir\.sizeLimit == quantity' "$ADMISSION"; then
   echo "admission compares a serialized resource string directly with a CEL Quantity" >&2
@@ -186,6 +187,10 @@ if render_enabled --set agentController.runtimeProfile.resources.requests.cpu=2 
 fi
 if render_enabled --kube-version 1.29.9 >/dev/null 2>&1; then
   echo "Kubernetes 1.29 was accepted despite the stable admission API requirement" >&2
+  exit 1
+fi
+if render_enabled --set sharedPlatform.litellm.mode=shared >/dev/null 2>&1; then
+  echo "agent controller accepted shared LiteLLM despite requiring its same-silo Service boundary" >&2
   exit 1
 fi
 if helm template oc "$CHART_ROOT" --namespace server-ns \

@@ -13,10 +13,10 @@ CNPG owns the running database. It is the single durable data store every silo d
 ## What it owns
 
 A **silo** is one customer's isolated slice of OpenCrane. This chart declares the silo's database:
-**one** CNPG `Cluster` holding several logical databases, expandable mounted storage, ingress
-isolation, and optional plugin-based backup/recovery. Application data is retained indefinitely; the
-Cluster survives Helm uninstall, and deleting a database is an explicit operator action, never a
-release side-effect.
+**one** CNPG `Cluster` holding several logical databases, a bounded CNPG-managed PgBouncer pooler,
+expandable mounted storage, ingress isolation, and optional plugin-based backup/recovery. Application
+data is retained indefinitely; the Cluster survives Helm uninstall, and deleting a database is an
+explicit operator action, never a release side-effect.
 
 It sits beneath everything else in the silo — the server, LiteLLM, Obot, and Langfuse each get their
 own logical database inside the shared Cluster, and each authenticates only to its own:
@@ -24,7 +24,7 @@ own logical database inside the shared Cluster, and each authenticates only to i
 ```
  ┌──────────────────────────────────────────────┐
  │  postgres (this chart)  ◄── HERE               │  declares desired Cluster + network boundary
- │   one CNPG Cluster                             │
+ │   one CNPG Cluster + bounded PgBouncer Pooler  │
  │     ├── opencrane   ├── litellm                │  one logical DB + owner role per authority
  │     ├── obot        └── langfuse  (+ fleet)    │
  │     └── database admin .........................│  inspect every DB; no durable writes/superuser
@@ -37,8 +37,10 @@ own logical database inside the shared Cluster, and each authenticates only to i
 [litellm](../_infra/litellm/README.md) · [obot](../_infra/obot/README.md) ·
 [langfuse](../_infra/langfuse/README.md)
 
-CNPG bootstraps the first database, then declaratively reconciles the remaining least-privilege roles
-and `Database` custom resources. Each application role can authenticate only to its own database —
+CNPG bootstraps the first database from one immutable, content-addressed ConfigMap containing the
+OpenCrane-owned target SQL, then declaratively reconciles the remaining least-privilege roles and
+`Database` custom resources. The publisher prepends `SET ROLE` for the configured first-database
+owner, so CNPG's bootstrap superuser never becomes the owner of application objects. Each application role can authenticate only to its own database —
 there are no shared owner roles or credentials. A separate operational administrator can connect to
 every logical database for monitoring and investigation, but cannot durably write application data,
 change persistent schemas, bypass row-level security, create databases/roles, or act as a superuser.
@@ -47,7 +49,17 @@ never reused by an application. Deployment publishes a separate administrator co
 for explicit operator access; no application workload consumes it. One connection Secret per
 database is published by
 `scripts/publish-app-connection-secret.sh`, which adds the `uri` without sharing credentials across
-authorities or leaking them into command arguments or logs.
+authorities or leaking them into command arguments or logs. Clean setup publishes the baseline with
+`scripts/publish-initdb-baseline-config-map.sh`; physical recovery does not execute that SQL because
+the backup already contains the schema, but records the source baseline identity as provenance.
+
+The pooler is deliberately part of the data boundary rather than an optional optimisation. Its default
+budget permits at most ten server connections per logical database (fifty across the deployed
+databases) while PostgreSQL permits eighty. The OpenCrane server's one replica is further capped at
+five Prisma connections with a five-second acquisition timeout. That means a burst waits at PgBouncer
+instead of holding every PostgreSQL connection while a run-admission transaction waits on a service
+lock. If replica counts or database count change, change these numbers together and keep the summed
+pooler budget below `postgresql.maxConnections`.
 
 **Invariant.** One CNPG Cluster hosts many databases (not one cluster per authority — that wastes idle
 pods and volumes). Because CNPG (as the database-pod controller) generates the instance-manager
@@ -63,7 +75,7 @@ runtime identity it reconciles.
 | OpenCrane (this chart) | CloudNativePG (vendor) |
 |---|---|
 | Desired `Cluster` spec, logical databases, storage request, ingress isolation | Running Postgres pods, instance-manager identity, failover |
-| Supplying distinct application/admin Secret names and reconciling database access | Bootstrapping and reconciling roles/`Database` CRs |
+| Supplying distinct application/admin Secret names, the app-owned target baseline reference, and database access | Bootstrapping the target SQL and reconciling roles/`Database` CRs |
 | Selecting/enabling a backup plugin in values | Operator + CRD install (an external prerequisite) |
 
 OpenCrane does **not** install or upgrade the CNPG operator, and does **not** generate, rotate, or
@@ -79,6 +91,8 @@ repair database credentials.
 - one separate basic-auth Secret for the operational database administrator; its `username` must
   equal `databaseAdmin.name`, and both the username and Secret must differ from every application
   owner/Secret;
+- one immutable target-baseline ConfigMap published from
+  `apps/opencrane/prisma/bootstrap/target-baseline.sql` before a fresh install;
 - a mounted `ReadWriteOnce` StorageClass with volume expansion enabled.
 
 ## Boundary
@@ -97,10 +111,15 @@ An app entrypoint (Helm chart). It is composed by the silo umbrella chart
 Install the database **before** the server release; grow the PVC request as durable data grows:
 
 ```bash
+kubectl create namespace opencrane --dry-run=client -o yaml | kubectl apply -f -
+BASELINE_CONFIG_MAP="$(bash apps/postgres/scripts/publish-initdb-baseline-config-map.sh \
+  opencrane opencrane apps/opencrane/prisma/bootstrap/target-baseline.sql)"
 helm upgrade --install opencrane-postgres apps/postgres/helm \
-  --namespace opencrane --create-namespace \
+  --namespace opencrane \
   --set databaseAdmin.name=opencrane_database_admin \
   --set databaseAdmin.credentialsSecret=opencrane-postgres-admin \
+  --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name="$BASELINE_CONFIG_MAP" \
+  --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql \
   --set databases[0].credentialsSecret=opencrane-postgres-bootstrap \
   --set databases[1].credentialsSecret=opencrane-obot-postgres-bootstrap \
   --set databases[2].credentialsSecret=opencrane-litellm-postgres-bootstrap \
@@ -109,7 +128,11 @@ kubectl wait --for=condition=Ready cluster/opencrane-postgres \
   --namespace opencrane --timeout=5m
 ```
 
-The k3d acceptance path server-dry-runs both contracts against the pinned CNPG CRDs, installs a pinned
+The chart requires exactly one target baseline for `initdb` and renders no SQL reference on
+`recovery`. A recovery instead requires `restore.sourceBaselineConfigMap`, the content-addressed
+identity recorded on its source Cluster, so later deploys can verify schema provenance without
+executing setup again. A changed baseline does not update a running Cluster: recreate an empty database or restore a compatible
+physical backup. The k3d acceptance path server-dry-runs both contracts against the pinned CNPG CRDs, installs a pinned
 Barman Cloud plugin and MinIO test target, writes a marker, completes an on-demand physical backup,
 recovers a fresh Cluster, and verifies the marker through the recovered application Secret.
 

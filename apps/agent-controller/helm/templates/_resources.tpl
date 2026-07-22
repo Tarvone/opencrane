@@ -26,6 +26,9 @@
 {{- if not (semverCompare ">=1.30.0-0" .Capabilities.KubeVersion.Version) }}
 {{- fail "agentController.enabled=true requires Kubernetes 1.30+ for admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy" }}
 {{- end }}
+{{- if eq (include "opencrane.litellmShared" .) "true" }}
+{{- fail "agentController.enabled=true requires sharedPlatform.litellm.mode=instance for its same-silo runtime boundary" }}
+{{- end }}
 {{- if not .Values.agentController.kubernetesApiServerCidrs }}
 {{- fail "agentController.enabled=true requires at least one exact agentController.kubernetesApiServerCidrs entry for bounded Kubernetes API egress" }}
 {{- end }}
@@ -44,7 +47,7 @@
 {{- end -}}
 {{- $openCraneInternalUrl := default (printf "http://%s-opencrane-server.%s.svc.cluster.local:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.clustertenantManager.service.internalPort) .Values.agentController.openCraneInternalUrl -}}
 {{- $runtimeStreamUrl := default (printf "%s/api/internal/agent-runtime" $openCraneInternalUrl) .Values.agentController.runtimeProfile.runtimeStreamUrl -}}
-{{- $runtimeLiteLlmUrl := default (printf "http://%s-litellm.%s.svc.cluster.local:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.litellm.service.port) .Values.agentController.runtimeProfile.litellmBaseUrl -}}
+{{- $runtimeLiteLlmUrl := printf "http://%s-litellm.%s.svc.cluster.local:%v" (include "opencrane.fullname" .) .Release.Namespace .Values.litellm.service.port -}}
 {{- $runtimeImage := printf "%s@%s" .Values.agentController.runtimeProfile.image.repository .Values.agentController.runtimeProfile.image.digest -}}
 {{- $controllerImage := printf "%s@%s" .Values.agentController.image.repository .Values.agentController.image.digest -}}
 {{- $controllerUsername := printf "system:serviceaccount:%s:%s" .Release.Namespace $controllerName -}}
@@ -553,6 +556,7 @@ spec:
         object.spec.template.spec.volumes[2].name == 'litellm-key' &&
         object.spec.template.spec.volumes[2].projected.defaultMode == 288 &&
         object.spec.template.spec.volumes[2].projected.sources.size() == 1 &&
+         object.spec.template.spec.volumes[2].projected.sources[0].secret.name.matches('^litellm-key-[a-f0-9]{32}$') &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items.size() == 1 &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].key == 'key' &&
         object.spec.template.spec.volumes[2].projected.sources[0].secret.items[0].path == 'key' &&

@@ -4,7 +4,7 @@ import { __UnavailableSandboxJobExecutor } from "@opencrane/server/_infra/sandbo
 import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memory-gateway-client";
 import { describe, expect, it } from "vitest";
 
-import { _CreateExternalActionExecutor, UnsupportedExternalActionError } from "../external-action-executor.js";
+import { _AssertExternalActionDispatchSucceeded, _CreateExternalActionExecutor, ExternalActionDispatchRejectedError, UnsupportedExternalActionError } from "../external-action-executor.js";
 
 /** Build a candidate for the given tool revision prefix. */
 function _candidate(toolRevisionId: string): RuntimeExternalActionCandidate
@@ -39,5 +39,10 @@ describe("composition-root external action executor", function _suite()
 	{
 		const executor = _CreateExternalActionExecutor(_candidate("unknown:thing"), DEPENDENCIES);
 		await expect(executor.execute()).rejects.toBeInstanceOf(UnsupportedExternalActionError);
+	});
+
+	it("makes a durable execution failure visible to the runtime transport", function _deniedDispatch()
+	{
+		expect(function _assertDenied(): void { _AssertExternalActionDispatchSucceeded({ outcome: "denied", reason: "invocation_execution_failed" }); }).toThrow(ExternalActionDispatchRejectedError);
 	});
 });

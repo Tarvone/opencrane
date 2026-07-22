@@ -29,7 +29,7 @@ import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memor
 import { ___DoWithTrace } from "@opencrane/observability";
 
 import { _CreatePrismaRunInputCompiler } from "./prisma-run-input-compiler.js";
-import { _CreateExternalActionExecutor } from "./external-action-executor.js";
+import { _AssertExternalActionDispatchSucceeded, _CreateExternalActionExecutor } from "./external-action-executor.js";
 import { _log } from "./log.js";
 
 /** Read a bounded, server-owned seconds setting and return milliseconds. */
@@ -214,6 +214,7 @@ function _CreateExternalActionRunner(prisma: PrismaClient): RuntimeExternalActio
 			const approvalRequired = tool?.requiresApproval ?? false;
 			const executor = _CreateExternalActionExecutor(candidate, { siloId: snapshot.siloId, subjectId: snapshot.identitySnapshot.executionSubjectId, obotCustody, sandboxExecutor, memoryGateway });
 			const result = await __ExecuteExternalAction(repository, { candidate, snapshot, compiledTools, approvalRequired }, executor);
+			_AssertExternalActionDispatchSucceeded(result);
 			// A deferred invocation opens the pending approval that gates the eventual resume.
 			if (result.outcome === "deferred")
 			{

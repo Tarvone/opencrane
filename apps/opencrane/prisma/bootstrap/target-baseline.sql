@@ -14,6 +14,9 @@ CREATE TYPE "AgentServiceState" AS ENUM ('draft', 'active', 'paused', 'retired')
 CREATE TYPE "AgentRevisionState" AS ENUM ('draft', 'published', 'rejected', 'retired');
 
 -- CreateEnum
+CREATE TYPE "AgentScheduleOverlapPolicy" AS ENUM ('skip', 'allow');
+
+-- CreateEnum
 CREATE TYPE "ArtifactKind" AS ENUM ('document', 'generated', 'skill', 'upload');
 
 -- CreateEnum
@@ -228,6 +231,23 @@ CREATE TABLE "agent_revision_scope_attachments" (
     "subject_id" TEXT NOT NULL,
 
     CONSTRAINT "agent_revision_scope_attachments_pkey" PRIMARY KEY ("agent_revision_id","scope","subject_type","subject_id")
+);
+
+-- CreateTable
+CREATE TABLE "agent_service_schedules" (
+    "id" TEXT NOT NULL,
+    "silo_id" TEXT NOT NULL,
+    "agent_service_id" TEXT NOT NULL,
+    "cron" TEXT NOT NULL,
+    "timezone" TEXT NOT NULL,
+    "overlap_policy" "AgentScheduleOverlapPolicy" NOT NULL DEFAULT 'skip',
+    "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "catchup_window_seconds" INTEGER NOT NULL DEFAULT 3600,
+    "last_scheduled_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "agent_service_schedules_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1617,6 +1637,12 @@ CREATE UNIQUE INDEX "agent_revisions_agent_service_id_digest_key" ON "agent_revi
 CREATE INDEX "agent_revision_scope_attachments_scope_subject_type_subject_idx" ON "agent_revision_scope_attachments"("scope", "subject_type", "subject_id");
 
 -- CreateIndex
+CREATE INDEX "agent_service_schedules_silo_id_agent_service_id_idx" ON "agent_service_schedules"("silo_id", "agent_service_id");
+
+-- CreateIndex
+CREATE INDEX "agent_service_schedules_enabled_idx" ON "agent_service_schedules"("enabled");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "agent_revision_skill_assignments_agent_revision_id_skill_re_key" ON "agent_revision_skill_assignments"("agent_revision_id", "skill_revision_id");
 
 -- CreateIndex
@@ -2222,6 +2248,9 @@ ALTER TABLE "agent_revisions" ADD CONSTRAINT "agent_revisions_source_revision_id
 
 -- AddForeignKey
 ALTER TABLE "agent_revision_scope_attachments" ADD CONSTRAINT "agent_revision_scope_attachments_agent_revision_id_fkey" FOREIGN KEY ("agent_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agent_service_schedules" ADD CONSTRAINT "agent_service_schedules_agent_service_id_silo_id_fkey" FOREIGN KEY ("agent_service_id", "silo_id") REFERENCES "agent_services"("id", "silo_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "agent_revision_skill_assignments" ADD CONSTRAINT "agent_revision_skill_assignments_agent_revision_id_fkey" FOREIGN KEY ("agent_revision_id") REFERENCES "agent_revisions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

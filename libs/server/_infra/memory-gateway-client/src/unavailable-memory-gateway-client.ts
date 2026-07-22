@@ -1,4 +1,5 @@
-import type { MemoryCorrectionCommand, MemoryForgetCommand, MemoryGatewayClient, MemoryQueryCommand, MemoryQueryResult } from "./memory-gateway-client.types.js";
+import { __AssertMemoryProvenanceComplete } from "./memory-provenance.js";
+import type { MemoryCorrectionCommand, MemoryForgetCommand, MemoryGatewayClient, MemoryQueryCommand, MemoryQueryResult, ScopedMemoryInjectionCommand, ScopedMemoryRecallCommand, ScopedMemoryRecallResult } from "./memory-gateway-client.types.js";
 
 /** Typed failure emitted when no authenticated memory-gateway transport is configured. */
 export class MemoryGatewayUnavailableError extends Error
@@ -29,6 +30,19 @@ export class __UnavailableMemoryGatewayClient implements MemoryGatewayClient
 	/** Rejects forgetting because no remote gateway can be contacted. */
 	async forget(_command: MemoryForgetCommand): Promise<void>
 	{
+		throw new MemoryGatewayUnavailableError();
+	}
+
+	/** Rejects scoped recall rather than returning an empty or fabricated result. */
+	async recallScoped(_command: ScopedMemoryRecallCommand): Promise<ScopedMemoryRecallResult>
+	{
+		throw new MemoryGatewayUnavailableError();
+	}
+
+	/** Enforces complete provenance first, then rejects the scoped write (no gateway configured). */
+	async injectScoped(command: ScopedMemoryInjectionCommand): Promise<void>
+	{
+		__AssertMemoryProvenanceComplete(command.provenance);
 		throw new MemoryGatewayUnavailableError();
 	}
 }

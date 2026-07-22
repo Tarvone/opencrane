@@ -1,4 +1,4 @@
-import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE } from "@opencrane/contracts";
 import { describe, expect, it } from "vitest";
 
 import { __BuildSuspendedAgentRuntimeJob, __DeriveAgentRuntimeReleaseDeadlineSeconds } from "../agent-runtime-job.js";
@@ -138,5 +138,36 @@ describe("personal-runtime attempt Job", function _Suite()
 	it("rejects delayed terminal cleanup that could retain scratch beyond assignment expiry", function _RejectsRetainedScratch()
 	{
 		expect(function _DelayedCleanup() { __BuildSuspendedAgentRuntimeJob(_Assignment(), { ..._Profile(), ttlSecondsAfterFinished: 1 }); }).toThrow(/immediate terminal cleanup/);
+	});
+
+	it("defaults to the personal identity class when no profile is selected", function _DefaultsPersonal()
+	{
+		const job = __BuildSuspendedAgentRuntimeJob(_Assignment(), _Profile());
+		const tokenProjection = job.spec?.template.spec?.volumes?.find(volume => volume.name === "runtime-token")?.projected?.sources?.[0]?.serviceAccountToken;
+		expect(tokenProjection?.audience).toBe(AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
+	});
+});
+
+describe("managed (central) agent runtime identity profile", function _ManagedSuite()
+{
+	/** Managed profile reusing the shared runtime image with the managed identity class. */
+	function _ManagedProfile(): AgentRuntimeJobProfile
+	{
+		return { ..._Profile(), identityProfile: "managed", serviceAccountName: "managed-agent-runtime-harvester" };
+	}
+
+	it("projects the distinct managed audience for a managed ServiceAccount", function _ManagedAudience()
+	{
+		const job = __BuildSuspendedAgentRuntimeJob(_Assignment(), _ManagedProfile());
+		const tokenProjection = job.spec?.template.spec?.volumes?.find(volume => volume.name === "runtime-token")?.projected?.sources?.[0]?.serviceAccountToken;
+		expect(tokenProjection?.audience).toBe(MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
+		expect(tokenProjection?.audience).not.toBe(AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE);
+		expect(job.spec?.template.spec?.serviceAccountName).toBe("managed-agent-runtime-harvester");
+	});
+
+	it("rejects a personal ServiceAccount name on a managed profile and vice versa", function _MutuallyExclusive()
+	{
+		expect(function _PersonalNameOnManaged() { __BuildSuspendedAgentRuntimeJob(_Assignment(), { ..._ManagedProfile(), serviceAccountName: "agent-runtime-personal" }); }).toThrow(/bounded runtime ServiceAccount/);
+		expect(function _ManagedNameOnPersonal() { __BuildSuspendedAgentRuntimeJob(_Assignment(), { ..._Profile(), serviceAccountName: "managed-agent-runtime-harvester" }); }).toThrow(/bounded runtime ServiceAccount/);
 	});
 });

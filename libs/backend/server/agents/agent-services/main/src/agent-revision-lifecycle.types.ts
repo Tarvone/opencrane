@@ -86,17 +86,32 @@ export interface ChangeAgentServiceStateCommand
 	readonly action: AgentServiceLifecycleAction;
 }
 
-/** Command that records one managed run-now admission request. */
+/** Why a managed run was admitted: an explicit run-now, or a due schedule slot. */
+export type ManagedRunTrigger = "managed_invocation" | "schedule";
+
+/** Command that records one managed run admission request. */
 export interface ManagedRunNowCommand
 {
-	/** Service to run now. */
+	/** Service to run. */
 	readonly agentServiceId: AgentServiceId;
 	/** Silo containing the service and durable run. */
 	readonly siloId: SiloId;
-	/** Subject requesting the managed invocation. */
+	/** Subject requesting the run (a human for run-now, the scheduler identity for a schedule). */
 	readonly requestedBy: string;
 	/** User-visible key making duplicate delivery return the first admission. */
 	readonly requestIdempotencyKey: string;
+	/**
+	 * Trigger recorded on the admitted run. `managed_invocation` for an explicit run-now;
+	 * `schedule` for a due schedule slot. The admission adapter maps this to the durable
+	 * `AgentRunTrigger`; it never opens a second run-creation path.
+	 */
+	readonly trigger: ManagedRunTrigger;
+	/**
+	 * Exact ISO-8601 scheduled-slot instant for a `schedule` trigger, or null for run-now. Carried
+	 * so the admission audit can attribute a run to its cron slot; the idempotency key already
+	 * encodes it, so it is descriptive rather than an independent dedup key.
+	 */
+	readonly scheduledSlot: string | null;
 }
 
 /** Stable reason a lifecycle command was refused before touching authority state. */

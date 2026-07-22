@@ -1,9 +1,27 @@
 import { createHash } from "node:crypto";
 import type { V1Job } from "@kubernetes/client-node";
 
-import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
+import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName, ___IsManagedAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 
-import type { AgentRuntimeJobAssignment, AgentRuntimeJobProfile } from "./agent-runtime-job.types.js";
+import type { AgentRuntimeIdentityProfile, AgentRuntimeJobAssignment, AgentRuntimeJobProfile } from "./agent-runtime-job.types.js";
+
+/** Resolve the identity class a profile projects, defaulting to the personal runtime class. */
+function _IdentityProfile(profile: AgentRuntimeJobProfile): AgentRuntimeIdentityProfile
+{
+	return profile.identityProfile ?? "personal";
+}
+
+/** Return the projected-token audience minted for the profile's identity class. */
+function _ProjectedTokenAudience(profile: AgentRuntimeJobProfile): string
+{
+	return _IdentityProfile(profile) === "managed" ? MANAGED_AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE : AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE;
+}
+
+/** Return whether a ServiceAccount name belongs to the profile's bounded identity class. */
+function _IsIdentityServiceAccountName(profile: AgentRuntimeJobProfile, value: string): boolean
+{
+	return _IdentityProfile(profile) === "managed" ? ___IsManagedAgentRuntimeServiceAccountName(value) : ___IsAgentRuntimeServiceAccountName(value);
+}
 
 /** Exact component label selected by the runtime namespace's deployment-owned policy. */
 const _COMPONENT_LABEL = "agent-runtime";
@@ -78,8 +96,9 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 		throw new Error("agent runtime profile requires an in-cluster LiteLLM base URL");
 	}
 
-	// 2. Bind the profile to one server namespace and one runtime identity class, never a per-user KSA.
-	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !___IsAgentRuntimeServiceAccountName(profile.serviceAccountName))
+	// 2. Bind the profile to one server namespace and the selected runtime identity class, never a
+	//    per-user KSA and never the OTHER class's grammar (personal ⇔ managed are mutually exclusive).
+	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !_IsIdentityServiceAccountName(profile, profile.serviceAccountName))
 	{
 		throw new Error("agent runtime profile requires one valid server namespace and bounded runtime ServiceAccount");
 	}
@@ -216,7 +235,7 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 						resources: structuredClone(profile.resources),
 					}],
 					volumes: [
-						{ name: "runtime-token", projected: { defaultMode: 0o440, sources: [{ serviceAccountToken: { path: "runtime.token", audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
+						{ name: "runtime-token", projected: { defaultMode: 0o440, sources: [{ serviceAccountToken: { path: "runtime.token", audience: _ProjectedTokenAudience(profile), expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
 						{ name: "runtime-bootstrap", downwardAPI: { defaultMode: 0o440, items: [{ path: "reference", fieldRef: { fieldPath: `metadata.annotations['${_BOOTSTRAP_REFERENCE_ANNOTATION}']` } }] } },
 						// The attempt-scoped LiteLLM key is projected group-readable (0440); never the master
 						// key, never a provider secret, and never a plaintext env var.

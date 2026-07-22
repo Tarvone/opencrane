@@ -5,6 +5,7 @@ export { __CreatePrismaRunInputCompiler } from "./prisma-run-input-compiler.js";
 export type { RunInputCompiler, RuntimeCandidateDispatchResult, RuntimeDispatchAuthorityConfig, RuntimeExternalActionRunner, RuntimeExternalActionRunnerResult, RuntimeStreamWorkloadIdentity } from "./prisma-runtime-dispatch-authority.types.js";
 export { __ExecuteExternalAction } from "./external-action-authority.js";
 export type { ExecuteExternalActionCommand, ExecuteExternalActionResult, ExternalActionExecutor, ExternalActionFailureReason } from "./external-action-authority.types.js";
+export { __CreateExternalActionExecutor } from "./external-action-executor.js";
 export { __AdmitModelTerminal, __ClaimSteeringBoundary } from "./steering-authority.js";
 export type { AdmitModelTerminalCommand, AdmitModelTerminalResult, ClaimSteeringBoundaryCommand, ClaimSteeringBoundaryResult, PendingSteering, SteeringBoundaryClaim, SteeringBoundaryClaimResult, SteeringBoundaryRepository, SteeringDisposition } from "./steering-authority.types.js";
 export { PrismaSteeringBoundaryRepository } from "./prisma-steering-boundary-repository.js";

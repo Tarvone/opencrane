@@ -48,8 +48,9 @@ candidate identifier rather than falsely treating the action as accepted or emit
 executor error. Once a runner records a durable refusal or result, that outcome is final and remains
 fail closed.
 
-It intentionally owns no HTTP listener, Kubernetes resource, model driver, provider credential,
-or tool execution. The app composes it with the stream transport and
+It intentionally owns no HTTP listener, Kubernetes resource, model driver, or provider credential.
+Its external-action adapter routes an admitted action through injected custody, sandbox, or memory
+ports; the app supplies those concrete ports and composes the library with the stream transport and
 the existing run/conversation authorities; a runtime can only submit candidates for those
 authorities to accept or reject.
 
@@ -62,6 +63,8 @@ authorities to accept or reject.
   runtime-instance binding on stream loss.
 - `__CreatePrismaRunInputCompiler` — binds the deterministic prompt compiler to the control-plane
   Prisma reads used by the dispatch transaction.
+- `__CreateExternalActionExecutor` — routes one admitted action to the injected MCP custody,
+  sandbox, or memory port and fails closed for unsupported revisions.
 - `RuntimeStreamWorkloadIdentity` / `RuntimeCandidateDispatchResult` / `RuntimeDispatchAuthorityConfig`
   — the identity handed in by the transport, the candidate result, and the fixed dispatch policy.
 - `RuntimeAttemptAuthority` — exact durable facts, including current run state, that the owning run
@@ -79,19 +82,20 @@ OpenClaw compatibility path, a cancellation side authority, or a second durable 
 
 ## Data & persistence
 
-The adapters read the immutable persona, conversation, artifact, skill, and model-route records
-needed to compile a dispatch and own two Postgres models in `runtime.prisma`: `RuntimeCommandStream` (one per run
+The compiler adapter reads the immutable persona, conversation, artifact, skill, and model-route
+records needed to compile a dispatch. The dispatch adapter owns two Postgres models in
+`runtime.prisma`: `RuntimeCommandStream` (one per run
 attempt — the lease fence, the bound runtime instance, the next command sequence, and accepted
 candidate ids) and `RuntimeDispatchedCommand` (one row per minted command, whose ids are exactly the
 attempt's accepted command set). Their clean-database schema lives in the OpenCrane-owned target
-baseline. The adapters read the assignment, run, and immutable snapshot rows owned by
-the personal-run and conversation domains but never writes them.
+baseline. It reads the assignment, run, and immutable snapshot rows owned by the personal-run and
+conversation domains but never writes those authorities.
 
 ## Dependency direction
 
-Tagged `scope:agent-runtime` (`layer:backend`): it may depend only on runtime, agent, personal-run,
-personal-conversation, authorization, and shared contracts. It never imports an app, transport
-adapter, model driver, or legacy runtime package.
+Tagged `scope:agent-runtime` (`layer:backend`): it may depend on runtime, agent, personal-run,
+personal-conversation, authorization, the three injected transport-port scopes, and shared
+contracts. It never imports an app, concrete transport adapter, model driver, or legacy runtime package.
 
 ## See also
 

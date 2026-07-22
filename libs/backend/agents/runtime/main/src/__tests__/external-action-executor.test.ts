@@ -4,7 +4,7 @@ import { __UnavailableSandboxJobExecutor } from "@opencrane/server/_infra/sandbo
 import { __UnavailableMemoryGatewayClient } from "@opencrane/server/_infra/memory-gateway-client";
 import { describe, expect, it } from "vitest";
 
-import { _CreateExternalActionExecutor, UnsupportedExternalActionError } from "../external-action-executor.js";
+import { __CreateExternalActionExecutor, UnsupportedExternalActionError } from "../external-action-executor.js";
 
 /** Build a candidate for the given tool revision prefix. */
 function _candidate(toolRevisionId: string): RuntimeExternalActionCandidate
@@ -19,25 +19,25 @@ describe("composition-root external action executor", function _suite()
 {
 	it("routes an MCP tool call through the fail-closed Obot custody port", async function _mcp()
 	{
-		const executor = _CreateExternalActionExecutor(_candidate("mcp-server:server-1"), DEPENDENCIES);
+		const executor = __CreateExternalActionExecutor(_candidate("mcp-server:server-1"), DEPENDENCIES);
 		await expect(executor.execute()).rejects.toThrow(/Obot custody authority is unavailable/);
 	});
 
 	it("fails closed for a sandbox tool call when no sandbox transport is available", async function _sandbox()
 	{
-		const executor = _CreateExternalActionExecutor(_candidate("sandbox:image-1"), DEPENDENCIES);
+		const executor = __CreateExternalActionExecutor(_candidate("sandbox:image-1"), DEPENDENCIES);
 		await expect(executor.execute()).rejects.toThrow(/Sandbox execution authority is unavailable/);
 	});
 
 	it("fails closed for a memory tool call when no memory gateway is available", async function _memory()
 	{
-		const executor = _CreateExternalActionExecutor(_candidate("memory:recall"), DEPENDENCIES);
+		const executor = __CreateExternalActionExecutor(_candidate("memory:recall"), DEPENDENCIES);
 		await expect(executor.execute()).rejects.toThrow(/Memory gateway is unavailable/);
 	});
 
 	it("refuses a tool revision that names no wired transport kind", async function _unsupported()
 	{
-		const executor = _CreateExternalActionExecutor(_candidate("unknown:thing"), DEPENDENCIES);
+		const executor = __CreateExternalActionExecutor(_candidate("unknown:thing"), DEPENDENCIES);
 		await expect(executor.execute()).rejects.toBeInstanceOf(UnsupportedExternalActionError);
 	});
 

@@ -4,16 +4,17 @@
 
 The runtime group owns the boundary between canonical OpenCrane state and any process that executes
 an agent. It contains command/candidate admission, pure Kubernetes resource construction, and the
-controller that exact-creates/adopts a still-suspended attempt Job. It does not yet bootstrap or
-unsuspend that Job, execute a model/tool loop, or own a durable transcript store.
+controller that exact-creates/adopts a still-suspended attempt Job. After assignment, the controller
+conditionally releases the exact Job and registers its unique first Pod. Authenticated bootstrap
+exchange, model/tool-loop execution, and durable transcript ownership remain later boundaries.
 
 ## Map
 
 | Package | What it owns |
 | --- | --- |
 | [`main`](./main/README.md) | Admission of runtime commands and candidate output against the current durable attempt authority. |
-| [`k8s-launcher`](./k8s-launcher/README.md) | Pure suspended Job and bounded NetworkPolicy resource construction. |
-| [`controller`](./controller/README.md) | Crash-safe claim, exact Kubernetes adoption, and pending-assignment orchestration. |
+| [`k8s-launcher`](./k8s-launcher/README.md) | Pure suspended Job construction for the dedicated runtime namespace. |
+| [`controller`](./controller/README.md) | Crash-safe assignment, UID-fenced Job release, and exact first-Pod registration. |
 
 ```text
 OpenCrane run authority
@@ -22,6 +23,11 @@ OpenCrane run authority
 runtime/main ── accepted command/candidate
         │
         └────► controller ──► k8s-launcher ──► suspended attempt Job
+                                            │ assigned Job UID
+                                            ▼
+                                      conditional release
+                                            │ first Pod UID
+                                            └────► run authority
 ```
 
 The boundary is language-neutral: a Python, TypeScript, or future runtime must satisfy the same
@@ -41,6 +47,6 @@ run/event persistence remains in its owning backend domain.
 - Parent group: [agents](../README.md)
 - Current authority: [runtime/main](./main/README.md)
 - Job contract: [runtime/k8s-launcher](./k8s-launcher/README.md)
-- Suspended-attempt controller: [runtime/controller](./controller/README.md)
+- Assignment-and-release controller: [runtime/controller](./controller/README.md)
 - Personal-run authority: [personal/runs](../personal/runs/main/README.md)
 - Server stream transport: [agent-runtime-stream](../../../server/_infra/agent-runtime-stream/README.md)

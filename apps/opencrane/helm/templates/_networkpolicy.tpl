@@ -55,7 +55,10 @@ spec:
     # The controller authenticates its fixed KSA and projected audience before it may claim or
     # commit an assignment; this rule exposes only the internal listener at the L3/4 floor.
     - from:
-        - podSelector:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
             matchLabels:
               {{- include "opencrane.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: agent-controller
@@ -64,14 +67,18 @@ spec:
           port: {{ .Values.clustertenantManager.service.internalPort }}
     # The personal-agent runtime owns no listener and can only initiate this connection.
     # TokenReview fixes its exact projected-token audience and ServiceAccount subject in-process.
+    {{- if .Values.agentController.enabled }}
     - from:
-        - podSelector:
+        - namespaceSelector:
             matchLabels:
-              {{- include "opencrane.selectorLabels" . | nindent 14 }}
+              opencrane.ai/runtime-release: {{ include "opencrane.agentController.runtimeNamespaceLabelValue" . | quote }}
+          podSelector:
+            matchLabels:
               app.kubernetes.io/component: agent-runtime
       ports:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}
+    {{- end }}
     # Allow the fleet-manager to reach the PUBLIC /api/v1/* API for cross-silo operations.
     - from:
         - podSelector:
@@ -92,6 +99,18 @@ spec:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}
   egress:
+    {{- if .Values.agentController.enabled }}
+    # TokenReview is the application-layer identity gate for controller and runtime calls. Keep the
+    # server's API-server path on the same exact Service-IP allow-list as the controller.
+    - to:
+        {{- range .Values.agentController.kubernetesApiServerCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.agentController.kubernetesApiServerPort }}
+    {{- end }}
     # The only cross-namespace server call: the app-owned artifact byte plane.
     - to:
         - namespaceSelector:

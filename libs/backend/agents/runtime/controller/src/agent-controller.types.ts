@@ -1,6 +1,6 @@
-import type { V1Job, V1NetworkPolicy } from "@kubernetes/client-node";
+import type { ConfigurationOptions, V1Job, V1Pod, V1PodList } from "@kubernetes/client-node";
 import type { Logger } from "@opencrane/observability";
-import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim } from "@opencrane/contracts";
+import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim, AgentControllerRunWorkloadRegistrationCommand, AgentControllerRunWorkloadRegistrationResult, AgentControllerRunWorkloadReleaseClaim } from "@opencrane/contracts";
 import type { AgentRuntimeJobProfile } from "@opencrane/backend/agents/runtime/k8s-launcher";
 
 /** Immutable runtime profiles keyed by the authority-owned profile name. */
@@ -13,15 +13,21 @@ export interface AgentControllerAuthority
 	__Claim(signal: AbortSignal): Promise<AgentControllerRunAttemptClaim | null>;
 	/** Atomically persist the exact suspended Job UID for the claimed attempt. */
 	__CommitAssignment(eventId: string, command: AgentControllerRunAttemptAssignmentCommand, signal: AbortSignal): Promise<AgentControllerRunAttemptAssignmentResult>;
+	/** Claim one assigned workload that is ready for release, or return null when none is ready. */
+	__ClaimWorkloadRelease(signal: AbortSignal): Promise<AgentControllerRunWorkloadReleaseClaim | null>;
+	/** Atomically register the first exact Pod created by the assigned Job. */
+	__RegisterFirstPod(eventId: string, command: AgentControllerRunWorkloadRegistrationCommand, signal: AbortSignal): Promise<AgentControllerRunWorkloadRegistrationResult>;
 }
 
-/** Kubernetes operations available to one reduced controller reconciliation. */
+/** Kubernetes operations available to the assignment and release reconciliations. */
 export interface AgentControllerKubernetesStore
 {
-	/** Create or exact-adopt the attempt NetworkPolicy without replacing it. */
-	__EnsureNetworkPolicy(expected: V1NetworkPolicy): Promise<V1NetworkPolicy>;
 	/** Create or exact-adopt the suspended attempt Job without changing it. */
 	__EnsureSuspendedJob(expected: V1Job): Promise<V1Job>;
+	/** Exact-adopt or conditionally release the assigned Job within its absolute authority lifetime. */
+	__EnsureRuntimeJobReleased(expected: V1Job, workloadUid: string, assignmentExpiresAt: string, releaseLeaseExpiresAt: string): Promise<V1Job>;
+	/** Return the unique exact first Pod, or null while Kubernetes has not created one. */
+	__FindFirstRuntimePod(expectedJob: V1Job, workloadUid: string, serviceAccountName: string): Promise<V1Pod | null>;
 }
 
 /** Dependencies and fixed policy for the controller reconciliation loop. */
@@ -29,12 +35,12 @@ export interface AgentControllerOptions
 {
 	/** Authenticated OpenCrane desired-state and assignment authority. */
 	readonly authority: AgentControllerAuthority;
-	/** Get/create-only Kubernetes adapter. */
+	/** Least-privilege Kubernetes projection and release adapter. */
 	readonly kubernetes: AgentControllerKubernetesStore;
 	/** Profiles selected by the claimed workload-profile name. */
 	readonly profiles: AgentControllerRuntimeProfiles;
-	/** Sole namespace this per-silo controller may mutate. */
-	readonly namespace: string;
+	/** Sole dedicated runtime namespace this per-silo controller may mutate. */
+	readonly runtimeNamespace: string;
 	/** Delay after an empty poll or a handled reconciliation failure. */
 	readonly pollIntervalMilliseconds: number;
 	/** Process-wide structured logger. */
@@ -45,6 +51,12 @@ export interface AgentControllerOptions
 export type AgentControllerReconcileResult =
 	| { readonly outcome: "idle" }
 	| { readonly outcome: "assigned" | "idempotent"; readonly eventId: string; readonly runId: string; readonly attempt: number; readonly workloadUid: string };
+
+/** Result of one workload-release poll. */
+export type AgentControllerRuntimeReleaseReconcileResult =
+	| { readonly outcome: "idle" }
+	| { readonly outcome: "pending-pod"; readonly eventId: string; readonly runId: string; readonly attempt: number; readonly workloadUid: string }
+	| { readonly outcome: "registered" | "idempotent"; readonly eventId: string; readonly runId: string; readonly attempt: number; readonly workloadUid: string; readonly podUid: string };
 
 /** Fetch-compatible function injected into the HTTP adapter. */
 export type AgentControllerFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -67,22 +79,44 @@ export interface AgentControllerHttpAuthorityOptions
 	readonly readToken?: AgentControllerTokenReader;
 }
 
-/** Narrow Batch API surface used by the get/create-only store. */
+/** Narrow Batch API surface used for exact Job creation, reads, and release. */
 export interface AgentControllerBatchApi
 {
 	/** Create one suspended namespaced Job. */
-	createNamespacedJob(request: { readonly namespace: string; readonly body: V1Job }): Promise<V1Job>;
+	createNamespacedJob(request: { readonly namespace: string; readonly body: V1Job }, options?: ConfigurationOptions): Promise<V1Job>;
 	/** Read one deterministic Job after an AlreadyExists response. */
-	readNamespacedJob(request: { readonly namespace: string; readonly name: string }): Promise<V1Job>;
+	readNamespacedJob(request: { readonly namespace: string; readonly name: string }, options?: ConfigurationOptions): Promise<V1Job>;
+	/** Apply one conditional JSON Patch to the exact assigned Job. */
+	patchNamespacedJob(request: AgentControllerJobPatchRequest, options?: ConfigurationOptions): Promise<V1Job>;
 }
 
-/** Narrow Networking API surface used by the get/create-only store. */
-export interface AgentControllerNetworkingApi
+/** One RFC 6902 operation used to release an exact suspended Job. */
+interface AgentControllerJobPatchOperation
 {
-	/** Create one attempt-scoped namespaced NetworkPolicy. */
-	createNamespacedNetworkPolicy(request: { readonly namespace: string; readonly body: V1NetworkPolicy }): Promise<V1NetworkPolicy>;
-	/** Read one deterministic NetworkPolicy after an AlreadyExists response. */
-	readNamespacedNetworkPolicy(request: { readonly namespace: string; readonly name: string }): Promise<V1NetworkPolicy>;
+	/** Conditional test or one of the two bounded release replacements. */
+	readonly op: "test" | "replace";
+	/** Exact immutable, deadline, or suspend field addressed by the operation. */
+	readonly path: "/metadata/uid" | "/metadata/resourceVersion" | "/spec/activeDeadlineSeconds" | "/spec/suspend";
+	/** Expected field value or bounded release replacement. */
+	readonly value: string | number | boolean;
+}
+
+/** Narrow request that makes JSON Patch semantics explicit at the Kubernetes adapter boundary. */
+interface AgentControllerJobPatchRequest
+{
+	/** Namespace containing the exact assigned Job. */
+	readonly namespace: string;
+	/** Deterministic assigned Job name. */
+	readonly name: string;
+	/** Conditional patch operations in required compare-and-swap order. */
+	readonly body: readonly AgentControllerJobPatchOperation[];
+}
+
+/** Narrow Core API surface used only for exact Pod listing. */
+export interface AgentControllerCoreApi
+{
+	/** List Pods using the exact attempt and Kubernetes Job UID selector. */
+	listNamespacedPod(request: { readonly namespace: string; readonly labelSelector: string }, options?: ConfigurationOptions): Promise<V1PodList>;
 }
 
 /** Clients required by the Kubernetes adapter. */
@@ -90,6 +124,10 @@ export interface AgentControllerKubernetesStoreOptions
 {
 	/** Kubernetes Batch client limited by Role to Jobs. */
 	readonly batchApi: AgentControllerBatchApi;
-	/** Kubernetes Networking client limited by Role to NetworkPolicies. */
-	readonly networkingApi: AgentControllerNetworkingApi;
+	/** Kubernetes Core client limited by Role to Pod list. */
+	readonly coreApi: AgentControllerCoreApi;
+	/** Hard timeout independently applied to every Kubernetes request. */
+	readonly requestTimeoutMilliseconds: number;
+	/** Process-lifetime cancellation propagated into every Kubernetes request. */
+	readonly shutdownSignal: AbortSignal;
 }

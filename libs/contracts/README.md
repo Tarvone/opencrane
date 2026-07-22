@@ -59,9 +59,12 @@ provider credentials or mutable source objects.
 - `AGENT_CONTROLLER_PROJECTED_TOKEN_AUDIENCE`, `AGENT_CONTROLLER_SERVICE_ACCOUNT_NAME`, and
   `AgentControllerRunAttempt*` — the private controller handshake for claiming one authorised run,
   reporting the Kubernetes-issued Job identity, and committing that identity under the same database
-  lease. These types deliberately expose only the immutable coordinates needed to create a suspended
-  workload; they never expose the run-input body or give the controller authority to choose a user,
-  revision, namespace, or runtime profile.
+  lease. `AgentControllerRunWorkloadRelease*` then carries the separate durable command, including
+  the assignment's absolute expiry, for releasing only that assigned Job and registering its first
+  Pod UID. The opaque bootstrap reference is a
+  locator projected through the Job's downward API, never a bearer credential. These types expose
+  only immutable workload coordinates; they never expose the run-input body or let the controller
+  choose a user, revision, namespace, runtime profile, or replacement Pod.
 - Re-exported model types: the agent, artifact, authorization, and platform-policy DTOs.
 
 ## Boundary

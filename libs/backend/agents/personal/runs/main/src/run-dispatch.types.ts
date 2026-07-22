@@ -1,9 +1,9 @@
-import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim } from "@opencrane/contracts";
+import type { AgentControllerRunAttemptAssignmentCommand, AgentControllerRunAttemptAssignmentResult, AgentControllerRunAttemptClaim, AgentControllerRunWorkloadRegistrationCommand, AgentControllerRunWorkloadRegistrationResult, AgentControllerRunWorkloadReleaseClaim } from "@opencrane/contracts";
 
 /** Fixed database-owned lease and assignment policy for run dispatch. */
 export interface RunDispatchRepositoryConfig
 {
-	/** Exact namespace containing this silo's OpenCrane server and runtime Jobs. */
+	/** Dedicated namespace containing this silo's untrusted runtime Jobs and no server workload. */
 	readonly namespace: string;
 	/** Time after which an uncommitted outbox claim may be reclaimed. */
 	readonly claimLeaseMilliseconds: number;
@@ -21,6 +21,17 @@ export type CommitRunAttemptAssignmentResult =
 	| { readonly status: "committed"; readonly result: AgentControllerRunAttemptAssignmentResult }
 	| { readonly status: "conflict"; readonly reason: "claim_not_found" | "stale_claim" | "claim_terminal" | "attempt_conflict" | "authority_conflict" | "assignment_conflict" | "invalid_assignment" };
 
+/** Outcome of claiming the next eligible suspended workload release. */
+export type ClaimNextRunWorkloadReleaseResult =
+	| { readonly status: "claimed"; readonly claim: AgentControllerRunWorkloadReleaseClaim }
+	| { readonly status: "terminalized"; readonly eventId: string; readonly runId: string; readonly attempt: number; readonly failureCode: string }
+	| { readonly status: "none" };
+
+/** Outcome of atomically registering the first Pod and publishing its release command. */
+export type RegisterRunWorkloadPodResult =
+	| { readonly status: "registered"; readonly result: AgentControllerRunWorkloadRegistrationResult }
+	| { readonly status: "conflict"; readonly reason: "claim_not_found" | "stale_claim" | "claim_terminal" | "attempt_conflict" | "authority_conflict" | "assignment_conflict" | "pod_conflict" | "invalid_registration" };
+
 /** Run-owned persistence port used by the controller-only internal API. */
 export interface RunDispatchRepository
 {
@@ -28,6 +39,10 @@ export interface RunDispatchRepository
 	claimNextAttemptAtomically(): Promise<ClaimNextRunAttemptResult>;
 	/** Commits only the exact current claim and suspended Job UID as a PendingPod assignment. */
 	commitSuspendedJobAssignmentAtomically(eventId: string, command: AgentControllerRunAttemptAssignmentCommand): Promise<CommitRunAttemptAssignmentResult>;
+	/** Claims one exact PendingPod assignment that is ready to be unsuspended. */
+	claimNextWorkloadReleaseAtomically(): Promise<ClaimNextRunWorkloadReleaseResult>;
+	/** Registers only the first Pod for the exact current release claim and publishes that command. */
+	registerFirstPodAndPublishReleaseAtomically(eventId: string, command: AgentControllerRunWorkloadRegistrationCommand): Promise<RegisterRunWorkloadPodResult>;
 }
 
 /** TokenReview-confirmed identity of an in-cluster workload. */
@@ -55,6 +70,8 @@ export interface AgentControllerRunDispatchLogger
 {
 	/** Records a failed internal operation without serialising credentials or request bodies. */
 	error(bindings: { readonly err: unknown; readonly operation: string }, message: string): void;
+	/** Records a committed fail-closed repair without serialising bootstrap or credential material. */
+	warn(bindings: { readonly eventId: string; readonly runId: string; readonly attempt: number; readonly failureCode: string }, message: string): void;
 }
 
 /** Dependencies of the controller-only run-dispatch HTTP adapter. */
@@ -79,4 +96,13 @@ export interface RunOutboxCandidateRow
 	readonly runId: string;
 	/** Service authority that must be locked before the run and outbox row. */
 	readonly agentServiceId: string;
+}
+
+/** Non-locking release candidate coordinates used only to establish canonical lock order. */
+export interface RunWorkloadReleaseCandidateRow extends RunOutboxCandidateRow
+{
+	/** Positive attempt number used to lock the exact assignment. */
+	readonly attempt: number;
+	/** Opaque bootstrap reference identifying the exact assignment integrity row. */
+	readonly bootstrapReference: string;
 }

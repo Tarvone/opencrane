@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { AuthenticationV1Api } from "@kubernetes/client-node";
 import express from "express";
 import type { Express } from "express";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, AGENT_RUNTIME_PROTOCOL_V1, type RuntimeCandidate } from "@opencrane/contracts";
@@ -94,6 +94,17 @@ function _RuntimeCandidate(): RuntimeCandidate
 
 describe("Control Plane", () =>
 {
+  beforeEach(function _RuntimeNamespaceBoundary()
+  {
+    vi.stubEnv("POD_NAMESPACE", "opencrane-silo");
+    vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "opencrane-silo-runtime");
+  });
+
+  afterEach(function _RestoreEnvironment()
+  {
+    vi.unstubAllEnvs();
+  });
+
   it("healthz endpoint returns ok", async () =>
   {
     const app = _buildHealthApp(true);
@@ -162,8 +173,8 @@ describe("Control Plane", () =>
 
     it("accepts only the bounded runtime-profile ServiceAccount naming contract", async function _RuntimeServiceAccountIdentity()
     {
-      const acceptedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:default:agent-runtime-personal");
-      const rejectedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:default:opencrane-agent-runtime");
+      const acceptedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo-runtime:agent-runtime-personal");
+      const rejectedApp = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo:agent-runtime-personal");
 
       const accepted = await request(acceptedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
       const rejected = await request(rejectedApp).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
@@ -173,9 +184,20 @@ describe("Control Plane", () =>
       expect(rejected.status).toBe(401);
     });
 
+    it("requires one explicit runtime namespace separate from the server", async function _RuntimeNamespaceSeparation()
+    {
+      const { _RegisterInternalRoutes } = await import("../app/routes.js");
+      const app = express();
+      vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "");
+      expect(function _MissingRuntimeNamespace() { _RegisterInternalRoutes(app, {} as PrismaClient, {} as AuthenticationV1Api); }).toThrow(/different from POD_NAMESPACE/);
+
+      vi.stubEnv("AGENT_RUNTIME_NAMESPACE", "opencrane-silo");
+      expect(function _SameRuntimeNamespace() { _RegisterInternalRoutes(app, {} as PrismaClient, {} as AuthenticationV1Api); }).toThrow(/different from POD_NAMESPACE/);
+    });
+
     it("rejects a reviewed token when Kubernetes omits the runtime audience", async function _RuntimeAudienceMismatch()
     {
-      const app = await _BuildRuntimeCandidateApp("system:serviceaccount:default:agent-runtime-personal", ["opencrane"]);
+      const app = await _BuildRuntimeCandidateApp("system:serviceaccount:opencrane-silo-runtime:agent-runtime-personal", ["opencrane"]);
 
       const response = await request(app).post("/api/internal/agent-runtime/candidates").set("authorization", "Bearer projected-token").send(_RuntimeCandidate());
 

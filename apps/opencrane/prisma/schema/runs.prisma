@@ -36,10 +36,11 @@ enum WorkloadKind {
 }
 
 enum RunOutboxEventKind {
-  RunAccepted              @map("run.accepted")
-  RunAttemptRequested      @map("run.attempt_requested")
-  RunCancellationRequested @map("run.cancellation_requested")
-  RunResumeRequested       @map("run.resume_requested")
+  RunAccepted                 @map("run.accepted")
+  RunAttemptRequested         @map("run.attempt_requested")
+  RunWorkloadReleaseRequested @map("run.workload_release_requested")
+  RunCancellationRequested    @map("run.cancellation_requested")
+  RunResumeRequested          @map("run.resume_requested")
 }
 
 /// One logical run authority. Retries atomically increment `attempt`; there is no AgentRunAttempt.
@@ -129,6 +130,7 @@ model WorkloadAssignment {
   namespace          String
   workloadKind       WorkloadKind             @map("workload_kind")
   workloadUid        String                   @map("workload_uid")
+  workloadProfile    String                   @map("workload_profile")
   podUid             String?                  @map("pod_uid")
   state              WorkloadAssignmentState  @default(PendingPod)
   expiresAt          DateTime                 @map("expires_at")

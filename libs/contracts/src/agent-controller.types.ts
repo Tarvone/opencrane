@@ -36,6 +36,8 @@ export interface AgentControllerRunAttemptProjection
 	readonly namespace: string;
 	/** Named bounded workload profile the controller must resolve. */
 	readonly workloadProfile: string;
+	/** Stable opaque bootstrap reference projected into the one-attempt Job; it is not a credential. */
+	readonly bootstrapReference: string;
 }
 
 /** One claimed outbox command and its authorised suspended-Job projection. */
@@ -60,6 +62,8 @@ export interface AgentControllerRunAttemptAssignmentCommand
 	readonly attempt: number;
 	/** Named workload profile observed when the event was claimed. */
 	readonly expectedWorkloadProfile: string;
+	/** Exact opaque bootstrap reference returned by the claim authority. */
+	readonly bootstrapReference: string;
 	/** Namespace containing the already-created suspended Job. */
 	readonly namespace: string;
 	/** Bounded runtime-profile ServiceAccount selected for the Job. */
@@ -79,4 +83,86 @@ export interface AgentControllerRunAttemptAssignmentResult
 	readonly attempt: number;
 	/** Immutable Kubernetes Job UID stored by the run authority. */
 	readonly workloadUid: string;
+}
+
+/** Immutable workload coordinates the controller must release and register. */
+export interface AgentControllerRunWorkloadReleaseProjection
+{
+	/** Logical run bound to the suspended Job. */
+	readonly runId: string;
+	/** Positive attempt number bound to the suspended Job. */
+	readonly attempt: number;
+	/** Silo authority containing the run. */
+	readonly siloId: string;
+	/** Stable AgentService executed by the Job. */
+	readonly agentServiceId: string;
+	/** Immutable AgentRevision executed by the Job. */
+	readonly agentRevisionId: string;
+	/** Kubernetes namespace containing the suspended Job. */
+	readonly namespace: string;
+	/** Bounded runtime-profile ServiceAccount selected when the assignment was committed. */
+	readonly serviceAccountName: string;
+	/** Immutable Kubernetes Job UID stored by the run authority. */
+	readonly workloadUid: string;
+	/** Immutable workload profile stored with the assignment. */
+	readonly workloadProfile: string;
+	/** Absolute canonical UTC instant after which the assignment grants no execution authority. */
+	readonly assignmentExpiresAt: string;
+	/** Stable opaque bootstrap reference projected into the Job; it grants no authority by itself. */
+	readonly bootstrapReference: string;
+}
+
+/** One leased request to unsuspend a Job and register its first Pod. */
+export interface AgentControllerRunWorkloadReleaseClaim
+{
+	/** Claim generation that fences stale controller replicas. */
+	readonly lease: AgentControllerRunAttemptClaimLease;
+	/** Exact durable assignment safe for the controller to reconcile. */
+	readonly workload: AgentControllerRunWorkloadReleaseProjection;
+}
+
+/** First-Pod evidence submitted after the assigned Job creates a Pod. */
+export interface AgentControllerRunWorkloadRegistrationCommand
+{
+	/** Exact database claim instant returned by the release claim endpoint. */
+	readonly claimedAt: string;
+	/** Exact delivery generation returned by the release claim endpoint. */
+	readonly deliveryCount: number;
+	/** Logical run expected on the release event. */
+	readonly runId: string;
+	/** Attempt expected on the release event. */
+	readonly attempt: number;
+	/** Silo authority expected on the assignment. */
+	readonly siloId: string;
+	/** Stable AgentService expected on the assignment. */
+	readonly agentServiceId: string;
+	/** Immutable AgentRevision expected on the assignment. */
+	readonly agentRevisionId: string;
+	/** Namespace containing the assigned Job and its first Pod. */
+	readonly namespace: string;
+	/** ServiceAccount observed on the assigned Job and Pod. */
+	readonly serviceAccountName: string;
+	/** Immutable Kubernetes Job UID stored by the run authority. */
+	readonly workloadUid: string;
+	/** Immutable workload profile echoed from the release claim. */
+	readonly workloadProfile: string;
+	/** Exact opaque bootstrap reference projected into the Job. */
+	readonly bootstrapReference: string;
+	/** Immutable Kubernetes UID of the first Pod created for the Job. */
+	readonly podUid: string;
+}
+
+/** Successful or exact-idempotent first-Pod registration response. */
+export interface AgentControllerRunWorkloadRegistrationResult
+{
+	/** Whether this call registered the Pod or replayed its exact durable value. */
+	readonly outcome: "registered" | "idempotent";
+	/** Logical run bound to the Pod. */
+	readonly runId: string;
+	/** Attempt bound to the Pod. */
+	readonly attempt: number;
+	/** Immutable Kubernetes Job UID owning the Pod. */
+	readonly workloadUid: string;
+	/** Immutable Kubernetes Pod UID registered for the attempt. */
+	readonly podUid: string;
 }

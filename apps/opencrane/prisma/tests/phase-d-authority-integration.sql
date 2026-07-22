@@ -387,11 +387,11 @@ SELECT pg_temp.expect_failure(
     $statement$
         INSERT INTO "workload_assignments" (
             "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
-            "audience", "service_account_name", "namespace", "workload_kind", "workload_uid",
+            "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "workload_profile",
             "pod_uid", "state", "expires_at", "registered_at"
         ) VALUES (
             'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-            'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-invalid',
+            'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-invalid', 'personal-small',
             'pod-uid-invalid', 'registered', clock_timestamp() + interval '1 hour', clock_timestamp()
         )
     $statement$,
@@ -400,10 +400,20 @@ SELECT pg_temp.expect_failure(
 
 INSERT INTO "workload_assignments" (
     "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
-    "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "expires_at"
+    "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "workload_profile", "expires_at"
 ) VALUES (
     'run-action', 1, 'svc-main', 'rev-published', 'silo-1', 'user-1',
-    'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1', clock_timestamp() + interval '1 hour'
+    'opencrane-agent-runtime', 'runtime', 'tenant-silo-1', 'job', 'job-uid-1', 'personal-small', clock_timestamp() + interval '1 hour'
+);
+
+SELECT pg_temp.expect_failure(
+    'WorkloadAssignment workload profile is immutable',
+    $statement$
+        UPDATE "workload_assignments"
+        SET "workload_profile" = 'personal-large'
+        WHERE "run_id" = 'run-action' AND "attempt" = 1
+    $statement$,
+    'identity is immutable'
 );
 
 SELECT pg_temp.expect_failure(
@@ -465,6 +475,16 @@ SELECT pg_temp.expect_failure(
 UPDATE "workload_assignments"
 SET "state" = 'registered', "pod_uid" = 'pod-uid-1', "registered_at" = clock_timestamp()
 WHERE "run_id" = 'run-action' AND "attempt" = 1;
+
+SELECT pg_temp.expect_failure(
+    'registered WorkloadAssignment rejects a different Pod UID',
+    $statement$
+        UPDATE "workload_assignments"
+        SET "pod_uid" = 'pod-uid-2'
+        WHERE "run_id" = 'run-action' AND "attempt" = 1
+    $statement$,
+    'invalid WorkloadAssignment state transition'
+);
 
 SELECT pg_temp.expect_failure(
     'WorkloadBootstrap cannot record a consumption instant after expiry',

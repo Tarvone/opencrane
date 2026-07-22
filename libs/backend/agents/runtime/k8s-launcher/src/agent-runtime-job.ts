@@ -1,29 +1,32 @@
 import { createHash } from "node:crypto";
-import type { V1Job, V1NetworkPolicy } from "@kubernetes/client-node";
+import type { V1Job } from "@kubernetes/client-node";
 
 import { AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, ___IsAgentRuntimeServiceAccountName } from "@opencrane/contracts";
 
-import type { AgentRuntimeJobAssignment, AgentRuntimeJobProfile, AgentRuntimeJobResources } from "./agent-runtime-job.types.js";
+import type { AgentRuntimeJobAssignment, AgentRuntimeJobProfile } from "./agent-runtime-job.types.js";
 
-/** Exact component label shared by the runtime Job and its attempt-scoped policy. */
+/** Exact component label selected by the runtime namespace's deployment-owned policy. */
 const _COMPONENT_LABEL = "agent-runtime";
 
 /** Exact projected-token path read by the runtime process. */
 const _TOKEN_PATH = "/var/run/opencrane/tokens/runtime.token";
 
+/** Read-only directory containing the downward-API bootstrap reference. */
+const _BOOTSTRAP_MOUNT_PATH = "/var/run/opencrane/bootstrap";
+
+/** Pod annotation projected as the non-secret bootstrap reference file. */
+const _BOOTSTRAP_REFERENCE_ANNOTATION = "opencrane.ai/bootstrap-reference";
+
 /** Hard ceiling for non-authoritative runtime-local scratch. */
 const _MAX_SCRATCH_BYTES = 1_073_741_824n;
+
+/** Safety margin ensuring whole-second Kubernetes deadline rounding cannot extend authority. */
+const _RELEASE_DEADLINE_SAFETY_SECONDS = 1;
 
 /** Reject blank or control-character-bearing authority coordinates. */
 function _IsBoundedCoordinate(value: string): boolean
 {
 	return value.length > 0 && value.length <= 256 && !/[\u0000-\u001f\u007f]/.test(value);
-}
-
-/** Validate a non-empty Kubernetes label value used by an exact selector. */
-function _IsKubernetesLabelValue(value: string): boolean
-{
-	return value.length <= 63 && /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/.test(value);
 }
 
 /** Parse a positive binary Kubernetes storage quantity into bytes. */
@@ -53,7 +56,7 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 {
 	// 1. Pin the image and stream to the exact in-cluster endpoint the policy will admit.
 	const streamUrl = URL.parse(profile.runtimeStreamUrl);
-	if (!_IsBoundedCoordinate(profile.image) || !/^[a-z0-9][a-z0-9._:/-]*@sha256:[a-f0-9]{64}$/.test(profile.image) || !streamUrl || streamUrl.protocol !== "http:" || !streamUrl.hostname.endsWith(`.${profile.serverNamespace}.svc.cluster.local`) || Number(streamUrl.port || "80") !== profile.serverPort || streamUrl.pathname !== "/api/internal/agent-runtime" || streamUrl.search !== "" || streamUrl.hash !== "" || streamUrl.username !== "" || streamUrl.password !== "")
+	if (!_IsBoundedCoordinate(profile.image) || !/^[a-z0-9][a-z0-9._:/-]*@sha256:[a-f0-9]{64}$/.test(profile.image) || !streamUrl || streamUrl.protocol !== "http:" || !streamUrl.hostname.endsWith(`.${profile.serverNamespace}.svc.cluster.local`) || streamUrl.pathname !== "/api/internal/agent-runtime" || streamUrl.search !== "" || streamUrl.hash !== "" || streamUrl.username !== "" || streamUrl.password !== "")
 	{
 		throw new Error("agent runtime profile requires an immutable image and an in-cluster HTTP stream URL");
 	}
@@ -62,21 +65,13 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 		throw new Error("agent runtime profile requires a Kubernetes image pull policy");
 	}
 
-	// 2. Bind the profile to one same-namespace runtime identity class, never a per-user KSA.
+	// 2. Bind the profile to one server namespace and one runtime identity class, never a per-user KSA.
 	if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(profile.serverNamespace) || profile.serverNamespace.length > 63 || !___IsAgentRuntimeServiceAccountName(profile.serviceAccountName))
 	{
 		throw new Error("agent runtime profile requires one valid server namespace and bounded runtime ServiceAccount");
 	}
 
-	// 3. Require the release selectors and network/token bounds shared with the server policies.
-	if (!_IsKubernetesLabelValue(profile.releaseSelectorLabels["app.kubernetes.io/name"] ?? "") || !_IsKubernetesLabelValue(profile.releaseSelectorLabels["app.kubernetes.io/instance"] ?? ""))
-	{
-		throw new Error("agent runtime profile requires exact release selector labels");
-	}
-	if (!Number.isSafeInteger(profile.serverPort) || profile.serverPort < 1 || profile.serverPort > 65535)
-	{
-		throw new Error("agent runtime profile requires a valid server port");
-	}
+	// 3. Require the projected-token and lifecycle bounds shared with deployment policy.
 	if (!Number.isSafeInteger(profile.projectedTokenTtlSeconds) || profile.projectedTokenTtlSeconds < 600 || profile.projectedTokenTtlSeconds > 3600)
 	{
 		throw new Error("agent runtime projected-token TTL must be between 600 and 3600 seconds");
@@ -84,9 +79,9 @@ function _AssertProfile(profile: AgentRuntimeJobProfile): void
 
 	// 4. Bound transient storage, lifecycle, CPU, and memory before the manifest reaches an adapter.
 	const scratchBytes = _ParseBinaryBytes(profile.scratchSize);
-	if (!scratchBytes || scratchBytes > _MAX_SCRATCH_BYTES || !Number.isSafeInteger(profile.activeDeadlineSeconds) || profile.activeDeadlineSeconds < 1 || !Number.isSafeInteger(profile.ttlSecondsAfterFinished) || profile.ttlSecondsAfterFinished < 0)
+	if (!scratchBytes || scratchBytes > _MAX_SCRATCH_BYTES || !Number.isSafeInteger(profile.activeDeadlineSeconds) || profile.activeDeadlineSeconds < 1 || profile.ttlSecondsAfterFinished !== 0)
 	{
-		throw new Error("agent runtime profile requires bounded scratch and lifecycle settings");
+		throw new Error("agent runtime profile requires bounded scratch, a finite deadline, and immediate terminal cleanup");
 	}
 	const requestedCpu = _ParseCpuMillis(String(profile.resources.requests?.cpu ?? ""));
 	const limitedCpu = _ParseCpuMillis(String(profile.resources.limits?.cpu ?? ""));
@@ -105,7 +100,7 @@ function _AssertAssignment(assignment: AgentRuntimeJobAssignment): void
 	{
 		throw new Error("agent runtime attempt must be a positive safe integer");
 	}
-	for (const value of [assignment.runId, assignment.agentServiceId, assignment.agentRevisionId, assignment.siloId, assignment.namespace])
+	for (const value of [assignment.runId, assignment.agentServiceId, assignment.agentRevisionId, assignment.siloId, assignment.namespace, assignment.bootstrapReference])
 	{
 		if (!_IsBoundedCoordinate(value))
 		{
@@ -118,12 +113,12 @@ function _AssertAssignment(assignment: AgentRuntimeJobAssignment): void
 	}
 }
 
-/** Require the Job and its selected server route to occupy the same NetworkPolicy namespace. */
-function _AssertSameNamespace(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile): void
+/** Keep untrusted runtime Pods outside the namespace that contains the OpenCrane server. */
+function _AssertSeparatedNamespaces(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile): void
 {
-	if (assignment.namespace !== profile.serverNamespace)
+	if (assignment.namespace === profile.serverNamespace)
 	{
-		throw new Error("agent runtime Job and server must share one namespace");
+		throw new Error("agent runtime Job and OpenCrane server require different namespaces");
 	}
 }
 
@@ -150,38 +145,19 @@ function _AuthorityAnnotations(assignment: AgentRuntimeJobAssignment): Record<st
 }
 
 /** Build selector-safe labels unique to the exact attempt. */
-function _AttemptLabels(name: string, profile: AgentRuntimeJobProfile): Record<string, string>
+function _AttemptLabels(name: string): Record<string, string>
 {
 	return {
-		"app.kubernetes.io/name": profile.releaseSelectorLabels["app.kubernetes.io/name"],
-		"app.kubernetes.io/instance": profile.releaseSelectorLabels["app.kubernetes.io/instance"],
+		"app.kubernetes.io/name": "opencrane-agent-runtime",
 		"app.kubernetes.io/component": _COMPONENT_LABEL,
 		"opencrane.ai/runtime-attempt": name,
-	};
-}
-
-/** Build a policy that denies ingress and permits only the server stream plus DNS egress. */
-function _BuildNetworkPolicy(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile, name: string, labels: Record<string, string>): V1NetworkPolicy
-{
-	return {
-		apiVersion: "networking.k8s.io/v1",
-		kind: "NetworkPolicy",
-		metadata: { name, namespace: assignment.namespace, labels: { ...labels }, annotations: _AuthorityAnnotations(assignment) },
-		spec: {
-			podSelector: { matchLabels: { "opencrane.ai/runtime-attempt": name } },
-			policyTypes: ["Ingress", "Egress"],
-			ingress: [],
-			egress: [
-				{ to: [{ podSelector: { matchLabels: { "app.kubernetes.io/name": profile.releaseSelectorLabels["app.kubernetes.io/name"], "app.kubernetes.io/instance": profile.releaseSelectorLabels["app.kubernetes.io/instance"], "app.kubernetes.io/component": "opencrane-server" } } }], ports: [{ protocol: "TCP", port: profile.serverPort }] },
-				{ to: [{ namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": "kube-system" } }, podSelector: { matchLabels: { "k8s-app": "kube-dns" } } }], ports: [{ protocol: "UDP", port: 53 }, { protocol: "TCP", port: 53 }] },
-			],
-		},
 	};
 }
 
 /** Build the suspended, one-Pod Job that cannot run before durable assignment commits. */
 function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile, name: string, labels: Record<string, string>): V1Job
 {
+	const podAnnotations = { ..._AuthorityAnnotations(assignment), [_BOOTSTRAP_REFERENCE_ANNOTATION]: assignment.bootstrapReference };
 	return {
 		apiVersion: "batch/v1",
 		kind: "Job",
@@ -194,12 +170,13 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 			activeDeadlineSeconds: profile.activeDeadlineSeconds,
 			ttlSecondsAfterFinished: profile.ttlSecondsAfterFinished,
 			template: {
-				metadata: { labels: { ...labels }, annotations: _AuthorityAnnotations(assignment) },
+				metadata: { labels: { ...labels }, annotations: podAnnotations },
 					spec: {
 					serviceAccountName: profile.serviceAccountName,
 					automountServiceAccountToken: false,
 					enableServiceLinks: false,
 					restartPolicy: "Never",
+					terminationGracePeriodSeconds: 0,
 					securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, fsGroupChangePolicy: "OnRootMismatch", seccompProfile: { type: "RuntimeDefault" } },
 					containers: [{
 						name: _COMPONENT_LABEL,
@@ -213,12 +190,14 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 						],
 						volumeMounts: [
 							{ name: "runtime-token", mountPath: "/var/run/opencrane/tokens", readOnly: true },
+							{ name: "runtime-bootstrap", mountPath: _BOOTSTRAP_MOUNT_PATH, readOnly: true },
 							{ name: "scratch", mountPath: "/tmp" },
 						],
 						resources: structuredClone(profile.resources),
 					}],
 					volumes: [
 						{ name: "runtime-token", projected: { defaultMode: 0o440, sources: [{ serviceAccountToken: { path: "runtime.token", audience: AGENT_RUNTIME_PROJECTED_TOKEN_AUDIENCE, expirationSeconds: profile.projectedTokenTtlSeconds } }] } },
+						{ name: "runtime-bootstrap", downwardAPI: { defaultMode: 0o440, items: [{ path: "reference", fieldRef: { fieldPath: `metadata.annotations['${_BOOTSTRAP_REFERENCE_ANNOTATION}']` } }] } },
 						{ name: "scratch", emptyDir: { sizeLimit: profile.scratchSize } },
 					],
 				},
@@ -228,30 +207,59 @@ function _BuildJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJ
 }
 
 /**
- * Build the exact Kubernetes resource set for one personal-runtime attempt. The returned Job is
+ * Build the exact Kubernetes Job for one personal-runtime attempt. The returned Job is
  * always suspended; the controller may unsuspend it only after persisting the Job UID together
  * with the PendingPod assignment and one-time bootstrap in the same authority transition.
  *
- * This function is pure and returns the policy and Job as one inseparable projection so callers
- * cannot accidentally launch a workload without first establishing its deny-by-default network.
+ * Runtime namespace ingress and egress are deployment-owned invariants rather than per-attempt
+ * resources, so this pure builder deliberately has no Networking API surface.
  * @param assignment - Durable run coordinates that become workload annotations and identity.
- * @param profile - Bounded deployment-owned image, ServiceAccount, network, and resource limits.
- * @returns Deterministically named policy and still-suspended one-attempt Job.
+ * @param profile - Bounded deployment-owned image, ServiceAccount, server, and resource limits.
+ * @returns Deterministically named, still-suspended one-attempt Job.
  */
-export function __BuildSuspendedAgentRuntimeJobResources(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile): AgentRuntimeJobResources
+export function __BuildSuspendedAgentRuntimeJob(assignment: AgentRuntimeJobAssignment, profile: AgentRuntimeJobProfile): V1Job
 {
 	// 1. Reject malformed authority and release inputs before any adapter can send them to Kubernetes.
 	_AssertAssignment(assignment);
 	_AssertProfile(profile);
-	_AssertSameNamespace(assignment, profile);
+	_AssertSeparatedNamespaces(assignment, profile);
 
-	// 2. Derive one collision-resistant identity reused across the Job and policy selectors.
+	// 2. Derive one collision-resistant identity reused by the Job and its Pod selector labels.
 	const name = _AttemptResourceName(assignment);
-	const labels = _AttemptLabels(name, profile);
+	const labels = _AttemptLabels(name);
 
-	// 3. Return an inseparable zero-RBAC, bounded-network, suspended attempt resource set.
-	return {
-		networkPolicy: _BuildNetworkPolicy(assignment, profile, name, labels),
-		job: _BuildJob(assignment, profile, name, labels),
-	};
+	// 3. Return only the suspended Job; Helm owns namespace-wide network isolation.
+	return _BuildJob(assignment, profile, name, labels);
+}
+
+/**
+ * Derive the conservative Kubernetes deadline for releasing one durable assignment.
+ *
+ * Kubernetes accepts only whole seconds. The result therefore rounds down, subtracts one further
+ * safety second, and never exceeds the deployment-owned profile maximum. An expired or nearly
+ * expired assignment fails before the controller can make the Job executable.
+ * @param assignmentExpiresAt - Canonical UTC assignment expiry issued by Postgres authority.
+ * @param nowEpochMilliseconds - Current controller wall-clock instant in epoch milliseconds.
+ * @param profileMaximumSeconds - Maximum active lifetime permitted by the immutable profile.
+ * @returns Positive whole seconds safe to patch into the assigned Job before release.
+ */
+export function __DeriveAgentRuntimeReleaseDeadlineSeconds(assignmentExpiresAt: string, nowEpochMilliseconds: number, profileMaximumSeconds: number): number
+{
+	const expiresAtEpochMilliseconds = Date.parse(assignmentExpiresAt);
+	if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(assignmentExpiresAt)
+		|| !Number.isSafeInteger(expiresAtEpochMilliseconds)
+		|| new Date(expiresAtEpochMilliseconds).toISOString() !== assignmentExpiresAt
+		|| !Number.isSafeInteger(nowEpochMilliseconds)
+		|| nowEpochMilliseconds < 0
+		|| !Number.isSafeInteger(profileMaximumSeconds)
+		|| profileMaximumSeconds < 1)
+	{
+		throw new Error("agent runtime release requires canonical expiry, current time, and profile deadline");
+	}
+	const remainingWholeSeconds = Math.floor((expiresAtEpochMilliseconds - nowEpochMilliseconds) / 1_000) - _RELEASE_DEADLINE_SAFETY_SECONDS;
+	if (remainingWholeSeconds <= 0)
+	{
+		throw new Error("agent runtime assignment expires before a safe Job release deadline");
+	}
+	return Math.min(profileMaximumSeconds, remainingWholeSeconds);
 }

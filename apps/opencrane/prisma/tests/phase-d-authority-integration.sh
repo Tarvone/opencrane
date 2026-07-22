@@ -119,9 +119,10 @@ SQL
   run_psql >"$RACE_DIR/dispatch-event-holder.out" 2>&1 <<'SQL'
 SET application_name = 'phase-e-dispatch-event-holder';
 BEGIN;
+SELECT pg_advisory_xact_lock(hashtextextended('dispatch-lock-run', 0));
+SELECT pg_sleep(3);
 INSERT INTO "conversation_run_events" ("run_id", "sequence", "type", "payload", "occurred_at")
 VALUES ('dispatch-lock-run', 1, 'run.started', '{}', clock_timestamp());
-SELECT pg_sleep(3);
 COMMIT;
 SQL
   echo "$?" >"$RACE_DIR/dispatch-event-holder.status"
@@ -702,11 +703,11 @@ COMMIT;
 UPDATE "agent_runs" SET "state" = 'queued' WHERE "id" = 'run-race-action-authority';
 INSERT INTO "workload_assignments" (
   "run_id", "attempt", "agent_service_id", "agent_revision_id", "silo_id", "subject_id",
-  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "expires_at"
+  "audience", "service_account_name", "namespace", "workload_kind", "workload_uid", "workload_profile", "expires_at"
 ) VALUES (
   'run-race-action-authority', 1, 'svc-race-action-authority', 'rev-race-action-authority',
   'silo-race-action', 'user-race', 'opencrane-agent-runtime', 'runtime', 'tenant-race-action', 'job',
-  'job-race-action', clock_timestamp() + interval '1 hour'
+  'job-race-action', 'personal-small', clock_timestamp() + interval '1 hour'
 );
 UPDATE "agent_runs" SET "state" = 'assigned' WHERE "id" = 'run-race-action-authority';
 INSERT INTO "workload_bootstraps" (

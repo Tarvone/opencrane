@@ -39,8 +39,10 @@ export interface TargetResolutionRequest
 	session: DelegatedSession;
 	/** Stable target-neutral operation name. */
 	action: "command.forward" | "events.read";
-	/** Thread selected by the caller, when reading its events. */
-	threadId?: string;
+	/** Canonical thread selected by the caller for either a command or event read. */
+	threadId: string;
+	/** Caller-supplied key that makes one retried command delivery addressable without trusting its body. */
+	requestIdempotencyKey?: string;
 	/** Persisted event cursor selected by the caller. */
 	cursor?: string;
 }

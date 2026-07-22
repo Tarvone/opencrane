@@ -39,7 +39,14 @@ function _Request(path: string, init: RequestInit = {}): Request
 	headers.set("origin", "https://acme.example.com");
 	headers.set("host", "acme.example.com");
 	headers.set("cookie", "session=opaque");
+	if (!headers.has("idempotency-key")) headers.set("idempotency-key", "delivery-1");
 	return new Request(`https://acme.example.com${path}`, { ...init, headers });
+}
+
+/** Returns the smallest valid command envelope while leaving its user payload opaque to the proxy. */
+function _CommandBody(): string
+{
+	return JSON.stringify({ threadId: "thread-1", content: { text: "hello" } });
 }
 
 describe("channel proxy public boundary", () =>
@@ -73,7 +80,7 @@ describe("channel proxy public boundary", () =>
 	it("rejects forged identity before target resolution", async () =>
 	{
 		const resolve = vi.fn(async function _resolve() { return _Target(); });
-		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-user": "admin" }, body: "{}" });
+		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-user": "admin" }, body: _CommandBody() });
 		const response = await __ForwardCommand(request, _Dependencies(resolve, vi.fn() as unknown as typeof fetch));
 		expect(response.status).toBe(400);
 		expect(resolve).not.toHaveBeenCalled();
@@ -82,7 +89,7 @@ describe("channel proxy public boundary", () =>
 	it("fails closed when OpenCrane target resolution is unavailable", async () =>
 	{
 		const resolve = vi.fn(async function _resolve(): Promise<AuthorizedChannelTarget> { throw new Error("offline"); });
-		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: _CommandBody() });
 		const response = await __ForwardCommand(request, _Dependencies(resolve, vi.fn() as unknown as typeof fetch));
 		expect(response.status).toBe(503);
 	});
@@ -97,7 +104,7 @@ describe("channel proxy public boundary", () =>
 				init?.signal?.addEventListener("abort", function _abort() { reject(init.signal?.reason); }, { once: true });
 			});
 		}) as unknown as typeof fetch;
-		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: _CommandBody() });
 		const response = await __ForwardCommand(request, _Dependencies(resolve, transport));
 		expect(response.status).toBe(504);
 	});
@@ -106,9 +113,37 @@ describe("channel proxy public boundary", () =>
 	{
 		const resolve = vi.fn(async function _resolve() { return _Target(); });
 		const transport = vi.fn(async function _fetch() { return new Response("x".repeat(257)); }) as unknown as typeof fetch;
-		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: _CommandBody() });
 		const response = await __ForwardCommand(request, _Dependencies(resolve, transport));
 		expect(response.status).toBe(502);
+	});
+
+	it("binds a command route decision to its canonical thread and transport delivery key", async function _BindsCommandCoordinates()
+	{
+		let resolved: TargetResolutionRequest | undefined;
+		const resolve = vi.fn(async function _resolve(request: TargetResolutionRequest)
+		{
+			resolved = request;
+			return _Target();
+		});
+		const transport = vi.fn(async function _fetch() { return Response.json({ accepted: true }); }) as unknown as typeof fetch;
+
+		const response = await __ForwardCommand(_Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": "delivery-77" }, body: _CommandBody() }), _Dependencies(resolve, transport));
+
+		expect(response.status).toBe(200);
+		expect(resolved).toMatchObject({ action: "command.forward", threadId: "thread-1", requestIdempotencyKey: "delivery-77" });
+	});
+
+	it("rejects a command that lacks its transport delivery key before target resolution", async function _RejectsMissingCommandCoordinates()
+	{
+		const resolve = vi.fn(async function _resolve() { return _Target(); });
+		const request = _Request("/v1/commands", { method: "POST", headers: { "content-type": "application/json" }, body: _CommandBody() });
+		request.headers.delete("idempotency-key");
+
+		const response = await __ForwardCommand(request, _Dependencies(resolve, vi.fn() as unknown as typeof fetch));
+
+		expect(response.status).toBe(400);
+		expect(resolve).not.toHaveBeenCalled();
 	});
 });
 

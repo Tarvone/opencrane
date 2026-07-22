@@ -21,6 +21,8 @@ export interface ResolveChannelTargetCommand
 	readonly action: ChannelResolutionAction;
 	/** Existing canonical thread selected by the browser. */
 	readonly threadId: string;
+	/** Opaque client delivery key that a real command-admission authority must deduplicate. */
+	readonly requestIdempotencyKey?: string;
 	/** Optional persisted replay cursor for event reads. */
 	readonly cursor?: string;
 }
@@ -179,6 +181,8 @@ export interface PrepareInteractiveRunCommand
 	readonly agentServiceId: string;
 	/** Authorization evidence accepted for run creation. */
 	readonly authorizationDigest: string;
+	/** Stable transport key that the run authority must bind to the durable user command. */
+	readonly requestIdempotencyKey: string;
 }
 
 /** Explicit outcome from the real run authority. */

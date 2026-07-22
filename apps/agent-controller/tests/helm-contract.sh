@@ -122,7 +122,10 @@ grep -A2 -F '  matchConstraints:' "$ADMISSION" | grep -Fq '    matchPolicy: Exac
 grep -Fq 'operations: ["CREATE", "UPDATE"]' "$ADMISSION"
 grep -Fq 'resources: ["jobs"]' "$ADMISSION"
 grep -Fq 'request.userInfo.username == "system:serviceaccount:server-ns:agent-controller"' "$ADMISSION"
-grep -Fq "request.subResource == \"\"" "$ADMISSION"
+if grep -Fq 'request.subResource' "$ADMISSION"; then
+  echo "Job-only admission must not dereference the optional subResource request field" >&2
+  exit 1
+fi
 grep -Fq "request.operation == 'CREATE' && object.spec.suspend == true" "$ADMISSION"
 grep -Fq "oldObject.spec.suspend == true && object.spec.suspend == false" "$ADMISSION"
 grep -Fq "object.spec.template.spec.containers.size() == 1" "$ADMISSION"

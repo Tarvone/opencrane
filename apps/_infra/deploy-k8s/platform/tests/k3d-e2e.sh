@@ -1104,6 +1104,8 @@ kubectl create secret generic "$BOOTSTRAP_SECRET_NAME" \
 #    Per-org domain provisioning stays on (manageOwnDomain, from standalone.yaml) and
 #    fail-closes cleanly without external-dns.
 echo "[e2e] Installing standalone silo release '$RELEASE_NAME'"
+KUBERNETES_API_ENDPOINT_IP="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')"
+KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes -n default -o jsonpath='{.subsets[0].ports[0].port}')"
 helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --namespace "$NAMESPACE" \
   --create-namespace \
@@ -1123,6 +1125,8 @@ helm upgrade --install "$RELEASE_NAME" "$ROOT_DIR/apps/_infra/deploy-k8s" \
   --set-string agentController.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --set-string agentController.runtimeProfile.image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
   --set-string 'agentController.kubernetesApiServerCidrs[0]=10.43.0.1/32' \
+  --set-string "agentController.kubernetesApiServerEndpointCidrs[0]=${KUBERNETES_API_ENDPOINT_IP}/32" \
+  --set "agentController.kubernetesApiServerEndpointPort=${KUBERNETES_API_ENDPOINT_PORT}" \
   --set-string "artifactService.namespace=$ARTIFACT_NAMESPACE" \
   --set-string "artifactService.keys.catalogExistingSecret=$ARTIFACT_CATALOG_KEY_SECRET" \
   --set-string "artifactService.keys.serviceExistingSecret=$ARTIFACT_SERVICE_KEY_SECRET" \

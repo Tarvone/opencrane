@@ -23,11 +23,13 @@ render_enabled() {
     --set-string agentController.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
     --set-string agentController.runtimeProfile.image.digest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
     --set-string 'agentController.kubernetesApiServerCidrs[0]=10.43.0.1/32' \
+    --set-string 'agentController.kubernetesApiServerEndpointCidrs[0]=172.18.0.2/32' \
+    --set agentController.kubernetesApiServerEndpointPort=6443 \
     "$@"
 }
 
 render_enabled > "$MANIFEST"
-helm template oc "$CHART_ROOT" --namespace server-ns > "$DISABLED"
+render_enabled --set agentController.enabled=false > "$DISABLED"
 
 awk 'BEGIN { RS="---" } $0 ~ /\nkind: Role\n/ && $0 ~ /\n  name: agent-controller\n/ { print $0 }' "$MANIFEST" > "$ROLE"
 awk 'BEGIN { RS="---" } $0 ~ /\nkind: RoleBinding\n/ && $0 ~ /\n  name: agent-controller\n/ { print $0 }' "$MANIFEST" > "$BINDING"
@@ -108,11 +110,15 @@ grep -Fq 'port: 4000' "$RUNTIME_EGRESS"
 test -s "$SERVER_POLICY"
 grep -Fq 'cidr: "10.43.0.1/32"' "$SERVER_POLICY"
 grep -A3 -F 'cidr: "10.43.0.1/32"' "$SERVER_POLICY" | grep -Fq 'port: 443'
+grep -Fq 'cidr: "172.18.0.2/32"' "$SERVER_POLICY"
+grep -A3 -F 'cidr: "172.18.0.2/32"' "$SERVER_POLICY" | grep -Fq 'port: 6443'
+grep -Fq 'cidr: "172.18.0.2/32"' "$CONTROLLER_POLICY"
+grep -A3 -F 'cidr: "172.18.0.2/32"' "$CONTROLLER_POLICY" | grep -Fq 'port: 6443'
 
 # Admission is fail closed, scoped by the release-unique namespace label, and grants no rights.
 test -s "$ADMISSION"
 grep -Fq 'failurePolicy: Fail' "$ADMISSION"
-grep -Fq 'matchPolicy: Exact' "$ADMISSION"
+grep -A2 -F '  matchConstraints:' "$ADMISSION" | grep -Fq '    matchPolicy: Exact'
 grep -Fq 'operations: ["CREATE", "UPDATE"]' "$ADMISSION"
 grep -Fq 'resources: ["jobs"]' "$ADMISSION"
 grep -Fq 'request.userInfo.username == "system:serviceaccount:server-ns:agent-controller"' "$ADMISSION"
@@ -151,7 +157,11 @@ grep -Fq 'validationActions: [Deny]' "$MANIFEST"
 # Disabled still tells OpenCrane the deployment-owned namespace boundary, but renders no namespace,
 # controller RBAC, network policy or cluster-scoped admission residue.
 grep -A2 -F 'name: AGENT_RUNTIME_NAMESPACE' "$DISABLED" | grep -Fq 'value: "oc-opencrane-runtime"'
-if grep -Eq 'kind: ValidatingAdmissionPolicy|kind: Namespace|name: agent-controller' "$DISABLED"; then
+grep -Fq 'cidr: "10.43.0.1/32"' "$DISABLED"
+grep -A3 -F 'cidr: "10.43.0.1/32"' "$DISABLED" | grep -Fq 'port: 443'
+grep -Fq 'cidr: "172.18.0.2/32"' "$DISABLED"
+grep -A3 -F 'cidr: "172.18.0.2/32"' "$DISABLED" | grep -Fq 'port: 6443'
+if grep -Eq 'kind: ValidatingAdmissionPolicy|kind: Namespace|name: agent-controller|opencrane.ai/runtime-release' "$DISABLED"; then
   echo "disabled agent-controller rendered runtime authority" >&2
   exit 1
 fi

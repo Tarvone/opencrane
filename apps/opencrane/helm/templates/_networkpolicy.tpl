@@ -99,7 +99,7 @@ spec:
         - protocol: TCP
           port: {{ .Values.clustertenantManager.service.internalPort }}
   egress:
-    {{- if .Values.agentController.enabled }}
+    {{- if .Values.agentController.kubernetesApiServerCidrs }}
     # TokenReview is the application-layer identity gate for controller and runtime calls. Keep the
     # server's API-server path on the same exact Service-IP allow-list as the controller.
     - to:
@@ -110,6 +110,18 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.agentController.kubernetesApiServerPort }}
+    {{- end }}
+    {{- if .Values.agentController.kubernetesApiServerEndpointCidrs }}
+    # Mirror the controller's post-Service-translation API endpoint rule for the
+    # in-process reconcilers and TokenReview calls owned by this server.
+    - to:
+        {{- range .Values.agentController.kubernetesApiServerEndpointCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.agentController.kubernetesApiServerEndpointPort }}
     {{- end }}
     # PostgreSQL and its PgBouncer pooler are CNPG-owned pods in this silo namespace.
     # The database Secret binds the exact authority; the app and database releases

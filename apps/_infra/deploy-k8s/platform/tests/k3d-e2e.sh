@@ -413,6 +413,10 @@ _create_database_credentials "$POSTGRES_CREDENTIALS_SECRET" "$POSTGRES_OWNER" "$
 _create_database_credentials "$OBOT_POSTGRES_CREDENTIALS_SECRET" "$OBOT_POSTGRES_OWNER" "$OBOT_DB_PASSWORD"
 _create_database_credentials "$LITELLM_POSTGRES_CREDENTIALS_SECRET" "$LITELLM_POSTGRES_OWNER" "$LITELLM_DB_PASSWORD"
 _create_database_credentials "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" "$LANGFUSE_POSTGRES_OWNER" "$LANGFUSE_DB_PASSWORD"
+OPENCRANE_BASELINE_CONFIG_MAP="$(bash "$ROOT_DIR/apps/postgres/scripts/publish-initdb-baseline-config-map.sh" \
+  "$NAMESPACE" \
+  "$POSTGRES_OWNER" \
+  "$ROOT_DIR/apps/opencrane/prisma/bootstrap/target-baseline.sql")"
 DATABASES_JSON="[{\"name\":\"opencrane\",\"owner\":\"$POSTGRES_OWNER\",\"credentialsSecret\":\"$POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"obot\",\"owner\":\"$OBOT_POSTGRES_OWNER\",\"credentialsSecret\":\"$OBOT_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"litellm\",\"owner\":\"$LITELLM_POSTGRES_OWNER\",\"credentialsSecret\":\"$LITELLM_POSTGRES_CREDENTIALS_SECRET\"},{\"name\":\"langfuse\",\"owner\":\"$LANGFUSE_POSTGRES_OWNER\",\"credentialsSecret\":\"$LANGFUSE_POSTGRES_CREDENTIALS_SECRET\"}]"
 
 echo "[e2e] Installing pinned MinIO backup target"
@@ -559,6 +563,8 @@ function _validate_cnpg_backup_recovery_schema()
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set backup.enabled=true \
     --set backup.plugin.name=barman-cloud.cloudnative-pg.io \
@@ -573,6 +579,7 @@ function _validate_cnpg_backup_recovery_schema()
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
     --set restore.enabled=true \
+    --set-string "restore.sourceBaselineConfigMap=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set restore.plugin.parameters.barmanObjectName=contract-only \
     --set-string restore.targetTime=2026-07-18T00:00:00Z >"$rendered"
@@ -588,10 +595,12 @@ function _install_postgres_server()
     --set-json "databases=$DATABASES_JSON" \
     --set-string "databaseAdmin.name=$POSTGRES_ADMIN_NAME" \
     --set-string "databaseAdmin.credentialsSecret=$POSTGRES_ADMIN_CREDENTIALS_SECRET" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].name=$OPENCRANE_BASELINE_CONFIG_MAP" \
+    --set-string "bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql" \
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set "storage.storageClass=local-path" \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"opencrane-server-migrate"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
+    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]'
   kubectl wait --for=condition=Ready "cluster/$OPENCRANE_DB_RELEASE_NAME" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
   for database_resource in obot litellm langfuse; do
     kubectl wait --for=jsonpath='{.status.applied}'=true "database/${OPENCRANE_DB_RELEASE_NAME}-${database_resource}" -n "$NAMESPACE" --timeout="${TIMEOUT_SECONDS}s"
@@ -619,46 +628,6 @@ function _copy_cnpg_uri_secret()
     | kubectl create secret generic "$target_secret" -n "$NAMESPACE" \
         --from-file="${target_key}=/dev/stdin" --dry-run=client -o yaml \
     | kubectl apply -f -
-}
-
-function _migrate_opencrane_database()
-{
-  # A physical recovery must restore a bootable *fresh* application database, not
-  # merely arbitrary PostgreSQL tables. Run the immutable application's normal
-  # Prisma deploy before writing the backup marker so `_prisma_migrations` and the
-  # target schema travel with the base backup. This is first-install bootstrap,
-  # not compatibility or legacy-data migration.
-  echo "[e2e] Initializing the fresh OpenCrane schema before physical backup"
-  cat <<EOF | kubectl apply -f -
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: opencrane-backup-schema-migrate
-  namespace: ${NAMESPACE}
-spec:
-  backoffLimit: 0
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component: opencrane-server-migrate
-    spec:
-      automountServiceAccountToken: false
-      restartPolicy: Never
-      containers:
-        - name: db-migrate
-          image: opencrane/opencrane-server:e2e
-          imagePullPolicy: IfNotPresent
-          command: ["node", "dist/apps/opencrane/scripts/migrate.js"]
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: ${OPENCRANE_POSTGRES_APP_SECRET}
-                  key: uri
-EOF
-  kubectl wait --for=condition=Complete job/opencrane-backup-schema-migrate \
-    -n "$NAMESPACE" \
-    --timeout="${TIMEOUT_SECONDS}s"
 }
 
 function _run_backup_restore_smoke()
@@ -800,8 +769,9 @@ EOF
     --set "storage.size=${DB_STORAGE_GB}Gi" \
     --set storage.storageClass=local-path \
     --set "networkPolicy.operatorNamespace=$CNPG_SYSTEM_NAMESPACE" \
-    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
+    --set-json 'networkPolicy.clientPodSelectors=[{"matchLabels":{"app.kubernetes.io/component":"opencrane-server"}},{"matchLabels":{"app.kubernetes.io/component":"mcp-gateway"}},{"matchLabels":{"app.kubernetes.io/component":"litellm"}},{"matchLabels":{"app.kubernetes.io/name":"langfuse"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-restore-smoke"}},{"matchLabels":{"app.kubernetes.io/component":"postgres-database-privileges"}}]' \
     --set restore.enabled=true \
+    --set-string "restore.sourceBaselineConfigMap=$OPENCRANE_BASELINE_CONFIG_MAP" \
     --set restore.plugin.name=barman-cloud.cloudnative-pg.io \
     --set-string "restore.plugin.parameters.barmanObjectName=$BACKUP_OBJECT_STORE_NAME" \
     --set-string "restore.plugin.parameters.serverName=$OPENCRANE_DB_RELEASE_NAME"
@@ -1016,7 +986,6 @@ _assert_cross_database_denied obot "$OBOT_POSTGRES_CREDENTIALS_SECRET" opencrane
 _assert_cross_database_denied litellm "$LITELLM_POSTGRES_CREDENTIALS_SECRET" obot
 _assert_cross_database_denied langfuse "$LANGFUSE_POSTGRES_CREDENTIALS_SECRET" litellm
 
-_migrate_opencrane_database
 _run_backup_restore_smoke
 
 # The standalone product must boot from the recovered authority, not quietly fall back to the

@@ -25,8 +25,6 @@
     { "path": "apps/opencrane/src/infra/db/db.ts", "owner": "apps/opencrane", "classification": "prisma-composition" },
     { "path": "apps/opencrane/src/infra/artifacts/artifact-upload.factory.ts", "owner": "apps/opencrane", "classification": "route-composition" },
     { "path": "apps/opencrane/src/infra/artifacts/__tests__/artifact-upload.factory.test.ts", "owner": "apps/opencrane", "classification": "composition-test" },
-    { "path": "apps/opencrane/src/scripts/migrate.ts", "owner": "apps/opencrane", "classification": "migration-entrypoint" },
-    { "path": "apps/opencrane/src/scripts/migrate.types.ts", "owner": "apps/opencrane", "classification": "migration-entrypoint" },
     { "path": "apps/opencrane/vitest.config.ts", "owner": "apps/opencrane", "classification": "test-config" },
 
     { "path": "apps/opencrane-ui/src/app/app.component.ts", "owner": "apps/opencrane-ui", "classification": "browser-composition" },

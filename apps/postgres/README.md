@@ -132,10 +132,16 @@ KUBERNETES_API_SERVICE_IP="$(kubectl get service kubernetes --namespace default 
   -o jsonpath='{.spec.clusterIP}')"
 KUBERNETES_API_SERVICE_PORT="$(kubectl get service kubernetes --namespace default \
   -o jsonpath='{.spec.ports[0].port}')"
-KUBERNETES_API_ENDPOINT_IP="$(kubectl get endpoints kubernetes --namespace default \
-  -o jsonpath='{.subsets[0].addresses[0].ip}')"
 KUBERNETES_API_ENDPOINT_PORT="$(kubectl get endpoints kubernetes --namespace default \
   -o jsonpath='{.subsets[0].ports[0].port}')"
+KUBERNETES_API_ENDPOINT_ARGS=()
+KUBERNETES_API_ENDPOINT_INDEX=0
+while IFS= read -r endpoint_ip; do
+  KUBERNETES_API_ENDPOINT_ARGS+=(--set-string \
+    "networkPolicy.kubernetesApiServerEndpointCidrs[$KUBERNETES_API_ENDPOINT_INDEX]=$(kubernetes_api_host_cidr "$endpoint_ip")")
+  KUBERNETES_API_ENDPOINT_INDEX=$((KUBERNETES_API_ENDPOINT_INDEX + 1))
+done < <(kubectl get endpoints kubernetes --namespace default \
+  -o jsonpath='{range .subsets[*].addresses[*]}{.ip}{"\n"}{end}')
 helm upgrade --install opencrane-postgres apps/postgres/helm \
   --namespace opencrane \
   --set databaseAdmin.name=opencrane_database_admin \
@@ -145,7 +151,7 @@ helm upgrade --install opencrane-postgres apps/postgres/helm \
   --set-string bootstrap.initdb.postInitApplicationSQLRefs.configMapRefs[0].key=target-baseline.sql \
   --set-string networkPolicy.kubernetesApiServerCidrs[0]="$(kubernetes_api_host_cidr "$KUBERNETES_API_SERVICE_IP")" \
   --set networkPolicy.kubernetesApiServerPort="$KUBERNETES_API_SERVICE_PORT" \
-  --set-string networkPolicy.kubernetesApiServerEndpointCidrs[0]="$(kubernetes_api_host_cidr "$KUBERNETES_API_ENDPOINT_IP")" \
+  "${KUBERNETES_API_ENDPOINT_ARGS[@]}" \
   --set networkPolicy.kubernetesApiServerEndpointPort="$KUBERNETES_API_ENDPOINT_PORT" \
   --set databases[0].credentialsSecret=opencrane-postgres-bootstrap \
   --set databases[1].credentialsSecret=opencrane-obot-postgres-bootstrap \

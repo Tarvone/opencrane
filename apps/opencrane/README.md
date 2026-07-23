@@ -86,6 +86,10 @@ approval, and stops on a positive cancel signal. The approval pause is reachable
 grant flagged `requiresApproval` defers and opens a pending `ApprovalRequest`); the human
 approval-DECISION endpoint and the steering-INGEST surface are the operator/product plane in Phase F
 (#224), so approval and steering are not yet driven by an external route.
+Idle runtime streams do not create a database transaction every second. An accepted runtime
+candidate wakes local streams to check the durable command state immediately; a bounded recovery
+check still runs afterwards in case that in-process hint was lost. PostgreSQL remains the source of
+truth for the command, its order, replay, and fence.
 
 Organisation administrators can also use `/api/v1/agent-services` to create a managed agent, edit
 its next immutable revision, inspect what changed, and publish a reviewed revision. A managed agent
@@ -140,6 +144,7 @@ Read from the environment at startup.
 | `AGENT_RUNTIME_ASSIGNMENT_TTL_SECONDS` | Hard lifetime of a pending runtime workload assignment | `3600` |
 | `AGENT_RUNTIME_OUTBOX_RETENTION_SECONDS` | Time to retain successfully delivered runtime handshakes before bounded cleanup | `604800` |
 | `AGENT_RUNTIME_OUTBOX_PRUNE_BATCH_SIZE` | Maximum successful handshakes removed by one controller maintenance pass | `100` |
+| `AGENT_RUNTIME_COMMAND_RECOVERY_POLL_SECONDS` | Bounded durable recovery check for an otherwise idle runtime stream | `5` |
 | `WATCH_NAMESPACE` | Namespace member workspaces are seeded into | falls back to `NAMESPACE` |
 | `FLEET_INTERNAL_URL` | Fleet membership write-through URL; empty = standalone silo | *(empty)* |
 | `OPENCRANE_API_TOKEN` | Token for fleet-internal calls | *(empty)* |

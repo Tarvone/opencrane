@@ -271,7 +271,7 @@ export function _RegisterInternalRoutes(app: Express, prisma: PrismaClient, auth
     authority: runtimeDispatchAuthority,
     maxBodyBytes: 64 * 1024,
     heartbeatMilliseconds: 15_000,
-    commandPollMilliseconds: 1_000,
+	commandRecoveryMilliseconds: _ReadBoundedSeconds("AGENT_RUNTIME_COMMAND_RECOVERY_POLL_SECONDS", 5, 5, 300),
   }));
 }
 

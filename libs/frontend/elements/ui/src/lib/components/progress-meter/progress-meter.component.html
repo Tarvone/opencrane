@@ -1,0 +1,17 @@
+<div class="wo-progress" [class.wo-progress--danger]="isDanger()">
+	<div class="wo-progress__summary">
+		<span>{{ prefix() }}{{ used() }}{{ unit() }} of {{ prefix() }}{{ limit() }}{{ unit() }}</span>
+		<span class="wo-progress__status">{{ status() }}</span>
+	</div>
+	<div
+		class="wo-progress__track"
+		role="progressbar"
+		[attr.aria-label]="label()"
+		[attr.aria-valuemin]="0"
+		[attr.aria-valuemax]="100"
+		[attr.aria-valuenow]="percentage()"
+		[attr.aria-valuetext]="valueText()"
+	>
+		<div class="wo-progress__fill" [style.width.%]="percentage()"></div>
+	</div>
+</div>

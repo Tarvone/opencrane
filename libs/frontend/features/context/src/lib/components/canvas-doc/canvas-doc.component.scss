@@ -187,11 +187,11 @@
 		padding: 8px;
 		border-radius: var(--radius);
 		background: rgba(74, 107, 138, 0.05);
-		border-left: 2px solid #4a6b8a;
+		border-left: 2px solid var(--wo-observation);
 
 		i {
 			font-size: 11px;
-			color: #4a6b8a;
+			color: var(--wo-observation);
 			margin-top: 2px;
 		}
 
@@ -202,11 +202,11 @@
 		}
 
 		&--high {
-			background: rgba(160, 133, 90, 0.07);
-			border-left-color: #a0855a;
+			background: var(--wo-policy-bg);
+			border-left-color: var(--wo-policy);
 
 			i {
-				color: #a0855a;
+				color: var(--wo-policy);
 			}
 		}
 	}

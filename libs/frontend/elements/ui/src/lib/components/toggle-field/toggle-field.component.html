@@ -1,0 +1,25 @@
+<div class="wo-toggle" [class.wo-toggle--pending]="pending()" [class.wo-toggle--invalid]="!!error()">
+	<div class="wo-toggle__control">
+		<p-toggleswitch
+			[ngModel]="value()"
+			(ngModelChange)="onValueChange($event)"
+			[inputId]="inputId"
+			[ariaLabelledBy]="labelId"
+			[disabled]="isBlocked()"
+			[invalid]="!!error()"
+			[pt]="passThrough()"
+		/>
+		<div>
+			<label class="wo-toggle__label" [class.wo-toggle__label--hidden]="hideLabel()" [id]="labelId" [for]="inputId">{{ label() }}</label>
+			@if (description(); as descriptionValue) {
+				<p class="wo-toggle__description" [id]="descriptionId">{{ descriptionValue }}</p>
+			}
+		</div>
+	</div>
+	@if (pending()) {
+		<p class="wo-toggle__pending" [id]="pendingId" role="status" aria-live="polite">Saving…</p>
+	}
+	@if (error(); as errorValue) {
+		<p class="wo-toggle__error" [id]="errorId" role="alert">{{ errorValue }}</p>
+	}
+</div>

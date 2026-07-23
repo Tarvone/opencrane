@@ -15,6 +15,7 @@ This file is the canonical agent instruction file for the repository.
 |-------|------|------------------------|
 | **TypeScript** | [`docs/agents/typescript.md`](docs/agents/typescript.md) | writing or editing any `.ts` file — bracket placement, arrow functions, JSDoc, naming, imports, type-file separation, self-review table. |
 | **Angular / Frontend** | [`docs/agents/angular.md`](docs/agents/angular.md) | working in the `apps/opencrane-ui` Angular SPA or `libs/frontend/*` (ported from WeOwnAI, #152) — PrimeNG, layering, signals/resources, standalone components. |
+| **UI Design** | [`docs/agents/ui-design.md`](docs/agents/ui-design.md) | working on the Settings & Session UI redesign handoff — Paper theme tokens, specific mock constraints, and layout requirements (overrides `angular.md` for this phase). |
 | **Architecture & Identity** | [`docs/agents/architecture.md`](docs/agents/architecture.md) | making IAM, identity, auth, or token-policy decisions (the IAM-first philosophy). |
 | **Kubernetes** | [`docs/agents/k8s.md`](docs/agents/k8s.md) | touching service accounts, RBAC, NetworkPolicy, or routes excluded from auth middleware. |
 | **Prisma & target baseline** | [`docs/agents/prisma.md`](docs/agents/prisma.md) | adding/altering database models or regenerating the clean target baseline — per-domain schema files under `prisma/schema/`, reviewed SQL under `prisma/bootstrap/`. |

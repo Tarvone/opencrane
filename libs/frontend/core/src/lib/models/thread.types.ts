@@ -1,4 +1,15 @@
-import { ScopeLevel } from "./scope.types";
+import { ScopeLevel } from "./scope.types.js";
+
+/** File attachment state in the composer. */
+export interface ComposerAttachment
+{
+	id: string;
+	name: string;
+	sizeBytes: number;
+	progress: number;
+	status: 'uploading' | 'done' | 'error' | 'unsupported';
+	errorText?: string;
+}
 
 /** Kinds of cards an assistant message can contain. */
 export enum MessageCardKind
@@ -111,6 +122,8 @@ export interface ThreadMessage
 	 * surface a distinct badge.
 	 */
 	delivery?: MessageDelivery;
+	/** Optional list of capability suggestions to render as a carousel. */
+	carousel?: string[];
 }
 
 /** A selectable model from the pod catalogue (`models.list`). */

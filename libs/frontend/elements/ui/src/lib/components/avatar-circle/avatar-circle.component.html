@@ -1,7 +1,9 @@
 <span
 	class="wo-avatar"
-	[style.width.px]="size()"
-	[style.height.px]="size()"
-	[style.font-size.px]="size() * 0.4"
-	[style.background]="color()"
+	role="img"
+	[attr.aria-label]="accessibleName()"
+	[style.width.px]="sizePixels()"
+	[style.height.px]="sizePixels()"
+	[style.font-size.px]="fontSizePixels()"
+	[style.background]="backgroundColor()"
 >{{ initials() }}</span>

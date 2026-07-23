@@ -1,7 +1,7 @@
-import { DatasetAccess, EgressDomain, ScopeLevel } from "@opencrane/core";
+import { DatasetAccess, EgressDomain, ScopeLevel, SkillRow } from "@opencrane/core";
 
-import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend, PodIdentity } from "./settings-gateway.types";
-import type { AccountTenantPatch, AccountTenantWire, BudgetSpendWire, DatasetsWire, EffectiveContractWire, PodTenantWire, PolicyWire } from "./settings-mapper.types";
+import { AccountProfile, AccountProfileUpdate, AwarenessContractInfo, BudgetSpend } from "./settings-gateway.types.js";
+import { AccountTenantPatch, AccountTenantWire, BudgetSpendWire, DatasetsWire, EffectiveContractWire, PolicyWire, SkillCatalogWire } from "./settings-mapper.types.js";
 
 /**
  * Map a wire `Tenant` onto the Account read model.
@@ -19,7 +19,8 @@ export function _MapAccountProfile(wire: AccountTenantWire, fallbackName: string
 		name: wire.name ?? fallbackName,
 		fullName: wire.displayName ?? "",
 		email: wire.email ?? "",
-		department: wire.team ?? ""
+		department: wire.team ?? "",
+		role: wire.role ?? "member"
 	};
 }
 
@@ -66,28 +67,6 @@ function _ScopeFromWire(scope: string | undefined): ScopeLevel
 }
 
 /**
- * Map a wire `Tenant` onto the Pod identity read model.
- *
- * Pure and DI-free. Optional wire fields collapse to empty strings;
- * `fallbackName` backstops a missing wire `name`.
- *
- * @param wire         - Tenant fields as returned by the API.
- * @param fallbackName - Tenant name to use when the wire omits one.
- */
-export function _MapPodIdentity(wire: PodTenantWire, fallbackName: string): PodIdentity
-{
-	return {
-		name: wire.name ?? fallbackName,
-		displayName: wire.displayName ?? "",
-		email: wire.email ?? "",
-		team: wire.team ?? "",
-		phase: wire.phase ?? "",
-		ingressHost: wire.ingressHost ?? "",
-		createdAt: wire.createdAt ?? ""
-	};
-}
-
-/**
  * Map a wire spend payload onto the Budget read model.
  *
  * Pure and DI-free. Missing figures collapse to `0`; an unrecognised alert band
@@ -101,7 +80,14 @@ export function _MapBudgetSpend(wire: BudgetSpendWire): BudgetSpend
 	return {
 		monthlyLimitUsd: wire.monthlyLimitUsd ?? 0,
 		currentSpendUsd: wire.currentSpendUsd ?? 0,
-		alertState: alert === "warning" || alert === "exceeded" ? alert : "ok"
+		alertState: alert === "warning" || alert === "exceeded" ? alert : "ok",
+		resetDate: wire.resetDate ?? "",
+		modelClasses: (wire.modelClasses ?? []).map((m: any) => ({
+			className: m.className ?? "",
+			modelNames: m.modelNames ?? "",
+			spendUsd: m.spendUsd ?? 0,
+			percentage: m.percentage ?? 0
+		}))
 	};
 }
 
@@ -116,7 +102,9 @@ export function _MapAwarenessContract(wire: EffectiveContractWire): AwarenessCon
 {
 	return {
 		contractId: wire.contractId ?? "",
-		contractVersion: wire.contractVersion ?? ""
+		contractVersion: wire.contractVersion ?? "",
+		fallbackBehaviour: wire.fallbackBehaviour ?? "proceed",
+		citationMode: wire.citationMode ?? true
 	};
 }
 
@@ -147,6 +135,32 @@ export function _MapDatasetAccess(wire: DatasetsWire): DatasetAccess[]
 		}
 	}
 	return rows;
+}
+
+/**
+ * Map skill-catalogue rows onto the Skills table read model.
+ *
+ * Pure and DI-free. The contract's publication status maps onto the table's
+ * status vocabulary (`published` → `active`, `draft` → `pending-promotion`),
+ * with any other value passed through. Missing strings collapse to `—`.
+ *
+ * @param wire - Catalogue rows as returned by the API.
+ */
+export function _MapSkills(wire: SkillCatalogWire[]): SkillRow[]
+{
+	return wire.map(function mapRow(row: SkillCatalogWire): SkillRow
+	{
+		const status = row.status === "published"
+			? "active"
+			: row.status === "draft" ? "pending-promotion" : row.status ?? "active";
+		return {
+			name: row.name ?? "—",
+			scope: _ScopeFromWire(row.scope),
+			version: row.version ?? "—",
+			digest: row.digest ?? "—",
+			status
+		};
+	});
 }
 
 /**

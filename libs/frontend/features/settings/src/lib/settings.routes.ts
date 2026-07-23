@@ -1,0 +1,180 @@
+import { Route, Routes } from "@angular/router";
+
+import { SettingsPageComponent } from "./settings-page/settings-page.component.js";
+import { _CanDeactivatePodSection } from "./sections/pod-section/pod-section.guard.js";
+import { _CanDeactivateMembersSection } from "./sections/members-section/members-section.guard.js";
+import { _CanDeactivateBudgetsSection } from "./sections/budgets-section/budgets-section.guard.js";
+
+/** Workspace-owned settings routes in the canonical navigation order. */
+const WORKSPACE_SETTINGS_ROUTES: Routes =
+[
+	{ path: "", pathMatch: "full", redirectTo: "pod" },
+	{
+		path: "pod",
+		canDeactivate: [_CanDeactivatePodSection],
+		loadComponent: function loadPodSection()
+		{
+			return import("./sections/pod-section/pod-section.component.js").then(function pickPodSection(module)
+			{
+				return module.PodSectionComponent;
+			});
+		}
+	},
+	{
+		path: "members",
+		children:
+		[
+			{
+				path: "",
+				pathMatch: "full",
+				loadComponent: function loadMembersSection()
+				{
+					return import("./sections/members-section/members-section.component.js").then(function pickMembersSection(module)
+					{
+						return module.MembersSectionComponent;
+					});
+				}
+			},
+			...(["department", "team", "project"] as const).map(function membersEditorRoute(editorKind): Route
+			{
+				return {
+					path: `edit/${editorKind}/:id`,
+					data: { editorKind },
+					canDeactivate: [_CanDeactivateMembersSection],
+					loadComponent: function loadMembersEditor()
+					{
+						return import("./sections/members-section/members-section.component.js").then(function pickMembersEditor(module)
+						{
+							return module.MembersSectionComponent;
+						});
+					}
+				};
+			})
+		]
+	},
+	{
+		path: "budgets",
+		canDeactivate: [_CanDeactivateBudgetsSection],
+		loadComponent: function loadBudgetsSection()
+		{
+			return import("./sections/budgets-section/budgets-section.component.js").then(function pickBudgetsSection(module)
+			{
+				return module.BudgetsSectionComponent;
+			});
+		}
+	},
+	{
+		path: "skills",
+		loadComponent: function loadSkillsSection()
+		{
+			return import("./sections/skills-section/skills-section.component.js").then(function pickSkillsSection(module)
+			{
+				return module.SkillsSectionComponent;
+			});
+		}
+	},
+	{
+		path: "connectors",
+		loadComponent: function loadConnectorsSection()
+		{
+			return import("./sections/connectors-section/connectors-section.component.js").then(function pickConnectorsSection(module)
+			{
+				return module.ConnectorsSectionComponent;
+			});
+		}
+	},
+	{
+		path: "agents",
+		loadComponent: function loadAgentsSection()
+		{
+			return import("./sections/agents-section/agents-section.component.js").then(function pickAgentsSection(module)
+			{
+				return module.AgentsSectionComponent;
+			});
+		}
+	},
+	{
+		path: "data-network",
+		loadComponent: function loadDataNetworkSection()
+		{
+			return import("./sections/data-network-section/data-network-section.component.js").then(function pickDataNetworkSection(module)
+			{
+				return module.DataNetworkSectionComponent;
+			});
+		}
+	},
+	{
+		path: "provider-keys",
+		loadComponent: function loadLlmProvidersSection()
+		{
+			return import("./sections/llm-providers-section/llm-providers-section.component.js").then(function pickLlmProvidersSection(module)
+			{
+				return module.LlmProvidersSectionComponent;
+			});
+		}
+	},
+	{ path: "**", redirectTo: "pod" }
+];
+
+/** Personal settings routes in the canonical navigation order. */
+const PERSONAL_SETTINGS_ROUTES: Routes =
+[
+	{ path: "", pathMatch: "full", redirectTo: "account" },
+	{
+		path: "account",
+		loadComponent: function loadAccountSection()
+		{
+			return import("./sections/account-section/account-section.component.js").then(function pickAccountSection(module)
+			{
+				return module.AccountSectionComponent;
+			});
+		}
+	},
+	{
+		path: "awareness",
+		loadComponent: function loadAwarenessSection()
+		{
+			return import("./sections/awareness-section/awareness-section.component.js").then(function pickAwarenessSection(module)
+			{
+				return module.AwarenessSectionComponent;
+			});
+		}
+	},
+	{
+		path: "budget",
+		loadComponent: function loadBudgetSection()
+		{
+			return import("./sections/budget-section/budget-section.component.js").then(function pickBudgetSection(module)
+			{
+				return module.BudgetSectionComponent;
+			});
+		}
+	},
+	{
+		path: "api-keys",
+		loadComponent: function loadApiKeysSection()
+		{
+			return import("./sections/api-keys-section/api-keys-section.component.js").then(function pickApiKeysSection(module)
+			{
+				return module.ApiKeysSectionComponent;
+			});
+		}
+	},
+	{ path: "**", redirectTo: "account" }
+];
+
+/** Routed settings feature mounted by the workspace at `/settings`. */
+export const SETTINGS_ROUTES: Routes =
+[
+	{
+		path: "",
+		component: SettingsPageComponent,
+		children:
+		[
+			{ path: "", pathMatch: "full", redirectTo: "workspace/pod" },
+			{ path: "workspace", children: WORKSPACE_SETTINGS_ROUTES },
+			{ path: "personal", children: PERSONAL_SETTINGS_ROUTES },
+			{ path: "**", redirectTo: "workspace/pod" }
+		]
+	}
+];

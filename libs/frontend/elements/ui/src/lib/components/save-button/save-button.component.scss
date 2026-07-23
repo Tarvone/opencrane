@@ -1,25 +1,83 @@
 .wo-save {
-	display: flex;
-	justify-content: flex-end;
+	display: grid;
+	gap: 12px;
 	margin-top: 32px;
 
-	&__button {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 8px 16px;
-		border-radius: var(--radius);
-		background: var(--primary);
-		color: var(--primary-foreground);
+	&__feedback {
+		margin: 0;
+		color: var(--oc-text-secondary);
 		font-size: 13px;
-		transition: background 120ms ease;
+		text-align: right;
 
-		&--saved {
-			background: var(--wo-ok);
+		&--error {
+			color: var(--oc-red);
+		}
+	}
+
+	&__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+	}
+
+	&__button,
+	&__secondary {
+		padding: 8px 16px;
+		border: 1px solid var(--oc-border);
+		border-radius: var(--radius, 8px);
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+		transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+
+		&:focus-visible {
+			outline: 3px solid color-mix(in srgb, var(--oc-teal) 35%, transparent);
+			outline-offset: 2px;
 		}
 
-		i {
-			font-size: 13px;
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 0.55;
+			transform: none;
+			box-shadow: none;
+		}
+	}
+
+	&__button {
+		padding: 10px 20px;
+		border: none;
+		border-radius: var(--oc-radius-button);
+		background: var(--oc-teal);
+		box-shadow: var(--paper-button-primary-shadow);
+		color: var(--oc-text-inverse);
+		font-size: 14px;
+		font-weight: 500;
+
+		&:not(:disabled):hover {
+			background: var(--paper-button-primary-gradient);
+			box-shadow: var(--paper-button-primary-shadow-hover);
+			transform: translateY(-1px);
+		}
+
+		&:not(:disabled):active {
+			box-shadow: 0 1px 0 var(--oc-teal-edge);
+			transform: none;
+		}
+	}
+
+	&__secondary {
+		background: var(--oc-surface-card);
+		box-shadow: var(--paper-button-secondary-shadow);
+		color: var(--oc-text-primary);
+
+		&:not(:disabled):hover {
+			background: var(--paper-button-secondary-gradient);
+			transform: translateY(-1px);
+		}
+
+		&:not(:disabled):active {
+			box-shadow: 0 1px 0 var(--paper-button-secondary-edge);
+			transform: none;
 		}
 	}
 }

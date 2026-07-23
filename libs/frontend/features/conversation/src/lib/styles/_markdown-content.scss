@@ -95,7 +95,7 @@
 		font-family: var(--font-mono, monospace);
 		font-size: 12.5px;
 		padding: 1px 5px;
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 		background: var(--secondary);
 		border: 1px solid var(--border);
 	}
@@ -172,7 +172,7 @@
 		font-size: 11px;
 		color: var(--muted-foreground);
 		padding: 2px 6px;
-		border-radius: 4px;
+		border-radius: var(--oc-radius-inner);
 
 		&:hover {
 			color: var(--foreground);
@@ -235,9 +235,9 @@
 	.hljs-selector-tag,
 	.hljs-built_in { color: var(--accent); }
 	.hljs-string,
-	.hljs-attr { color: var(--wo-ok, #2f7d55); }
+	.hljs-attr { color: var(--wo-ok); }
 	.hljs-number,
-	.hljs-literal { color: var(--wo-warn, #8a6d00); }
+	.hljs-literal { color: var(--wo-warn); }
 	.hljs-comment { color: var(--muted-foreground); font-style: italic; }
 	.hljs-title,
 	.hljs-section { color: var(--foreground); font-weight: 600; }

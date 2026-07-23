@@ -1,44 +1,37 @@
-# @opencrane/elements/ui — shared presentational UI components
+# @opencrane/elements/ui
 
-> [frontend](../../README.md) › [elements](../README.md) › ui
+Reusable, presentational PrimeNG-based components shared across features. Pure
+display + orchestration — no data fetching, no domain logic.
 
-## What it owns
+## Import
 
-This is a frontend **element** package: a set of small, reusable display components (built on
-PrimeNG, the app's default component library) shared across the app's feature screens. They are
-purely presentational — they take inputs and draw pixels, and they emit events. They hold no
-client-side state, fetch no data, and know nothing about the domain. Feature screens compose them
-so the same visual pattern is never hand-written twice (the repo's reusable-component rule).
+```ts
+import { AvatarCircleComponent, ProgressMeterComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+```
 
-Each component is a standalone Angular component (self-contained — it declares its own imports
-rather than relying on a shared module), uses `OnPush` change detection, and takes signal inputs;
-templates and styles live in sibling files.
+## Contents
 
-## Public surface
+`scope-chip` · `collapsible-section` · `avatar-circle` · `ledger-card` ·
+`section-heading` · `settings-row` · `progress-meter` · `toggle-field` ·
+`save-button`.
 
-The package's index file (barrel) re-exports the components directly:
+Avatar sizes are named to keep call sites consistent: `xs` (18px), `small`
+(20px), `medium` (24px), `large` (28px), and `xl` (32px). Avatars use the
+deterministic Paper palette by default and accept `color` when a design context
+requires a fixed background. Settings-row
+projection slots are marked with `woSettingsControl`, `woSettingsHelp`, and
+`woSettingsError`.
 
-- `ScopeChipComponent` — a coloured chip labelling a data scope.
-- `CollapsibleSectionComponent` — an expandable titled section.
-- `AvatarCircleComponent` — a circular initials/avatar badge.
-- `LedgerCardComponent` — one card in an agent action/observation ledger.
-- `SectionHeadingComponent`, `SettingsRowComponent`, `SaveButtonComponent` — settings-form primitives.
+All standalone, OnPush, signal-based, `input()`/`output()`, templates and styles
+in sibling files.
 
-## Boundary
+## Dependencies
 
-Consumed by feature packages (`features/context`, `features/conversation`, `features/settings`,
-and others). It must not import any `features/*` package — dependencies flow one way, from features
-into shared elements, never back. If the same markup appears in two or more places, extract it here
-before writing it a third time.
+May depend on `@opencrane/core` (types, colour tokens) only. **Must not** import
+any `features/*` lib. New shared element packages live as siblings under
+`libs/elements/` (e.g. a future `libs/elements/table`).
 
-## Dependency direction
+## When to add here
 
-Tagged `scope:web` (the frontend dependency tier): it may import only other `scope:web` packages
-and `scope:shared` contracts. In practice it depends only on `@opencrane/core` for shared types and
-colour tokens.
-
-## See also
-
-- Parent index: [elements](../README.md)
-- Sibling: [a2ui](../a2ui/README.md)
-- Types source: [core](../../core/README.md)
+If the same markup appears in two or more places, extract it here before writing
+it a third time (see AGENTS.md "reusable-component rule").

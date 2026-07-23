@@ -50,6 +50,7 @@
       "cache": true
     }
   },
+  "analytics": false,
   "sync": {
     "globalGenerators": [
       "@nx/js:typescript-sync"

@@ -3,8 +3,8 @@ import { Router } from "@angular/router";
 
 import { ConversationViewComponent, FilePanelComponent, FilePreviewService } from "@opencrane/features/conversation";
 import { ContextPanelComponent } from "@opencrane/features/context";
-import { NewSessionRelay } from "./new-session-relay";
-import { _NewSessionId } from "./session-page.utils";
+import { NewSessionRelay } from "./new-session-relay.js";
+import { _NewSessionId } from "./session-page.utils.js";
 
 /** Session route page: the conversation stream plus its context / file side panel. */
 @Component({
@@ -41,7 +41,7 @@ export class SessionPageComponent
 	public readonly initialMessage: string | undefined = this._relay.consume();
 
 	/** Whether the context panel is open. */
-	public readonly contextOpen = signal<boolean>(true);
+	public readonly contextOpen = signal<boolean>(false);
 
 	/**
 	 * Start a session from the root composer's first message: mint a session id,

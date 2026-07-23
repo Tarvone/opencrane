@@ -1,6 +1,6 @@
 import { InjectionToken, Signal } from "@angular/core";
 
-import { AgentOption, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
+import { AgentOption, ComposerAttachment, ModelOption, SessionSummary, ThreadData, ThreadMessage } from "@opencrane/core";
 
 /** Live connection state for a conversation stream. */
 export enum ConnectionStatus
@@ -59,6 +59,9 @@ export interface ConversationGateway
 	/** Messages in the open thread, appended as the stream arrives. */
 	readonly messages: Signal<ThreadMessage[]>;
 
+	/** Attachments staged in the composer for the next send. */
+	readonly draftAttachments: Signal<ComposerAttachment[]>;
+
 	/** Whether the assistant is currently composing a reply. */
 	readonly typing: Signal<boolean>;
 
@@ -81,6 +84,12 @@ export interface ConversationGateway
 	 * sidebar fills in as soon as the connection is live (and on reconnect).
 	 */
 	readonly sessions: Signal<SessionSummary[]>;
+
+	/** Whether the sessions list is currently loading. */
+	readonly sessionsLoading: Signal<boolean>;
+
+	/** Any error that occurred while fetching sessions. */
+	readonly sessionsError: Signal<string | null>;
 
 	/**
 	 * Whether older history can still be loaded for the open thread.

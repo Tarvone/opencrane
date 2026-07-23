@@ -17,7 +17,7 @@
 			<div class="wo-conv__header wo-conv__header--draft">
 				<div class="wo-conv__title-row">
 					<div class="wo-conv__title-group">
-						<h1 class="wo-conv__title wo-serif wo-truncate">New session</h1>
+						<h1 class="wo-conv__title wo-truncate">New session</h1>
 					</div>
 					<div class="wo-conv__header-actions">
 						<button type="button" class="wo-conv__context-toggle" [class.wo-conv__context-toggle--active]="contextOpen()" (click)="toggleContext.emit()">
@@ -30,7 +30,7 @@
 			<div class="wo-conv__header">
 				<div class="wo-conv__title-row">
 					<div class="wo-conv__title-group">
-						<h1 class="wo-conv__title wo-serif wo-truncate">#{{ thread().title }}</h1>
+						<h1 class="wo-conv__title wo-truncate">{{ thread().title }}</h1>
 						<span
 							class="wo-conv__dept wo-mono"
 							[style.color]="thread().deptColor"
@@ -59,12 +59,6 @@
 					<div class="wo-conv__sync">
 						<span class="wo-conv__sync-dot" [style.background]="thread().synced ? 'var(--wo-ok)' : 'var(--wo-warn)'"></span>
 						<span class="wo-mono">{{ thread().synced ? "In sync" : "Out of sync" }} · {{ thread().pod }}</span>
-					</div>
-					<div class="wo-conv__scopes wo-mono">
-						@for (scope of headerScopes(); track scope.label) {
-							<span [style.color]="scope.color">{{ scope.label }}{{ $index < 3 ? " ·" : "" }}</span>
-						}
-						<span class="wo-conv__contract">contract {{ thread().contractVersion }}</span>
 					</div>
 				</div>
 			</div>
@@ -107,11 +101,7 @@
 				</div>
 			}
 			@if (typing() && !isDraft()) {
-				<div class="wo-conv__typing">
-					<span></span>
-					<span></span>
-					<span></span>
-				</div>
+				<wo-origami-loader />
 			}
 		</div>
 
@@ -123,36 +113,66 @@
 				</div>
 			}
 			<div class="wo-conv__composer">
-				<button type="button" class="wo-conv__attach"><i class="pi pi-paperclip"></i></button>
-				<textarea
-					rows="1"
-					[placeholder]="isDraft() ? 'Start a new session…' : 'Message this session…'"
-					[value]="draft()"
-					(input)="draft.set($any($event.target).value)"
-					(keydown)="onComposerKeydown($event)"
-				></textarea>
-				<div class="wo-conv__composer-actions">
-					@if (typing() && !isDraft()) {
-						<span class="wo-mono wo-conv__composer-status">esc to stop</span>
-					} @else if (isDraft() || ready()) {
-						<span class="wo-mono">↵ send</span>
-					} @else if (connecting()) {
-						<span class="wo-mono wo-conv__composer-status"><i class="pi pi-spin pi-spinner"></i> connecting…</span>
-					} @else if (isReconnecting()) {
-						<span class="wo-mono wo-conv__composer-status"><i class="pi pi-spin pi-spinner"></i> reconnecting…</span>
-					} @else {
-						<button type="button" class="wo-mono wo-conv__composer-status wo-conv__composer-retry" (click)="retry()">disconnected — reconnect</button>
-					}
-					@if (typing() && !isDraft()) {
-						<button type="button" class="wo-conv__stop" title="Stop generating" (click)="stop()">
-							<i class="pi pi-stop-circle"></i>
-						</button>
-					} @else {
-						<button type="button" class="wo-conv__send" [disabled]="!draft().trim() || (!isDraft() && !ready())" [class.wo-conv__send--ready]="draft().trim() && (isDraft() || ready())" (click)="send()">
-							<i class="pi pi-send"></i>
-						</button>
-					}
+				@if (attachments().length > 0) {
+					<div class="wo-conv__attachments">
+						@for (att of attachments(); track att.id) {
+							<div class="wo-conv__attachment-chip" [class.wo-conv__attachment-chip--error]="att.status === 'error' || att.status === 'unsupported'">
+								<div class="wo-conv__attachment-info">
+									<span class="wo-conv__attachment-name">{{ att.name }}</span>
+									<span class="wo-conv__attachment-size">{{ (att.sizeBytes / 1024 / 1024) | number:'1.1-2' }} MB</span>
+								</div>
+								@if (att.status === 'uploading') {
+									<div class="wo-conv__attachment-progress">
+										<div class="wo-conv__attachment-progress-bar" [style.width.%]="att.progress"></div>
+									</div>
+								} @else if (att.status === 'error' || att.status === 'unsupported') {
+									<span class="wo-conv__attachment-error">{{ att.errorText }}</span>
+								}
+								<button type="button" class="wo-conv__attachment-remove"><i class="pi pi-times"></i></button>
+							</div>
+						}
+					</div>
+				}
+				<div class="wo-conv__composer-inner">
+					<button type="button" class="wo-conv__attach">
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13.5 8a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"></path><path d="M8 5.5v5M5.5 8h5"></path></svg>
+					</button>
+					<div class="wo-conv__input-wrap">
+						@if (!draft()) {
+							<div class="wo-conv__placeholder">
+								<span class="wo-conv__placeholder-text">{{ isDraft() ? 'Start a new session…' : 'Message this session…' }}</span>
+								<span class="wo-conv__placeholder-hints">
+									&nbsp;&nbsp;·&nbsp;&nbsp;<span class="wo-conv__placeholder-key">@</span> people or agents&nbsp;&nbsp;·&nbsp;&nbsp;<span class="wo-conv__placeholder-key">/</span> skills
+								</span>
+							</div>
+						}
+						<textarea
+							#composerTextarea
+							id="oc-input"
+							rows="1"
+							[value]="draft()"
+							(input)="onComposerInput($event)"
+							(keydown)="onComposerKeydown($event)"
+						></textarea>
+					</div>
+					<div class="wo-conv__composer-actions">
+						@if (typing() && !isDraft()) {
+							<button type="button" class="wo-conv__stop" title="Stop generating" (click)="stop()">
+								<i class="pi pi-stop-circle"></i>
+							</button>
+						} @else {
+							<button type="button" class="wo-conv__send" [disabled]="!draft().trim() || (!isDraft() && !ready())" (click)="send()">
+								<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7H2M8 3l4 4-4 4"></path></svg>
+							</button>
+						}
+					</div>
 				</div>
+			</div>
+			<div class="wo-conv__contract-summary">
+				contract v{{ thread().contractVersion }}
+				@for (scope of headerScopes(); track scope.label) {
+					· <span [class.wo-conv__contract-active]="scope.label === 'personal'">{{ scope.label }}</span>
+				}
 			</div>
 		</div>
 	}

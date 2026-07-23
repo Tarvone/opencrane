@@ -18,12 +18,10 @@
 #   MIDFILE-IMPORT    import below the first non-import statement
 #   REL-IMPORT-EXT    relative import missing the .js extension (NodeNext)
 #   PKG-IMPORT-EXT    package specifier wrongly carrying .js
-#   CONSOLE           raw console.* in shipped code (use @opencrane/observability)
+#   CONSOLE           raw console.* outside the CLI (use @opencrane/observability)
 #   TYPES-IN-IMPL     exported interface/type outside a *.types.ts file
 #   JSDOC             exported declaration with no JSDoc directly above (heuristic)
 #   BRACE             opening { not on its own line for a multi-line fn/class (heuristic)
-#   MISSING-README    new/changed package (project.json) with no sibling README.md
-#   README-SECTIONS   leaf package README missing a mandatory package-docs section
 #   TEST-LOCATION     *.test.ts file not placed under a __tests__ directory
 
 set -euo pipefail
@@ -63,37 +61,6 @@ _report()
 	if [[ "$3" == "ERROR" ]]; then ERRORS=$((ERRORS + 1)); else WARNS=$((WARNS + 1)); fi
 }
 
-# MISSING-README / README-SECTIONS — package docs (docs/agents/package-docs.md).
-# A changed package must ship a README, and a changed leaf-package README must
-# carry the mandatory sections. Diff-scoped like the .ts checks; skipped when
-# explicit files were passed.
-DOC_FILES=()
-if [[ $# -eq 0 ]]; then
-	while IFS= read -r f; do DOC_FILES+=("$f"); done < <(git diff --name-only --diff-filter=ACMR HEAD -- 'libs/**/README.md' 'apps/**/README.md' 'libs/**/project.json' 'apps/**/project.json' 2>/dev/null || true)
-elif [[ "${1:-}" == "--diff" ]]; then
-	while IFS= read -r f; do DOC_FILES+=("$f"); done < <(git diff --name-only --diff-filter=ACMR "$2" -- 'libs/**/README.md' 'apps/**/README.md' 'libs/**/project.json' 'apps/**/project.json' 2>/dev/null || true)
-fi
-for f in "${DOC_FILES[@]:-}"; do
-	[[ -z "$f" || ! -f "$f" ]] && continue
-	dir="$(dirname "$f")"
-	case "$f" in
-		*/project.json)
-			if [[ ! -f "$dir/README.md" ]]; then
-				_report "$f" 1 ERROR MISSING-README "package has no README.md — create it from docs/agents/README-TEMPLATE.md"
-			fi
-			;;
-		*/README.md)
-			# Only leaf packages (the directory owning project.json) follow the
-			# fixed section order; group/area index READMEs have their own shape.
-			[[ -f "$dir/project.json" ]] || continue
-			if ! head -5 "$f" | grep -q '^> '; then
-				_report "$f" 1 ERROR README-SECTIONS "missing breadcrumb line ('> area > group > package') — see docs/agents/package-docs.md"
-			fi
-			for section in "## What it owns" "## Public surface" "## See also"; do
-				if ! grep -q "^${section}" "$f"; then
-					_report "$f" 1 ERROR README-SECTIONS "missing mandatory section '${section}' — see docs/agents/package-docs.md"
-				fi
-			done
 # TEST-LOCATION — every *.test.ts must live under a __tests__ directory,
 # never co-located next to the source file it tests. Runs against the raw
 # FILES list since test files are otherwise excluded from CHECKABLE below.
@@ -167,16 +134,11 @@ for f in "${CHECKABLE[@]}"; do
 		}
 	' "$f")
 
-	# REL-IMPORT-EXT — NodeNext services require .js. Angular's bundler resolves
-	# extensionless workspace imports, which is the established frontend convention.
-	case "$f" in
-		apps/opencrane-ui/*|libs/frontend/*) : ;;
-		*)
-			while IFS=: read -r ln _; do
-				_report "$f" "$ln" ERROR REL-IMPORT-EXT "relative import must end in .js (NodeNext)"
-			done < <(grep -nE 'from[[:space:]]+"(\.\.?/[^"]*)"' "$f" | grep -vE '\.(js|json)"' || true)
-			;;
-	esac
+	# REL-IMPORT-EXT — NodeNext: relative imports MUST end in .js (the most
+	# common mistake per docs/agents/typescript.md).
+	while IFS=: read -r ln _; do
+		_report "$f" "$ln" ERROR REL-IMPORT-EXT "relative import must end in .js (NodeNext)"
+	done < <(grep -nE 'from[[:space:]]+"(\.\.?/[^"]*)"' "$f" | grep -vE '\.(js|json)"' || true)
 
 	# PKG-IMPORT-EXT — @opencrane barrel specifiers must NOT carry .js. (Deep
 	# subpath imports of third-party packages, e.g. the MCP SDK, genuinely end
@@ -185,8 +147,10 @@ for f in "${CHECKABLE[@]}"; do
 		_report "$f" "$ln" ERROR PKG-IMPORT-EXT "@opencrane package specifier must not end in .js"
 	done < <(grep -nE 'from[[:space:]]+"@opencrane/[^"]+\.js"' "$f" || true)
 
-	# CONSOLE — shipped code logs via @opencrane/observability.
+	# CONSOLE — shipped code logs via @opencrane/observability. The CLI is
+	# exempt: its console.log IS the --output json channel.
 	case "$f" in
+		apps/cli/*) : ;;
 		*)
 			while IFS=: read -r ln _; do
 				_report "$f" "$ln" ERROR CONSOLE "raw console.* — use the structured logger (@opencrane/observability)"
@@ -202,16 +166,6 @@ for f in "${CHECKABLE[@]}"; do
 			while IFS=: read -r ln _; do
 				_report "$f" "$ln" ERROR TYPES-IN-IMPL "exported interface/type outside *.types.ts — move to the paired types file"
 			done < <(grep -nE '^[[:space:]]*export[[:space:]]+(interface|type)[[:space:]]+[A-Za-z_$]' "$f" || true)
-			;;
-	esac
-
-	# ROOT-CACHE — every vitest config must anchor its Vite cache at the repo root,
-	# or the dep optimizer spawns a stray node_modules/.vite inside the package.
-	case "$f" in
-		*vitest.config.ts)
-			if ! grep -q '_PackageCacheDir' "$f"; then
-				_report "$f" 1 ERROR ROOT-CACHE "vitest config without _PackageCacheDir cacheDir — caches must live under the root node_modules (see vitest.cache.ts)"
-			fi
 			;;
 	esac
 

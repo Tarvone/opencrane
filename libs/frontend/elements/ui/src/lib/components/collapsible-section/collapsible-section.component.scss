@@ -32,6 +32,17 @@
 		}
 	}
 
+	&__badge {
+		font-size: 10px;
+		background: var(--wo-sidebar-bg);
+		color: var(--oc-text-muted);
+		padding: 1px 5px;
+		border-radius: 3px;
+		margin-left: auto;
+		line-height: 1.2;
+		font-weight: 600;
+	}
+
 	&__body {
 		padding-bottom: 12px;
 	}
@@ -53,7 +64,7 @@
 
 		.wo-section__title,
 		.wo-section__chevron {
-			color: rgba(232, 228, 220, 0.3);
+			color: color-mix(in srgb, var(--wo-sidebar-fg) 30%, transparent);
 		}
 
 		.wo-section__chevron {
@@ -62,6 +73,11 @@
 
 		.wo-section__body {
 			padding-bottom: 0;
+		}
+
+		.wo-section__badge {
+			background: var(--paper-badge-bg);
+			color: var(--paper-badge-text);
 		}
 	}
 }

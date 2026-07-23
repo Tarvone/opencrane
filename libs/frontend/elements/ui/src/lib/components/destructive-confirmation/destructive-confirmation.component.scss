@@ -1,0 +1,97 @@
+.wo-destructive {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	background: color-mix(in srgb, var(--oc-text-primary) 42%, transparent);
+
+	&__panel {
+		width: min(100%, 440px);
+		padding: 24px;
+		border: 1px solid var(--oc-border);
+		border-radius: 12px;
+		background: var(--oc-surface-card);
+		box-shadow: 0 18px 48px rgba(26, 25, 24, 0.2);
+
+		h2 {
+			margin: 0 0 10px;
+			color: var(--oc-text-primary);
+			font-size: 20px;
+		}
+
+		p {
+			margin: 0;
+			color: var(--oc-text-secondary);
+			font-size: 14px;
+			line-height: 1.5;
+		}
+	}
+
+	&__status {
+		margin-top: 14px !important;
+	}
+
+	&__pending {
+		margin-top: 14px !important;
+		padding: 8px 10px;
+		border-radius: var(--oc-radius-control);
+		background: var(--oc-surface-paper);
+
+		&:focus-visible {
+			outline: 3px solid color-mix(in srgb, var(--oc-teal) 35%, transparent);
+			outline-offset: 2px;
+		}
+	}
+
+	&__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+		margin-top: 24px;
+
+		button {
+			padding: 8px 16px;
+			border: 1px solid var(--oc-border);
+			border-radius: var(--radius, 8px);
+			font: inherit;
+			font-size: 13px;
+			cursor: pointer;
+			transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+
+			&:focus-visible {
+				outline: 3px solid color-mix(in srgb, var(--oc-teal) 35%, transparent);
+				outline-offset: 2px;
+			}
+
+			&:disabled {
+				cursor: not-allowed;
+				opacity: 0.55;
+			}
+		}
+	}
+
+	&__cancel {
+		background: var(--oc-surface-card);
+		box-shadow: var(--paper-button-secondary-shadow);
+		color: var(--oc-text-primary);
+
+		&:not(:disabled):hover {
+			background: var(--paper-button-secondary-gradient);
+			transform: translateY(-1px);
+		}
+	}
+
+	&__confirm {
+		border-color: var(--oc-red) !important;
+		background: var(--oc-red);
+		box-shadow: var(--paper-button-danger-shadow);
+		color: var(--oc-text-on-red);
+
+		&:not(:disabled):hover {
+			background: var(--paper-button-danger-gradient);
+			transform: translateY(-1px);
+		}
+	}
+}

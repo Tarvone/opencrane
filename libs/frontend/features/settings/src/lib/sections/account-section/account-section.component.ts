@@ -1,16 +1,18 @@
-import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource } from "@angular/core";
+import { ChangeDetectionStrategy, Component, Signal, computed, inject, resource, signal, effect } from "@angular/core";
 
+import { SettingsFormPhase, SettingsFormState, SettingsMutationOutcome, _CreateSettingsFormState, _EditSettingsForm, _ResolveSettingsForm, _SubmitSettingsForm } from "@opencrane/core";
 import { ActiveTenantStore } from "@opencrane/state/gateways";
-import { SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent } from "@opencrane/elements/ui";
-import { AccountProfile, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
-import { ToggleFieldComponent } from "../../components/toggle-field/toggle-field.component";
-import { _settledValue } from "../../resource.util";
+import { AvatarCircleComponent, SaveButtonComponent, SectionHeadingComponent, SettingsRowComponent, ToggleFieldComponent } from "@opencrane/elements/ui";
+import { AccountProfile, AccountProfileUpdate, SETTINGS_GATEWAY } from "@opencrane/state/settings/adapter";
+import { _settledValue } from "../../resource.util.js";
+
+interface AccountFormDraft { fullName: string; }
 
 /** Account settings section. */
 @Component({
 	selector: "wo-account-section",
 	standalone: true,
-	imports: [SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent],
+	imports: [AvatarCircleComponent, SectionHeadingComponent, SettingsRowComponent, SaveButtonComponent, ToggleFieldComponent],
 	templateUrl: "./account-section.component.html",
 	styleUrl: "./account-section.component.scss",
 	changeDetection: ChangeDetectionStrategy.OnPush
@@ -32,10 +34,32 @@ export class AccountSectionComponent
 		loader: ({ params }): Promise<AccountProfile> => this._gateway.getAccountProfile(params)
 	});
 
-	/** Full name shown in the editable field. */
-	public readonly fullName: Signal<string> = computed((): string =>
+	/** Form state signal. */
+	public readonly formState = signal<SettingsFormState<AccountFormDraft>>(_CreateSettingsFormState({ fullName: "" }));
+
+	/** Form phase enum exposed to the template. */
+	public readonly SettingsFormPhase = SettingsFormPhase;
+
+	constructor()
 	{
-		return _settledValue(this._profile)?.fullName ?? "";
+		// Seed form state when profile loads
+		effect(() =>
+		{
+			const profile = _settledValue(this._profile);
+			if (profile)
+			{
+				this.formState.update(s => s.phase === SettingsFormPhase.Pristine ? _CreateSettingsFormState({ fullName: profile.fullName }) : s);
+			}
+		});
+	}
+
+	/** Avatar initials computed from form draft fullName. */
+	public readonly avatarInitials: Signal<string> = computed((): string =>
+	{
+		const name = this.formState().draft.fullName.trim();
+		if (!name) return "";
+		const parts = name.split(/\s+/);
+		return parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
 	});
 
 	/** Org-managed email shown read-only. */
@@ -44,14 +68,11 @@ export class AccountSectionComponent
 		return _settledValue(this._profile)?.email ?? "";
 	});
 
-	/** Department the pod belongs to, used to mark the selected option. */
-	public readonly department: Signal<string> = computed((): string =>
+	/** Role of the user. */
+	public readonly role: Signal<string> = computed((): string =>
 	{
-		return _settledValue(this._profile)?.department ?? "";
+		return _settledValue(this._profile)?.role ?? "";
 	});
-
-	/** Department options for the select. */
-	public readonly departments: string[] = ["Product", "Engineering", "Marketing", "Finance", "Design"];
 
 	/** Notification preference labels. */
 	public readonly notificationPreferences: string[] =
@@ -62,4 +83,36 @@ export class AccountSectionComponent
 		"Harvest completions",
 		"Policy changes"
 	];
+
+	/** Handles input changes. */
+	public onFullNameChange(event: Event): void
+	{
+		const input = event.target as HTMLInputElement;
+		this.formState.update(s => _EditSettingsForm(s, { fullName: input.value }));
+	}
+
+	/** Save the profile changes. */
+	public async save(): Promise<void>
+	{
+		const tenant = this._tenant();
+		if (!tenant) return;
+
+		const stateBeforeSubmit = this.formState();
+		if (stateBeforeSubmit.phase !== SettingsFormPhase.Dirty && stateBeforeSubmit.phase !== SettingsFormPhase.RecoverableError) return;
+		const draft = stateBeforeSubmit.draft;
+
+		this.formState.update(_SubmitSettingsForm);
+
+		try
+		{
+			const update: AccountProfileUpdate = { fullName: draft.fullName };
+			const accepted = await this._gateway.updateAccountProfile(tenant, update);
+			this.formState.update(s => _ResolveSettingsForm(s, { outcome: SettingsMutationOutcome.Success, accepted: { fullName: accepted.fullName }, message: "Account profile updated." }));
+		}
+		catch (e)
+		{
+			const msg = e instanceof Error ? e.message : "Failed to save profile.";
+			this.formState.update(s => _ResolveSettingsForm(s, { outcome: SettingsMutationOutcome.RecoverableError, message: msg }));
+		}
+	}
 }

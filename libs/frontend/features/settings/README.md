@@ -1,39 +1,33 @@
-# @opencrane/features/settings — the settings page
+# @opencrane/features/settings
 
-> [frontend](../../README.md) › [features](../README.md) › settings
+The route-driven settings shell plus workspace and personal settings sections.
 
-## What it owns
+## Import
 
-This is a frontend **feature** package: it owns the settings page — a left-hand section nav and one
-active section at a time (chosen by a `@switch` over a `SettingsSection` enum). The sections cover
-pod, model budget, awareness, skills, channels, access, network, and account.
+```ts
+import { SETTINGS_ROUTES } from "@opencrane/features/settings";
+```
 
-The page is mounted by the workspace shell at the `/settings` child route, so it is deep-linkable.
-It reads settings models from `core` and the settings **store** (a client-side state holder — a
-singleton that keeps the browser app's copy of settings and exposes it as signals). Talking to the API goes
-through the settings **gateway** (an injection token that is the port to the opencrane-server HTTP
-surface), which the app binds to either a live or a mock implementation.
+## Contents
 
-## Public surface
+- `settings.routes` — canonical `/settings/workspace/**` and
+  `/settings/personal/**` child routes, redirects, and later-milestone
+  placeholders.
+- `settings-page` — persistent Paper shell with route-derived navigation and a
+  child router outlet.
+- `settings-navigation` — feature-owned stable IDs, labels, exact URLs, and
+  handoff SVG paths.
+- `sections/*` — the surviving pod, awareness, and account pages used until
+  their milestone 4/5 replacements land.
+- `settings-placeholder` — explicit leaf content for routes whose final page
+  is owned by a later milestone.
 
-- `SettingsPageComponent` — the page: section nav plus the active section, composing the shared
-  settings-form primitives.
+## Dependencies
 
-## Boundary
+`core` (settings models + data) and `elements/ui` (section heading, settings
+row, save button, scope chip). Must not import other feature libs.
 
-Consumed by `features/workspace`, which mounts it as a child route. It must not import other feature
-packages; shared visuals come from `elements/ui`. It presents settings and raises save/toggle
-intents — the server remains the authority on what actually changes.
+## Note
 
-## Dependency direction
-
-Tagged `scope:web` (the frontend dependency tier): it may import only other `scope:web` packages
-and `scope:shared` contracts. It depends on `@opencrane/core`, `@opencrane/state/settings/adapter`
-(the settings store), `@opencrane/state/gateways` (dependency-injection composition), and
-`@opencrane/elements/ui` (section heading, settings row, save button, scope chip).
-
-## See also
-
-- Parent index: [features](../README.md)
-- Consumer: [features/workspace](../workspace/README.md)
-- Store: [state/settings/adapter](../../state/settings/adapter/README.md)
+Section controls (save, promote, toggles) are mock-only during the UI handoff.
+Final section pages replace placeholders without changing their stable routes.

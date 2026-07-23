@@ -24,6 +24,9 @@
     },
     {
       "path": "../../state/core"
+    },
+    {
+      "path": "../../state/conversation/render/tsconfig.lib.json"
     }
   ]
 }

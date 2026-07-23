@@ -4,6 +4,7 @@
 	justify-content: center;
 	border-radius: 50%;
 	flex-shrink: 0;
-	font-weight: 600;
-	color: #f6f4ef;
+	font-weight: var(--font-weight-bold, 700);
+	color: var(--oc-text-inverse);
+	line-height: 1;
 }

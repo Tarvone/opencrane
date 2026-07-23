@@ -64,7 +64,7 @@
 							<div class="wo-ap__chips">
 								@for (user of pol.users; track user.id) {
 									<span class="wo-ap__chip">
-										<wo-avatar-circle [initials]="user.initials" [color]="user.color" [size]="18" />
+										<wo-avatar-circle [initials]="user.initials" [accessibleName]="user.name" size="xs" />
 										{{ user.name }}
 										<button type="button" class="wo-ap__chip-x" (click)="removeUser(user.id)">✕</button>
 									</span>

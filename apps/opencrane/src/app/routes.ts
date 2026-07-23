@@ -11,7 +11,7 @@ import { _RegisterInternalParticipation, awarenessRolloutRouter, awarenessPartic
 import { mcpOperatorRouter, mcpServersRouter } from "@opencrane/backend/server/gateways/mcp";
 import { metricsRouter, prometheusMetricsRouter } from "@opencrane/backend/server/reporting/metrics";
 import { policiesRouter } from "@opencrane/backend/server/iam/policies";
-import { providerKeysRouter, providerCredentialsRouter, providerByokRouter, modelRegistryRouter } from "@opencrane/backend/server/gateways/providers";
+import { providerCredentialsRouter, providerByokRouter, modelRegistryRouter } from "@opencrane/backend/server/gateways/providers";
 import { resourceSharesRouter, sharesRouter } from "@opencrane/backend/server/iam/grants";
 import { tenantsRouter } from "@opencrane/backend/server/tenancy/tenants";
 import { thirdPartySourcesRouter } from "@opencrane/backend/server/knowledge/retrieval";
@@ -315,7 +315,6 @@ export function _RegisterRoutes(app: Express, prisma: PrismaClient, customApi: k
   app.use("/api/v1/awareness/rollout", awarenessRolloutRouter(prisma));
   app.use("/api/v1/awareness/participation", awarenessParticipationRouter(prisma));
   app.use("/api/v1/spend", spendRouter(prisma));
-  app.use("/api/v1/providers/keys", providerKeysRouter(prisma));
   app.use("/api/v1/providers/credentials", providerCredentialsRouter(prisma));
   // BYOK raw-key path — writes the silo's provider key Secret in the operator's own namespace
   // (POD_NAMESPACE, downward-API populated; "default" fallback mirrors config._readOwnNamespace).

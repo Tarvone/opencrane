@@ -1189,15 +1189,6 @@ CREATE TABLE "access_policies" (
 );
 
 -- CreateTable
-CREATE TABLE "provider_api_keys" (
-    "provider" TEXT NOT NULL,
-    "key_value" TEXT NOT NULL,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "provider_api_keys_pkey" PRIMARY KEY ("provider")
-);
-
--- CreateTable
 CREATE TABLE "provider_credentials" (
     "id" TEXT NOT NULL,
     "scope" "ModelRoutingScope" NOT NULL DEFAULT 'global',

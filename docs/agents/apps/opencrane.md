@@ -49,7 +49,7 @@ CRUD + notable actions:
   deleted when AgentService and target authorization APIs land; do not preserve dual writes.
 - **mcp-servers** — OBO credential brokering only.
 - **skills** — ArtifactStore-backed SkillRevision publication authority.
-- **groups**, **third-party-sources**, **provider-keys**, **access-tokens**, **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**.
+- **groups**, **third-party-sources**, **provider credentials and models**, **access-tokens**, **audit**, **metrics** (`/projection-drift` + alert webhook), **token-usage**, **ai-budget** (LiteLLM spend, read-only), **org/workspace-docs** (company-doc versioning + 3-way merge proposals), **awareness/rollout** (`+ promote/rollback/resolve`), **awareness/participation**.
 
 **Control-plane ownership:** ClusterTenant lifecycle, org membership, DNS, and Zitadel
 administration are local target authorities. There is no external membership mirror.
@@ -76,7 +76,7 @@ or dataset projection.
 
 The composed frozen runtime lifecycle provisions Cognee's dependencies, all best-effort/idempotent: a **dedicated LiteLLM virtual key** (`cognee-litellm-key.ts` — Cognee's LLM+embedding spend is a separate budget identity, never a tenant's), a per-silo **Cognee owner account + Cognee Tenant** (`cognee-silo-tenant.ts`), and — per openclaw Tenant, in the reconcile loop — a **real per-tenant Cognee login** keyed to the tenant's owner email (`cognee-tenant-identity.ts`), which is registered, joined to the silo Cognee Tenant, and `tenants/select`-ed so the plugin's `company` scope is genuinely shared silo-wide (not a private dataset per tenant). These files are under `libs/backend/feat-openclaw-tenant/main`. The tenant pod authenticates as itself via `COGNEE_USERNAME`/`COGNEE_PASSWORD` (never Cognee's `default_user` fallback).
 
-**Embeddings** run through LiteLLM via the stable `auto-embedding` alias — the embedding-side mirror of the chat `auto` selection, registered by the BYOK bootstrap (`provision-byok-key.ts` `_ensureProviderEmbeddingModel`, `mode:"embedding"`, and deliberately **no `ModelDefinition` row** so it never surfaces as a tenant-selectable chat model). It only exists when a provider with a catalogued `embeddingModel` is set (`byok-default-models.ts` — today `openai` only). Cognee uses `EMBEDDING_PROVIDER=openai_compatible` (values.yaml `clustertenantManager.cognee.embedding`) so the model name reaches the proxy **verbatim**; the older `custom` value routed through Cognee's litellm engine, which strips the provider prefix and 400s. A fleet-level shared self-hosted embedding model is planned (issue #185).
+**Embeddings** run through LiteLLM via the stable `auto-embedding` alias — the embedding-side mirror of the chat `auto` selection. It exists only when an administrator has explicitly registered a provider model with an embedding capability, and it deliberately has no `ModelDefinition` row so it never surfaces as a tenant-selectable chat model. Cognee uses `EMBEDDING_PROVIDER=openai_compatible` (values.yaml `clustertenantManager.cognee.embedding`) so the model name reaches the proxy **verbatim**; the older `custom` value routed through Cognee's litellm engine, which strips the provider prefix and 400s. A fleet-level shared self-hosted embedding model is planned (issue #185).
 
 ## Prisma schema (`prisma/schema/`)
 

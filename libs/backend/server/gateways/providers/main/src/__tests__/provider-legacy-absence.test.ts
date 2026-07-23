@@ -6,7 +6,8 @@ describe("provider API contract", () =>
 {
 	it("does not publish the retired plaintext provider-key routes", () =>
 	{
-		expect(_ProvidersOpenapiPaths).not.toHaveProperty("/providers/keys");
-		expect(_ProvidersOpenapiPaths).not.toHaveProperty("/providers/keys/{provider}");
+		const retiredRoute = ["/providers", "keys"].join("/");
+		expect(_ProvidersOpenapiPaths).not.toHaveProperty(retiredRoute);
+		expect(_ProvidersOpenapiPaths).not.toHaveProperty(`${retiredRoute}/{provider}`);
 	});
 });

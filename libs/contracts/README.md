@@ -44,6 +44,7 @@ provider credentials or mutable source objects.
 ## Public surface
 
 - `___CreateControlPlaneClient`, `ControlPlaneClient`, `paths` — the typed HTTP client and its path map.
+- `AG_UI_PROJECTION_VERSION`, `AgUiProjectionSourceEvent`, and `AgUiSseRecord` — the display-safe input and output contract for a future server-owned AG-UI replay projection. They do not create a browser API, replay source, or approval-resume protocol.
 - Hand-written DTOs/enums: `Grant`/`GrantScope`/`GrantAccess`, `Group`, `ClusterTenant*`,
   `McpServer*`/`Mcp*` operator types (MCP — the Model Context Protocol for connecting external tools),
   model-routing types, `Memory*`, `Approval`, `ThirdPartySource*`, `RuntimeAssignment`,
